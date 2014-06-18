@@ -50,6 +50,22 @@ else:
     from ucsctools_py3 import tabixFetch
 
 
+class ExtractVCF(SkiptableAction):
+    '''Use tabix to extract portion of a local or online VCF file '''
+    def __init__(self, regions, sourceURL, output):
+        self.sourceURL = sourceURL
+        self.regions = regions
+        SkiptableAction.__init__(self, cmd='ExtractVCF {} {} {}'.format(sourceURL, regions, output),
+            output=output, ignoreInput=True)
+
+    def _execute(self, ifiles, pipeline):
+        tabixFetch(self.sourceURL, [], self.output[0], True)
+        for r in expandRegions(self.regions, pipeline.proj):
+            region = '{}:{}-{}'.format(r[0], r[1], r[2])
+            env.logger.info('Retriving genotype for region chr{}{}'.format(region,
+                ' ({})'.format(r[3] if r[3] else '')))
+            tabixFetch(self.sourceURL, [region], self.output[0], False)
+
 
 class CreatePopulation(SkiptableAction):
     '''Create a simuPOP population from specified regions and number of individuals.
@@ -57,7 +73,7 @@ class CreatePopulation(SkiptableAction):
     def __init__(self, regions, size=None, importGenotypeFrom=None, output=[]):
         self.regions = regions
         self.size = size
-        self.sourceURL = importGenotypeFrom
+        self.sourceFile = importGenotypeFrom
         SkiptableAction.__init__(self, cmd='PopFromRegions {} {}\n'.format(regions, output),
             output=output)
 
@@ -71,25 +87,17 @@ class CreatePopulation(SkiptableAction):
             else:
                 lociPos[r[0]] = range(r[1], r[2] + 1)
         #
-        if self.sourceURL is not None:
-            if self.sourceURL.lower().endswith('.vcf') or self.sourceURL.lower().endswith('.vcf.gz'):
-                self.sourceFile = tempfile.NamedTemporaryFile(dir=env.temp_dir, delete=False).name
-                tabixFetch(self.sourceURL, [], self.sourceFile, True)
-                for r in regions:
-                    region = '{}:{}-{}'.format(r[0], r[1], r[2])
-                    env.logger.info('Retriving genotype for region chr{}{}'.format(region,
-                        ' ({})'.format(r[3] if r[3] else '')))
-                tabixFetch(self.sourceURL, [region], self.sourceFile, False)
+        if self.sourceFile is not None:
+            if self.sourceFile.lower().endswith('.vcf') or self.sourceFile.lower().endswith('.vcf.gz'):
                 pop = self._importFromVcf(lociPos)
-            elif self.sourceURL.lower().endswith('.ms'):
-                self.sourceFile = self.sourceURL
+            elif self.sourceFile.lower().endswith('.ms'):
                 pop = self._importFromMS(lociPos)
             else:
                 raise ValueError('CreatePopulaton can only import genotypes from files in '
                     'vcf (with extension .vcf and .vcf.gz) or ms (with extension .ms) formats')
             if self.size is not None and pop.popSize() != self.size:
                 env.logger.warning('Population imported from {} has {} individuals where a '
-                    'population of size {} is requested'.format(self.sourceURL,
+                    'population of size {} is requested'.format(self.sourceFile,
                     pop.popSize(), self.size))
         else:
             chroms = lociPos.keys()

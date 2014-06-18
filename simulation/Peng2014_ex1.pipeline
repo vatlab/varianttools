@@ -200,9 +200,19 @@ action=RunCommand('vtools use refGene')
 comment=Link the refGene database to the project. This database is required
 	to parse the regions for gene structure.
 
+
+[resample_25]
+action=ExtractVCF(
+	sourceURL='ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/ALL.2of4intersection.20100804.genotypes.vcf.gz',
+	regions='%(regions)s',
+	output='cache/ex1_resample_init.vcf')
+output='cache/ex1_resample_init.vcf'
+comment=Create an empty simuPOP population for specified regions.
+
+
 [resample_30]
 action=CreatePopulation(
-	importGenotypeFrom='ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/ALL.2of4intersection.20100804.genotypes.vcf.gz',
+	importGenotypeFrom='${INPUT}',
 	regions='%(regions)s',
 	output='cache/ex1_resample_init_${seed}.pop')
 output='cache/ex1_resample_init_${seed}.pop'

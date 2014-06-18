@@ -1117,6 +1117,9 @@ class Project:
         if self._db is None or self._db.closed:
             self._db = DatabaseEngine()
             self._db.connect(self.proj_file)
+            #
+            for ann in self._attachedDB:
+                self._db.attach(*ann)
         return self._db
 
     def _set_db(self, name):
@@ -1132,6 +1135,7 @@ class Project:
             self.mode = mode
         #
         self._db = None
+        self._attachedDB = []
         # version of vtools, useful when opening a project created by a previous
         # version of vtools.
         self.version = VTOOLS_VERSION
@@ -1303,6 +1307,7 @@ class Project:
         self.alt_build = self.loadProperty('alt_build')
         self.creation_date = self.loadProperty('creation_date', '')
         self.annoDB = []
+        self._attachedDB = []
         for db in eval(self.loadProperty('annoDB', '[]').replace('${local_resource}', env._local_resource)):
             # the case with alternative name
             try:
@@ -1313,6 +1318,7 @@ class Project:
                     anno_type = self.loadProperty('{}_anno_type'.format(db_name), default='None')
                     linked_fields = eval(self.loadProperty('{}_linked_fields'.format(db_name), default='None'))
                     self.db.attach(db[0], db_name)
+                    self._attachedDB.append((db[0], db_name))
                     self.annoDB.append(AnnoDB(self, db[0], linked_by, anno_type, linked_fields, db_name))
                 else:
                     # remove path, remove version string, and suffix
@@ -1323,6 +1329,7 @@ class Project:
                     anno_type = self.loadProperty('{}_anno_type'.format(db_name), default='None')
                     linked_fields = eval(self.loadProperty('{}_linked_fields'.format(db_name), default='None'))
                     self.db.attach(db)
+                    self._attachedDB.append((db,))
                     self.annoDB.append(AnnoDB(self, db, linked_by, anno_type, linked_fields))
             except Exception as e:
                 env.logger.warning('Cannot open annotation database {}: {}'.format(db[1] if type(db) == tuple else db, e))
