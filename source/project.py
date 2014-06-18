@@ -1163,6 +1163,8 @@ class Project:
                     raise ValueError('Cannot find any project in the current directory.')
             elif len(files) > 1:
                 raise ValueError('More than one project exists in the current directory.')
+            elif not os.access(files[0], os.W_OK):
+                self.mode.append('READONLY')
             if name is None:
                 name = files[0][:-5]
             elif name != files[0][:-5]:
@@ -1241,7 +1243,6 @@ class Project:
         self.createProjectTable()
         self.saveProperty('version', self.version)
         self.saveProperty('revision', self.revision)
-        self.saveProperty('batch', kwargs.get('batch', 10000))
         self.saveProperty('__option_verbosity', env.verbosity)
         self.saveProperty('name', self.name)
         self.saveProperty('creation_date', self.creation_date)
@@ -1268,14 +1269,11 @@ class Project:
             else:
                 raise ValueError('Invalid project database (missing project table)')
         #
-        self.batch = self.loadProperty('batch')
-        self.batch = 10000 if self.batch is None else int(self.batch)
         #
         # get connection parameters
         # pragma, set to None if the key does not exist. In this case
         # the system default will be used.
         env.sqlite_pragma = self.loadProperty('__option_sqlite_pragma', None)
-        # pass things like batch ... and re-connect
         # env['sqlite_pragma'] will be used 
         self.db = DatabaseEngine()
         self.db.connect(self.proj_file)
@@ -1397,7 +1395,6 @@ class Project:
         cur = self.db.cursor()
         tables = self.db.tables()
         cur = self.db.cursor()
-        s = delayedAction(env.logger.info, 'Analyzing project')
         for tbl in tables:
             # do not analyze these small tables
             if tbl in ['sample', 'filename', 'project']:
@@ -1411,9 +1408,10 @@ class Project:
                 except:
                     analyzed = False
             if force or not analyzed:
+                s = delayedAction(env.logger.info, 'Analyzing {}'.format(tbl))
                 cur.execute('ANALYZE {}'.format(tbl))
+                del s
         self.db.commit()
-        del s
         
     def upgrade(self, proj_revision):
         for ver, rev, proc in project_format_history:
@@ -2140,7 +2138,7 @@ class Project:
             else:
                 variantIndex[key] = {rec[2]: (rec[0], 0)}
             #variantIndex[(rec[1], rec[3], rec[4])][rec[2]] = (rec[0], 0)
-            if count % self.db.batch == 0:
+            if count % 10000 == 0:
                 prog.update(count)
         prog.done()
         return variantIndex

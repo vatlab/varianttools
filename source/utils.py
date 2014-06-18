@@ -2196,8 +2196,6 @@ class RefGenome:
 class DatabaseEngine:
     def __init__(self):
         #
-        self.batch = 10000
-        # saved in case a new connection is needed
         # not connected to any database for now
         self.dbName = None
         self.PH = '?'
@@ -2587,11 +2585,11 @@ class DatabaseEngine:
 
     def startProgress(self, text):
         self.prog = ProgressBar(text)
-        self.database.set_progress_handler(self.prog.sqliteUpdate, self.batch)
+        self.database.set_progress_handler(self.prog.sqliteUpdate, 10000)
 
     def stopProgress(self):
         self.prog.done()
-        self.database.set_progress_handler(None, self.batch)
+        self.database.set_progress_handler(None, 10000)
 
     def getHeaders(self, table):
         '''Obtain field names of a table'''

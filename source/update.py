@@ -960,7 +960,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             cur.execute(update_query, res + [id])
         except Exception as e:
             env.logger.debug(e)
-        if count % proj.db.batch == 0:
+        if count % 10000 == 0:
             proj.db.commit()
             prog.update(count)
     #
@@ -976,7 +976,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             for id in missing_variants:
                 cur.execute(update_query, [id])
                 count += 1
-                if count % proj.db.batch == 0:
+                if count % 10000 == 0:
                     prog.update(count)
     prog.done()
     # done

@@ -112,7 +112,7 @@ class LiftOverTool:
                 except Exception as e:
                     env.logger.debug('Invalid record {}'.format(rec))
                     env.logger.debug(e)
-                if count % self.db.batch == 0:
+                if count % 10000:
                     prog.update(count)
         prog.done()
         return count
@@ -187,7 +187,7 @@ class LiftOverTool:
             for count, line in enumerate(var_mapped):
                 chr, start, end, id = line.strip().split()
                 cur.execute(query, (getMaxUcscBin(int(start), int(end)), chr[3:] if chr.startswith('chr') else chr, int(start) + 1, id))
-                if count % self.db.batch == 0:
+                if count % 10000:
                     self.db.commit()
                     prog.update(count)
         self.db.commit()

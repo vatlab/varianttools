@@ -1567,7 +1567,7 @@ class Importer:
                     continue
                 cur.execute(query, (getMaxUcscBin(pos - 1, pos), chr, pos, var_id))
                 count += 1
-                if count % self.db.batch == 0:
+                if count % 10000 == 0:
                     self.db.commit()
                     prog.update(count)
         self.db.commit()
