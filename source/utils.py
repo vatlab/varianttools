@@ -2200,7 +2200,18 @@ class DatabaseEngine:
         self.dbName = None
         self.PH = '?'
         self.database = None
+        self.closed = True
 
+    def __enter__(self):
+        self.closed = False
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if self.database is not None:
+            self.database.commit()
+            self.database.close()
+        self.closed = True
+            
     def describeEngine(self):
         if env.sqlite_pragma == []:
             return 'sqlite (no pragma)'
