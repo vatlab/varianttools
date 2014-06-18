@@ -1767,7 +1767,6 @@ class Simulator(multiprocessing.Process):
         while True:
             args = self.queue.get()
             if args is None:
-                self.queue.task_done()
                 break
             #
             try:

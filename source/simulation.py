@@ -64,23 +64,29 @@ class CreatePopulation(SkiptableAction):
     def _execute(self, ifiles, pipeline):
         # translate regions to simuPOP ...
         lociPos = {}
-        if self.sourceURL is not None:
-            self.sourceFile = tempfile.NamedTemporaryFile(dir=env.temp_dir, delete=False).name
-            tabixFetch(self.sourceURL, [], self.sourceFile, True)
-        for r in expandRegions(self.regions, pipeline.proj):
+        regions = expandRegions(self.regions, pipeline.proj)
+        for r in regions:
             if r[0] in lociPos:
                 lociPos[r[0]].extend(range(r[1], r[2] + 1))
             else:
                 lociPos[r[0]] = range(r[1], r[2] + 1)
-            #
-            if self.sourceURL is not None:
-                region = '{}:{}-{}'.format(r[0], r[1], r[2])
-                env.logger.info('Retriving genotype for region chr{}{}'.format(region,
-                    ' ({})'.format(r[3] if r[3] else '')))
-                tabixFetch(self.sourceURL, [region], self.sourceFile, False)
         #
         if self.sourceURL is not None:
-            pop = self._extractVcf(lociPos)
+            if self.sourceURL.lower().endswith('.vcf') or self.sourceURL.lower().endswith('.vcf.gz'):
+                self.sourceFile = tempfile.NamedTemporaryFile(dir=env.temp_dir, delete=False).name
+                tabixFetch(self.sourceURL, [], self.sourceFile, True)
+                for r in regions:
+                    region = '{}:{}-{}'.format(r[0], r[1], r[2])
+                    env.logger.info('Retriving genotype for region chr{}{}'.format(region,
+                        ' ({})'.format(r[3] if r[3] else '')))
+                tabixFetch(self.sourceURL, [region], self.sourceFile, False)
+                pop = self._importFromVcf(lociPos)
+            elif self.sourceURL.lower().endswith('.ms'):
+                self.sourceFile = self.sourceURL
+                pop = self._importFromMS(lociPos)
+            else:
+                raise ValueError('CreatePopulaton can only import genotypes from files in '
+                    'vcf (with extension .vcf and .vcf.gz) or ms (with extension .ms) formats')
             if self.size is not None and pop.popSize() != self.size:
                 env.logger.warning('Population imported from {} has {} individuals where a '
                     'population of size {} is requested'.format(self.sourceURL,
@@ -94,7 +100,7 @@ class CreatePopulation(SkiptableAction):
         env.logger.info('Saving created population to {}'.format(self.output[0]))
         pop.save(self.output[0])
 
-    def _extractVcf(self, lociPos):
+    def _importFromVcf(self, lociPos):
         chroms = lociPos.keys()
         chroms.sort()
         #
@@ -126,7 +132,78 @@ class CreatePopulation(SkiptableAction):
                         mutantCount += 1
         return pop
 
- 
+    def _importFromMS(self, lociPos):
+        #
+        with open(self.sourceFile, 'r') as ms:
+            cmd = ms.readline()
+            seeds = ms.readline()
+            ms.readline()
+            # current we do not handle multiple populations etc
+            chroms = lociPos.keys()
+            chroms.sort()
+            #
+            all_indexes = []
+            all_geno = []
+            indexes = []
+            geno = []
+            for line in ms:
+                if line.strip() in ['' or '//']:
+                    continue
+                elif line.startswith('segsites:'):
+                    segsites = int(line[len('segsites:'):])
+                    # new block?
+                    if indexes:
+                       all_indexes.append(indexes)
+                       all_geno.append(geno)
+                       indexes = []
+                       geno = []
+                elif line.startswith('positions:'):
+                    positions = [float(x) for x in line[len('positions:'):].split()]
+                    if len(positions) != segsites:
+                        raise ValueError('Number of segsites do not match number of positions')
+                    #
+                    # check number of loci
+                    nLoci = len(lociPos[chroms[len(all_indexes)]])
+                    if nLoci < segsites:
+                        raise ValueError('Specified region cannot accomendate {} segregating sites'.format(segsites))
+                    #
+                    indexes = [int(nLoci*x) for x in positions]
+                    if len(set(indexes)) != len(indexes):
+                        env.logger.warning('Some loci positions need to be adjusted because they are too close to each other')
+                        existing_indexes = set(indexes)
+                        acceptable_indexes = list(set(range(nLoci)) - existing_indexes)
+                        indexes = list(existing_indexes | set(acceptable_indexes[:nLoci-len(existing_indexes)]))
+                        indexes.sort()
+                    # read?
+                    # population size?
+                else:
+                    geno.append(line.strip())
+            # add everything to all_index etc
+            all_indexes.append(indexes)
+            del indexes
+            all_geno.append(geno)
+            del geno
+            #
+            pop = sim.Population(size=[len(x)/2 for x in all_geno], loci=[len(lociPos[x]) for x in chroms],
+                chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
+            # add genotype
+            prog = ProgressBar('Importing from {}'.format(self.sourceFile), pop.popSize() * len(chroms))
+            processed = 0
+            for ch in range(len(chroms)):
+                index = all_indexes[ch]
+                for ind,geno in enumerate(all_geno[ch]):
+                    for idx,g in enumerate(geno):
+                        if g != '0':
+                            pop.individual(ind/2).setAllele(int(g), index[idx], ind % 2, ch)
+                    processed += 1
+                    prog.update(processed)
+            prog.done()
+            return pop
+
+                    
+
+
+            
 
 
 def FineScaleRecombinator(regions, scale, defaultRate=1e-8, output=None):

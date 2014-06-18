@@ -15,6 +15,10 @@ description=This file defines simulations of DNA sequences in specified regions
 	automatically downloaded and applied. The simulated populations are analyzed
 	and discarded to save diskspace.
 
+ms_description=This simulator calls ms to execute coalescent-based simulations,
+    create a population with simulated dataset and run through the same statistical
+	analysis as other pipeline.
+
 neutral_description=A neutral simulation using a Juke-Cantor (1969) DNA 
     nucleotide mutation model, a mutation rate of 1.8x10^-8, and no
 	natural selelction. 
@@ -34,6 +38,48 @@ regions_comment=One or more chromosome regions (separated by ',') in the format 
 scale=10
 scale_comment=Scaling factor to speed up the simulation by scaling down the
 	simulation while boosting mutation, selection and recombination rates.
+
+
+[ms_0]
+action=CheckVariantToolsVersion('2.3.1')
+comment=Check the version of variant tools. Version 2.3.1 or higher is required
+	for the execution of this simulation.
+
+[ms_5]
+action=CheckCommands('ms')
+comment=Check the existence of command ms
+
+[ms_10]
+input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
+action=RunCommand('vtools init Peng2014_ex1')
+comment=Create a new project if there is no existing project under the current
+	directory.
+
+[ms_20]
+# this is the command to use for this particular simulation.
+action=RunCommand('ms 1400 1 -t 4082.4 -G 46065.49 -eG 1.028e-4 0.0 -seeds ${seed} ${seed:int(seed)+1} ${seed:int(seed)+2} > cache/ex1_ms_${seed}.ms || :',
+	output='cache/ex1_ms_${seed}.ms')
+comment=Execute ms. NOTE that these parameters only matches the parameters used
+    in example 1 of Peng 2014.
+
+[ms_30]
+action=CreatePopulation(
+    importGenotypeFrom='${INPUT}',
+	regions='%(regions)s',
+	output='cache/ex1_ms_${seed}.pop')
+output='cache/ex1_ms_${seed}.pop'
+comment=Create an empty simuPOP population for specified regions and import
+	ms-simulated genotypes.
+
+[ms_50]
+action=OutputPopulationStatistics(
+	mut_count=['ex1_ms_freq_spec_${seed}.txt', 700],
+	)
+comment=Get allele frequency spectrum in a sample of 700 individuals.
+
+[ms_999]
+action=RemoveIntermediateFiles(['cache/ex1_ms_${seed}.pop', 'cache/ex1_ms_${seed}.ms'])
+comment=Remove intermediate populations to save diskspace.
 
 
 [neutral_0]
@@ -76,7 +122,7 @@ comment=Evolve and expand the population using a JC69 mutation model
 
 [neutral_50]
 action=OutputPopulationStatistics(
-	mut_count=['ex1_neutral_freq_spec_${seed}', 700],
+	mut_count=['ex1_neutral_freq_spec_${seed}.txt', 700],
 	)
 comment=Get allele frequency spectrum in a sample of 700 individuals.
 
@@ -128,7 +174,7 @@ comment=Evolve and expand the population using a JC69 mutation model
 
 [with_selection_50]
 action=OutputPopulationStatistics(
-	mut_count=['ex1_with_selection_freq_spec_${seed}', 700],
+	mut_count=['ex1_with_selection_freq_spec_${seed}.txt', 700],
 	)
 comment=Get allele frequency spectrum in a sample of 700 individuals.
 
@@ -179,7 +225,7 @@ comment=Expand the population exponentially to reach a large population
 
 [resample_50]
 action=OutputPopulationStatistics(
-	mut_count=['ex1_resample_freq_spec_${seed}', 700],
+	mut_count=['ex1_resample_freq_spec_${seed}.txt', 700],
 	)
 comment=Get allele frequency spectrum in a sample of 700 individuals.
 
