@@ -1205,16 +1205,17 @@ class Project:
             self.checkUpdate()
         else:
             self.open()
-            if 'SKIP_VERIFICATION' not in self.mode:
+            if 'READONLY' not in self.mode and 'SKIP_VERIFICATION' not in self.mode:
                 try:
                     self.checkIntegrity()
                 except Exception as e:
                     env.logger.warning('Skip checking integrity of project: {}'.format(e))
             # 
-            try:
-                self.analyze()
-            except Exception as e:
-                env.logger.warning('Skip analyzing project: {}'.format(e))
+            if 'READONLY' not in self.mode:
+                try:
+                    self.analyze()
+                except Exception as e:
+                    env.logger.warning('Skip analyzing project: {}'.format(e))
         
 
     def create(self, **kwargs):
@@ -1259,7 +1260,13 @@ class Project:
         self.db = DatabaseEngine()
         self.db.connect(self.proj_file)
         if not self.db.hasTable('project'):
-            raise ValueError('Invalid project database (missing project table)')
+            if 'ALLOW_NO_PROJ' in self.mode:
+                self.build = None
+                self.name = None
+                env.temp_dir = None
+                return
+            else:
+                raise ValueError('Invalid project database (missing project table)')
         #
         self.batch = self.loadProperty('batch')
         self.batch = 10000 if self.batch is None else int(self.batch)

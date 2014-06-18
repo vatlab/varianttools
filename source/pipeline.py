@@ -1384,9 +1384,9 @@ class DownloadResource:
  
 
 class Pipeline:
-    def __init__(self, proj, name, extra_args=[]):
+    def __init__(self, proj, name, extra_args=[], pipeline_type='pipeline'):
         self.proj = proj
-        self.pipeline = PipelineDescription(name, extra_args)
+        self.pipeline = PipelineDescription(name, extra_args, pipeline_type)
 
     def var_expr(self, var):
         if type(var) == str:
@@ -1711,7 +1711,7 @@ def execute(args):
                     args.jobs)
     # 
     try:
-        with Project(verbosity=args.verbosity, mode='ALLOW_NO_PROJ') as proj:
+        with Project(verbosity=args.verbosity, mode=['ALLOW_NO_PROJ', 'READONLY']) as proj:
             #
             # definitely a pipeline
             if args.input or args.output or args.unknown_args:
@@ -1770,9 +1770,9 @@ class Simulator(multiprocessing.Process):
                 break
             #
             try:
-                with Project(verbosity=args.verbosity, mode='ALLOW_NO_PROJ') as proj:
+                with Project(verbosity=args.verbosity, mode=['ALLOW_NO_PROJ', 'READ_ONLY']) as proj:
                     env.logger.info('Starting simulation {}'.format(args.cfg_file))
-                    pipeline = Pipeline(proj, args.model[0], extra_args=args.unknown_args)
+                    pipeline = Pipeline(proj, args.model[0], extra_args=args.unknown_args, pipeline_type='simulation')
                     # using a pool of simulators 
                     if len(args.model) == 1:
                         pipeline.execute(None, [args.cfg_file], [], jobs=1, seed=args.seed)
@@ -1787,7 +1787,7 @@ class Simulator(multiprocessing.Process):
 
 def simulate(args):
     try:
-        with Project(verbosity=args.verbosity, mode='ALLOW_NO_PROJ') as proj:
+        with Project(verbosity=args.verbosity, mode=['ALLOW_NO_PROJ', 'READONLY']) as proj:
             # step 1, create a simulation configuration file.
             model_name = os.path.basename(args.model[0]).split('.', 1)[0]
             if args.seed is None:

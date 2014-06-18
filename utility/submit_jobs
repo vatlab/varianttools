@@ -114,6 +114,8 @@ class Jobs:
                 keys[str(i)] = key.strip()
                 keys['name'] = keys['0']
                 keys['output'] = keys[str(i)]
+            if len(job.split(sep)) == 1:
+                keys['output'] = None
             # replace $1, etc in script with values of keys
             s = script
             for k,v in keys.items():
@@ -167,7 +169,7 @@ class Jobs:
             elif name in running_jobs:
                 job.status = 'running'
                 nRunning += 1
-            elif os.path.isfile(job.output):
+            elif job.output is not None and os.path.isfile(job.output):
                 job.status = 'completed'
                 nCompleted += 1
             elif job.status != 'unsubmitted':
