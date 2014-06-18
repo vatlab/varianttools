@@ -415,13 +415,13 @@ def printDNASequence(args, regions):
     # get chromosomal region
     for chr, start, end, comment in regions:
         # get reference seq
-        if start <= end:
-            seq = ref.getSequence(chr, start, end)
-            reversed_seq = False
-        else:
+        if 'reverse' in comment:
             start, end = end, start
             reversed_seq = True
             seq = ''.join([complement_table[x] for x in ref.getSequence(chr, start, end)[::-1]])
+        else:
+            seq = ref.getSequence(chr, start, end)
+            reversed_seq = False
         print('>ref|{}|{}:{}-{} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr,
             start, end, '({})'.format(comment) if comment else ''))
         # break into pieces of 70 bp

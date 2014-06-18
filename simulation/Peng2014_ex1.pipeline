@@ -43,7 +43,7 @@ comment=Check the version of variant tools. Version 2.3.1 or higher is required
 
 [neutral_10]
 input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
-action=RunCommand('vtools init srv')
+action=RunCommand('vtools init Peng2014_ex1')
 comment=Create a new project if there is no existing project under the current
 	directory.
 
@@ -56,15 +56,15 @@ comment=Link the refGene database to the project. This database is required
 action=CreatePopulation(
 	size=1000,
 	regions='%(regions)s',
-	output='cache/srv_neutral_init_${seed}.pop')
-output='cache/srv_neutral_init_${seed}.pop'
+	output='cache/ex1_neutral_init_${seed}.pop')
+output='cache/ex1_neutral_init_${seed}.pop'
 comment=Create an empty simuPOP population for specified regions.
 
 [neutral_40]
 action=EvolvePopulation(
-	output='srv_neutral_evolved_${seed}.pop',
+	output='ex1_neutral_evolved_${seed}.pop',
 	mutator=RefGenomeMutator(regions='%(regions)s', model='JC69', rate=[1.8e-8 * %(scale)s * 4. / 3.]),
-	recScale=%(scale)s,
+	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s, output='map.txt'),
 	demoModel = MultiStageModel([
         InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
 			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
@@ -76,12 +76,12 @@ comment=Evolve and expand the population using a JC69 mutation model
 
 [neutral_50]
 action=OutputPopulationStatistics(
-	mut_count=['srv_neutral_freq_spec_${seed}', 700],
+	mut_count=['ex1_neutral_freq_spec_${seed}', 700],
 	)
 comment=Get allele frequency spectrum in a sample of 700 individuals.
 
 [neutral_999]
-action=RemoveIntermediateFiles(['srv_neutral_evolved_${seed}.pop', 'cache/srv_neutral_init_${seed}.pop'])
+action=RemoveIntermediateFiles(['ex1_neutral_evolved_${seed}.pop', 'cache/ex1_neutral_init_${seed}.pop'])
 comment=Remove intermediate populations to save diskspace.
 
 
@@ -93,7 +93,7 @@ comment=Check the version of variant tools. Version 2.3.1 or higher is required
 
 [with_selection_10]
 input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
-action=RunCommand('vtools init srv')
+action=RunCommand('vtools init Peng2014_ex1')
 comment=Create a new project if there is no existing project under the current
 	directory.
 
@@ -106,17 +106,17 @@ comment=Link the refGene database to the project. This database is required
 action=CreatePopulation(
 	size=1000,
 	regions='%(regions)s',
-	output='cache/srv_with_selection_init_${seed}.pop')
-output='cache/srv_with_selection_init_${seed}.pop'
+	output='cache/ex1_with_selection_init_${seed}.pop')
+output='cache/ex1_with_selection_init_${seed}.pop'
 comment=Create an empty simuPOP population for specified regions.
 
 [with_selection_40]
 action=EvolvePopulation(
-	output='srv_with_selection_evolved_${seed}.pop',
+	output='ex1_with_selection_evolved_${seed}.pop',
 	mutator=RefGenomeMutator(regions='%(regions)s', model='JC69', rate=[1.8e-8 * %(scale)s * 4. / 3.]),
 	selector=ProteinSelector('%(regions)s', s_missense=0.005 * %(scale)s,
 		s_stoploss=0.02 * %(scale)s, s_stopgain=0.1 * %(scale)s),
-	recScale=%(scale)s,
+	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
 	demoModel = MultiStageModel([
         InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
 			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
@@ -128,12 +128,12 @@ comment=Evolve and expand the population using a JC69 mutation model
 
 [with_selection_50]
 action=OutputPopulationStatistics(
-	mut_count=['srv_with_selection_freq_spec_${seed}', 700],
+	mut_count=['ex1_with_selection_freq_spec_${seed}', 700],
 	)
 comment=Get allele frequency spectrum in a sample of 700 individuals.
 
 [with_selection_999]
-action=RemoveIntermediateFiles(['srv_with_selection_evolved_${seed}.pop', 'cache/srv_with_selection_init_${seed}.pop'])
+action=RemoveIntermediateFiles(['ex1_with_selection_evolved_${seed}.pop', 'cache/ex1_with_selection_init_${seed}.pop'])
 comment=Remove intermediate populations to save diskspace.
 
 
@@ -145,7 +145,7 @@ comment=Check the version of variant tools. Version 2.3.1 or higher is required
 
 [resample_10]
 input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
-action=RunCommand('vtools init srv')
+action=RunCommand('vtools init Peng2014_ex1')
 comment=Create a new project if there is no existing project under the current
 	directory.
 
@@ -158,17 +158,17 @@ comment=Link the refGene database to the project. This database is required
 action=CreatePopulation(
 	importGenotypeFrom='ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/ALL.2of4intersection.20100804.genotypes.vcf.gz',
 	regions='%(regions)s',
-	output='cache/srv_resample_init_${seed}.pop')
-output='cache/srv_resample_init_${seed}.pop'
+	output='cache/ex1_resample_init_${seed}.pop')
+output='cache/ex1_resample_init_${seed}.pop'
 comment=Create an empty simuPOP population for specified regions.
 
 [resample_40]
 action=EvolvePopulation(
-	output='srv_resample_sampled_${seed}.pop',
+	output='ex1_resample_sampled_${seed}.pop',
 	mutator=RefGenomeMutator(regions='%(regions)s', model='JC69', rate=[1.8e-8 * %(scale)s * 4. / 3.]),
 	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
 		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
-	recScale=%(scale)s,
+	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
 	demoModel = ExponentialGrowthModel(T=10 / %(scale)s,
 		NT=10000 / %(scale)s)
     )
@@ -179,12 +179,12 @@ comment=Expand the population exponentially to reach a large population
 
 [resample_50]
 action=OutputPopulationStatistics(
-	mut_count=['srv_resample_freq_spec_${seed}', 700],
+	mut_count=['ex1_resample_freq_spec_${seed}', 700],
 	)
 comment=Get allele frequency spectrum in a sample of 700 individuals.
 
 [resample_999]
-action=RemoveIntermediateFiles(['srv_resample_sampled_${seed}.pop', 'cache/srv_resample_init_${seed}.pop'])
+action=RemoveIntermediateFiles(['ex1_resample_sampled_${seed}.pop', 'cache/ex1_resample_init_${seed}.pop'])
 comment=Remove intermediate populations to save diskspace.
 
 

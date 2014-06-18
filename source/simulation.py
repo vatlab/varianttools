@@ -49,7 +49,6 @@ if sys.version_info.major == 2:
 else:
     from ucsctools_py3 import tabixFetch
 
-Recom_URL = 'ftp://ftp.hapmap.org/hapmap/recombination/2011-01_phaseII_B37/genetic_map_HapMapII_GRCh37.tar.gz'
 
 
 class CreatePopulation(SkiptableAction):
@@ -92,8 +91,6 @@ class CreatePopulation(SkiptableAction):
             pop = sim.Population(size=self.size, loci=[len(lociPos[x]) for x in chroms],
                 chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
         #
-        self.set_map_dist(pop)
-        #
         env.logger.info('Saving created population to {}'.format(self.output[0]))
         pop.save(self.output[0])
 
@@ -129,92 +126,134 @@ class CreatePopulation(SkiptableAction):
                         mutantCount += 1
         return pop
 
-    def set_map_dist(self, pop, recRate=1e-8):
-        '''Set map distance for each locus'''
-        recom = downloadFile(Recom_URL)
-        recom_files = decompressGzFile(recom)
-        recom_map = {}
-        for ch in range(pop.numChrom()):
-            ch_name = pop.chromName(ch)
-            l_pos = int(pop.locusPos(pop.chromBegin(ch)))
-            h_pos = int(pop.locusPos(pop.chromEnd(ch)-1) + 1)
-            try:
-                #env.logger.error([os.path.basename(x) for x in recom_files])
-                #env.logger.error('genetic_map_GRCh37_chr{}.txt'.format(ch_name))
-                recom_file = [x for x in recom_files if os.path.basename(x) == 'genetic_map_GRCh37_chr{}.txt'.format(ch_name)][0]
-            except Exception as e:
-                raise RuntimeError('Could not find recombination map for chromosome {}: {}'.format(ch_name, e))
-            dist = {}
-            with open(recom_file) as recom:
-                recom.readline()
-                for line in recom:
-                    try:
-                        fields = line.split()
-                        pos = int(fields[1])
-                        if pos >= l_pos and pos <= h_pos:
-                            dist[pos] = float(fields[3])
-                    except Exception as e:
-                        env.logger.warning(e)
-            env.logger.info('Map distance of %d markers within region %s:%d-%d are found' % (len(dist), ch_name, l_pos, h_pos))
-            if not dist:
-                # using generic distance
-                for idx,loc in enumerate(range(pop.chromBegin(ch), pop.chromEnd(ch))):
-                    recom_map[loc] = idx*recRate
-                continue
-            nLoci = pop.numLoci(ch)
-            endLoc = pop.chromEnd(ch)
-            # now, try to set genetic map
-            map_dist = [-1]*endLoc;
-            cnt = 0
-            for loc in range(pop.chromBegin(ch), pop.chromEnd(ch)):
-                pos = int(int(pop.locusPos(loc)))
+ 
+
+
+def FineScaleRecombinator(regions, scale, defaultRate=1e-8, output=None):
+    '''For specified regions of the chroosome, find genetic locations of
+    all loci using a genetic map downloaded from HapMap. If no genetic
+    map is used, a default recombination rate (per bp) is used. If a
+    output file is specified, the physical/genetic map will be written
+    to the file.
+    '''
+    if scale == 0:
+        return sim.MendelianGenoTransmitter()
+    #
+    with Project(verbosity='1') as proj:
+        lociPos = {}
+        for reg in expandRegions(regions, proj):
+            if reg[0] in lociPos:
+                lociPos[reg[0]].extend(range(reg[1], reg[2]+1))
+            else:
+                lociPos[reg[0]] = range(reg[1], reg[2]+1)
+        #
+        chroms = lociPos.keys()
+        chroms.sort()
+    #
+    # download the map
+    Recom_URL = 'ftp://ftp.hapmap.org/hapmap/recombination/2011-01_phaseII_B37/genetic_map_HapMapII_GRCh37.tar.gz'
+    recom = downloadFile(Recom_URL)
+    recom_files = decompressGzFile(recom)
+    rec_rates = []
+    for ch, ch_name in enumerate(chroms):
+        try:
+            recom_file = [x for x in recom_files if os.path.basename(x) == 'genetic_map_GRCh37_chr{}.txt'.format(ch_name)][0]
+        except Exception as e:
+            raise RuntimeError('Could not find recombination map for chromosome {}: {}'.format(ch_name, e))
+        #
+        physicalPos = lociPos[ch_name]
+        geneticPos = {}
+        mapPoints = []
+        with open(recom_file) as recom:
+            recom.readline()
+            for line in recom:
                 try:
-                    map_dist[loc] = dist[pos]
-                    cnt += 1
-                except:
-                    pass
-            if cnt != nLoci:
-                prev = -1     # name of the previous marker with map distance
-                next = -1     # name of the next marker with map distance
-                loc = 0
-                while (loc < endLoc):
-                    # already has value
-                    if map_dist[loc] != -1:
-                        prev = next = loc
-                        loc += 1
-                        continue
-                    # find the ext one
-                    if prev == next:
-                        next = -1
-                        for n in range(loc+1, endLoc):
-                             if map_dist[n] != -1:
-                                 next = n
-                                 next_pos = pop.locusPos(next)
-                                 next_dis = map_dist[next]
-                                 break
-                        if prev == -1:
-                            for n in range(next):
-                                # rough estimation: distance (in cM) proportional to 0.01 recombination rate
-                                map_dist[n] = map_dist[next] - (pop.locusPos(next) - pop.locusPos(n)) * 1e-8
-                        # if not found, this is at the end of a chromosome
-                        elif next == -1:
-                            for n in range(loc, endLoc):
-                                map_dist[n] = map_dist[prev] + (pop.locusPos(n) - pop.locusPos(prev)) * 1e-8
-                            break
-                        # if found, but no previous, this is the first one
-                        else:
-                            prev_pos = pop.locusPos(prev)
-                            prev_dis = map_dist[prev]
-                            for n in range(loc, next):
-                                map_dist[n] = map_dist[prev] + (pop.locusPos(n) - prev_pos) / (next_pos - prev_pos) * (next_dis - prev_dis)
-                        prev = next
-                        loc = next + 1
-            for loc in range(pop.chromBegin(ch), pop.chromEnd(ch)):
-                recom_map[loc] = map_dist[loc]
-            env.logger.info('Total map distance from {}:{}-{} ({} bp) is {:.4e} cM (r={:.4e}/bp)'.format(ch_name,
-                l_pos, h_pos, h_pos - l_pos, recom_map[pop.chromEnd(ch)-1] - recom_map[pop.chromBegin(ch)],
-                   (recom_map[pop.chromEnd(ch)-1] - recom_map[pop.chromBegin(ch)])/pop.numLoci(ch)))
-        pop.dvars().geneticMap = recom_map
+                    fields = line.split()
+                    pos = int(fields[1])
+                    if pos >= physicalPos[0] and pos <= physicalPos[-1]:
+                        geneticPos[pos] = float(fields[3])
+                        mapPoints.append((pos, float(fields[3])))
+                except Exception as e:
+                    env.logger.warning(e)
+        env.logger.info('Map distance of {} markers within region {}:{}-{} are found'.format(len(geneticPos), ch_name,
+            physicalPos[0], physicalPos[-1]))
+        if len(geneticPos) <= 1:
+            # using generic distance
+            env.logger.info('Using a default recombination rate {}'.format(defaultRate))
+            geneticPos = {x:(x-physicalPos[0])*defaultRate for x in physicalPos}
+            rec_rates.extend([geneticPos[physicalPos[i+1]] - geneticPos[physicalPos[i]] for i in range(len(physicalPos)-1)] + [0.5])
+            continue
+        #
+        # step 1: find the first two positions and calculate the leading portion
+        if physicalPos[0] not in geneticPos:
+            #
+            # ...........P0.....P1
+            p0 = physicalPos[1]
+            while p0 not in geneticPos:
+                p0 += 1
+            p1 = p0 + 1
+            while p1 not in geneticPos:
+                p1 += 1
+            #
+            # now, rate
+            rate = (geneticPos[p1] - geneticPos[p0])/(p1-p0)
+            #
+            # fill up to P1
+            for p in physicalPos:
+                if p < p1:
+                    geneticPos[p] = geneticPos[p1] - (p1 - p) * rate
+                else:
+                    break
+        else:
+            p1 = physicalPos[0]
+        #
+        # step 2: find the middle ones, starting from p1
+        #
+        # p1 ... p2 .....
+        idx = physicalPos.index(p1)
+        while p1 <= physicalPos[-1]:
+            # can we found P2?
+            p2 = p1 + 1
+            while p2 not in geneticPos and p2 < physicalPos[-1]:
+                p2 += 1
+            # two cases
+            if p2 in geneticPos: 
+                # good
+                rate = (geneticPos[p2] - geneticPos[p1]) / (p2 - p1)
+                for p in physicalPos[idx+1:]:
+                    if p < p2:
+                        geneticPos[p] = geneticPos[p1] + (p - p1) * rate
+                idx = physicalPos.index(p2)
+                p1 = p2 
+            else:
+                # not in use the last rate
+                for p in physicalPos[idx+1:]:
+                    geneticPos[p] = geneticPos[p1] + (p - p1) * rate
+                break
+        # 
+        rec_rates.extend([geneticPos[physicalPos[i+1]] - geneticPos[physicalPos[i]] for i in range(len(physicalPos)-1)] + [0.5])
+        env.logger.info('Total map distance from {}:{}-{} ({} bp) is {:.4e} cM (r={:.4e}/bp)'.format(ch_name,
+            physicalPos[0], physicalPos[-1], physicalPos[-1] - physicalPos[0] + 1,
+                geneticPos[physicalPos[-1]] - geneticPos[physicalPos[0]],
+                (geneticPos[physicalPos[-1]] - geneticPos[physicalPos[0]]) / (physicalPos[-1] - physicalPos[0])))
+        #
+        if output is not None:
+            with open(output, 'w' if ch == 0 else 'a') as gmap:
+                if ch == 0:
+                    gmap.write('chr\tpos\tgenetic_pos\trate\n')
+                idx = 0
+                lp, lg = None, None
+                for p, g in mapPoints:
+                    if lp is None:
+                        gmap.write('#{}\t{}\t{}\t0\n'.format(ch_name, p, g))
+                    else:
+                        gmap.write('#{}\t{}\t{}\t{}\n'.format(ch_name, p, g, (g-lg)/(p-lp)))
+                    lp, lg = p, g
+                for p, r in zip(lociPos[ch_name], [0]+rec_rates[idx: idx+len(lociPos[ch_name])-1]):
+                    gmap.write('{}\t{}\t{}\t{}\n'.format(ch_name, p, geneticPos[p], r))
+    #
+    rec_rates = [x * scale if x * scale < 0.5 else 0.5 for x in rec_rates] 
+    return sim.Recombinator(rates=rec_rates)
 
 
 class PopToVcf(SkiptableAction):
@@ -634,8 +673,8 @@ class RefGenomeMutator(sim.PyOperator):
         with Project(verbosity='1') as proj:
             refGenome = RefGenome(proj.build)
             idx = 0
-            for r in expandRegions(regions, proj):
-                for s in refGenome.getSequence(r[0], r[1], r[2]):
+            for reg in expandRegions(regions, proj):
+                for s in refGenome.getSequence(reg[0], reg[1], reg[2]):
                     base[s].append(idx)
                     idx += 1
         #
@@ -757,30 +796,24 @@ class EvolvePopulation(SkiptableAction):
     def __init__(self,
         selector = None, demoModel=None, 
         mutator = None, 
-        recScale=1, output=[]):
+        transmitter = None,
+        output=[]):
         self.mutator = sim.NoneOp() if mutator is None else mutator
         self.selector = sim.NoneOp() if selector is None else selector
         self.demoModel = demoModel
-        self.recScale = recScale
+        self.transmitter = sim.MendelianGenoTransmitter() if transmitter is None else transmitter
         self.output = [output]
-        SkiptableAction.__init__(self, cmd='EvolvePop recScale={} output={}\n'
-            .format(recScale, output), output=output)
+        SkiptableAction.__init__(self, cmd='EvolvePop output={}\n'
+            .format(output), output=output)
 
     def _execute(self, ifiles, pipeline):
         pop = sim.loadPopulation(ifiles[0])
-        # Evolve
-        env.logger.info('Add info fields fitness and migrate_to')
         pop.addInfoFields(['fitness', 'migrate_to'])
         startTime = time.clock()
         #
+        # Evolve
         env.logger.info('Start evolving...')
         pop.dvars().last_time = time.time()
-        # try to use a genetic map
-        genetic_pos = [pop.dvars().geneticMap[x] for x in range(pop.totNumLoci())]
-        rec_rate = [genetic_pos[i+1] - genetic_pos[i] for i in range(pop.totNumLoci()-1)] + [0.5]
-        rec_rate = [x * self.recScale if x >=0 else 0.5 for x in rec_rate]
-        #with open('rec.txt', 'w') as rr:
-        #    rr.write('\n'.join(['{:.8e} {:.8e}'.format(f,g) for f,g in zip(genetic_pos, rec_rate)]))
         exec('import time', pop.vars(), pop.vars())
         pop.evolve(
             initOps=sim.InitSex(),
@@ -813,8 +846,7 @@ class EvolvePopulation(SkiptableAction):
                         output=env.logger.info),
                     ])
             ],
-            matingScheme=sim.RandomMating(ops=
-                sim.MendelianGenoTransmitter() if self.recScale == 0 else sim.Recombinator(rates=rec_rate, loci=sim.ALL_AVAIL),
+            matingScheme=sim.RandomMating(ops=self.transmitter,
                 subPopSize=self.demoModel),
             finalOps=[
                 # revert fixed sites so that the final population does not have fixed sites

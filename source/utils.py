@@ -1185,6 +1185,8 @@ def getSnapshotInfo(name):
 
 
 def expandRegions(arg_regions, proj, mergeRegions=True):
+    '''
+    '''
     if not arg_regions:
         raise ValueError('Empty region is specified.')
     regions = []
@@ -1210,7 +1212,7 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
                 raise ValueError('0 is not allowed as starting or ending position')
             # start might be after end
             if start > end:
-                regions.append((chr[3:] if chr.startswith('chr') else chr, start, end, '(reverse complementary)'))
+                regions.append((chr[3:] if chr.startswith('chr') else chr, end, start, '(reverse complementary)'))
             else:
                 regions.append((chr[3:] if chr.startswith('chr') else chr, start, end, ''))
         except Exception as e:
@@ -1278,11 +1280,7 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
                 r2 = regions[j]
                 if r1 is None or r2 is None:
                     continue
-                # reversed?
-                reversed = r1[1] > r1[2] or r2[1] > r2[2]
-                if reversed:
-                    r1 = (r1[0], min(r1[1], r1[2]), max(r1[1], r1[2]), r1[3])
-                    r2 = (r2[0], min(r2[1], r2[2]), max(r2[1], r2[2]), r2[3])
+                # 
                 if r1[0] == r2[0] and r1[2] >= r2[1] and r1[1] <= r2[2]:
                     env.logger.debug('Merging regions {}:{}-{} ({}) and {}:{}-{} ({})'
                         .format(r2[0], r2[1], r2[2], r2[3], r1[0], r1[1], r1[2], r1[3]))
@@ -1291,10 +1289,7 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
                     except:
                         # no shared leading string
                         shared_label = 0
-                    if reversed:
-                        regions[i] = (r1[0], max(r1[2], r2[2]), min(r1[1], r2[1]), r1[3] + ', ' + r2[3][shared_label:])
-                    else:
-                        regions[i] = (r1[0], min(r1[1], r2[1]), max(r1[2], r2[2]), r1[3] + ', ' + r2[3][shared_label:])
+                    regions[i] = (r1[0], min(r1[1], r2[1]), max(r1[2], r2[2]), r1[3] + ', ' + r2[3][shared_label:])
                     regions[j] = None
                     merged = True
         if not merged:
