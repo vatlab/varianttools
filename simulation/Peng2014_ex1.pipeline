@@ -5,7 +5,7 @@
 # a description of the format of this file.
 
 [pipeline description]
-description=This pipeline simulates DNA sequences in specified regions
+description=This file defines simulations of DNA sequences in specified regions
 	using a nucleotide mutation model, with/without recombination
 	and with/without natural selection. This simulation model has been
 	used to simulate data for the first example in paper "Reproducible
@@ -39,7 +39,7 @@ scale_comment=Scaling factor to speed up the simulation by scaling down the
 [neutral_0]
 action=CheckVariantToolsVersion('2.3.1')
 comment=Check the version of variant tools. Version 2.3.1 or higher is required
-	for the execution of this pipeline.
+	for the execution of this simulation.
 
 [neutral_10]
 input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
@@ -89,7 +89,7 @@ comment=Remove intermediate populations to save diskspace.
 [with_selection_0]
 action=CheckVariantToolsVersion('2.3.1')
 comment=Check the version of variant tools. Version 2.3.1 or higher is required
-	for the execution of this pipeline.
+	for the execution of this simulation.
 
 [with_selection_10]
 input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
@@ -141,7 +141,7 @@ comment=Remove intermediate populations to save diskspace.
 [resample_0]
 action=CheckVariantToolsVersion('2.3.1')
 comment=Check the version of variant tools. Version 2.3.1 or higher is required
-	for the execution of this pipeline.
+	for the execution of this simulation.
 
 [resample_10]
 input_emitter=EmitInput(select=${:not glob.glob('*.proj')})

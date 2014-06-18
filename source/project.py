@@ -648,12 +648,13 @@ class fileFMT:
 
 
 class PipelineDescription:
-    def __init__(self, name, extra_args=[], folder='pipeline'):
+    def __init__(self, name, extra_args=[], pipeline_type='pipeline'):
         '''Pipeline configuration file'''
         self.description = None
         self.pipeline_vars = {}
         self.pipelines = {}
         self.pipeline_descriptions = {}
+        self.pipeline_type = pipeline_type
         #
         if os.path.isfile(name + '.pipeline'):
             self.name = os.path.split(name)[-1]
@@ -666,9 +667,9 @@ class PipelineDescription:
         else:
             # not found, try online
             if name.endswith('.pipeline'):
-                url = '{}/{}'.format(folder, name)
+                url = '{}/{}'.format(pipeline_type, name)
             else:
-                url = '{}/{}.pipeline'.format(folder, name)
+                url = '{}/{}.pipeline'.format(pipeline_type, name)
             try:
                 pipeline = downloadFile(url, quiet=True)
             except Exception as e:
@@ -780,11 +781,15 @@ class PipelineDescription:
         if self.description is not None:
             print('\n'.join(textwrap.wrap(self.description, width=textWidth)))
         #
-        text = 'Available pipelines: {}'.format(', '.join(sorted(self.pipelines.keys())))
+        text = 'Available {}: {}'.format(
+            'simulation models' if self.pipeline_type == 'simulation' else 'pipelines',
+            ', '.join(sorted(self.pipelines.keys())))
         print('\n' + '\n'.join(textwrap.wrap(text, width=textWidth, subsequent_indent=' '*8)))
         for pname, pipeline in sorted(self.pipelines.items()):
-            print('\n' + '\n'.join(textwrap.wrap('Pipeline "{}":  {}'
-                .format(pname, self.pipeline_descriptions[pname.lower()]),
+            print('\n' + '\n'.join(textwrap.wrap('{} "{}":  {}'
+                .format(
+                'Model' if self.pipeline_type == 'simulation' else 'Pipeline',
+                pname, self.pipeline_descriptions[pname.lower()]),
                 width=textWidth)))
             for idx, step in enumerate(pipeline):
                 # hide a step if there is no comment
@@ -793,7 +798,7 @@ class PipelineDescription:
                     print('\n'.join(textwrap.wrap(text, width=textWidth, subsequent_indent=' '*22)))
         #
         if self.parameters:
-            print('\nPipeline parameters:')
+            print('\n{} parameters:'.format('Model' if self.pipeline_type == 'simulation' else 'Pipeline'))
             for item in self.parameters:
                 #
                 text = '  ' + item[0] + \
@@ -803,7 +808,8 @@ class PipelineDescription:
                 print('\n'.join(textwrap.wrap(text, subsequent_indent=' '*22,
                     width=textWidth)))
         else:
-            print('\nNo configurable parameter is defined for this format.\n')
+            print('\nNo configurable parameter is defined for this {}.\n'
+                .format('model' if self.pipeline_type == 'simulation' else 'pipeline'))
 
 
 class AnnoDBWriter:
@@ -4206,7 +4212,7 @@ def show(args):
                 if len(args.items) > 1:
                     raise ValueError('Please specify only one simulation model')
                 try:
-                    pipeline = PipelineDescription(args.items[0], folder='simulation')
+                    pipeline = PipelineDescription(args.items[0], pipeline_type='simulation')
                 except Exception as e:
                     raise IndexError('Unrecognized simulation model {}: {}'
                         .format(args.items[0], e))
