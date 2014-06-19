@@ -33,7 +33,6 @@ import argparse
 import logging
 import shutil
 import tarfile
-import copy
 import gzip
 import bz2
 import zipfile
@@ -338,18 +337,17 @@ class SkiptableAction:
     '''Internal actions that can be skipped according to a exe_info file.
     Actions using this class as a base class should define a _execute() function.
     '''
-    def __init__(self, cmd, output, ignoreInput=False):
+    def __init__(self, cmd, output):
         self.cmd = cmd.strip()
         if isinstance(output, str):
             self.output = [output]
         else:
             self.output = output
-        self.ignoreInput = ignoreInput
 
     def __call__(self, ifiles, pipeline=None):
         exe_info = '{}.exe_info'.format(self.output[0])
         if os.path.isfile(exe_info) and open(exe_info).readline().strip() == self.cmd.strip() \
-            and existAndNewerThan(self.output, [] if self.ignoreInput else ifiles,
+            and existAndNewerThan(self.output, ifiles,
             exe_info):
             # not that we do not care input file because it might contain different seed
             env.logger.info('Reuse existing {}'.format(self.output[0]))
@@ -1765,20 +1763,21 @@ class Simulator(multiprocessing.Process):
 
     def run(self):
         while True:
-            args = self.queue.get()
-            if args is None:
+            params = self.queue.get()
+            if params is None:
                 break
+            args, seed, cfg_file = params
             #
             try:
                 with Project(verbosity=args.verbosity, mode=['ALLOW_NO_PROJ', 'READ_ONLY']) as proj:
-                    env.logger.info('Starting simulation {}'.format(args.cfg_file))
+                    env.logger.info('Starting simulation {}'.format(cfg_file))
                     pipeline = Pipeline(proj, args.model[0], extra_args=args.unknown_args, pipeline_type='simulation')
                     # using a pool of simulators 
                     if len(args.model) == 1:
-                        pipeline.execute(None, [args.cfg_file], [], jobs=1, seed=args.seed)
+                        pipeline.execute(None, [cfg_file], [], jobs=1, seed=seed)
                     else:
                         for name in args.model[1:]:
-                            pipeline.execute(name, [args.cfg_file], [], jobs=1, seed=args.seed)
+                            pipeline.execute(name, [cfg_file], [], jobs=1, seed=seed)
             except KeyboardInterrupt:
                 break
             except Exception as e:
@@ -1787,57 +1786,49 @@ class Simulator(multiprocessing.Process):
 
 def simulate(args):
     try:
-        with Project(verbosity=args.verbosity, mode=['ALLOW_NO_PROJ', 'READONLY']) as proj:
-            # step 1, create a simulation configuration file.
-            model_name = os.path.basename(args.model[0]).split('.', 1)[0]
-            if args.seed is None:
-                args.seed = random.randint(1, 2**32-1)
-            if not os.path.isdir(env.cache_dir):
-                os.mkdir(env.cache_dir)
+        # step 1, create a simulation configuration file.
+        model_name = os.path.basename(args.model[0]).split('.', 1)[0]
+        if args.seed is None:
+            args.seed = random.randint(1, 2**32-1)
+        if not os.path.isdir(env.cache_dir):
+            os.mkdir(env.cache_dir)
+        #
+        if args.replicates <= 0:
+            raise ValueError('No replication studies is requested.')
+        #
+        queue = multiprocessing.Queue()
+        workers = [Simulator(queue) for i in range(args.jobs)]
+        for worker in workers:
+            worker.start()
+        for rep in range(args.replicates):
+            # set random seed of simulators
+            random.seed(args.seed + rep)
+            if len(args.model) == 1:
+                cfg_file = '{}/{}_{}.cfg'.format(env.cache_dir, model_name, args.seed + rep)
+            else:
+                cfg_file = '{}/{}_{}_{}.cfg'.format(env.cache_dir, model_name, args.model[1], args.seed + rep)
             #
-            if args.replicates <= 0:
-                raise ValueError('No replication studies is requested.')
-            #
-            all_args = [args for x in range(args.replicates)]
-            for rep in range(args.replicates):
-                # set random seed of simulators
-                random.seed(args.seed + rep)
-                if len(args.model) == 1:
-                    cfg_file = '{}/{}_{}.cfg'.format(env.cache_dir, model_name, args.seed + rep)
+            with open(cfg_file, 'w') as cfg:
+                cfg.write('model={}\n'.format(' '.join(args.model)))
+                cfg.write('seed={}\n'.format(args.seed + rep))
+                if '--seed' in sys.argv:
+                    # skip the seed option so to stop pipeline from distinguishing the two commands
+                    cmd_args = sys.argv[:sys.argv.index('--seed')] + sys.argv[sys.argv.index('--seed') + 2:]
+                    cfg.write("command=vtools {}\n".format(subprocess.list2cmdline(cmd_args[1:])))
                 else:
-                    cfg_file = '{}/{}_{}_{}.cfg'.format(env.cache_dir, model_name, args.model[1], args.seed + rep)
-                #
-                with open(cfg_file, 'w') as cfg:
-                    cfg.write('model={}\n'.format(' '.join(args.model)))
-                    cfg.write('seed={}\n'.format(args.seed + rep))
-                    if '--seed' in sys.argv:
-                        # skip the seed option so to stop pipeline from distinguishing the two commands
-                        cmd_args = sys.argv[:sys.argv.index('--seed')] + sys.argv[sys.argv.index('--seed') + 2:]
-                        cfg.write("command=vtools {}\n".format(subprocess.list2cmdline(cmd_args[1:])))
-                    else:
-                        cfg.write("command={}\n".format(env.command_line))
-                #
-                all_args[rep].cfg_file = cfg_file
-                all_args[rep].seed = args.seed + rep
-            #
-            env.logger.info('Start dispatching {} workers for {} replicates'.format(args.jobs, args.replicates))
-            queue = multiprocessing.Queue()
-            workers = [Simulator(queue) for i in range(args.jobs)]
+                    cfg.write("command={}\n".format(env.command_line))
+            queue.put((args, args.seed + rep, cfg_file))
+        queue.put(None)
+        #
+        try:
             for worker in workers:
-                worker.start()
-            for j in range(args.replicates):
-                queue.put(all_args[i])
-            queue.put(None)
-            #
-            try:
-                for worker in workers:
-                    worker.join()
-            except KeyboardInterrupt:
-                env.logger.error('Terminated by user.')
-                for worker in workers:
-                    worker.terminate()
-                    worker.join()
-                sys.exit(1)
+                worker.join()
+        except KeyboardInterrupt:
+            env.logger.error('Terminated by user.')
+            for worker in workers:
+                worker.terminate()
+                worker.join()
+            sys.exit(1)
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)

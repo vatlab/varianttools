@@ -56,7 +56,7 @@ class ExtractVCF(SkiptableAction):
         self.sourceURL = sourceURL
         self.regions = regions
         SkiptableAction.__init__(self, cmd='ExtractVCF {} {} {}'.format(sourceURL, regions, output),
-            output=output, ignoreInput=True)
+            output=output)
 
     def _execute(self, ifiles, pipeline):
         tabixFetch(self.sourceURL, [], self.output[0], True)

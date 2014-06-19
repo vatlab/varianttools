@@ -122,16 +122,16 @@ class Jobs:
                 # first protect double $ sign.
                 s = re.sub(r'\$\$', r'%%%', s)
                 # subsitute in script
-                if True in [x in str(v) for x in [' ', ',', '[', ']']]:
-                    if '"' in str(v):
-                        quote = '"'
-                    else:
-                        quote = "'"
-                    s = re.sub(r'\$%s([^a-zA-Z])' % k, r"%s%s%s\1" % (quote, str(v), quote), s)
-                    s = re.sub(r'\$\{%s\}' % k, "%s%s%s" % (quote, str(v), quote), s)
-                else:
-                    s = re.sub(r'\$%s([^a-zA-Z])' % k, r"%s\1" % str(v), s)
-                    s = re.sub(r'\$\{%s\}' % k, str(v), s)
+                #if True in [x in str(v) for x in [' ', ',', '[', ']']]:
+                #    if '"' in str(v):
+                #        quote = '"'
+                #    else:
+                #        quote = "'"
+                #    s = re.sub(r'\$%s([^a-zA-Z])' % k, r"%s%s%s\1" % (quote, str(v), quote), s)
+                #    s = re.sub(r'\$\{%s\}' % k, "%s%s%s" % (quote, str(v), quote), s)
+                #else:
+                s = re.sub(r'\$%s([^a-zA-Z])' % k, r"%s\1" % str(v), s)
+                s = re.sub(r'\$\{%s\}' % k, str(v), s)
                 # $$ is replaced with single $
                 s = re.sub(r'%%%', r'$', s)
             self.jobs[name] = Job(name=name, script=s, status='new', output=keys['output'])

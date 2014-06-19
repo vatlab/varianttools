@@ -37,8 +37,13 @@ regions_comment=One or more chromosome regions (separated by ',') in the format 
   
 scale=10
 scale_comment=Scaling factor to speed up the simulation by scaling down the
-	simulation while boosting mutation, selection and recombination rates.
+  simulation while boosting mutation, selection and recombination rates.
 
+extracted_vcf=extracted.vcf
+extracted_vcf=Filename (with dir) to save genotypes (.vcf file extracted by tabix
+  command) for the resample model. This file will be automatically created but 
+  reused if it already exists. You will need to remove this file if you run the 
+  same pipeline using another region.
 
 [ms_0]
 action=CheckVariantToolsVersion('2.3.1')
@@ -205,14 +210,17 @@ comment=Link the refGene database to the project. This database is required
 action=ExtractVCF(
 	sourceURL='ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/ALL.2of4intersection.20100804.genotypes.vcf.gz',
 	regions='%(regions)s',
-	output='cache/ex1_resample_init.vcf')
-output='cache/ex1_resample_init.vcf'
-comment=Create an empty simuPOP population for specified regions.
-
+	output='%(extracted_vcf)s')
+input_emitter=EmitInput(select=${:not os.path.isfile('%(extracted_vcf)s')})
+output='%(extracted_vcf)s'
+comment=Extract genotypes of specified regions from 1000 genomes project. No
+    dependency check will be performed so the extracted file can be used by
+    other projects if you put is to a place accessible by other projects. Location
+    of the extracted file can be specified by option --extracted_file.
 
 [resample_30]
 action=CreatePopulation(
-	importGenotypeFrom='${INPUT}',
+	importGenotypeFrom='%(extracted_vcf)s',
 	regions='%(regions)s',
 	output='cache/ex1_resample_init_${seed}.pop')
 output='cache/ex1_resample_init_${seed}.pop'
