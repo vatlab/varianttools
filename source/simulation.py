@@ -895,6 +895,8 @@ class EvolvePopulation(SkiptableAction):
         pop = sim.loadPopulation(ifiles[0])
         pop.addInfoFields(['fitness', 'migrate_to'])
         startTime = time.clock()
+        # reset RNG to use pipeline seed
+        sim.setRNG(seed=pipeline.VARS['seed'])
         #
         # Evolve
         env.logger.info('Start evolving...')

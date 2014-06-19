@@ -1755,80 +1755,47 @@ def simulateArguments(parser):
     parser.add_argument('-j', '--jobs', default=1, type=int,
         help='''Maximum number of concurrent jobs to execute, for steps
             of a pipeline that allows multi-processing.''')
-    
-class Simulator(multiprocessing.Process):
-    def __init__(self, queue):
-        multiprocessing.Process.__init__(self)
-        self.queue = queue
-
-    def run(self):
-        while True:
-            params = self.queue.get()
-            if params is None:
-                break
-            args, seed, cfg_file = params
-            #
-            try:
-                with Project(verbosity=args.verbosity, mode=['ALLOW_NO_PROJ', 'READ_ONLY']) as proj:
-                    env.logger.info('Starting simulation {}'.format(cfg_file))
-                    pipeline = Pipeline(proj, args.model[0], extra_args=args.unknown_args, pipeline_type='simulation')
-                    # using a pool of simulators 
-                    if len(args.model) == 1:
-                        pipeline.execute(None, [cfg_file], [], jobs=1, seed=seed)
-                    else:
-                        for name in args.model[1:]:
-                            pipeline.execute(name, [cfg_file], [], jobs=1, seed=seed)
-            except KeyboardInterrupt:
-                break
-            except Exception as e:
-                env.logger.error(e)
-                break
 
 def simulate(args):
     try:
-        # step 1, create a simulation configuration file.
-        model_name = os.path.basename(args.model[0]).split('.', 1)[0]
-        if args.seed is None:
-            args.seed = random.randint(1, 2**32-1)
-        if not os.path.isdir(env.cache_dir):
-            os.mkdir(env.cache_dir)
-        #
-        if args.replicates <= 0:
-            raise ValueError('No replication studies is requested.')
-        #
-        queue = multiprocessing.Queue()
-        workers = [Simulator(queue) for i in range(args.jobs)]
-        for worker in workers:
-            worker.start()
-        for rep in range(args.replicates):
-            # set random seed of simulators
-            random.seed(args.seed + rep)
-            if len(args.model) == 1:
-                cfg_file = '{}/{}_{}.cfg'.format(env.cache_dir, model_name, args.seed + rep)
-            else:
-                cfg_file = '{}/{}_{}_{}.cfg'.format(env.cache_dir, model_name, args.model[1], args.seed + rep)
+        with Project(verbosity=args.verbosity, mode=['ALLOW_NO_PROJ', 'READ_ONLY']) as proj:
+            # step 1, create a simulation configuration file.
+            model_name = os.path.basename(args.model[0]).split('.', 1)[0]
+            if args.seed is None:
+                args.seed = random.randint(1, 2**32-1)
+            if not os.path.isdir(env.cache_dir):
+                os.mkdir(env.cache_dir)
             #
-            with open(cfg_file, 'w') as cfg:
-                cfg.write('model={}\n'.format(' '.join(args.model)))
-                cfg.write('seed={}\n'.format(args.seed + rep))
-                if '--seed' in sys.argv:
-                    # skip the seed option so to stop pipeline from distinguishing the two commands
-                    cmd_args = sys.argv[:sys.argv.index('--seed')] + sys.argv[sys.argv.index('--seed') + 2:]
-                    cfg.write("command=vtools {}\n".format(subprocess.list2cmdline(cmd_args[1:])))
+            if args.replicates <= 0:
+                raise ValueError('No replication studies is requested.')
+            #
+            for rep in range(args.replicates):
+                # set random seed of simulators
+                random.seed(args.seed + rep)
+                if len(args.model) == 1:
+                    cfg_file = '{}/{}_{}.cfg'.format(env.cache_dir, model_name, args.seed + rep)
                 else:
-                    cfg.write("command={}\n".format(env.command_line))
-            queue.put((args, args.seed + rep, cfg_file))
-        queue.put(None)
-        #
-        try:
-            for worker in workers:
-                worker.join()
-        except KeyboardInterrupt:
-            env.logger.error('Terminated by user.')
-            for worker in workers:
-                worker.terminate()
-                worker.join()
-            sys.exit(1)
+                    cfg_file = '{}/{}_{}_{}.cfg'.format(env.cache_dir, model_name, args.model[1], args.seed + rep)
+                #
+                with open(cfg_file, 'w') as cfg:
+                    cfg.write('model={}\n'.format(' '.join(args.model)))
+                    cfg.write('seed={}\n'.format(args.seed + rep))
+                    if '--seed' in sys.argv:
+                        # skip the seed option so to stop pipeline from distinguishing the two commands
+                        cmd_args = sys.argv[:sys.argv.index('--seed')] + sys.argv[sys.argv.index('--seed') + 2:]
+                        cfg.write("command=vtools {}\n".format(subprocess.list2cmdline(cmd_args[1:])))
+                    else:
+                        cfg.write("command={}\n".format(env.command_line))
+                #
+                env.logger.info('Starting simulation {}'.format(cfg_file))
+                pipeline = Pipeline(proj, args.model[0], extra_args=args.unknown_args,
+                    pipeline_type='simulation')
+                # using a pool of simulators 
+                if len(args.model) == 1:
+                    pipeline.execute(None, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
+                else:
+                    for name in args.model[1:]:
+                        pipeline.execute(name, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
