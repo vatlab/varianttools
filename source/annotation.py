@@ -99,8 +99,7 @@ class AnnoDBConfiger:
     def remove(self):
         '''Remove an annotation database'''
         env.logger.info('Removing database {}'.format(self.name))
-        with self.proj.db as db:
-            db.removeDatabase(self.name)
+        self.proj.db.removeDatabase(self.name)
 
     def parseConfigFile(self, filename):
         '''Read from an ini style configuration file'''

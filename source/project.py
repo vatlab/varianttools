@@ -1113,20 +1113,6 @@ class Project:
             cls._instance = super(Project, cls).__new__(cls)
         return cls._instance
 
-    def _get_db(self):
-        if self._db is None or self._db.closed:
-            self._db = DatabaseEngine()
-            self._db.connect(self.proj_file)
-            #
-            for ann in self._attachedDB:
-                self._db.attach(*ann)
-        return self._db
-
-    def _set_db(self, name):
-        raise RuntimeError('using Project.db to set database is not allowed')
-
-    db = property(_get_db, _set_db)
-
     def __init__(self, name=None, mode=[], verbosity=None, **kwargs):
         '''Create a new project or connect to an existing one.'''
         if isinstance(mode, str):
@@ -1134,7 +1120,6 @@ class Project:
         else:
             self.mode = mode
         #
-        self._db = None
         self._attachedDB = []
         # version of vtools, useful when opening a project created by a previous
         # version of vtools.
@@ -1190,8 +1175,8 @@ class Project:
         self.proj_file = self.name + '.proj'
         #
         # create a temporary directory
-        #self.db = DatabaseEngine()
-        #self.db.connect(self.proj_file)
+        self.db = DatabaseEngine()
+        self.db.connect(self.proj_file)
         env.cache_dir = self.loadProperty('__option_cache_dir', None)
         #
         env.treat_missing_as_wildtype = self.loadProperty('__option_treat_missing_as_wildtype', None)
@@ -1219,12 +1204,10 @@ class Project:
         env.logger.debug('Using temporary directory {}'.format(env.temp_dir))
         #
         if 'NEW_PROJ' in self.mode: 
-            with self.db:
-                self.create(**kwargs)
-                self.checkUpdate()
+            self.create(**kwargs)
+            self.checkUpdate()
         else:
-            with self.db:
-                self.open()
+            self.open()
             if 'READONLY' not in self.mode and 'SKIP_VERIFICATION' not in self.mode:
                 try:
                     self.checkIntegrity()
@@ -1245,8 +1228,8 @@ class Project:
         env.logger.info(VTOOLS_CITATION)
         env.logger.info(VTOOLS_CONTACT)
         env.logger.info('Creating a new project {}'.format(self.name))
-        #self.db = DatabaseEngine()
-        #self.db.connect(self.proj_file)
+        self.db = DatabaseEngine()
+        self.db.connect(self.proj_file)
         #
         self.creation_date = time.asctime()
         self.build = None
@@ -1276,8 +1259,8 @@ class Project:
         '''Open an existing project'''
         # open the project file
         env.logger.debug('Opening project {}'.format(self.proj_file))
-        #self.db = DatabaseEngine()
-        #self.db.connect(self.proj_file)
+        self.db = DatabaseEngine()
+        self.db.connect(self.proj_file)
         if not self.db.hasTable('project'):
             if 'ALLOW_NO_PROJ' in self.mode:
                 self.build = None
@@ -1293,8 +1276,8 @@ class Project:
         # the system default will be used.
         env.sqlite_pragma = self.loadProperty('__option_sqlite_pragma', None)
         # env['sqlite_pragma'] will be used 
-        #self.db = DatabaseEngine()
-        #self.db.connect(self.proj_file)
+        self.db = DatabaseEngine()
+        self.db.connect(self.proj_file)
         # loading other options if they have been set
         env.import_num_of_readers = self.loadProperty('__option_import_num_of_readers', None)
         env.local_resource = self.loadProperty('__option_local_resource', None)
@@ -1355,24 +1338,23 @@ class Project:
 
     def checkIntegrity(self):
         '''Check if the project is ok...(and try to fix it if possible)'''
-        with self.db as db:
-            for table in ['project', 'filename', 'sample', 'variant']:
-                if not db.hasTable(table):
-                    raise RuntimeError('Corrupted project: missing table {}'.format(table))
-            #
-            headers = db.getHeaders('variant')
-            if self.alt_build is not None:
-                if not ('alt_bin' in headers and 'alt_chr' in headers and 'alt_pos' in headers):
-                    env.logger.warning('Disable alternative reference genome because of missing column {}.'.format(
-                        ', '.join([x for x in ('alt_bin', 'alt_chr', 'alt_pos') if x not in headers])))
-                    self.alt_build = None
-                    self.saveProperty('alt_build', None)
-            #
-            # missing index on master variant table, this will happen after all data is imported
-            if not db.hasIndex('variant_index'):
-                self.createIndexOnMasterVariantTable()
-                if not db.hasIndex('variant_index'):
-                    raise RuntimeError('Corrupted project: failed to create index on master variant table.')
+        for table in ['project', 'filename', 'sample', 'variant']:
+            if not self.db.hasTable(table):
+                raise RuntimeError('Corrupted project: missing table {}'.format(table))
+        #
+        headers = self.db.getHeaders('variant')
+        if self.alt_build is not None:
+            if not ('alt_bin' in headers and 'alt_chr' in headers and 'alt_pos' in headers):
+                env.logger.warning('Disable alternative reference genome because of missing column {}.'.format(
+                    ', '.join([x for x in ('alt_bin', 'alt_chr', 'alt_pos') if x not in headers])))
+                self.alt_build = None
+                self.saveProperty('alt_build', None)
+        #
+        # missing index on master variant table, this will happen after all data is imported
+        if not self.db.hasIndex('variant_index'):
+            self.createIndexOnMasterVariantTable()
+            if not self.db.hasIndex('variant_index'):
+                raise RuntimeError('Corrupted project: failed to create index on master variant table.')
 
     def checkUpdate(self):
         res = ResourceManager()
@@ -1460,21 +1442,18 @@ class Project:
             i = [x.linked_name for x in self.annoDB].index(db.linked_name)
             self.annoDB.append(db)
             self.annoDB.pop(i)
-        with self.db:
-            self.saveProperty('annoDB', str([(os.path.join(x.dir, x.filename).replace(env._local_resource, '${local_resource}'), x.linked_name) for x in self.annoDB]))
-            # an annotation database might be re-used with a different linked_field
-            self.saveProperty('{}_linked_by'.format(db.linked_name), str(db.linked_by))
-            self.saveProperty('{}_anno_type'.format(db.linked_name), str(db.anno_type))
-            self.saveProperty('{}_linked_fields'.format(db.linked_name), str(db.build))
-            # 
-            # if a field database, connect and check 
-            if db.linked_by:
-                db.checkLinkedFields(self)
+        self.saveProperty('annoDB', str([(os.path.join(x.dir, x.filename).replace(env._local_resource, '${local_resource}'), x.linked_name) for x in self.annoDB]))
+        # an annotation database might be re-used with a different linked_field
+        self.saveProperty('{}_linked_by'.format(db.linked_name), str(db.linked_by))
+        self.saveProperty('{}_anno_type'.format(db.linked_name), str(db.anno_type))
+        self.saveProperty('{}_linked_fields'.format(db.linked_name), str(db.build))
+        # 
+        # if a field database, connect and check 
+        if db.linked_by:
+            db.checkLinkedFields(self)
 
     def close(self):
         '''Write everything to disk...'''
-        #if self._db.closed:
-        #    env.logger.warning('db is alrady closed')
         self.db.commit()
         # temporary directories are cleared each time
         try:
@@ -3611,7 +3590,7 @@ def initArguments(parser):
 
 
 def init(args):
-    #try:
+    try:
         temp_dirs = []
         if args.parent and not os.path.isdir(args.parent):
             if (not args.samples) and (not args.genotypes) and args.variants == 'variant':
@@ -3700,9 +3679,9 @@ def init(args):
                 shutil.rmtree(temp_dir)
             except:
                 pass
-    #except Exception as e:
-    #    env.logger.error(e)
-    #    sys.exit(1)
+    except Exception as e:
+        env.logger.error(e)
+        sys.exit(1)
 
 
 def removeArguments(parser):
