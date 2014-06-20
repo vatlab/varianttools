@@ -174,8 +174,8 @@ class CreatePopulation(SkiptableAction):
                     nLoci = len(lociPos[chroms[len(all_indexes)]])
                     if nLoci < segsites:
                         raise ValueError('Specified region cannot accomendate {} segregating sites'.format(segsites))
-                    #
-                    indexes = [int(nLoci*x) for x in positions]
+                    # the last index is not allowed
+                    indexes = [int(nLoci*x) for x in positions if x != 1.0]
                     if len(set(indexes)) != len(indexes):
                         env.logger.warning('{} loci at identical location needs to be re-located'.format(len(indexes)-len(set(indexes))))
                         existing_indexes = set(indexes)
