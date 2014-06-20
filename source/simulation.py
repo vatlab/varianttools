@@ -177,10 +177,11 @@ class CreatePopulation(SkiptableAction):
                     #
                     indexes = [int(nLoci*x) for x in positions]
                     if len(set(indexes)) != len(indexes):
-                        env.logger.warning('Some loci positions need to be adjusted because they are too close to each other')
+                        env.logger.warning('{} loci at identical location needs to be re-located'.format(len(indexes)-len(set(indexes))))
                         existing_indexes = set(indexes)
                         acceptable_indexes = list(set(range(nLoci)) - existing_indexes)
-                        indexes = list(existing_indexes | set(acceptable_indexes[:nLoci-len(existing_indexes)]))
+                        random.shuffle(acceptable_indexes)
+                        indexes = list(existing_indexes | set(acceptable_indexes[:segsites - len(existing_indexes)]))
                         indexes.sort()
                     # read?
                     # population size?
@@ -462,17 +463,8 @@ class OutputPopulationStatistics(SkiptableAction):
         #
         sim.stat(sample, alleleFreq=sim.ALL_AVAIL, vars='alleleNum')
         #
-        num = [int(sz*2-x[0]) for x in sample.dvars().alleleNum.values()]
-        cnt = [0]*(sz*2 + 1)
-        for n in num:
-            cnt[n] += 1
         with open(self.mut_count[0], 'w') as out:
-            # output number of loci in each frequency class
-            out.write('## number of mutant\t#loci in this mutant class\n')
-            for idx,c in enumerate(cnt):
-                if c != 0:
-                    out.write('#{}\t{}\n'.format(idx, c))
-            out.write('## index, chr, position, #0, #1, #2, #3\n')
+            out.write('#index\tchr\tposition\t#0\t#1\t#2\t#3\n')
             # output allele counts at each locus
             for ch in range(self.pop.numChrom()):
                 ch_name = self.pop.chromName(ch)
