@@ -1934,16 +1934,19 @@ class FileInfo:
                 self._getFirstLine(self.filename)))
 
     def load(self):
-        with open(self.filename + '.file_info') as info:
-            self._size = int(info.readline().strip())
-            self._md5 = info.readline().strip()
-            self._ctime = float(info.readline().strip())
-            self._mtime = float(info.readline().strip())
-            try:
-                self._first_line = info.readline().strip()
-            except:
-                # early version of file_info does not have first line
-                pass
+        try:
+            with open(self.filename + '.file_info') as info:
+                self._size = int(info.readline().strip())
+                self._md5 = info.readline().strip()
+                self._ctime = float(info.readline().strip())
+                self._mtime = float(info.readline().strip())
+                try:
+                    self._first_line = info.readline().strip()
+                except:
+                    # early version of file_info does not have first line
+                    pass
+        except Exception as e:
+            raise ValueError('Corrupted file info file {}.file_info: {}'.format(self.filename, e))
     
     def _getFirstLine(self, filename):
         try:
@@ -2035,16 +2038,20 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
                 if not (os.path.isfile(f) or os.path.isfile(f + '.file_info')):
                     env.logger.warning('{} in {} does not exist.'.format(f, md5file))
                     return False
-                f_info = FileInfo(f)
-                if f_info.size() != s:
-                    env.logger.warning(
-                        'Size of existing file differ from recorded file: {}'
-                        .format(f))
-                    return False
-                if f_info.md5() != m.strip():
-                    env.logger.warning(
-                        'md5 of existing file differ from recorded file: {}'
-                        .format(f))
+                try:
+                    f_info = FileInfo(f)
+                    if f_info.size() != s:
+                        env.logger.warning(
+                            'Size of existing file differ from recorded file: {}'
+                            .format(f))
+                        return False
+                    if f_info.md5() != m.strip():
+                        env.logger.warning(
+                            'md5 of existing file differ from recorded file: {}'
+                            .format(f))
+                        return False
+                except Exception as e:
+                    env.logger.warning(e)
                     return False
                 md5matched.append(f)
         if len(nFiles) != 2 or nFiles[0] == 0 or nFiles[1] == 0:

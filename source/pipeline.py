@@ -352,6 +352,9 @@ class SkiptableAction:
             # not that we do not care input file because it might contain different seed
             env.logger.info('Reuse existing {}'.format(self.output[0]))
             return self.output
+        for ifile in ifiles:
+            if not os.path.isfile(ifile):
+                raise RewindExecution(ifile)
         with open(exe_info, 'w') as exe_info:
             exe_info.write(self.cmd + '\n')
             exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
