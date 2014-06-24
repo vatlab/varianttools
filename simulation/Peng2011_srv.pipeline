@@ -1,0 +1,199 @@
+# Copyright (C) 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Simulation/New for
+# a description of the format of this file.
+
+[pipeline description]
+description=Re-implementation of some of the simulations performed by SRV
+   (Peng & Liu, Simulating Sequences of the Human Genome with Rare Variants,
+   2011). 	
+
+ex1_neutral_description=Implementation of the neutral SRV simulation in
+    the first example of Peng & Liu 2011.
+
+ex1_with_selection_description=The same as the neutral model but use a
+	selection model with random fitness effects.
+
+srv_description=An alternative implementation of SRV that accepts less
+	parameter than SRV. Users who need to use an alternative demographic
+	model should change this file directly.
+
+[DEFAULT]
+regions=chr17:41200001-41263000
+regions_comment=One or more chromosome regions (separated by ',') in the format of
+  chr:start-end (e.g. chr21:33031597-33041570), or Field:Value from a region-based
+  annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947).
+  Please visit http://varianttools.sourceforge.net/Simulation for detailed
+  description of this parameter.
+  
+mu=1.8e-8
+mu_comment=Mutation rate for the srv model.
+
+recRate=0
+recRate_comment=A constant recombination rate used to recombine parental chromosomes.
+	Default to no recombination.
+
+selDist=gamma
+selDist_comment=Distribution of random effect, can be constant, gamma, trimmed_gamma,
+	and bounded_gamma. Each model generates a pair of s, h (default to 0.5 for additivity)
+	that assign fitness values  1, 1-hs and 1-s for genotypes AA (wildtype), Aa and aa,
+	respectively. Note that positive s is used for negative selection so negative s is
+    needed to specify positive selection. Note that we use 2k in the default distribution
+	of Gamma distributions because theoretical estimates of s is for each mutant with
+	1-2s as fitness value for genotype aa in our model. The trimmed_gamma distribution
+	yield l or h if the random s falls outside of [l, h]. The bounded_gamma distribution
+	repeats the draw until s falls inside of [l, h]. The bounded_gamma and trimmed_gamma
+	both accept a probability p for which a constant a will be returned.
+
+selCoef=[]
+selCoef_comment=Coefficient that should be passed as a list of numbers with number of
+	parameters differ from distribution to distribution. The default values are
+	(s=0.001, h=0.5) for contant model, (k=0.23, theta=0.185*2, h=0.5) for gamma
+	distribution (Eyre-Walker et al, 2006, gamma1 for srv), (k=0.184, theta=0.160*2,
+    h=0.5, p=0.0186, a=0.0001, lower=0.0001, upper=0.1) for bounded_gamma, and
+	(k=0.562341, theta=0.01, h=0.5, p=0, a=0, lower=0.00001, upper=0.1) for
+	trimmed_gamma. Other sets of paramters could be gamma(k=0.184, theta=0.160*2, h=0.5)
+	for African population (Boyko et al, 2008), and gamma(0.206, 0.146*2) for 
+	European population (Boyko et al, 2008, gamma3 for srv).
+
+scale=10
+scale_comment=Scaling factor to speed up the simulation by scaling down the
+  simulation while boosting mutation, selection and recombination rates. srv
+  does not scale simulation by default (scale=1).
+
+
+
+[ex1_neutral_0]
+action=CheckVariantToolsVersion('2.3.1')
+comment=Check the version of variant tools. Version 2.3.1 or higher is required
+	for the execution of this simulation.
+
+[ex1_neutral_10]
+input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
+action=RunCommand('vtools init Peng2014_ex1')
+comment=Create a new project if there is no existing project under the current
+	directory.
+
+[ex1_neutral_20]
+action=RunCommand('vtools use refGene')
+comment=Link the refGene database to the project. This database is required
+	to parse the regions for gene structure.
+
+[ex1_neutral_30]
+action=CreatePopulation(
+	size=1000,
+	regions='%(regions)s',
+	output='cache/ex1_neutral_init_${seed}.pop')
+output='cache/ex1_neutral_init_${seed}.pop'
+comment=Create an empty simuPOP population for specified regions.
+
+[ex1_neutral_40]
+action=EvolvePopulation(
+	output='ex1_neutral_evolved_${seed}.pop',
+	mutator=sim.SNPMutator(u=1.8e-8 * %(scale)s, v=1.8e-8 * %(scale)s),
+	demoModel = MultiStageModel([
+        InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
+			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
+        ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
+     ]))
+comment=Evolve the population with a SNP mutator, without recombination and natural selection. 
+
+[ex1_neutral_50]
+action=OutputPopulationStatistics(
+	mut_count=['ex1_neutral_freq_spec_${seed}.txt', 700],
+	)
+comment=Get allele frequency spectrum in a sample of 700 individuals.
+
+
+[ex1_with_selection_0]
+action=CheckVariantToolsVersion('2.3.1')
+comment=Check the version of variant tools. Version 2.3.1 or higher is required
+	for the execution of this simulation.
+
+[ex1_with_selection_10]
+input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
+action=RunCommand('vtools init Peng2014_ex1')
+comment=Create a new project if there is no existing project under the current
+	directory.
+
+[ex1_with_selection_20]
+action=RunCommand('vtools use refGene')
+comment=Link the refGene database to the project. This database is required
+	to parse the regions for gene structure.
+
+[ex1_with_selection_30]
+action=CreatePopulation(
+	size=1000,
+	regions='%(regions)s',
+	output='cache/ex1_with_selection_init_${seed}.pop')
+output='cache/ex1_with_selection_init_${seed}.pop'
+comment=Create an empty simuPOP population for specified regions.
+
+[ex1_with_selection_40]
+action=EvolvePopulation(
+	output='ex1_with_selection_evolved_${seed}.pop',
+	mutator=sim.SNPMutator(u=1.8e-8 * %(scale)s, v=1.8e-8 * %(scale)s),
+	selector=RandomFitnessSelector(
+		model='gamma', coef=(0.184, 0.160*2),
+		scale=%(scale)s, mode=sim.MULTIPLICATIVE),
+	demoModel = MultiStageModel([
+        InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
+			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
+        ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
+     ]))
+comment=Evolve the population with a SNP mutator, without recombination and natural selection. 
+
+[ex1_with_selection_50]
+action=OutputPopulationStatistics(
+	mut_count=['ex1_with_selection_freq_spec_${seed}.txt', 700],
+	)
+comment=Get allele frequency spectrum in a sample of 700 individuals.
+
+
+[srv_0]
+action=CheckVariantToolsVersion('2.3.1')
+comment=Check the version of variant tools. Version 2.3.1 or higher is required
+	for the execution of this simulation.
+
+[srv_10]
+input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
+action=RunCommand('vtools init Peng2014_ex1')
+comment=Create a new project if there is no existing project under the current
+	directory.
+
+[srv_20]
+action=RunCommand('vtools use refGene')
+comment=Link the refGene database to the project. This database is required
+	to parse the regions for gene structure.
+
+[srv_30]
+action=CreatePopulation(
+	size=1000,
+	regions='%(regions)s',
+	output='cache/srv_init_${seed}.pop')
+output='cache/srv_init_${seed}.pop'
+comment=Create an empty simuPOP population for specified regions.
+
+[srv_40]
+action=EvolvePopulation(
+	output='srv_evolved_${seed}.pop',
+	mutator=sim.SNPMutator(u=%(mu)s * %(scale)s, v=%(mu)s * %(scale)s),
+	transmitter=sim.Recombinator(rates=%(recRate)s),
+	selector=RandomFitnessSelector(
+		model='%(selDist)s', coef=%(selCoef)s,
+		scale=%(scale)s, mode=sim.MULTIPLICATIVE),
+	demoModel = MultiStageModel([
+        InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
+			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
+        ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
+     ]))
+comment=Evolve the population with a SNP mutator, without recombination and natural selection. 
+
+[srv_50]
+action=OutputPopulationStatistics(
+	mut_count=['srv_freq_spec_${seed}.txt', 700],
+	)
+comment=Get allele frequency spectrum in a sample of 700 individuals.
+
+
