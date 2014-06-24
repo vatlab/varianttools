@@ -5,14 +5,10 @@
 # a description of the format of this file.
 
 [pipeline description]
-description=This file defines simulations of DNA sequences in specified regions
-	using a nucleotide mutation model, with/without recombination
-	and with/without natural selection. This simulation model has been
-	used to simulate data for the first example in paper "Reproducible
+description=Simulations of DNA sequences in specified regions using different
+    simulation methods, for the first example in paper "Reproducible
 	Simulations of realistic samples for next-gen sequencing studies
-	using Variant Simulation Tools". A demographic model that mimicks that
-	of the European population is used. A fine-scale recombination map is
-	automatically downloaded and applied. The simulated populations are analyzed
+	using Variant Simulation Tools". The simulated populations are analyzed
 	and discarded to save diskspace.
 
 ms_description=This simulator calls ms to execute coalescent-based simulations,
@@ -20,12 +16,17 @@ ms_description=This simulator calls ms to execute coalescent-based simulations,
 	analysis as other pipeline.
 
 neutral_description=A neutral simulation using a Juke-Cantor (1969) DNA 
-    nucleotide mutation model, a mutation rate of 1.8x10^-8, and no
-	natural selelction. 
+    nucleotide mutation model, a mutation rate of 1.8x10^-8, a fine-scale
+	recombination map, a demographic model that mimicks the European
+	population, and no natural selelction. 
 
 with_selection_description=A simulation that uses identical models as the neutral
 	model but use a protein selection model with selection pressure 0.005,
 	0.02 and 0.1 for missense, stoploss and stopgain mutations.
+
+resample_description=A simulation model that extracts genotypes within the 
+	sepecified regions from the 1000 genomes project, and expands it very
+	rapidly to mimick a resampling-based simulation.
 
 [DEFAULT]
 regions=chr17:41200001-41263000
@@ -40,8 +41,8 @@ scale_comment=Scaling factor to speed up the simulation by scaling down the
   simulation while boosting mutation, selection and recombination rates.
 
 extracted_vcf=extracted.vcf
-extracted_vcf=Filename (with dir) to save genotypes (.vcf file extracted by tabix
-  command) for the resample model. This file will be automatically created but 
+extracted_vcf_comment=Filename (with dir) to save genotypes (.vcf file extracted by tabix
+  command) for the resample model. This file will be automatically created and 
   reused if it already exists. You will need to remove this file if you run the 
   same pipeline using another region.
 
@@ -74,12 +75,13 @@ action=CreatePopulation(
 	output='cache/ex1_ms_${seed}.pop')
 output='cache/ex1_ms_${seed}.pop'
 comment=Create an empty simuPOP population for specified regions and import
-	ms-simulated genotypes.
+	ms-simulated genotypes. The segregating sites are distributed within the specified
+	region according to the positions (float numbers from 0 to 1) assigned by ms.
+	Mutants are assumed to be from A->C, C->G, G->T and T->A for bases A, C, G and
+	T respectively.
 
 [ms_50]
-action=OutputPopulationStatistics(
-	mut_count=['ex1_ms_freq_spec_${seed}.txt', 700],
-	)
+action=OutputPopulationStatistics(mut_count=['ex1_ms_freq_spec_${seed}.txt', 700])
 comment=Get allele frequency spectrum in a sample of 700 individuals.
 
 [ms_999]
@@ -115,7 +117,7 @@ comment=Create an empty simuPOP population for specified regions.
 action=EvolvePopulation(
 	output='ex1_neutral_evolved_${seed}.pop',
 	mutator=RefGenomeMutator(regions='%(regions)s', model='JC69', rate=[1.8e-8 * %(scale)s * 4. / 3.]),
-	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s, output='map.txt'),
+	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
 	demoModel = MultiStageModel([
         InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
 			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),

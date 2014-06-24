@@ -14,20 +14,17 @@ description=Simulation of case control samples for 20 genes
 	automatically downloaded and applied. The simulated populations are analyzed
 	and discarded to save diskspace.
 
-ms_description=This simulator calls ms to execute coalescent-based simulations,
+MexicanAmerican_description=This simulator calls ms to execute coalescent-based simulations,
     create a population with simulated dataset and run through the same statistical
 	analysis as other pipeline.
 
-neutral_description=A neutral simulation using a Juke-Cantor (1969) DNA 
-    nucleotide mutation model, a mutation rate of 1.8x10^-8, and no
-	natural selelction. 
-
-with_selection_description=A simulation that uses identical models as the neutral
-	model but use a protein selection model with selection pressure 0.005,
-	0.02 and 0.1 for missense, stoploss and stopgain mutations.
+European_description=This simulator calls ms to execute coalescent-based simulations,
+    create a population with simulated dataset and run through the same statistical
+	analysis as other pipeline.
 
 [DEFAULT]
-regions=refGene_exon.name2:
+# GPCR signaling pathway
+regions=ccdsGene_exon.name:CCDS12419.1,CCDS46035.1,CCDS4360.1,CCDS3581.1,CCDS10170.1,CCDS6264.1,CCDS1708.1,CCDS44408.1,CCDS7260.1,CCDS47427.1,CCDS47426.1,CCDS47425.1,CCDS4863.1,CCDS8524.1,CCDS3997.1,CCDS6035.1,CCDS6036.1,CCDS14332.1,CCDS14331.1,CCDS11625.1
 regions_comment=One or more chromosome regions (separated by ',') in the format of
   chr:start-end (e.g. chr21:33031597-33041570), or Field:Value from a region-based
   annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947).
@@ -39,52 +36,121 @@ scale_comment=Scaling factor to speed up the simulation by scaling down the
   simulation while boosting mutation, selection and recombination rates.
 
 
-[neutral_0]
+[MexicanAmerican_0]
 action=CheckVariantToolsVersion('2.3.1')
 comment=Check the version of variant tools. Version 2.3.1 or higher is required
 	for the execution of this simulation.
 
-[neutral_10]
+[MexicanAmerican_10]
 input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
 action=RunCommand('vtools init Peng2014_ex1')
 comment=Create a new project if there is no existing project under the current
 	directory.
 
-[neutral_20]
-action=RunCommand('vtools use refGene')
-comment=Link the refGene database to the project. This database is required
+[MexicanAmerican_20]
+action=RunCommand([
+	'vtools use refGene',
+	'vtools use ccdsGene_exon'])
+comment=Link the refGene and ccdsGene_exon databases to the project. This database is used
 	to parse the regions for gene structure.
 
-[neutral_30]
+[MexicanAmerican_30]
 action=CreatePopulation(
 	size=1000,
 	regions='%(regions)s',
-	output='cache/ex1_neutral_init_${seed}.pop')
-output='cache/ex1_neutral_init_${seed}.pop'
+	output='cache/MexicanAmerican_init_${seed}.pop')
+output='cache/MexicanAmerican_init_${seed}.pop'
 comment=Create an empty simuPOP population for specified regions.
 
-[neutral_40]
+[MexicanAmerican_40]
 action=EvolvePopulation(
-	output='ex1_neutral_evolved_${seed}.pop',
-	mutator=RefGenomeMutator(regions='%(regions)s', model='JC69', rate=[1.8e-8 * %(scale)s * 4. / 3.]),
+	output='MexicanAmerican_evolved_${seed}.pop',
+	mutator=RefGenomeMutator(regions='%(regions)s', model='K80', rate=[1.8e-8 * %(scale)s, 2]),
 	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s, output='map.txt'),
-	demoModel = MultiStageModel([
-        InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
-			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
-        ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
-     ]))
-comment=Evolve and expand the population using a JC69 mutation model
-	and a demographic model that evolves a population of size 8100 for
-	81000 generations before it is expanded to size 900000 in 370 generations.
-
-[neutral_50]
-action=OutputPopulationStatistics(
-	mut_count=['ex1_neutral_freq_spec_${seed}.txt', 700],
+	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
+		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
+	demoModel = SettlementOfNewWorldModel(20000, scale=%(scale)s)
 	)
+comment=Evolve and expand the population using a K80 mutation model	and a demographic 
+	model that models the settlement of new world model of the Mexican American population.
+ 
+[MexicanAmerican_50]
+action=OutputPopulationStatistics(
+ 	mut_count=['MexicanAmerican_freq_spec_${seed}.txt', 700],
+    )
 comment=Get allele frequency spectrum in a sample of 700 individuals.
+ 
+[MexicanAmerican_60]
+input=${OUTPUT40}
+action=DrawCaseControlSample(cases=1000, controls=1000, 
+	penetrance=ProteinPenetrance('%(regions)s', s_sporadic=0.0001, s_missense=0.001,
+		s_stoploss=0.001, s_stopgain=0.01),
+	output='MexicanAmerican_sample_${seed}.pop')
+comment=Draw case control sample from the mixed Mexican American population.
+#[MexicanAmerican_
+# [MexicanAmerican_999]
+# action=RemoveIntermediateFiles(['MexicanAmerican_evolved_${seed}.pop', 'cache/MexicanAmerican_init_${seed}.pop'])
+# comment=Remove intermediate populations to save diskspace.
+# 
+# 
 
-[neutral_999]
-action=RemoveIntermediateFiles(['ex1_neutral_evolved_${seed}.pop', 'cache/ex1_neutral_init_${seed}.pop'])
-comment=Remove intermediate populations to save diskspace.
 
+
+[European_0]
+action=CheckVariantToolsVersion('2.3.1')
+comment=Check the version of variant tools. Version 2.3.1 or higher is required
+	for the execution of this simulation.
+
+[European_10]
+input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
+action=RunCommand('vtools init Peng2014_ex1')
+comment=Create a new project if there is no existing project under the current
+	directory.
+
+[European_20]
+action=RunCommand([
+	'vtools use refGene',
+	'vtools use ccdsGene_exon'])
+comment=Link the refGene and ccdsGene_exon databases to the project. This database is used
+	to parse the regions for gene structure.
+
+[European_30]
+action=CreatePopulation(
+	size=1000,
+	regions='%(regions)s',
+	output='cache/European_init_${seed}.pop')
+output='cache/European_init_${seed}.pop'
+comment=Create an empty simuPOP population for specified regions.
+
+[European_40]
+action=EvolvePopulation(
+	output='European_evolved_${seed}.pop',
+	mutator=RefGenomeMutator(regions='%(regions)s', model='K80', rate=[1.8e-8 * %(scale)s, 2]),
+	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s, output='map.txt'),
+	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
+		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
+	demoModel = SettlementOfNewWorldModel(20000, scale=%(scale)s, mix=False)
+	)
+comment=Evolve and expand the population using a K80 mutation model	and a demographic 
+	model that models the settlement of new world model of the Mexican American population.
+ 
+[European_50]
+action=OutputPopulationStatistics(
+ 	mut_count=['European_freq_spec_${seed}.txt', 700],
+    )
+comment=Get allele frequency spectrum in a sample of 700 individuals.
+ 
+[European_60]
+input=${OUTPUT40}
+action=DrawCaseControlSample(cases=[0, 1000, 0, 0], controls=[0, 1000, 0, 0],
+	penetrance=ProteinPenetrance('%(regions)s', s_sporadic=0.0001, s_missense=0.001,
+		s_stoploss=0.001, s_stopgain=0.01),
+	output='European_sample_${seed}.pop')
+comment=Draw case control sample from the mixed Mexican American population.
+#[European_
+# [European_999]
+# action=RemoveIntermediateFiles(['European_evolved_${seed}.pop', 'cache/European_init_${seed}.pop'])
+# comment=Remove intermediate populations to save diskspace.
+# 
+# 
 

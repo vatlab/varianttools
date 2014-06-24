@@ -24,7 +24,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import simuOpt
-simuOpt.setOptions(alleleType='mutant', optimized=True, quiet=True, version='1.0.5')
+#simuOpt.setOptions(alleleType='mutant', optimized=True, quiet=True, version='1.0.5')
+simuOpt.setOptions(alleleType='mutant', optimized=False, quiet=True, version='1.0.5')
 
 import simuPOP as sim
 from simuPOP.demography import *
@@ -103,8 +104,8 @@ class CreatePopulation(SkiptableAction):
             chroms = lociPos.keys()
             chroms.sort()
             pop = sim.Population(size=self.size, loci=[len(lociPos[x]) for x in chroms],
-                chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
-        #
+                chromNames=chroms, lociPos=sum([lociPos[x] for x in chroms], []))
+                #chromTypes=[sim.CHROMOSOME_X if x=='X' else (sim.CHROMOSOME_Y if x=='Y' else sim.AUTOSOME) for x in chroms])
         env.logger.info('Saving created population to {}'.format(self.output[0]))
         pop.save(self.output[0])
 
@@ -209,12 +210,6 @@ class CreatePopulation(SkiptableAction):
             prog.done()
             return pop
 
-                    
-
-
-            
-
-
 def FineScaleRecombinator(regions, scale, defaultRate=1e-8, output=None):
     '''For specified regions of the chroosome, find genetic locations of
     all loci using a genetic map downloaded from HapMap. If no genetic
@@ -271,6 +266,7 @@ def FineScaleRecombinator(regions, scale, defaultRate=1e-8, output=None):
             continue
         #
         # step 1: find the first two positions and calculate the leading portion
+        idx = 0
         if physicalPos[0] not in geneticPos:
             #
             # ...........P0.....P1
@@ -285,18 +281,22 @@ def FineScaleRecombinator(regions, scale, defaultRate=1e-8, output=None):
             rate = (geneticPos[p1] - geneticPos[p0])/(p1-p0)
             #
             # fill up to P1
-            for p in physicalPos:
-                if p < p1:
+            while idx < len(physicalPos):
+                p = physicalPos[idx]
+                if p <= p1:
                     geneticPos[p] = geneticPos[p1] - (p1 - p) * rate
+                    idx += 1
                 else:
                     break
         else:
             p1 = physicalPos[0]
+            idx = 1
+        #
+        # idx is the currently processed physicalPos
         #
         # step 2: find the middle ones, starting from p1
         #
         # p1 ... p2 .....
-        idx = physicalPos.index(p1)
         while p1 <= physicalPos[-1]:
             # can we found P2?
             p2 = p1 + 1
@@ -306,28 +306,32 @@ def FineScaleRecombinator(regions, scale, defaultRate=1e-8, output=None):
             if p2 in geneticPos: 
                 # good
                 rate = (geneticPos[p2] - geneticPos[p1]) / (p2 - p1)
-                for p in physicalPos[idx+1:]:
-                    if p < p2:
+                while idx < len(physicalPos):
+                    p = physicalPos[idx]
+                    if p <= p2:
                         geneticPos[p] = geneticPos[p1] + (p - p1) * rate
-                idx = physicalPos.index(p2)
+                        idx += 1
+                    else:
+                        break
                 p1 = p2 
             else:
                 # not in use the last rate
-                for p in physicalPos[idx+1:]:
+                for p in physicalPos[idx:]:
                     geneticPos[p] = geneticPos[p1] + (p - p1) * rate
                 break
         # 
+        start_pos = len(rec_rates)
         rec_rates.extend([geneticPos[physicalPos[i+1]] - geneticPos[physicalPos[i]] for i in range(len(physicalPos)-1)] + [0.5])
         env.logger.info('Total map distance from {}:{}-{} ({} bp) is {:.4e} cM (r={:.4e}/bp)'.format(ch_name,
             physicalPos[0], physicalPos[-1], physicalPos[-1] - physicalPos[0] + 1,
                 geneticPos[physicalPos[-1]] - geneticPos[physicalPos[0]],
                 (geneticPos[physicalPos[-1]] - geneticPos[physicalPos[0]]) / (physicalPos[-1] - physicalPos[0])))
         #
+        assert(len(lociPos[ch_name]) == len(rec_rates[start_pos:]))
         if output is not None:
             with open(output, 'w' if ch == 0 else 'a') as gmap:
                 if ch == 0:
                     gmap.write('chr\tpos\tgenetic_pos\trate\n')
-                idx = 0
                 lp, lg = None, None
                 for p, g in mapPoints:
                     if lp is None:
@@ -335,7 +339,7 @@ def FineScaleRecombinator(regions, scale, defaultRate=1e-8, output=None):
                     else:
                         gmap.write('#{}\t{}\t{}\t{}\n'.format(ch_name, p, g, (g-lg)/(p-lp)))
                     lp, lg = p, g
-                for p, r in zip(lociPos[ch_name], [0]+rec_rates[idx: idx+len(lociPos[ch_name])-1]):
+                for p, r in zip(lociPos[ch_name], [0]+rec_rates[start_pos : start_pos + len(lociPos[ch_name])-1]):
                     gmap.write('{}\t{}\t{}\t{}\n'.format(ch_name, p, geneticPos[p], r))
     #
     rec_rates = [x * scale if x * scale < 0.5 else 0.5 for x in rec_rates] 
@@ -955,34 +959,56 @@ class EvolvePopulation(SkiptableAction):
 
 
 class DrawCaseControlSample(SkiptableAction):
+    '''Draw case control samples from simulated population. If there are subpopulations and 
+    cases and controls have the same demension, cases and controls are drawn from each
+    subpopulation.
+    '''
     def __init__(self, cases, controls, penetrance, output):
-        self.cases = cases
-        self.controls = controls
+        if isinstance(cases, int):
+            self.cases = [cases]
+        else:
+            self.cases = cases
+        if isinstance(controls, int):
+            self.controls = [controls]
+        else:
+            self.controls = controls
+        # 
+        if len(self.cases) != len(self.controls):
+            raise ValueError('Please specify cases and controls with the same dimensions.')
         self.penetrance = penetrance
-        self.selectedCases = 0
-        self.selectedCtrls = 0
+        self.selectedCases = [0]*len(self.cases)
+        self.selectedCtrls = [0]*len(self.controls)
+        #
         SkiptableAction.__init__(self, cmd='CaseCtrlSampler {}\n'.format(output),
             output=output)
     
     def _execute(self, ifiles, pipeline):
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
-        self.prog = ProgressBar('Generating %d cases and %d controls...' % (self.cases, self.controls), self.cases + self.controls)
+        #
+        env.logger.info('Draw {} cases and {} controls from a population of sizes sizes {}'.format(self.cases, self.controls, pop.subPopSizes()))
+        if len(self.cases) > 1 and pop.numSubPop() != len(self.cases):
+            raise ValueError('If an array of cases and controls are specified, they should match the number of subpopulations.')
+        if len(self.cases) == 1 and pop.numSubPop() > 1:
+            pop.mergeSubPops()
+        self.prog = ProgressBar('Generating %d cases and %d controls' % (sum(self.cases), 
+            sum(self.controls)), sum(self.cases) + sum(self.controls))
         pop.evolve(
             matingScheme=sim.RandomMating(
                 ops=[
                     sim.MendelianGenoTransmitter(),
                     # apply a penetrance model 
-                    self.penetrance,
+                    self.penetrance
+                ] + [
                     # an individual will be discarded if _selectInds returns False
-                    sim.PyOperator(func=self._selectInds)
+                    sim.PyOperator(func=self._selectInds, subPops=sp, param=sp) for sp in range(pop.numSubPop())
                 ],
-                subPopSize=self.cases + self.controls,
+                subPopSize=[x + y for x,y in zip(self.cases, self.controls)],
             ),
             gen = 1
         )
         self.prog.done()
-        # 
+        #
         if 'migrate_to' in pop.infoFields():
             pop.removeInfoFields('migrate_to')
         if 'fitness' in pop.infoFields():
@@ -990,19 +1016,19 @@ class DrawCaseControlSample(SkiptableAction):
         env.logger.info('Saving samples to population {}'.format(self.output[0]))
         pop.save(self.output[0])
 
-    def _selectInds(self, off):
+    def _selectInds(self, off, param):
         'Determine if the offspring can be kept.'
         if off.affected():
-            if self.selectedCases < self.cases:
-                self.selectedCases += 1
-                self.prog.update(self.selectedCases + self.selectedCtrls)
+            if self.selectedCases[param] < self.cases[param]:
+                self.selectedCases[param] += 1
+                self.prog.update(sum(self.selectedCases) + sum(self.selectedCtrls))
                 return True
         else:
             # we keep number of ctrls less than cases to keep the progress even 
             # because it is generally much easier to find controls
-            if self.selectedCtrls < self.controls and self.selectedCtrls <= self.selectedCases:
-                self.prog.update(self.selectedCases + self.selectedCtrls)
-                self.selectedCtrls += 1
+            if self.selectedCtrls[param] < self.controls[param] and self.selectedCtrls[param] <= self.selectedCases[param]:
+                self.selectedCtrls[param] += 1
+                self.prog.update(sum(self.selectedCases) + sum(self.selectedCtrls))
                 return True
         return False
 
