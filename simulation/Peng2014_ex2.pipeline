@@ -31,6 +31,13 @@ regions_comment=One or more chromosome regions (separated by ',') in the format 
   Please visit http://varianttools.sourceforge.net/Simulation for detailed
   description of this parameter.
   
+causing_genes=ccdsGene_exon.name:CCDS12419.1,CCDS46035.1,CCDS4360.1,CCDS3581.1,CCDS10170.1
+regions_comment=One or more chromosome regions (separated by ',') in the format of
+  chr:start-end (e.g. chr21:33031597-33041570), or Field:Value from a region-based
+  annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947).
+  Please visit http://varianttools.sourceforge.net/Simulation for detailed
+  description of this parameter.
+  
 scale=10
 scale_comment=Scaling factor to speed up the simulation by scaling down the
   simulation while boosting mutation, selection and recombination rates.
@@ -43,7 +50,7 @@ comment=Check the version of variant tools. Version 2.3.1 or higher is required
 
 [MexicanAmerican_10]
 input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
-action=RunCommand('vtools init Peng2014_ex1')
+action=RunCommand('vtools init MexicanAmerican --force')
 comment=Create a new project if there is no existing project under the current
 	directory.
 
@@ -83,10 +90,22 @@ comment=Get allele frequency spectrum in a sample of 700 individuals.
 [MexicanAmerican_60]
 input=${OUTPUT40}
 action=DrawCaseControlSample(cases=1000, controls=1000, 
-	penetrance=ProteinPenetrance('%(regions)s', s_sporadic=0.0001, s_missense=0.001,
+	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
 		s_stoploss=0.001, s_stopgain=0.01),
 	output='MexicanAmerican_sample_${seed}.pop')
 comment=Draw case control sample from the mixed Mexican American population.
+
+[MexicanAmerican_70]
+action=ExportPopulation(output=[
+	'MexicanAmerican_sample_${seed}.vcf',
+	'MexicanAmerican_sample_${seed}.phe'])
+comment=Export genotype and phenotype simulated samples in vcf and text formats, respectively.
+
+[MexicanAmerican_80]
+action=RunCommand(['vtools import ${INPUT: INPUT[0]}',
+	'vtools phenotype --from_file ${INPUT: INPUT[1]}'])
+comment=Import data into a variant tools project.
+
 #[MexicanAmerican_
 # [MexicanAmerican_999]
 # action=RemoveIntermediateFiles(['MexicanAmerican_evolved_${seed}.pop', 'cache/MexicanAmerican_init_${seed}.pop'])

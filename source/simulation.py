@@ -39,6 +39,7 @@ import os
 import sys
 import math
 import time
+import datetime
 import random
 import tempfile
 from collections import defaultdict
@@ -343,13 +344,14 @@ def FineScaleRecombinator(regions, scale, defaultRate=1e-8, output=None):
                     gmap.write('{}\t{}\t{}\t{}\n'.format(ch_name, p, geneticPos[p], r))
     #
     rec_rates = [x * scale if x * scale < 0.5 else 0.5 for x in rec_rates] 
-    return sim.Recombinator(rates=rec_rates)
+    # use loci position to return list of loci
+    return sim.Recombinator(rates=rec_rates, loci=sum([[(ch,pos) for pos in lociPos[ch]] for ch in chroms], []))
 
 
-class PopToVcf(SkiptableAction):
+class ExportPopulation(SkiptableAction):
     def __init__(self, output, sample_names=[]):
         self.sample_names = sample_names
-        SkiptableAction.__init__(self, cmd='PopToVcf {} {}\n'.format(sample_names, output),
+        SkiptableAction.__init__(self, cmd='ExportPopulation {} {}\n'.format(sample_names, output),
             output=output)
 
     def _execute(self, ifiles, pipeline):
@@ -365,6 +367,11 @@ class PopToVcf(SkiptableAction):
         pop = sim.loadPopulation(ifiles[0])
         # output genotype
         with open(self.output[0], 'w') as vcf:
+            vcf.write('##fileformat=VCFv4.1\n')
+            vcf.write('##fileData={}\n'.format(datetime.date.today().strftime("%Y%m%d")))
+            vcf.write('##source=Variant Simulation Tools\n')
+            vcf.write('##reference={}\n'.format(pipeline.proj.build))
+            vcf.write('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n')
             vcf.write('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t')
             if self.sample_names:
                 if len(self.sample_names) != pop.popSize():
@@ -413,6 +420,8 @@ class PopToVcf(SkiptableAction):
                     prog.update(loc)
             prog.done()
         #
+        if len(self.output) == 1:
+            return
         # output phenotype
         with open(self.output[1], 'w') as phe:
             fields = pop.infoFields()
@@ -567,7 +576,6 @@ def _identifyCodonInRegions(raw_regions):
     # We pass location of coding sequences to PySelector, the call back function will receive
     # genotypes at these loci, and we need to remap these genotypes to the genome.
     #
-    # pos2idx: pos->idx in region
     # ......................................................................................
     # coding_loci: positions of xxxxx
     #
@@ -583,15 +591,12 @@ def _identifyCodonInRegions(raw_regions):
         #
         # all loci contrains all pos in the region and their indexes
         all_loci = defaultdict(set)
+        nLoci = 0
         for reg in regions:
             all_loci[reg[0]] = all_loci[reg[0]].union(range(reg[1], reg[2]+1))
+            nLoci += len(all_loci[reg[0]])
         # find the number of loci on each chromosome
         chroms = sorted(all_loci.keys())
-        start_idx = 0
-        pos2idx = {}
-        for ch in sorted(all_loci.keys()):
-            pos2idx.update({(ch,y):(start_idx + x) for x,y in enumerate(sorted(all_loci[ch]))})
-            start_idx += len(pos2idx)
         #
         ref = RefGenome(proj.build)
         genes = genesInRegions(regions, proj)
@@ -621,7 +626,7 @@ def _identifyCodonInRegions(raw_regions):
                         skip_codon = True
                         continue
                     # information about the codon: p0, p1, p2, aa, strand
-                    codon = (pos2idx[(ch, p)], pos2idx[(ch, pos[idx+1])], pos2idx[(ch, pos[idx+2])],
+                    codon = ((ch, p), (ch, pos[idx+1]), (ch, pos[idx+2]),
                         codon_table[s + seq[idx+1] + seq[idx+2]] if stru['strand'] == '+' else
                         codon_table_reverse_complement[s + seq[idx+1] + seq[idx+2]] ,
                         stru['strand'])
@@ -630,25 +635,24 @@ def _identifyCodonInRegions(raw_regions):
                     continue
                 within += 1
                 # record reference sequence
-                coding_base[pos2idx[(ch,p)]] = s
+                coding_base[(ch,p)] = s
                 # other two positions share the same codon
                 # because of there can be multiple genes, one basepair can be in multiple codon
-                if pos2idx[(ch,p)] in codon_info:
-                    if codon not in codon_info[pos2idx[(ch,p)]]:
-                        codon_info[pos2idx[(ch,p)]].append(codon)
+                if (ch,p) in codon_info:
+                    if codon not in codon_info[(ch,p)]:
+                        codon_info[(ch,p)].append(codon)
                 else:
-                    codon_info[pos2idx[(ch,p)]] = [codon]
+                    codon_info[(ch,p)] = [codon]
             env.logger.info('Length of all coding regions of {}: {} ({} within specified regions)'.format(
                 gene, len(pos), within))
     #
     # remove all positions that are not in regions
     env.logger.info('{} out of {} bp ({:.2f}%) are in coding regions of genes {}'.format(
-        len(codon_info), len(pos2idx), 
-        100. * len(codon_info) / len(pos2idx), 
+        len(codon_info), nLoci, 100. * len(codon_info) / nLoci, 
         ', '.join(genes)))
-    with open('coding.txt', 'w') as coding:
-        coding.write(''.join([str(x)+'\n' for x in sorted(codon_info.keys())]))
-    return len(pos2idx), coding_base, codon_info
+    #with open('coding.txt', 'w') as coding:
+    #    coding.write(''.join([str(x)+'\n' for x in sorted(codon_info.keys())]))
+    return coding_base, codon_info
 
 class ProteinSelector(sim.PySelector):
     def __init__(self, regions, s_missense=0.001, s_stoploss=0.002, s_stopgain=0.01):
@@ -670,14 +674,15 @@ class ProteinSelector(sim.PySelector):
         self.s_stoploss = s_stoploss
         self.s_stopgain = s_stopgain
         #
-        self.num_loci, self.coding_base, self.codon_info = _identifyCodonInRegions(regions)
+        self._codon_info = None
+        self._coding_base = None
+        self.coding_base, self.codon_info = _identifyCodonInRegions(regions)
         if (not self.codon_info) or (s_missense == 0 and s_stoploss == 0 and s_stopgain == 0):
             env.logger.warning('Specified region does not contain any gene or all selection coefficient is zero. A neutral model will be used.')
             sim.PySelector.__init__(self, func=self._neutral, loci=[])
         else:
             # we need to send simuPOP to indexes of coding loci within the specified region
-            sim.PySelector.__init__(self, func=self._select, loci=sorted(self.codon_info.keys()))
-
+            sim.PySelector.__init__(self, func=self._select, loci=[(str(x[0]), x[1]) for x in sorted(self.codon_info.keys())])
         # 
         # a cache for all fitness values
         #self.fitness_cache = {}
@@ -690,10 +695,22 @@ class ProteinSelector(sim.PySelector):
             'T': {0: 'T', 1: 'A', 2: 'C', 3: 'G'},
         }
 
+    def _updatePosWithIndexes(self, pop):
+        all_pos = sorted(self.coding_base.keys())
+        indexes = pop.indexesOfLoci(all_pos)
+        posMap = {x:y for x,y in zip(all_pos, indexes)}
+        self._coding_base = {posMap[x]:y for x,y in self.coding_base.items()}
+        self._codon_info = {}
+        for key,codons in self.codon_info.items():
+            new_codons = []
+            for codon in codons:
+                new_codons.append((posMap[codon[0]], posMap[codon[1]], posMap[codon[2]], codon[3], codon[4]))
+            self._codon_info[posMap[key]] = new_codons
+        
     def _neutral(self):
         return 1
 
-    def _select(self, mut):
+    def _select(self, mut, pop):
         # geno is arranged locus by locus (A1,A2,B1,B2 etc)
         #
         # we can not divide the sequence into triplets because it is possible that a nucleotide
@@ -701,19 +718,22 @@ class ProteinSelector(sim.PySelector):
         # 
         # the same aa change can be caused by two mutations, we need to keep only one
         # aa_change with the same (aa, naa, ploidy, p0)
+        if self._codon_info is None:
+            self._updatePosWithIndexes(pop)
+        #
         aa_change = set()
-        N = self.num_loci
+        N = pop.totNumLoci()
         for m in mut.keys():
             p = m / N  # ploidy
             loc = m % N
             aa_change_at_m = []
             # we need to map index in coding region to their original position
-            for p0, p1, p2, aa, s in self.codon_info[loc]:
+            for p0, p1, p2, aa, s in self._codon_info[loc]:
                 # p0: location
                 # mut: mutation (0 for wildtype)
-                codon = self.mutant_map[self.coding_base[p0]][mut[p0+p*N]] + \
-                        self.mutant_map[self.coding_base[p1]][mut[p1+p*N]] + \
-                        self.mutant_map[self.coding_base[p2]][mut[p2+p*N]]
+                codon = self.mutant_map[self._coding_base[p0]][mut[p0+p*N]] + \
+                        self.mutant_map[self._coding_base[p1]][mut[p1+p*N]] + \
+                        self.mutant_map[self._coding_base[p2]][mut[p2+p*N]]
                 naa = codon_table[codon] if s == '+' else codon_table_reverse_complement[codon]
                 # if this is a real change
                 if naa != aa:
@@ -794,7 +814,9 @@ class ProteinPenetrance(sim.PyPenetrance):
         self.s_stoploss = s_stoploss
         self.s_stopgain = s_stopgain
         #
-        self.num_loci, self.coding_base, self.codon_info = _identifyCodonInRegions(regions)
+        self._codon_info = None
+        self._coding_base = None
+        self.coding_base, self.codon_info = _identifyCodonInRegions(regions)
         if not self.codon_info:
             env.logger.warning('Specified region does not contain any gene. A neutral model will be used.')
             sim.PyPenetrance.__init__(self, func=self._neutral, loci=[])
@@ -815,10 +837,22 @@ class ProteinPenetrance(sim.PyPenetrance):
             'T': {0: 'T', 1: 'A', 2: 'C', 3: 'G'},
         }
 
+    def _updatePosWithIndexes(self, pop):
+        all_pos = sorted(self.coding_base.keys())
+        indexes = pop.indexesOfLoci(all_pos)
+        posMap = {x:y for x,y in zip(all_pos, indexes)}
+        self._coding_base = {posMap[x]:y for x,y in self.coding_base.items()}
+        self._codon_info = {}
+        for key,codons in self.codon_info.items():
+            new_codons = []
+            for codon in codons:
+                new_codons.append((posMap[codon[0]], posMap[codon[1]], posMap[codon[2]], codon[3], codon[4]))
+            self._codon_info[posMap[key]] = new_codons
+
     def _neutral(self):
         return 1 - s_sporadic
 
-    def _penetrance(self, mut):
+    def _penetrance(self, mut, pop):
         # geno is arranged locus by locus (A1,A2,B1,B2 etc)
         #
         # we can not divide the sequence into triplets because it is possible that a nucleotide
@@ -826,19 +860,21 @@ class ProteinPenetrance(sim.PyPenetrance):
         # 
         # the same aa change can be caused by two mutations, we need to keep only one
         # aa_change with the same (aa, naa, ploidy, p0)
+        if self._codon_info is None:
+            self._updatePosWithIndexes(pop)
         aa_change = set()
-        N = self.num_loci
+        N = pop.totNumLoci()
         for m in mut.keys():
             p = m / N  # ploidy
             loc = m % N
             aa_change_at_m = []
             # we need to map index in coding region to their original position
-            for p0, p1, p2, aa, s in self.codon_info[loc]:
+            for p0, p1, p2, aa, s in self._codon_info[loc]:
                 # p0: location
                 # mut: mutation (0 for wildtype)
-                codon = self.mutant_map[self.coding_base[p0]][mut[p0+p*N]] + \
-                        self.mutant_map[self.coding_base[p1]][mut[p1+p*N]] + \
-                        self.mutant_map[self.coding_base[p2]][mut[p2+p*N]]
+                codon = self.mutant_map[self._coding_base[p0]][mut[p0+p*N]] + \
+                        self.mutant_map[self._coding_base[p1]][mut[p1+p*N]] + \
+                        self.mutant_map[self._coding_base[p2]][mut[p2+p*N]]
                 naa = codon_table[codon] if s == '+' else codon_table_reverse_complement[codon]
                 # if this is a real change
                 if naa != aa:
