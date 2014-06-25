@@ -101,6 +101,14 @@ class TestAdmin(ProcessTestCase):
         self.assertFalse('DESD' in outputOfCmd('vtools show tables'))
         self.assertTrue('NN NN' in outputOfCmd('vtools show tables'))
 
+    def testSaveLoadSnapshot(self):
+        'test save/load snapshot'
+        self.assertFail('vtools admin --save_snapshot a')
+        self.assertSucc('vtools admin --save_snapshot a "some comment"')
+        self.assertSucc('vtools admin --load_snapshot a')
+        self.assertSucc('vtools admin --save_snapshot a.tar.gz "some comment"')
+        self.assertSucc('vtools admin --load_snapshot a.tar.gz')
+
     def testRuntimeOption(self):
         'test set runtime options'
         # FIXME: test for valid options

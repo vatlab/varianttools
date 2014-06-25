@@ -251,7 +251,7 @@ class AnnoDB:
             .format(len(val_common), len(val_proj), ', '.join(self.linked_by), self.name))
         if len(val_common) < len(val_proj):
             env.logger.debug('The {} values not annotated are: {}'
-                .format('first 100' if len(val_common) + 100 < len(val_proj) else len(val_proj) - len(val_commmon),
+                .format('first 100' if len(val_common) + 100 < len(val_proj) else len(val_proj) - len(val_common),
                     ', '.join([str(x[0]) for x in list(val_proj - val_annoDB)[:100]])))
         #
         # if not all values are used

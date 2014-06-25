@@ -156,8 +156,8 @@ class TestUpdate(ProcessTestCase):
         self.assertSucc('vtools output variant chr pos total num maf -l 10')
         #we can set the fields from the annotation file
         self.assertSucc('vtools liftover hg19')
-        self.assertSucc('vtools use evs')
-        self.assertSucc('vtools update variant --set evs_gene=evs.Genes')
+        self.assertSucc('vtools use ESP')
+        self.assertSucc('vtools update variant --set evs_gene=ESP.Genes')
         self.assertOutput(('vtools execute "select chr,pos, ref, alt, evs_gene from variant\
                          where evs_gene is not null"'), '22\t49524956\tG\tA\tACR\n')
         self.assertOutput(('vtools select variant "evs_gene is not NULL" -c'), '1\n')

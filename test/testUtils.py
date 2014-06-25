@@ -92,10 +92,12 @@ class ProcessTestCase(unittest.TestCase):
                         text = text[:skip-1] + text[skip:]
                         self.assertEqual('\n'.join(text), output)
                 elif file is not None:
+                        with open(file) as f:
+                             content = f.read()
                         self.assertEqual(
                              subprocess.check_output(cmd, stderr=fnull,
                              env=test_env).decode(),
-                             open(file).read())
+                             content)
             elif numOfLines > 0:            
                 if file is None:            
                     self.assertEqual(

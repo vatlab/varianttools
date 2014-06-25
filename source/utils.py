@@ -1146,12 +1146,12 @@ else:
         during file read.
         '''
         def __init__(self, prog, *args, **kwargs):
-            file.__init__(self, *args, **kwargs)
+            FileIO.__init__(self, *args, **kwargs)
             self.prog = prog
 
         def read(self, n, *args):
             self.prog.progressBy(n)
-            return file.read(self, n, *args)
+            return FileIO.read(self, n, *args)
 
 def getSnapshotInfo(name):
     '''return meta information for all snapshots'''
