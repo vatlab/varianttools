@@ -69,7 +69,7 @@ class TestExport(ProcessTestCase):
 
         runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
         runCmd('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-        runCmd('vtools use dbSNP-hg19_137')
+        runCmd('vtools use dbSNP-hg19_138')
 
         #you can assin any word for the suboption of --format_string
         self.assertSucc('vtools export variant --format vcf --format_string GT')
@@ -93,7 +93,7 @@ class TestExport(ProcessTestCase):
         self.assertSucc('vtools export variant --format vcf --ref dbSNP.refUCSC')
         self.assertSucc('vtools export variant --format vcf --alt dbSNP.alt')
         
-        self.assertSucc('vtools export variant --format vcf --qual dbSNP.func')
+        self.assertSucc('vtools export variant --format vcf --qual dbSNP.VP')
         self.assertSucc('vtools export variant --format vcf --filter dbSNP.valid')
         self.assertSucc('vtools export variant --format vcf --info dbSNP.locType')
         self.assertSucc('vtools export variant --format vcf --geno dbSNP.molType')
@@ -146,7 +146,7 @@ class TestExport(ProcessTestCase):
         'Test command export with multiple sub-options'
         runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
         runCmd('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-        runCmd('vtools use dbSNP-hg19_137')
+        runCmd('vtools use dbSNP-hg19_138')
         
         # You can assign a file or give the file format using this export "vcf" command 
         self.assertSucc('vtools export variant --format vcf --pos pos --ref ref')
@@ -162,12 +162,12 @@ class TestExport(ProcessTestCase):
         #those tests are passed. Please check the fields you want to assign to each suboption, otherwise the output will be messy.
         self.assertSucc('vtools export variant --format vcf --pos dbSNP.start --ref ref')
         self.assertSucc('vtools export variant --format vcf --pos dbSNP.start --ref dbSNP.refUCSC --alt dbSNP.alt ')
-        self.assertSucc('vtools export variant -o my.vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.func')
-        self.assertSucc('vtools export variant --format vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.func --samples 1 --format_string GT:DP')
+        self.assertSucc('vtools export variant -o my.vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.VP')
+        self.assertSucc('vtools export variant --format vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.VP --samples 1 --format_string GT:DP')
 
         #output in alternative reference genome
         runCmd('vtools liftover hg18')
-        self.assertSucc('vtools export variant --format vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.func --samples 1 --format_string GT:DP')
+        self.assertSucc('vtools export variant --format vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.VP --samples 1 --format_string GT:DP')
 
     def testHeader(self):
         'Test option header of vtools export'
@@ -201,10 +201,10 @@ class TestExport(ProcessTestCase):
         'Test command export in annovar input format'
         runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
         runCmd('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-        runCmd('vtools use dbSNP-hg19_137')
+        runCmd('vtools use dbSNP')
         #the output format of 'ANNOVAR' is with one options: --comment_string
         self.assertSucc('vtools export variant --format ANNOVAR') 
-        self.assertSucc('vtools export variant --format ANNOVAR --comment_string dbSNP.func')
+        self.assertSucc('vtools export variant --format ANNOVAR --comment_string dbSNP.VP')
         #
         # export table with non-ascii name
         runCmd('vtools select variant -t "8#?"')
@@ -215,7 +215,7 @@ class TestExport(ProcessTestCase):
         #the output format of 'ANNOVAR_output' is with one options: --var_info. This format is not working right now.
         #runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
         #runCmd('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-        #runCmd('vtools use dbSNP-hg19_137')
+        #runCmd('vtools use dbSNP-hg19_138')
         #self.assertFail('vtools export variant --format ANNOVAR_output') 
         #self.assertSucc('vtools export variant --format ANNOVAR_output --var_info dbSNP.name')
 
@@ -229,7 +229,7 @@ class TestExport(ProcessTestCase):
         self.assertSucc('vtools export variant --format tped --samples 1 --style numeric')
         self.assertOutput('vtools export tmp --format tped --samples "sample_name like \'NA069%\'"', 
                           '1	.	.	533	G	G	G	G	G	G', 1)
-        runCmd('vtools use dbSNP-hg19_137')
+        runCmd('vtools use dbSNP-hg19_138')
         self.assertSucc('vtools export variant --format tped --samples \'sample_name like "NA069%"\' --name dbSNP.name')
 
     def testTpedMissingGen(self):
