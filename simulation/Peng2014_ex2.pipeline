@@ -102,16 +102,13 @@ action=ExportPopulation(output=[
 comment=Export genotype and phenotype simulated samples in vcf and text formats, respectively.
 
 [MexicanAmerican_80]
-action=RunCommand(['vtools import ${INPUT: INPUT[0]}',
+action=RunCommand(['vtools import ${INPUT: INPUT[0]} --force',
 	'vtools phenotype --from_file ${INPUT: INPUT[1]}'])
 comment=Import data into a variant tools project.
 
-#[MexicanAmerican_
-# [MexicanAmerican_999]
-# action=RemoveIntermediateFiles(['MexicanAmerican_evolved_${seed}.pop', 'cache/MexicanAmerican_init_${seed}.pop'])
-# comment=Remove intermediate populations to save diskspace.
-# 
-# 
+[MexicanAmerican_90]
+action=RunCommand(['vtools associate variant aff -m GroupStat BurdenBt --group_by refGene.name2 > MexicanAmerican_${seed}.res'])
+comment=Analyze the project using variant association tools.
 
 
 
@@ -122,7 +119,7 @@ comment=Check the version of variant tools. Version 2.3.1 or higher is required
 
 [European_10]
 input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
-action=RunCommand('vtools init Peng2014_ex1')
+action=RunCommand('vtools init European --force')
 comment=Create a new project if there is no existing project under the current
 	directory.
 
@@ -162,14 +159,24 @@ comment=Get allele frequency spectrum in a sample of 700 individuals.
 [European_60]
 input=${OUTPUT40}
 action=DrawCaseControlSample(cases=[0, 1000, 0, 0], controls=[0, 1000, 0, 0],
-	penetrance=ProteinPenetrance('%(regions)s', s_sporadic=0.0001, s_missense=0.001,
+	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
 		s_stoploss=0.001, s_stopgain=0.01),
 	output='European_sample_${seed}.pop')
 comment=Draw case control sample from the mixed Mexican American population.
-#[European_
-# [European_999]
-# action=RemoveIntermediateFiles(['European_evolved_${seed}.pop', 'cache/European_init_${seed}.pop'])
-# comment=Remove intermediate populations to save diskspace.
-# 
-# 
+
+[European_70]
+action=ExportPopulation(output=[
+	'European_sample_${seed}.vcf',
+	'European_sample_${seed}.phe'])
+comment=Export genotype and phenotype simulated samples in vcf and text formats, respectively.
+
+[European_80]
+action=RunCommand(['vtools import ${INPUT: INPUT[0]} --force',
+	'vtools phenotype --from_file ${INPUT: INPUT[1]}'])
+comment=Import data into a variant tools project.
+
+
+[European_90]
+action=RunCommand(['vtools associate variant aff -m GroupStat BurdenBt --group_by refGene.name2 > European_${seed}.res'])
+comment=Analyze the project using variant association tools.
 
