@@ -1678,7 +1678,7 @@ def execute(args):
     # to keep backward compatibility, the vtools execute command
     # can execute a SQL query and a pipeline
     def executeQuery():
-        with Project(verbosity=args.verbosity, mode=['ALLOW_NO_PROJ', 'READONLY']) as proj:
+        with Project(verbosity=args.verbosity) as proj:
             # if there is no output, 
             proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
             # for backward compatibility
