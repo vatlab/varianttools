@@ -1385,8 +1385,7 @@ class DownloadResource:
  
 
 class Pipeline:
-    def __init__(self, proj, name, extra_args=[], pipeline_type='pipeline'):
-        self.proj = proj
+    def __init__(self, name, extra_args=[], pipeline_type='pipeline'):
         self.pipeline = PipelineDescription(name, extra_args, pipeline_type)
 
     def var_expr(self, var):
@@ -1492,15 +1491,17 @@ class Pipeline:
         #
         global max_running_jobs 
         max_running_jobs = jobs
-        self.VARS = {
-            'cmd_input': input_files,
-            'cmd_output': output_files,
-            'temp_dir': env.temp_dir,
-            'cache_dir': env.cache_dir,
-            'local_resource': env.local_resource,
-            'ref_genome_build': '' if self.proj is None or not self.proj.build else  self.proj.build,
-            'vtools_version': '' if self.proj is None else self.proj.version,
-        }
+        # the project will be opened when needed
+        with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY']) as proj:
+            self.VARS = {
+                'cmd_input': input_files,
+                'cmd_output': output_files,
+                'temp_dir': env.temp_dir,
+                'cache_dir': env.cache_dir,
+                'local_resource': env.local_resource,
+                'ref_genome_build': proj.build,
+                'vtools_version': proj.version,
+            }
         self.VARS.update(**kwargs)
         for key, val in self.pipeline.pipeline_vars.items():
             self.VARS[key.lower()] = self.substitute(val, self.VARS)
@@ -1676,32 +1677,33 @@ def executeArguments(parser):
 def execute(args):
     # to keep backward compatibility, the vtools execute command
     # can execute a SQL query and a pipeline
-    def executeQuery(proj):
-        # if there is no output, 
-        proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
-        # for backward compatibility
-        proj.db.attach('{}_genotype'.format(proj.name))
-        cur = proj.db.cursor()
-        # 
-        query = ' '.join(args.pipeline)
-        if query.upper().startswith('SELECT'):
-            env.logger.debug('Analyze statement: "{}"'.format(query))
-            cur.execute('EXPLAIN QUERY PLAN ' + query)
+    def executeQuery():
+        with Project(verbosity=args.verbosity, mode=['ALLOW_NO_PROJ', 'READONLY']) as proj:
+            # if there is no output, 
+            proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
+            # for backward compatibility
+            proj.db.attach('{}_genotype'.format(proj.name))
+            cur = proj.db.cursor()
+            # 
+            query = ' '.join(args.pipeline)
+            if query.upper().startswith('SELECT'):
+                env.logger.debug('Analyze statement: "{}"'.format(query))
+                cur.execute('EXPLAIN QUERY PLAN ' + query)
+                for rec in cur:
+                    env.logger.debug('\t'.join([str(x) for x in rec]))
+            # really execute the query
+            try:
+                cur.execute(query)
+            except Exception as e:
+                raise RuntimeError('Failed to execute SQL query "{}": {}'
+                    .format(query, e))
+            proj.db.commit()
+            sep = args.delimiter
             for rec in cur:
-                env.logger.debug('\t'.join([str(x) for x in rec]))
-        # really execute the query
-        try:
-            cur.execute(query)
-        except Exception as e:
-            raise RuntimeError('Failed to execute SQL query "{}": {}'
-                .format(query, e))
-        proj.db.commit()
-        sep = args.delimiter
-        for rec in cur:
-            print(sep.join(['{}'.format(x) for x in rec]))
+                print(sep.join(['{}'.format(x) for x in rec]))
     #
-    def executePipeline(proj):                
-        pipeline = Pipeline(proj, args.pipeline[0], extra_args=args.unknown_args)
+    def executePipeline():                
+        pipeline = Pipeline(args.pipeline[0], extra_args=args.unknown_args)
         # unspecified
         if len(args.pipeline) == 1:
             pipeline.execute(None, args.input, args.output,
@@ -1712,22 +1714,20 @@ def execute(args):
                     args.jobs)
     # 
     try:
-        with Project(verbosity=args.verbosity, mode=['ALLOW_NO_PROJ', 'READONLY']) as proj:
-            #
-            # definitely a pipeline
-            if args.input or args.output or args.unknown_args:
-                executePipeline(proj)
-            # definitely a sql query
-            elif args.delimiter != '\t':
-                executeQuery(proj)
-            else:
-                try:
-                    # try to execute as a SQL query
-                    executeQuery(proj)
-                except RuntimeError as e:
-                    env.logger.debug('Failed to execute {} as SQL query: {}'
-                        .format(' '.join(args.pipeline), e))
-                    executePipeline(proj)
+        # definitely a pipeline
+        if args.input or args.output or args.unknown_args:
+            executePipeline()
+        # definitely a sql query
+        elif args.delimiter != '\t':
+            executeQuery()
+        else:
+            try:
+                # try to execute as a SQL query
+                executeQuery()
+            except RuntimeError as e:
+                env.logger.debug('Failed to execute {} as SQL query: {}'
+                    .format(' '.join(args.pipeline), e))
+                executePipeline()
     except Exception as e:
         env.unlock_all()
         env.logger.error(e)
@@ -1761,44 +1761,43 @@ def simulateArguments(parser):
 
 def simulate(args):
     try:
-        with Project(verbosity=args.verbosity, mode=['ALLOW_NO_PROJ', 'READ_ONLY']) as proj:
-            # step 1, create a simulation configuration file.
-            model_name = os.path.basename(args.model[0]).split('.', 1)[0]
-            if args.seed is None:
-                args.seed = random.randint(1, 2**32-1)
-            if not os.path.isdir(env.cache_dir):
-                os.mkdir(env.cache_dir)
+        # step 1, create a simulation configuration file.
+        model_name = os.path.basename(args.model[0]).split('.', 1)[0]
+        if args.seed is None:
+            args.seed = random.randint(1, 2**32-1)
+        if not os.path.isdir(env.cache_dir):
+            os.mkdir(env.cache_dir)
+        #
+        if args.replicates <= 0:
+            raise ValueError('No replication studies is requested.')
+        #
+        for rep in range(args.replicates):
+            # set random seed of simulators
+            random.seed(args.seed + rep)
+            if len(args.model) == 1:
+                cfg_file = '{}/{}_{}.cfg'.format(env.cache_dir, model_name, args.seed + rep)
+            else:
+                cfg_file = '{}/{}_{}_{}.cfg'.format(env.cache_dir, model_name, args.model[1], args.seed + rep)
             #
-            if args.replicates <= 0:
-                raise ValueError('No replication studies is requested.')
+            with open(cfg_file, 'w') as cfg:
+                cfg.write('model={}\n'.format(' '.join(args.model)))
+                cfg.write('seed={}\n'.format(args.seed + rep))
+                if '--seed' in sys.argv:
+                    # skip the seed option so to stop pipeline from distinguishing the two commands
+                    cmd_args = sys.argv[:sys.argv.index('--seed')] + sys.argv[sys.argv.index('--seed') + 2:]
+                    cfg.write("command=vtools {}\n".format(subprocess.list2cmdline(cmd_args[1:])))
+                else:
+                    cfg.write("command={}\n".format(env.command_line))
             #
-            for rep in range(args.replicates):
-                # set random seed of simulators
-                random.seed(args.seed + rep)
-                if len(args.model) == 1:
-                    cfg_file = '{}/{}_{}.cfg'.format(env.cache_dir, model_name, args.seed + rep)
-                else:
-                    cfg_file = '{}/{}_{}_{}.cfg'.format(env.cache_dir, model_name, args.model[1], args.seed + rep)
-                #
-                with open(cfg_file, 'w') as cfg:
-                    cfg.write('model={}\n'.format(' '.join(args.model)))
-                    cfg.write('seed={}\n'.format(args.seed + rep))
-                    if '--seed' in sys.argv:
-                        # skip the seed option so to stop pipeline from distinguishing the two commands
-                        cmd_args = sys.argv[:sys.argv.index('--seed')] + sys.argv[sys.argv.index('--seed') + 2:]
-                        cfg.write("command=vtools {}\n".format(subprocess.list2cmdline(cmd_args[1:])))
-                    else:
-                        cfg.write("command={}\n".format(env.command_line))
-                #
-                env.logger.info('Starting simulation {}'.format(cfg_file))
-                pipeline = Pipeline(proj, args.model[0], extra_args=args.unknown_args,
-                    pipeline_type='simulation')
-                # using a pool of simulators 
-                if len(args.model) == 1:
-                    pipeline.execute(None, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
-                else:
-                    for name in args.model[1:]:
-                        pipeline.execute(name, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
+            env.logger.info('Starting simulation {}'.format(cfg_file))
+            pipeline = Pipeline(args.model[0], extra_args=args.unknown_args,
+                pipeline_type='simulation')
+            # using a pool of simulators 
+            if len(args.model) == 1:
+                pipeline.execute(None, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
+            else:
+                for name in args.model[1:]:
+                    pipeline.execute(name, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)

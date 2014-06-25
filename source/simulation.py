@@ -62,7 +62,7 @@ class ExtractVCF(SkiptableAction):
 
     def _execute(self, ifiles, pipeline):
         tabixFetch(self.sourceURL, [], self.output[0], True)
-        for r in expandRegions(self.regions, pipeline.proj):
+        for r in expandRegions(self.regions):
             region = '{}:{}-{}'.format(r[0], r[1], r[2])
             env.logger.info('Retriving genotype for region chr{}{}'.format(region,
                 ' ({})'.format(r[3] if r[3] else '')))
@@ -82,7 +82,7 @@ class CreatePopulation(SkiptableAction):
     def _execute(self, ifiles, pipeline):
         # translate regions to simuPOP ...
         lociPos = {}
-        regions = expandRegions(self.regions, pipeline.proj)
+        regions = expandRegions(self.regions)
         for r in regions:
             if r[0] in lociPos:
                 lociPos[r[0]].extend(range(r[1], r[2] + 1))
@@ -221,16 +221,15 @@ def FineScaleRecombinator(regions, scale, defaultRate=1e-8, output=None):
     if scale == 0:
         return sim.MendelianGenoTransmitter()
     #
-    with Project(verbosity='1') as proj:
-        lociPos = {}
-        for reg in expandRegions(regions, proj):
-            if reg[0] in lociPos:
-                lociPos[reg[0]].extend(range(reg[1], reg[2]+1))
-            else:
-                lociPos[reg[0]] = range(reg[1], reg[2]+1)
-        #
-        chroms = lociPos.keys()
-        chroms.sort()
+    lociPos = {}
+    for reg in expandRegions(regions):
+        if reg[0] in lociPos:
+            lociPos[reg[0]].extend(range(reg[1], reg[2]+1))
+        else:
+            lociPos[reg[0]] = range(reg[1], reg[2]+1)
+    #
+    chroms = lociPos.keys()
+    chroms.sort()
     #
     # download the map
     Recom_URL = 'ftp://ftp.hapmap.org/hapmap/recombination/2011-01_phaseII_B37/genetic_map_HapMapII_GRCh37.tar.gz'
@@ -366,11 +365,15 @@ class ExportPopulation(SkiptableAction):
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
         # output genotype
+        with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY']) as proj:
+            build = proj.build
+        if build is None:
+            build = 'hg19'
         with open(self.output[0], 'w') as vcf:
             vcf.write('##fileformat=VCFv4.1\n')
             vcf.write('##fileData={}\n'.format(datetime.date.today().strftime("%Y%m%d")))
             vcf.write('##source=Variant Simulation Tools\n')
-            vcf.write('##reference={}\n'.format(pipeline.proj.build))
+            vcf.write('##reference={}\n'.format(build))
             vcf.write('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n')
             vcf.write('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t')
             if self.sample_names:
@@ -382,7 +385,7 @@ class ExportPopulation(SkiptableAction):
                 vcf.write('\t'.join(['S_{}'.format(x) for x in range(1, pop.popSize()+1)]) + '\n')
             #
             # get reference genome
-            refGenome = RefGenome(pipeline.proj.build)
+            refGenome = RefGenome(build)
             sim.stat(pop, alleleFreq=sim.ALL_AVAIL, vars='alleleNum')
             nAlleles = 2*pop.popSize()
             segregated = [loc for loc,nums in pop.dvars().alleleNum.items() if nums[0] == nAlleles]

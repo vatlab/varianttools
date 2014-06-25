@@ -1184,7 +1184,7 @@ def getSnapshotInfo(name):
         return (None, None, None)
 
 
-def expandRegions(arg_regions, proj, mergeRegions=True):
+def expandRegions(arg_regions, proj=None, mergeRegions=True):
     '''
     '''
     if not arg_regions:
@@ -1218,19 +1218,21 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
         except Exception as e:
             # this is not a format for chr:start-end, try field:name
             try:
+                from .project import Project
+                myproj = proj if proj is not None else Project() 
                 if region.count(':') == 1:
                     field, value = region.rsplit(':', 1)
                     comment_field = "''"
                 else:
                     field, value, comment_field = region.rsplit(':', 2)
                 # what field is this?
-                query, fields = consolidateFieldName(proj, 'variant', field, False) 
+                query, fields = consolidateFieldName(myproj, 'variant', field, False) 
                 # query should be just one of the fields according to things that are passed
                 if query.strip() not in fields:
                     raise ValueError('Could not identify field {} from the present project'.format(field))
                 # now we have annotation database
                 try:
-                    annoDB = [x for x in proj.annoDB if x.linked_name.lower() == query.split('.')[0].lower()][0]
+                    annoDB = [x for x in myproj.annoDB if x.linked_name.lower() == query.split('.')[0].lower()][0]
                 except:
                     raise ValueError('Could not locate annotation database {} in the project'.format(query.split('.')[0]))
                 #
@@ -1240,7 +1242,7 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
                 chr_field, start_field, end_field = annoDB.build
                 #
                 # find the regions
-                cur = proj.db.cursor()
+                cur = myproj.db.cursor()
                 try:
                     cur.execute('SELECT {},{},{},{} FROM {}.{} WHERE {}="{}"'.format(
                         chr_field, start_field, end_field, comment_field, annoDB.linked_name, annoDB.name,
@@ -1262,6 +1264,9 @@ def expandRegions(arg_regions, proj, mergeRegions=True):
                             .format(chr, start, end, annoDB.linked_name))
                 if not regions:
                     env.logger.error('No valid chromosomal region is identified for {}'.format(region)) 
+                #
+                if proj is None:
+                    myproj.close()
             except Exception as e:
                 raise ValueError('Incorrect format for chromosomal region {}: {}'.format(region, e))
     regions = sorted(regions)
