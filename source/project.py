@@ -1254,6 +1254,10 @@ class Project:
         self.createFilenameTable()
         self.createMasterVariantTable()
         self.createSampleTableIfNeeded()
+        # save file to disk
+        self.db.commit()
+        self.db.close()
+        self.db.connect(self.proj_file)
 
     def open(self, verify=True):
         '''Open an existing project'''
