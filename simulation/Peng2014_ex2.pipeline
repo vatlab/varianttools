@@ -36,7 +36,7 @@ regions_comment=One or more chromosome regions (separated by ',') in the format 
 causing_genes=ccdsGene_exon.name:CCDS12419.1,CCDS46035.1,CCDS4360.1,CCDS3581.1,CCDS10170.1
 causing_genes_comment=A subset of regions from which a phenotype is simulated.
   
-scale=10
+scale=4
 scale_comment=Scaling factor to speed up the simulation by scaling down the
   simulation while boosting mutation, selection and recombination rates.
 
@@ -114,7 +114,7 @@ action=DrawCaseControlSample(
 	controls=[0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}, 0, 0],
 	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
 		s_stoploss=0.001, s_stopgain=0.01),
-	output='${pipeline_name}_sample_1000_${seed}.pop')
+	output='${pipeline_name}_sample_${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}_${seed}.pop')
 comment=Draw ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]} cases
     and ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]} controls 
 	from the European population.
@@ -127,7 +127,7 @@ action=DrawCaseControlSample(
 	controls=[0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}, 0, 0],
 	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
 		s_stoploss=0.001, s_stopgain=0.01),
-	output='${pipeline_name}_sample_1000_${seed}.pop')
+	output='${pipeline_name}_sample_${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}_${seed}.pop')
 comment=Draw ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]} cases
 	from the European population and ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]} controls 
 	from the Asian population.
