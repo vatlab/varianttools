@@ -1188,9 +1188,7 @@ class DrawCaseControlSample(SkiptableAction):
                 self.prog.update(sum(self.selectedCases) + sum(self.selectedCtrls))
                 return True
         else:
-            # we keep number of ctrls less than cases to keep the progress even 
-            # because it is generally much easier to find controls
-            if self.selectedCtrls[param] < self.controls[param] and self.selectedCtrls[param] <= self.selectedCases[param]:
+            if self.selectedCtrls[param] < self.controls[param]:
                 self.selectedCtrls[param] += 1
                 self.prog.update(sum(self.selectedCases) + sum(self.selectedCtrls))
                 return True
