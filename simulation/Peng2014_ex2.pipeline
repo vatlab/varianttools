@@ -5,22 +5,24 @@
 # a description of the format of this file.
 
 [pipeline description]
-description=Simulation of case control samples for 20 genes 
-	This simulation model has been
-	used to simulate data for the second example in paper "Reproducible
-	Simulations of realistic samples for next-gen sequencing studies
-	using Variant Simulation Tools". A demographic model that mimicks that
-	of the European population is used. A fine-scale recombination map is
-	automatically downloaded and applied. The simulated populations are analyzed
-	and discarded to save diskspace.
+description=Simulation of case control samples for 20 genes and analyze samples
+    of different sizes (1000, 2000, 3000, 4000 cases and matching number of 
+	controls) draw from European, Mexican American (mixed and matched case
+	and control), and from both Asican (cases) and European (controls) populations
+	for a mismatch design. This simulation model has been used to simulate data
+	for the second example in paper "Reproducible Simulations of realistic samples
+	for next-gen sequencing studies using Variant Simulation Tools". The generated
+	samples are analyzed using Variant Association Tools, first for all variants
+	and then for non-synoymous variants.
 
-MexicanAmerican_description=This simulator calls ms to execute coalescent-based simulations,
-    create a population with simulated dataset and run through the same statistical
-	analysis as other pipeline.
+MexicanAmerican_description=This model draws samples from Mexican American population
+    which is mixed from Eurpean and Mexican populations.
 
-European_description=This simulator calls ms to execute coalescent-based simulations,
-    create a population with simulated dataset and run through the same statistical
-	analysis as other pipeline.
+European_description=This model draws cases and controls from simulated European
+	population.
+
+Mismatch_description=This model draws cases from Asian population and controls
+    from European population.
 
 [DEFAULT]
 # GPCR signaling pathway
@@ -63,7 +65,7 @@ comment=Create an empty simuPOP population for specified regions.
 action=EvolvePopulation(
 	output='${pipeline_name}_evolved_${seed}.pop',
 	mutator=RefGenomeMutator(regions='%(regions)s', model='K80', rate=[1.8e-8 * %(scale)s, 2]),
-	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s, output='map.txt'),
+	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
 	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
 		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
 	demoModel = SettlementOfNewWorldModel(20000, scale=%(scale)s)
@@ -76,7 +78,7 @@ comment=Evolve and expand the population using a K80 mutation model	and a demogr
 action=EvolvePopulation(
 	output='European_evolved_${seed}.pop',
 	mutator=RefGenomeMutator(regions='%(regions)s', model='K80', rate=[1.8e-8 * %(scale)s, 2]),
-	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s, output='map.txt'),
+	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
 	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
 		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
 	demoModel = SettlementOfNewWorldModel(20000, scale=%(scale)s, mix=False)
