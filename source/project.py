@@ -727,15 +727,17 @@ class PipelineDescription:
                         self.pipeline_vars[item[0]] = item[1]
             else:
                 try:
-                    pname, pidx = section.rsplit('_', 1)
+                    pnames = [x.rsplit('_', 1)[0] for x in section.split(',')]
+                    pidxs = [x.rsplit('_', 1)[1] for x in section.split(',')]
                 except Exception as e:
                     raise ValueError('Invalid section name {} in pipeline description file {}'
                         .format(section, filename))
-                if not pidx.isdigit():
+                if not all([x.isdigit() for x in pidxs]):
                     raise ValueError('Index of a pipeline step should be an integer: {} provided'
-                        .format(pidx))
-                if pname not in self.pipelines:
-                    self.pipelines[pname] = []
+                        .format(', '.join(pidxs)))
+                for pname in pnames:
+                    if pname not in self.pipelines:
+                        self.pipelines[pname] = []
                 try:
                     items = [x[0] for x in parser.items(section, raw=True)]
                     if 'action' not in items:
@@ -746,13 +748,14 @@ class PipelineDescription:
                             continue
                         if item not in ['input', 'input_emitter', 'action', 'comment'] + defaults.keys():
                             step_vars.append([item, parser.get(section, item, vars=defaults)])
-                    command = PipelineCommand(index=pidx,
+                    for pname,pidx in zip(pnames, pidxs):
+                        command = PipelineCommand(index=pidx,
                             input=parser.get(section, 'input', vars=defaults) if 'input' in items else '',
                             input_emitter=parser.get(section, 'input_emitter', vars=defaults) if 'input_emitter' in items else '',
                             action=parser.get(section, 'action', vars=defaults) if 'action' in items else '',
                             pipeline_vars=step_vars,
                             comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
-                    self.pipelines[pname].append(command)
+                        self.pipelines[pname].append(command)
                 except Exception as e:
                     raise ValueError('Invalid section {}: {}'.format(section, e))
         # sort steps
@@ -767,6 +770,7 @@ class PipelineDescription:
                     .format(pname, ', '.join(self.pipelines.keys())))
         for pname, pipeline in self.pipelines.items():
             if pname.lower() not in self.pipeline_descriptions:
+                env.logger.warning('No description for {} {} is available.'.format(self.pipeline_type, pname))
                 self.pipeline_descriptions[pname.lower()] = ''
             for idx, cmd in enumerate(pipeline):
                 if cmd is None:
@@ -1129,19 +1133,15 @@ class Project:
         files = glob.glob('*.proj')
         if 'NEW_PROJ' in self.mode: # new project
             if len(files) > 0:
-                if name + '.proj' in files:
-                    if 'REMOVE_EXISTING' in self.mode:
-                        existing_files = glob.glob('*.proj') + glob.glob('*.lck') + \
-                            glob.glob('*.proj-journal') + glob.glob('*_genotype.DB')
-                        for f in existing_files:
-                            try:
-                                os.remove(f)
-                            except:
-                                # we might not be able to remove files...
-                                raise OSError('Failed to remove existing project {}'.format(f))
-                    else:
-                        raise ValueError('Project {0} already exists. Please use '.format(name) + \
-                            'option --force to remove it if you would like to start a new project.')
+                if 'REMOVE_EXISTING' in self.mode:
+                    existing_files = glob.glob('*.proj') + glob.glob('*.lck') + \
+                        glob.glob('*.proj-journal') + glob.glob('*_genotype.DB')
+                    for f in existing_files:
+                        try:
+                            os.remove(f)
+                        except:
+                            # we might not be able to remove files...
+                            raise OSError('Failed to remove existing project {}'.format(f))
                 else:
                     raise ValueError('A project can only be created in a directory without another project.')
             if name is None:
