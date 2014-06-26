@@ -32,31 +32,24 @@ regions_comment=One or more chromosome regions (separated by ',') in the format 
   description of this parameter.
   
 causing_genes=ccdsGene_exon.name:CCDS12419.1,CCDS46035.1,CCDS4360.1,CCDS3581.1,CCDS10170.1
-regions_comment=One or more chromosome regions (separated by ',') in the format of
-  chr:start-end (e.g. chr21:33031597-33041570), or Field:Value from a region-based
-  annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947).
-  Please visit http://varianttools.sourceforge.net/Simulation for detailed
-  description of this parameter.
+causing_genes_comment=A subset of regions from which a phenotype is simulated.
   
 scale=10
 scale_comment=Scaling factor to speed up the simulation by scaling down the
   simulation while boosting mutation, selection and recombination rates.
-
 
 [*_0]
 action=CheckVariantToolsVersion('2.3.1')
 comment=Check the version of variant tools. Version 2.3.1 or higher is required
 	for the execution of this simulation.
 
-[*_10]
-action=RunCommand('vtools init Peng2014_ex2 --force')
-comment=Create a new project Peng2014_ex2.
-
-[*_20,*_68,*_78,*_88,*_98]
+[*_10,*_110,*_210,*_310,*_410]
+# used for data simulation and analyses of 4 different types of samples
 action=RunCommand([
+	'vtools init Peng2014_ex2 --force',
 	'vtools use refGene',
 	'vtools use ccdsGene_exon'])
-comment=Link the refGene and ccdsGene_exon databases to the project.
+comment=Create a new project Peng2014_ex2 and link the refGene and ccdsGene_exon databases to the project.
 
 [*_30]
 action=CreatePopulation(
@@ -78,7 +71,8 @@ action=EvolvePopulation(
 comment=Evolve and expand the population using a K80 mutation model	and a demographic 
 	model that models the settlement of new world model of the Mexican American population.
  
-[European_40]
+[European_40,Mismatch_40]
+# the same as MexicanAmerican but without final mixing step (mix=False)
 action=EvolvePopulation(
 	output='European_evolved_${seed}.pop',
 	mutator=RefGenomeMutator(regions='%(regions)s', model='K80', rate=[1.8e-8 * %(scale)s, 2]),
@@ -97,46 +91,71 @@ action=OutputPopulationStatistics(
     )
 comment=Get allele frequency spectrum in a sample of 700 individuals.
  
-[MexicanAmerican_60,MexicanAmerican_70,MexicanAmerican_80,MexicanAmerican_90]
+[MexicanAmerican_100,MexicanAmerican_200,MexicanAmerican_300,MexicanAmerican_400]
+# draw different numbers of samples for different pipeline steps
 input=${OUTPUT40}
 action=DrawCaseControlSample(
-	cases=${pipeline_step: {'60':1000, '70':2000, '80':3000, '90':4000}[pipeline_step]},
-	controls=${pipeline_step: {'60':1000, '70':2000, '80':3000, '90':4000}[pipeline_step]},
+	cases=${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]},
+	controls=${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]},
 	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
 		s_stoploss=0.001, s_stopgain=0.01),
 	output='${pipeline_name}_sample_1000_${seed}.pop')
-comment=Draw ${pipeline_step: {'60':1000, '70':2000, '80':3000, '90':4000}[pipeline_step]} cases 
-	and ${pipeline_step: {'60':1000, '70':2000, '80':3000, '90':4000}[pipeline_step]} controls 
+comment=Draw ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]} cases 
+	and ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]} controls 
 	from the mixed Mexican American population.
 
-[European_60,European_70,European_80,European_90]
+[European_100,European_200,European_300,European_400]
+# The difference is that the case control samples are drawn from the European population
 input=${OUTPUT40}
 action=DrawCaseControlSample(
-	cases=[0, ${pipeline_step: {'60':1000, '70':2000, '80':3000, '90':4000}[pipeline_step]}, 0, 0], 
-	controls=[0, ${pipeline_step: {'60':1000, '70':2000, '80':3000, '90':4000}[pipeline_step]}, 0, 0],
+	cases=[0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}, 0, 0], 
+	controls=[0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}, 0, 0],
 	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
 		s_stoploss=0.001, s_stopgain=0.01),
 	output='${pipeline_name}_sample_1000_${seed}.pop')
-comment=Draw ${pipeline_step: {'60':1000, '70':2000, '80':3000, '90':4000}[pipeline_step]} cases
-    and ${pipeline_step: {'60':1000, '70':2000, '80':3000, '90':4000}[pipeline_step]} controls 
+comment=Draw ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]} cases
+    and ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]} controls 
 	from the European population.
 
-[MexicanAmerican_65,MexicanAmerican_75,MexicanAmerican_85,MexicanAmerican_95,European_65,European_75,European_85,European_95]
+[Mismatch_100,Mismatch_200,Mismatch_300,Mismatch_400]
+# The difference is that the case control samples are drawn from the European population
+input=${OUTPUT40}
+action=DrawCaseControlSample(
+	cases=[0, 0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}, 0], 
+	controls=[0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}, 0, 0],
+	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
+		s_stoploss=0.001, s_stopgain=0.01),
+	output='${pipeline_name}_sample_1000_${seed}.pop')
+comment=Draw ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]} cases
+	from the European population and ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]} controls 
+	from the Asian population.
+
+
+[*_120,*_220,*_320,*_420]
 action=ExportPopulation(output=[
 	'${INPUT: INPUT[0][:-4] + ".vcf"}',
 	'${INPUT: INPUT[0][:-4] + ".phe"}'])
 comment=Export genotype and phenotype simulated samples in vcf and text formats, respectively.
 
-[MexicanAmerican_67,MexicanAmerican_77,MexicanAmerican_87,MexicanAmerican_97,European_67,European_77,European_87,European_97]
+[*_130,*_230,*_330,*_430]
 action=RunCommand([
-	'vtools init Peng2014 --force',
 	'vtools import ${INPUT: INPUT[0]} --build hg19',
 	'vtools phenotype --from_file ${INPUT: INPUT[1]}'])
 comment=Import data into a variant tools project.
 
-[MexicanAmerican_69,MexicanAmerican_79,MexicanAmerican_89,MexicanAmerican_99,European_69,European_79,European_89,European_99]
-action=RunCommand(['vtools associate variant aff -m GroupStat BurdenBt --group_by refGene.name2 > ${INPUT: INPUT[0][:-4] + ".res"}'])
+[*_140,*_240,*_340,*_440]
+action=RunCommand('vtools associate variant aff -m GroupStat BurdenBt --group_by refGene.name2 > ${INPUT: INPUT[0][:-4] + ".res"}')
 comment=Analyze the project using variant association tools.
 
+[*_150,*_250,*_350,*_450]
+action=RunCommand('vtools execute snpEff --snpeff_path ~/bin/snpEff/ --eff_fields EFF_Type')
+comment=Call snpEff to annotate variants.
 
+[*_160,*_260,*_360,*_460]
+action=RunCommand('''vtools select variant "EFF_Type in ('NON_SYNONYMOUS_CODING', 'STOP_LOST', 'STOP_GAINED')" -t ns ''')
+comment=Select non-synonymous variants according to snpEff annotation.
+
+[*_170,*_270,*_370,*_470]
+action=RunCommand(['vtools associate ns aff -m GroupStat BurdenBt --group_by refGene.name2 > ${INPUT: INPUT[0][:-4] + "_ns.res"}'])
+comment=Analyze the project using non-synonymous variants.
 
