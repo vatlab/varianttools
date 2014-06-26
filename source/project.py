@@ -55,9 +55,8 @@ from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
     RefGenome, filesInURL, downloadFile, getMaxUcscBin, env, sizeExpr, \
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName, \
     PrettyPrinter, determineSexOfSamples, getVariantsOnChromosomeX, \
-    getVariantsOnChromosomeY, getTermWidth, matchName, ProgressFileObj
-
-
+    getVariantsOnChromosomeY, getTermWidth, matchName, ProgressFileObj, \
+    substituteVars
 
 # define a field type
 Field = namedtuple('Field', ['name', 'index', 'adj', 'fmt', 'type', 'comment'])
@@ -726,6 +725,9 @@ class PipelineDescription:
                     else:
                         self.pipeline_vars[item[0]] = item[1]
             else:
+                #
+                # section header can contain multiple steps
+                # [A_1,B_1,*_3]
                 try:
                     pnames = [x.rsplit('_', 1)[0] for x in section.split(',')]
                     pidxs = [x.rsplit('_', 1)[1] for x in section.split(',')]
@@ -758,6 +760,13 @@ class PipelineDescription:
                         self.pipelines[pname].append(command)
                 except Exception as e:
                     raise ValueError('Invalid section {}: {}'.format(section, e))
+        # process wild cast pipelines
+        for wildname in [x for x in self.pipelines.keys() if '*' in x or '?' in x]:
+            for pname in [y for y in self.pipelines.keys() if '*' not in y and '?' not in y]:
+                if matchName(wildname, pname):
+                    self.pipelines[pname].extend(self.pipelines[wildname])
+        #
+        self.pipelines = {x:y for x,y in self.pipelines.items() if '*' not in x and '?' not in x}
         # sort steps
         for pname in self.pipelines:
             self.pipelines[pname].sort(key=lambda x: int(x[0].rsplit('_')[-1]))
@@ -798,7 +807,10 @@ class PipelineDescription:
             for idx, step in enumerate(pipeline):
                 # hide a step if there is no comment
                 if step.comment:
-                    text = '{:<22}'.format('  {}_{}:'.format(pname, step.index)) + step.comment
+                    # step.comment might have expression with pipeline_name and pipeline_step
+                    comment = substituteVars(step.comment, 
+                        {'pipeline_name': pname, 'pipeline_step': step.index})
+                    text = '{:<22}'.format('  {}_{}:'.format(pname, step.index)) + comment
                     print('\n'.join(textwrap.wrap(text, width=textWidth, subsequent_indent=' '*22)))
         #
         if self.parameters:

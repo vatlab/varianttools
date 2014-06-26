@@ -3155,9 +3155,91 @@ def pairwise(x,y):
 def convertDoubleQuote(x):
     return '"{}"'.format(x.replace('"', "'"))
 
+class VariableSubstitutor:
+    def __init__(self, text):
+        self.text = text
 
+    def var_expr(self, var):
+        if type(var) == str:
+            # tries to be clever and quote filenames with space
+            if os.path.isfile(var) and ' ' in var:
+                return "'{}'".format(var)
+            else:
+                return var
+        elif type(var) == list:
+            return ' '.join([self.var_expr(x) for x in var])
+        else:
+            return str(var)
 
+    def _substitute(self, text, PipelineVars):
+        # if text has new line, replace it with space
+        text =  ' '.join(text.split())
+        # now, find ${}
+        pieces = re.split('(\${(?:[^{}]|{[^}]*})*})', text)
+        for idx, piece in enumerate(pieces):
+            if piece.startswith('${') and piece.endswith('}'):
+                KEY = piece[2:-1].lower()
+                if ':' in KEY:
+                    # a lambda function?
+                    try:
+                        FUNC = eval('lambda {}'.format(piece[2:-1]))
+                    except Exception as e:
+                        env.logger.warning('Failed to interpret {} as a pipeline variable: {}'
+                            .format(piece, e))
+                        continue
+                    KEY = KEY.split(':', 1)[0].strip()
+                    try:
+                        if not KEY:
+                            # if there is no KEY, this is a lamba function without parameter
+                            pieces[idx] = self.var_expr(FUNC())
+                        elif ',' not in KEY:
+                            # single varialbe
+                            if KEY in PipelineVars:
+                                VAL = PipelineVars[KEY]
+                            else:
+                                env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
+                                    .format(piece, KEY))
+                                continue
+                            pieces[idx] = self.var_expr(FUNC(VAL))
+                        else:
+                            # several parameters
+                            KEYS = KEY.split(',')
+                            VAL = []
+                            for KEY in KEYS:
+                                # single varialbe
+                                if KEY in PipelineVars:
+                                    VAL.append(PipelineVars[KEY])
+                                else:
+                                    env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
+                                        .format(piece, KEY))
+                                    continue
+                            pieces[idx] = self.var_expr(FUNC(*VAL))
+                    except Exception as e:
+                        env.logger.warning('Failed to interpret {} as a pipeline variable: {}'
+                            .format(piece, e))
+                        continue
+                else:
+                    # if KEY in PipelineVars, replace it
+                    if KEY in PipelineVars:
+                        pieces[idx] = self.var_expr(PipelineVars[KEY])
+                    else:
+                        env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
+                            .format(piece, KEY))
+                        continue
+        # now, join the pieces together, but remove all newlines
+        return ' '.join(''.join(pieces).split())
+
+    def substituteWith(self, PipelineVars):
+        while True:
+            new_text = self._substitute(self.text, PipelineVars)
+            if new_text == self.text:
+                return new_text
+            else:
+                self.text = new_text
     
+def substituteVars(text, PipelineVars):
+    return VariableSubstitutor(text).substituteWith(PipelineVars)
+
 def determineSexOfSamples(proj, sample_IDs=None):
     '''Determine the sex of samples by checking phenotype sex or gender.
     Only selected samples will be checked if sample_IDs is provided.

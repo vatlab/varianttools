@@ -47,7 +47,8 @@ from collections import namedtuple
 
 from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
     existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName, \
-    FileInfo, convertDoubleQuote, openFile, encodeTableName, expandRegions
+    FileInfo, convertDoubleQuote, openFile, encodeTableName, expandRegions, \
+    substituteVars
     
 from .project import PipelineDescription, Project
 
@@ -1388,84 +1389,6 @@ class Pipeline:
     def __init__(self, name, extra_args=[], pipeline_type='pipeline'):
         self.pipeline = PipelineDescription(name, extra_args, pipeline_type)
 
-    def var_expr(self, var):
-        if type(var) == str:
-            # tries to be clever and quote filenames with space
-            if os.path.isfile(var) and ' ' in var:
-                return "'{}'".format(var)
-            else:
-                return var
-        elif type(var) == list:
-            return ' '.join([self.var_expr(x) for x in var])
-        else:
-            return str(var)
-
-    def _substitute(self, text, PipelineVars):
-        # if text has new line, replace it with space
-        text =  ' '.join(text.split())
-        # now, find ${}
-        pieces = re.split('(\${[^{}]*})', text)
-        for idx, piece in enumerate(pieces):
-            if piece.startswith('${') and piece.endswith('}'):
-                KEY = piece[2:-1].lower()
-                if ':' in KEY:
-                    # a lambda function?
-                    try:
-                        FUNC = eval('lambda {}'.format(piece[2:-1]))
-                    except Exception as e:
-                        env.logger.warning('Failed to interpret {} as a pipeline variable: {}'
-                            .format(piece, e))
-                        continue
-                    KEY = KEY.split(':', 1)[0].strip()
-                    try:
-                        if not KEY:
-                            # if there is no KEY, this is a lamba function without parameter
-                            pieces[idx] = self.var_expr(FUNC())
-                        elif ',' not in KEY:
-                            # single varialbe
-                            if KEY in PipelineVars:
-                                VAL = PipelineVars[KEY]
-                            else:
-                                env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
-                                    .format(piece, KEY))
-                                continue
-                            pieces[idx] = self.var_expr(FUNC(VAL))
-                        else:
-                            # several parameters
-                            KEYS = KEY.split(',')
-                            VAL = []
-                            for KEY in KEYS:
-                                # single varialbe
-                                if KEY in PipelineVars:
-                                    VAL.append(PipelineVars[KEY])
-                                else:
-                                    env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
-                                        .format(piece, KEY))
-                                    continue
-                            pieces[idx] = self.var_expr(FUNC(*VAL))
-                    except Exception as e:
-                        env.logger.warning('Failed to interpret {} as a pipeline variable: {}'
-                            .format(piece, e))
-                        continue
-                else:
-                    # if KEY in PipelineVars, replace it
-                    if KEY in PipelineVars:
-                        pieces[idx] = self.var_expr(PipelineVars[KEY])
-                    else:
-                        env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
-                            .format(piece, KEY))
-                        continue
-        # now, join the pieces together, but remove all newlines
-        return ' '.join(''.join(pieces).split())
-
-    def substitute(self, text, PipelineVars):
-        while True:
-            new_text = self._substitute(text, PipelineVars)
-            if new_text == text:
-                return new_text
-            else:
-                text = new_text
-
     def execute(self, pname, input_files=[], output_files=[], jobs=1, **kwargs):
         if pname is None:
             if len(self.pipeline.pipelines) == 1:
@@ -1500,11 +1423,13 @@ class Pipeline:
                 'cache_dir': env.cache_dir,
                 'local_resource': env.local_resource,
                 'ref_genome_build': proj.build,
+                'pipeline_name': pname,
+                'model_name': pname,
                 'vtools_version': proj.version,
             }
         self.VARS.update(**kwargs)
         for key, val in self.pipeline.pipeline_vars.items():
-            self.VARS[key.lower()] = self.substitute(val, self.VARS)
+            self.VARS[key.lower()] = substituteVars(val, self.VARS)
         #
         ifiles = input_files
         step_index = 0
@@ -1513,12 +1438,13 @@ class Pipeline:
             # step_index can jump back and forth depending on the 
             # execution status of each step
             command = psteps[step_index]
+            self.VARS['pipeline_step'] = command.index
             env.logger.info('Executing [[{}.{}_{}]]: {}'
                 .format(self.pipeline.name, pname, command.index, 
                     ' '.join(command.comment.split())))
             # substitute ${} variables
             if command.input:
-                step_input = shlex.split(self.substitute(command.input, self.VARS))
+                step_input = shlex.split(substituteVars(command.input, self.VARS))
             else:
                 step_input = ifiles
             #
@@ -1540,7 +1466,7 @@ class Pipeline:
                     if 'input' in self.VARS:
                         self.VARS.pop('input')
                     # ${CMD_INPUT} etc can be used.
-                    emitter = eval(self.substitute(command.input_emitter, self.VARS))
+                    emitter = eval(substituteVars(command.input_emitter, self.VARS))
                 except Exception as e:
                     raise RuntimeError('Failed to group input files: {}'
                         .format(e))
@@ -1553,7 +1479,7 @@ class Pipeline:
                     if not ig:
                         continue
                     self.VARS['input'] = ig
-                    action = self.substitute(command.action, self.VARS)
+                    action = substituteVars(command.action, self.VARS)
                     env.logger.debug('Emitted input of step {}_{}: {}'
                         .format(pname, command.index, ig))
                     env.logger.debug('Action of step {}_{}: {}'
@@ -1580,7 +1506,7 @@ class Pipeline:
                             'completion of step {}_{}'
                             .format(f, pname, command.index))
                 for key, val in command.pipeline_vars:
-                    self.VARS[key.lower()] = self.substitute(val, self.VARS)
+                    self.VARS[key.lower()] = substituteVars(val, self.VARS)
                     env.logger.debug('Pipeline variable {} is set to {}'
                         .format(key, self.VARS[key.lower()]))
                 #
