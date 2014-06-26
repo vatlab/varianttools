@@ -120,7 +120,7 @@ comment=Draw ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[p
 	from the European population.
 
 [Mismatch_100,Mismatch_200,Mismatch_300,Mismatch_400]
-# The difference is that the case control samples are drawn from the European population
+# The difference is that the case control samples are drawn from different populations
 input=${OUTPUT40}
 action=DrawCaseControlSample(
 	cases=[0, 0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}, 0], 
