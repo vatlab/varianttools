@@ -1142,6 +1142,8 @@ class DrawCaseControlSample(SkiptableAction):
         self.penetrance = penetrance
         self.selectedCases = [0]*len(self.cases)
         self.selectedCtrls = [0]*len(self.controls)
+        self.numOfOffspring = 0
+        self.numOfAffected = 0
         #
         SkiptableAction.__init__(self, cmd='CaseCtrlSampler {}\n'.format(output),
             output=output)
@@ -1177,12 +1179,17 @@ class DrawCaseControlSample(SkiptableAction):
             pop.removeInfoFields('migrate_to')
         if 'fitness' in pop.infoFields():
             pop.removeInfoFields('fitness')
+        env.logger.info('Observed prevalence of the disease is {:.3f}% ({}/{})'
+            .format(self.numOfAffected * 100. / self.numOfOffspring, self.numOfAffected,
+                self.numOfOffspring))
         env.logger.info('Saving samples to population {}'.format(self.output[0]))
         pop.save(self.output[0])
 
     def _selectInds(self, off, param):
         'Determine if the offspring can be kept.'
+        self.numOfOffspring += 1
         if off.affected():
+            self.numOfAffected += 1
             if self.selectedCases[param] < self.cases[param]:
                 self.selectedCases[param] += 1
                 self.prog.update(sum(self.selectedCases) + sum(self.selectedCtrls))

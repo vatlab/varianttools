@@ -8,7 +8,7 @@
 description=Simulation of case control samples for 20 genes and analyze samples
     of different sizes (1000, 2000, 3000, 4000 cases and matching number of 
 	controls) draw from European, Mexican American (mixed and matched case
-	and control), and from both Asican (cases) and European (controls) populations
+	and control), and from both Asian (cases) and European (controls) populations
 	for a mismatch design. This simulation model has been used to simulate data
 	for the second example in paper "Reproducible Simulations of realistic samples
 	for next-gen sequencing studies using Variant Simulation Tools". The generated
@@ -101,7 +101,7 @@ action=DrawCaseControlSample(
 	controls=${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]},
 	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
 		s_stoploss=0.001, s_stopgain=0.01),
-	output='${pipeline_name}_sample_1000_${seed}.pop')
+	output='${pipeline_name}_sample_${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}_${seed}.pop')
 comment=Draw ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]} cases 
 	and ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]} controls 
 	from the mixed Mexican American population.
