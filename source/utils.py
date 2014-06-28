@@ -1349,11 +1349,14 @@ class GenomicRegions(object):
         if len(var_regs) == 1:
             regions = var_regs[0]
         else:
+            env.logger.debug('Evaluating {}'.format(expr))
             # we have to evaluate an expression to get the regions
             regions = self.eval_regions(expr, var_regs)
         #
         regions = sorted(regions)
-        if mergeRegions:
+        if not regions:
+            env.logger.warning('An empty region is specified')
+        if regions and mergeRegions:
             regions = self.mergeRegions(regions)
         #env.logger.info('Regions to be simulated ({} bp): {}'.format(
         #    sum([abs(x[2]-x[1])+1 for x in regions]),

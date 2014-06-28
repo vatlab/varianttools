@@ -1157,6 +1157,10 @@ class Project:
                     existing_files = glob.glob('*.proj') + glob.glob('*.lck') + \
                         glob.glob('*.proj-journal') + glob.glob('*_genotype.DB')
                     for f in existing_files:
+                        # if the project was created or updated in the past
+                        # 24 hours, do not check for update
+                        if time.time() - os.path.getmtime(f) < 60*60*24:
+                            self.mode.append('NO_CHECK_UPDATE')
                         try:
                             os.remove(f)
                         except:
@@ -1225,7 +1229,8 @@ class Project:
         #
         if 'NEW_PROJ' in self.mode: 
             self.create(**kwargs)
-            self.checkUpdate()
+            if 'NO_CHECK_UPDATE' not in self.mode:
+                self.checkUpdate()
         else:
             self.open()
             if 'READONLY' not in self.mode and 'SKIP_VERIFICATION' not in self.mode:
