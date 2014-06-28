@@ -1183,128 +1183,186 @@ def getSnapshotInfo(name):
         env.logger.warning('{}: snapshot read error: {}'.format(snapshot_file, e))
         return (None, None, None)
 
+class GenomicRegions(object):
+    '''A class to interpret user specified regions. Regions can be
+    chr:start-end, chr:end-start, annoDB.field:value, 
+    chr:start-end,start1-end1, annoDB.field:value1,value2, and their
+    union (|), intersection (&), difference(-), and symmetric_difference (^)
+    '''
+    def __init__(self, regions):
+        self.raw_regions = regions
+        if not self.raw_regions:
+            raise ValueError('Empty region is specified.')
+        self.proj = None
 
-def expandRegions(arg_regions, proj=None, mergeRegions=True):
-    '''
-    '''
-    if not arg_regions:
-        raise ValueError('Empty region is specified.')
-    regions = []
-    if not isinstance(arg_regions, str):
-        arg_regions = ','.join(arg_regions)
-    # used to keep track of chr or field name to allow 
-    # specification of regions such as refGename.name2:G1,G2,G3
-    last_chr_or_field = None
-    for region in arg_regions.split(','):
-        if ':' in region:
-            last_chr_or_field = region.split(':', 1)[0]
+    def chr_pos_region(self, region):
+        # first seprate by ,
+        print(region)
+        chr, location = region.split(':', 1)
+        start, end = location.split('-')
+        start = int(start.replace(',', ''))
+        end = int(end.replace(',', ''))
+        if start == 0 or end == 0:
+            raise ValueError('0 is not allowed as starting or ending position')
+        # start might be after end
+        if start > end:
+            return (chr[3:] if chr.startswith('chr') else chr, end, start, '(reverse complementary)')
         else:
-            if last_chr_or_field is None:
-                raise ValueError('Invalid field specification: {}'.format(region))
-            else:
-                region = '{}:{}'.format(last_chr_or_field, region)
-        try:
-            chr, location = region.split(':', 1)
-            start, end = location.split('-')
-            start = int(start.replace(',', ''))
-            end = int(end.replace(',', ''))
-            if start == 0 or end == 0:
-                raise ValueError('0 is not allowed as starting or ending position')
-            # start might be after end
-            if start > end:
-                regions.append((chr[3:] if chr.startswith('chr') else chr, end, start, '(reverse complementary)'))
-            else:
-                regions.append((chr[3:] if chr.startswith('chr') else chr, start, end, ''))
-        except Exception as e:
-            # this is not a format for chr:start-end, try field:name
-            try:
-                from .project import Project
-                myproj = proj if proj is not None else Project() 
-                if region.count(':') == 1:
-                    field, value = region.rsplit(':', 1)
-                    comment_field = "''"
-                else:
-                    field, value, comment_field = region.rsplit(':', 2)
-                # what field is this?
-                query, fields = consolidateFieldName(myproj, 'variant', field, False) 
-                # query should be just one of the fields according to things that are passed
-                if query.strip() not in fields:
-                    raise ValueError('Could not identify field {} from the present project'.format(field))
-                # now we have annotation database
-                try:
-                    annoDB = [x for x in myproj.annoDB if x.linked_name.lower() == query.split('.')[0].lower()][0]
-                except:
-                    raise ValueError('Could not locate annotation database {} in the project'.format(query.split('.')[0]))
-                #
-                if annoDB.anno_type != 'range':
-                    raise ValueError('{} is not linked as a range-based annotation database.'.format(annoDB.linked_name))
-                # get the fields?
-                chr_field, start_field, end_field = annoDB.build
-                #
-                # find the regions
-                cur = myproj.db.cursor()
-                try:
-                    cur.execute('SELECT {},{},{},{} FROM {}.{} WHERE {}="{}"'.format(
-                        chr_field, start_field, end_field, comment_field, annoDB.linked_name, annoDB.name,
-                        field.rsplit('.',1)[-1], value))
-                except Exception as e:
-                    raise ValueError('Failed to search range and comment field: {}'.format(e))
-                for idx, (chr, start, end, comment) in enumerate(cur):
-                    if start > end:
-                        env.logger.warning('Ignoring unrecognized region chr{}:{}-{} from {}'
-                            .format(chr, start + 1, end + 1, annoDB.linked_name))
-                        continue
-                    try:
-                        if comment:
-                            regions.append((str(chr), int(start), int(end), comment))
-                        else:
-                            regions.append((str(chr), int(start), int(end), '{} {}'.format(field, idx+1)))
-                    except Exception as e:
-                        env.logger.warning('Ignoring unrecognized region chr{}:{}-{} from {}'
-                            .format(chr, start, end, annoDB.linked_name))
-                if not regions:
-                    env.logger.error('No valid chromosomal region is identified for {}'.format(region)) 
-                #
-                if proj is None:
-                    myproj.close()
-            except Exception as e:
-                raise ValueError('Incorrect format for chromosomal region {}: {}'.format(region, e))
-    regions = sorted(regions)
-    # remove duplicates and merge ranges
-    if not mergeRegions:
-        env.logger.info('Regions to be simulated ({} bp): {}'.format(
-            sum([abs(x[2]-x[1])+1 for x in regions]),
-           ','.join(['{}:{}-{}'.format(x[0], x[1], x[2]) for x in regions])))
-        return regions
-    regions = list(set(regions))
-    while True:
-        merged = False
-        for i in range(len(regions)):
-            for j in range(i + 1, len(regions)):
-                r1 = regions[i]
-                r2 = regions[j]
-                if r1 is None or r2 is None:
-                    continue
-                # 
-                if r1[0] == r2[0] and r1[2] >= r2[1] and r1[1] <= r2[2]:
-                    env.logger.debug('Merging regions {}:{}-{} ({}) and {}:{}-{} ({})'
-                        .format(r2[0], r2[1], r2[2], r2[3], r1[0], r1[1], r1[2], r1[3]))
-                    try:
-                        shared_label = [x!=y for x,y in zip(r1[3], r2[3])].index(True)
-                    except:
-                        # no shared leading string
-                        shared_label = 0
-                    regions[i] = (r1[0], min(r1[1], r2[1]), max(r1[2], r2[2]), r1[3] + ', ' + r2[3][shared_label:])
-                    regions[j] = None
-                    merged = True
-        if not merged:
-            regions = sorted([x for x in regions if x is not None])
-            env.logger.info('Regions to be simulated ({} bp): {}'.format(
-                sum([abs(x[2]-x[1])+1 for x in regions]),
-                ','.join(['{}:{}-{}'.format(x[0], x[1], x[2]) for x in regions])))
-            return regions
-        
+            return (chr[3:] if chr.startswith('chr') else chr, start, end, '')
 
+    def field_region(self, proj, region):
+        if self.proj is None:
+            if proj is not None:
+                self.proj = proj
+            else:
+                from .project import Project
+                self.proj = Project() 
+        # if the regions have been probed before
+        regions = self.proj.loadProperty('__region_{}'.format(region), None)
+        if regions is not None:
+            return eval(regions)
+        regions = []
+        field, value = region.rsplit(':', 1)
+        # what field is this?
+        query, fields = consolidateFieldName(self.proj, 'variant', field, False) 
+        # query should be just one of the fields according to things that are passed
+        if query.strip() not in fields:
+            raise ValueError('Could not identify field {} from the present project'.format(field))
+        # now we have annotation database
+        try:
+            annoDB = [x for x in self.proj.annoDB if x.linked_name.lower() == query.split('.')[0].lower()][0]
+        except:
+            raise ValueError('Could not locate annotation database {} in the project'.format(query.split('.')[0]))
+        #
+        if annoDB.anno_type != 'range':
+            raise ValueError('{} is not linked as a range-based annotation database.'.format(annoDB.linked_name))
+        # get the fields?
+        chr_field, start_field, end_field = annoDB.build
+        #
+        # find the regions
+        cur = self.proj.db.cursor()
+        try:
+            cur.execute('SELECT {},{},{} FROM {}.{} WHERE {}="{}"'.format(
+                chr_field, start_field, end_field, annoDB.linked_name, annoDB.name,
+                field.rsplit('.',1)[-1], value))
+        except Exception as e:
+            raise ValueError('Failed to search range and comment field: {}'.format(e))
+        for idx, (chr, start, end) in enumerate(cur):
+            if start > end:
+                env.logger.warning('Ignoring unrecognized region chr{}:{}-{} from {}'
+                    .format(chr, start + 1, end + 1, annoDB.linked_name))
+                continue
+            regions.append((str(chr), int(start), int(end), '{} {}'.format(field, idx+1)))
+        if not regions:
+            env.logger.warning('No valid chromosomal region is identified for {}'.format(region)) 
+        self.proj.saveProperty('__region_{}'.format(region), str(regions))
+        return regions
+ 
+    def mergeRegions(self, regions):
+        while True:
+            merged = False
+            for i in range(len(regions)):
+                for j in range(i + 1, len(regions)):
+                    r1 = regions[i]
+                    r2 = regions[j]
+                    if r1 is None or r2 is None:
+                        continue
+                    # 
+                    if r1[0] == r2[0] and r1[2] >= r2[1] and r1[1] <= r2[2]:
+                        env.logger.debug('Merging regions {}:{}-{} ({}) and {}:{}-{} ({})'
+                            .format(r2[0], r2[1], r2[2], r2[3], r1[0], r1[1], r1[2], r1[3]))
+                        try:
+                            shared_label = [x!=y for x,y in zip(r1[3], r2[3])].index(True)
+                        except:
+                            # no shared leading string
+                            shared_label = 0
+                        regions[i] = (r1[0], min(r1[1], r2[1]), max(r1[2], r2[2]), r1[3] + ', ' + r2[3][shared_label:])
+                        regions[j] = None
+                        merged = True
+            if merged:
+                return sorted([x for x in regions if x is not None])
+
+    def eval_regions(self, expr, var_regs):
+        #
+        # first for all var-regs, we need to expand them to points
+        # this can be memory intensive
+        for idx in range(len(var_regs)):
+            pos = []
+            for reg in var_regs[idx]:
+                pos.extend([(reg[0],x) for x in range(reg[1], reg[2]+1)])
+            var_regs[idx] = set(pos)
+        try:
+            positions = eval(expr)
+        except Exception as e:
+            raise ValueError('Failed to evaluate expression of regions {}: {}'.format(expr, e))
+        # re-create regions from positions
+        positions = list(positions)
+        positions.sort()
+        if not positions:
+            return []
+        regions = [(positions[0][0], positions[0][1], positions[0][1], '')]
+        for pos in positions:
+            if pos[0] == regions[-1][0] and pos[1] == regions[-1][2] + 1:
+                regions[-1][2] += 1
+            else:
+                regions.append([pos[0], pos[1], pos[1], ''])
+        return regions
+
+    def expand(self, proj=None, mergeRegions=True):
+        self.proj = proj
+        #
+        # first, let us identify pieces of the string
+        pieces = re.split('(\w+:\d+-\d+(?:,\d+-\d+)*|\w+\.\w+:[\w.]+(?:,[\w.]+)*)', self.raw_regions)
+        expr = ''
+        var_regs = []
+        var_idx = 0
+        for piece in [x.strip() for x in pieces if x]:
+            if re.match(r'\w+:\d+-\d+(,\d+-\d+)*', piece):
+                var_regs.append([])
+                chromosome = piece.split(':', 1)[0]
+                for reg in piece.split(','):
+                    if ':' in reg:
+                        var_regs[-1].append(self.chr_pos_region(reg))
+                    else:
+                        var_regs[-1].append(self.chr_pos_region(chromosome + ':' + reg))
+                expr += 'var_regs[{}]'.format(var_idx)
+                var_idx += 1
+            elif re.match('\w+\.\w+:[\w.]+(:?,[\w.]+)*', piece):
+                var_regs.append([])
+                field = piece.split(':', 1)[0]
+                for reg in piece.split(','):
+                    if ':' in reg:
+                        var_regs[-1].extend(self.field_region(proj, reg))
+                    else:
+                        var_regs[-1].extend(self.field_region(proj, field + ':' + reg))
+                expr += 'var_regs[{}]'.format(var_idx)
+                var_idx += 1
+            elif piece in [',', '|', '&', '^', '-', '(', ')']:
+                # treat , as |
+                expr += piece.replace(',', '|')
+            else:
+                raise ValueError('Incorrect format for regions {}'.format(piece))
+        #
+        if proj is None and self.proj is not None:
+            self.proj.close()
+        # if a single expression of regions is specified
+        if len(var_regs) == 1:
+            regions = var_regs[0]
+        else:
+            # we have to evaluate an expression to get the regions
+            regions = self.eval_regions(expr, var_regs)
+        #
+        regions = sorted(regions)
+        if mergeRegions:
+            regions = self.mergeRegions(regions)
+        #env.logger.info('Regions to be simulated ({} bp): {}'.format(
+        #    sum([abs(x[2]-x[1])+1 for x in regions]),
+        #    ','.join(['{}:{}-{}'.format(x[0], x[1], x[2]) for x in regions])))
+        return regions
+
+def expandRegions(regions, proj=None, mergeRegions=True):
+    return GenomicRegions(regions).expand(proj, mergeRegions)
+    
     
 class ShelfDB:
     '''A sqlite implementation of shelf'''

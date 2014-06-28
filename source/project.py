@@ -788,6 +788,17 @@ class PipelineDescription:
                 if not cmd.action:
                     raise ValueError('Missing or empty action for step {} of pipeline {}'
                         .format(pname, idx + 1))
+                # step.comment might have expression with pipeline_name and pipeline_step
+                if '${' in cmd.comment:
+                    pipeline[idx] = PipelineCommand(
+                        index=cmd.index,
+                        input=cmd.input,
+                        input_emitter=cmd.input_emitter,
+                        action=cmd.action,
+                        pipeline_vars=cmd.pipeline_vars,
+                        comment=substituteVars(cmd.comment, 
+                            {'pipeline_name': pname, 'pipeline_step': cmd.index})
+                        )
      
     def describe(self):
         textWidth = max(60, getTermWidth())
@@ -807,10 +818,7 @@ class PipelineDescription:
             for idx, step in enumerate(pipeline):
                 # hide a step if there is no comment
                 if step.comment:
-                    # step.comment might have expression with pipeline_name and pipeline_step
-                    comment = substituteVars(step.comment, 
-                        {'pipeline_name': pname, 'pipeline_step': step.index})
-                    text = '{:<22}'.format('  {}_{}:'.format(pname, step.index)) + comment
+                    text = '{:<22}'.format('  {}_{}:'.format(pname, step.index)) + step.comment
                     print('\n'.join(textwrap.wrap(text, width=textWidth, subsequent_indent=' '*22)))
         #
         if self.parameters:
