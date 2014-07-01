@@ -853,7 +853,7 @@ class ProteinPenetrance(sim.PyPenetrance):
             self._codon_info[posMap[key]] = new_codons
 
     def _neutral(self):
-        return 1 - s_sporadic
+        return 1 - self.s_sporadic
 
     def _penetrance(self, mut, pop):
         # geno is arranged locus by locus (A1,A2,B1,B2 etc)

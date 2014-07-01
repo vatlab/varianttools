@@ -1279,7 +1279,7 @@ class GenomicRegions(object):
                         regions[i] = (r1[0], min(r1[1], r2[1]), max(r1[2], r2[2]), r1[3] + ', ' + r2[3][shared_label:])
                         regions[j] = None
                         merged = True
-            if merged:
+            if not merged:
                 return sorted([x for x in regions if x is not None])
 
     def eval_regions(self, expr, var_regs):
