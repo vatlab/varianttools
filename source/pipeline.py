@@ -1767,11 +1767,19 @@ def simulateArguments(parser):
     parser.add_argument('--replicates', default=1, type=int,
         help='''Number of consecutive replications to simulate''')
     parser.add_argument('-j', '--jobs', default=1, type=int,
-        help='''Maximum number of concurrent jobs to execute, for steps
-            of a pipeline that allows multi-processing.''')
+        help='''Maximum number of threads for simulation. Variant Simulation Tools
+            does not allow multi-processing but single simulation can benefit
+            from using multiple threads.''')
 
 def simulate_replicate(args, rep):
     try:
+        try:
+            if args.jobs > 1:
+                sim.setOptions(numThreads=args.jobs)
+                env.logger.info('Using {} threads for simulation'.format(args.jobs))
+        except Exception as e:
+            env.logger.error('Failed to use {} threads for simulation: {}'.format(args.jobs, e))
+
         # step 1, create a simulation configuration file.
         model_name = os.path.basename(args.model[0]).split('.', 1)[0]
         if args.seed is None:
@@ -1801,10 +1809,10 @@ def simulate_replicate(args, rep):
             pipeline_type='simulation')
         # using a pool of simulators 
         if len(args.model) == 1:
-            pipeline.execute(None, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
+            pipeline.execute(None, [cfg_file], [], jobs=1, seed=args.seed+rep)
         else:
             for name in args.model[1:]:
-                pipeline.execute(name, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
+                pipeline.execute(name, [cfg_file], [], jobs=1, seed=args.seed+rep)
     except Exception as e:
         env.logger.error('Failed to simulate replicate {} of model {}'.format(rep, model_name))
 
