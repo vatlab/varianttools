@@ -24,8 +24,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import simuOpt
-#simuOpt.setOptions(alleleType='mutant', optimized=True, quiet=True, version='1.0.5')
-simuOpt.setOptions(alleleType='mutant', optimized=False, quiet=True, version='1.0.5')
+simuOpt.setOptions(alleleType='mutant', optimized=True, quiet=True, version='1.0.5')
 
 import simuPOP as sim
 from simuPOP.demography import *
