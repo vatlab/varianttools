@@ -1210,13 +1210,10 @@ class GenomicRegions(object):
         else:
             return (chr[3:] if chr.startswith('chr') else chr, start, end, '')
 
-    def field_region(self, proj, region):
+    def field_region(self, region):
         if self.proj is None:
-            if proj is not None:
-                self.proj = proj
-            else:
-                from .project import Project
-                self.proj = Project() 
+            from .project import Project
+            self.proj = Project() 
         # if the regions have been probed before
         regions = self.proj.loadProperty('__region_{}'.format(region), None)
         if regions is not None:
@@ -1332,9 +1329,9 @@ class GenomicRegions(object):
                 field = piece.split(':', 1)[0]
                 for reg in piece.split(','):
                     if ':' in reg:
-                        var_regs[-1].extend(self.field_region(proj, reg))
+                        var_regs[-1].extend(self.field_region(reg))
                     else:
-                        var_regs[-1].extend(self.field_region(proj, field + ':' + reg))
+                        var_regs[-1].extend(self.field_region(field + ':' + reg))
                 expr += 'var_regs[{}]'.format(var_idx)
                 var_idx += 1
             elif piece in [',', '|', '&', '^', '-', '(', ')']:

@@ -42,7 +42,7 @@ import csv
 import platform
 import logging
 import random
-import multiprocessing
+from multiprocessing import Process
 from collections import namedtuple
 
 from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
@@ -1685,7 +1685,7 @@ def simulateArguments(parser):
         help='''Maximum number of concurrent jobs to execute, for steps
             of a pipeline that allows multi-processing.''')
 
-def simulate(args):
+def simulate_replicate(args, rep):
     try:
         # step 1, create a simulation configuration file.
         model_name = os.path.basename(args.model[0]).split('.', 1)[0]
@@ -1693,37 +1693,45 @@ def simulate(args):
             args.seed = random.randint(1, 2**32-1)
         if not os.path.isdir(env.cache_dir):
             os.mkdir(env.cache_dir)
+
+        # set random seed of simulators
+        random.seed(args.seed + rep)
+        if len(args.model) == 1:
+            cfg_file = '{}/{}_{}.cfg'.format(env.cache_dir, model_name, args.seed + rep)
+        else:
+            cfg_file = '{}/{}_{}_{}.cfg'.format(env.cache_dir, model_name, args.model[1], args.seed + rep)
         #
+        with open(cfg_file, 'w') as cfg:
+            cfg.write('model={}\n'.format(' '.join(args.model)))
+            cfg.write('seed={}\n'.format(args.seed + rep))
+            if '--seed' in sys.argv:
+                # skip the seed option so to stop pipeline from distinguishing the two commands
+                cmd_args = sys.argv[:sys.argv.index('--seed')] + sys.argv[sys.argv.index('--seed') + 2:]
+                cfg.write("command=vtools {}\n".format(subprocess.list2cmdline(cmd_args[1:])))
+            else:
+                cfg.write("command={}\n".format(env.command_line))
+        #
+        env.logger.info('Starting simulation [[{}]]'.format(cfg_file))
+        pipeline = Pipeline(args.model[0], extra_args=args.unknown_args,
+            pipeline_type='simulation')
+        # using a pool of simulators 
+        if len(args.model) == 1:
+            pipeline.execute(None, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
+        else:
+            for name in args.model[1:]:
+                pipeline.execute(name, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
+    except Exception as e:
+        env.logger.error('Failed to simulate replicate {} of model {}'.format(rep, model_name))
+
+def simulate(args):
+    try:
         if args.replicates <= 0:
             raise ValueError('No replication studies is requested.')
         #
         for rep in range(args.replicates):
-            # set random seed of simulators
-            random.seed(args.seed + rep)
-            if len(args.model) == 1:
-                cfg_file = '{}/{}_{}.cfg'.format(env.cache_dir, model_name, args.seed + rep)
-            else:
-                cfg_file = '{}/{}_{}_{}.cfg'.format(env.cache_dir, model_name, args.model[1], args.seed + rep)
-            #
-            with open(cfg_file, 'w') as cfg:
-                cfg.write('model={}\n'.format(' '.join(args.model)))
-                cfg.write('seed={}\n'.format(args.seed + rep))
-                if '--seed' in sys.argv:
-                    # skip the seed option so to stop pipeline from distinguishing the two commands
-                    cmd_args = sys.argv[:sys.argv.index('--seed')] + sys.argv[sys.argv.index('--seed') + 2:]
-                    cfg.write("command=vtools {}\n".format(subprocess.list2cmdline(cmd_args[1:])))
-                else:
-                    cfg.write("command={}\n".format(env.command_line))
-            #
-            env.logger.info('Starting simulation {}'.format(cfg_file))
-            pipeline = Pipeline(args.model[0], extra_args=args.unknown_args,
-                pipeline_type='simulation')
-            # using a pool of simulators 
-            if len(args.model) == 1:
-                pipeline.execute(None, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
-            else:
-                for name in args.model[1:]:
-                    pipeline.execute(name, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
+            p = Process(target=simulate_replicate, args=(args, rep))
+            p.start()
+            p.join()
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
