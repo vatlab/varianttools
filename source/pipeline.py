@@ -759,7 +759,89 @@ def elapsed_time(start):
     return ('{} days '.format(days_elapsed) if days_elapsed else '') + \
         time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
  
+  
 def run_command(cmd, output=None, working_dir=None, max_jobs=1):
+    '''Call a list of external command cmd, raise an error if any of them
+    fails. '''
+    if not output:
+        # subprocess.DEVNULL was introduced in Python 3.3
+        proc_out = None
+        proc_err = None
+        proc_lck = None
+    else:
+        proc_out = open(output[0] + '.out_{}'.format(os.getpid()), 'w')
+        proc_err = open(output[0] + '.err_{}'.format(os.getpid()), 'w')
+        proc_lck = output[0] + '.lck'
+    #
+    # wait for empty slot to run the job
+    if proc_lck:
+        env.lock(proc_lck, str(os.getpid()))
+    start_time=time.time()
+    for cur_cmd in cmd:
+        ret = subprocess.call(cur_cmd, shell=True, stdout=proc_out, stderr=proc_err,
+            cwd=working_dir)
+        env.logger.info('Running [[{}]]'.format(cur_cmd))
+        if ret < 0:
+            if output:
+                try:
+                    env.unlock(output[0] + '.lck', str(os.getpid()))
+                except:
+                    pass
+            raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
+                .format(cur_cmd, -ret, elapsed_time(start_time)))
+        elif ret > 0:
+            if output:
+                with open(output[0] + '.err_{}'.format(os.getpid())) as err:
+                    for line in err.read().split('\n')[-50:]:
+                        env.logger.error(line)
+                try:
+                    env.unlock(output[0] + '.lck', str(os.getpid()))
+                except:
+                    pass
+            raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
+                .format(cur_cmd, elapsed_time(start_time), ret))
+    #
+    if output:
+        # including output from previous failed runs
+        # this step will fail if the .lck file has been changed by
+        # another process
+        env.unlock(output[0] + '.lck', str(os.getpid()))
+        if not os.path.isfile(output[0] + '.out_{}'.format(os.getpid())) \
+            or not os.path.isfile(output[0] + '.err_{}'.format(os.getpid())):
+            env.logger.warning('Could not locate process-specific output file (id {}), '
+                'which might have been removed by another process that produce '
+                'the same output file {}'.format(os.getpid(), output[0]))
+            # try to rerun this step
+            raise RewindExecution()
+        with open(output[0] + '.exe_info', 'a') as exe_info:
+            exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
+            for f in output:
+                if not os.path.isfile(f):
+                    raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
+                # for performance considerations, use partial MD5
+                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                    calculateMD5(f, partial=True)))
+            # write standard output to exe_info
+            exe_info.write('\n\nSTDOUT\n\n')
+            with open(output[0] + '.out_{}'.format(os.getpid())) as stdout:
+                for line in stdout:
+                    exe_info.write(line)
+            # write standard error to exe_info
+            exe_info.write('\n\nSTDERR\n\n')
+            with open(output[0] + '.err_{}'.format(os.getpid())) as stderr:
+                for line in stderr:
+                    exe_info.write(line)
+        # if command succeed, remove all out_ and err_ files, 
+        for filename in glob.glob(output[0] + '.out_*') + \
+            glob.glob(output[0] + '.err_*'):
+            try:
+                os.remove(filename)
+            except Exception as e:
+                env.logger.warning('Fail to remove {}: {}'
+                    .format(filename, e))
+
+
+def run_command_in_parallel(cmd, output=None, working_dir=None, max_jobs=1):
     '''Call a list of external command cmd, raise an error if any of them
     fails. '''
     global running_jobs
@@ -1006,8 +1088,11 @@ class RunCommand:
         # the input can be fake .file_info files
         if not all([os.path.isfile(x) for x in ifiles]):
             raise RewindExecution()
-        run_command(self.cmd, output=self.output, working_dir=self.working_dir,
-            max_jobs=self.max_jobs)
+        if self.max_jobs == 1:
+            run_command(self.cmd, output=self.output, working_dir=self.working_dir)
+        else:
+            run_command_in_parallel(self.cmd, output=self.output, working_dir=self.working_dir,
+                max_jobs=self.max_jobs)
         # add md5 signature of input and output files
         if self.output:
             with open(self.output[0] + '.exe_info', 'w') as exe_info:
