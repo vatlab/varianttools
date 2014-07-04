@@ -357,12 +357,11 @@ def discordanceRate(args):
 #
 def sequenceArguments(parser):
     parser.add_argument('regions', nargs='+', help='''One or more chromosome regions in
-        the format of chr:start-end (e.g. chr21:33,031,597-33,041,570), or Field:Value
+        the format of chr:start-end (e.g. chr21:33,031,597-33,041,570), Field:Value
         from a region-based annotation database (e.g. refGene.name2:TRIM2 or
-        refGene_exon.name:NM_000947). Several regions will be printed if the name matches
-        more than one regions. The regions will be marked by their indexes
-        but values from another field will be used if the its name is appended
-        (e.g. refGene.name2:BRCA2:name will mark each regions with name of isoforms).
+        refGene_exon.name:NM_000947), or set options of several regions (&, |, -, 
+        and ^ for intersection, union, difference, and symmetric difference).
+        Several regions will be printed if the name matches more than one regions. 
         Chromosome positions are 1-based and are inclusive at both ends so the chromosome
         region has a length of end-start+1 bp. A reversed complementary sequence will be
         outputted if starting position is after the ending position.''')
