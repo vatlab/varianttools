@@ -1726,7 +1726,7 @@ def execute(args):
     # 
     try:
         # definitely a pipeline
-        if args.input or args.output or args.unknown_args:
+        if args.pipeline[0].endswith('.pipeline') or args.input or args.output or args.unknown_args:
             executePipeline()
         # definitely a sql query
         elif args.delimiter != '\t':

@@ -1,0 +1,31 @@
+# Copyright (C) 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Simulation/New for
+# a description of the format of this file.
+
+[pipeline description]
+description=A pipeline for testing features of VST.
+
+seed=12345
+
+[checkvtools_0]
+input=test_vst.pipeline
+action=CheckVariantToolsVersion('2.3.1')
+
+[checkvtools_fail_10]
+input=test_vst.pipeline
+action=CheckVariantToolsVersion('10')
+
+[checkcommand_1]
+action=CheckCommands(['vtools', 'vtools_report'])
+comment=Check avalability of commands vtools and vtools_report
+
+[createpop_30]
+action=CreatePopulation(
+	size=1000,
+	regions='chr1:1-2000',
+	output='cache/${pipeline_name}_init_${seed}.pop')
+output='cache/${pipeline_name}_init_${seed}.pop'
+comment=Create an empty simuPOP population for specified regions.
+
