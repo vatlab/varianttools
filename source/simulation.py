@@ -1124,7 +1124,8 @@ class EvolvePopulation(SkiptableAction):
 class DrawCaseControlSample(SkiptableAction):
     '''Draw case control samples from simulated population. If there are subpopulations and 
     cases and controls have the same demension, cases and controls are drawn from each
-    subpopulation.
+    subpopulation. If more than one output files are provided, multiple samples are
+    draw from the population.
     '''
     def __init__(self, cases, controls, penetrance, output):
         if isinstance(cases, int):
@@ -1139,17 +1140,26 @@ class DrawCaseControlSample(SkiptableAction):
         if len(self.cases) != len(self.controls):
             raise ValueError('Please specify cases and controls with the same dimensions.')
         self.penetrance = penetrance
-        self.selectedCases = [0]*len(self.cases)
-        self.selectedCtrls = [0]*len(self.controls)
-        self.numOfOffspring = 0
-        self.numOfAffected = 0
         #
-        SkiptableAction.__init__(self, cmd='CaseCtrlSampler {}\n'.format(output),
+        SkiptableAction.__init__(self, cmd='DrawCaseCtrlSample {}\n'.format(output),
             output=output)
     
     def _execute(self, ifiles, pipeline):
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
+        for idx, output in enumerate(self.output):
+            self.selectedCases = [0]*len(self.cases)
+            self.selectedCtrls = [0]*len(self.controls)
+            self.numOfOffspring = 0
+            self.numOfAffected = 0
+            # if there is only one sample or the last sample, use the loaded population.
+            if idx == len(self.output) - 1:
+                self._drawSample(pop, output)
+            else:
+                # else use a copy of the loaded population
+                self._drawSample(pop.clone(), output)
+
+    def _drawSample(self, pop, output):
         #
         env.logger.info('Draw {} cases and {} controls from a population of sizes sizes {}'.format(self.cases, self.controls, pop.subPopSizes()))
         if len(self.cases) > 1 and pop.numSubPop() != len(self.cases):
@@ -1181,8 +1191,9 @@ class DrawCaseControlSample(SkiptableAction):
         env.logger.info('Observed prevalence of the disease is {:.3f}% ({}/{})'
             .format(self.numOfAffected * 100. / self.numOfOffspring, self.numOfAffected,
                 self.numOfOffspring))
-        env.logger.info('Saving samples to population {}'.format(self.output[0]))
-        pop.save(self.output[0])
+        env.logger.info('Saving samples to population {}'.format(output))
+        pop.save(output)
+        del pop
 
     def _selectInds(self, off, param):
         'Determine if the offspring can be kept.'
@@ -1203,12 +1214,21 @@ class DrawCaseControlSample(SkiptableAction):
 class DrawRandomSample(SkiptableAction):
     def __init__(self, sizes, output):
         self.sizes = sizes
-        SkiptableAction.__init__(self, cmd='CaseCtrlSampler {}\n'.format(output),
+        SkiptableAction.__init__(self, cmd='DrawRandomSampler {}\n'.format(output),
             output=output)
     
     def _execute(self, ifiles, pipeline):
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
+        for idx, output in enumerate(self.output):
+            # if there is only one sample or the last sample, use the loaded population.
+            if idx == len(self.output) - 1:
+                self._drawSample(pop, output)
+            else:
+                # else use a copy of the loaded population
+                self._drawSample(pop.clone(), output)
+
+    def _drawSample(self, pop, output):
         pop.evolve(
             matingScheme=sim.RandomMating(
                 subPopSize=self.sizes
@@ -1220,6 +1240,67 @@ class DrawRandomSample(SkiptableAction):
             pop.removeInfoFields('migrate_to')
         if 'fitness' in pop.infoFields():
             pop.removeInfoFields('fitness')
-        env.logger.info('Saving samples to population {}'.format(self.output[0]))
-        pop.save(self.output[0])
+        env.logger.info('Saving samples to population {}'.format(output))
+        pop.save(output)
+        del pop
+
+
+class DrawQuanTraitSample(SkiptableAction):
+    '''This operator cannot yet sample from different
+    subpopulations.
+    '''
+    def __init__(self, sizes, conditions, qtrait, output):
+        if isinstance(sizes, int):
+            self.sizes = [sizes]
+        else:
+            self.sizes = sizes
+        #
+        if isinstance(conditions, str):
+            self.conditions = [conditions]
+        else:
+            self.conditions = conditions
+        #
+        self.qtrait = qtrait
+        SkiptableAction.__init__(self, cmd='DrawQuanTraitSample {}\n'.format(output),
+            output=output)
+    
+    def _execute(self, ifiles, pipeline):
+        env.logger.info('Loading {}'.format(ifiles[0]))
+        pop = sim.loadPopulation(ifiles[0])
+        for idx, output in enumerate(self.output):
+            # if there is only one sample or the last sample, use the loaded population.
+            if idx == len(self.output) - 1:
+                self._drawSample(pop, output)
+            else:
+                # else use a copy of the loaded population
+                self._drawSample(pop.clone(), output)
+
+    def _drawSample(self, pop, output):
+        if pop.numSubPop() > 1:
+            pop.mergeSubPops()
+        #
+        if len(self.sizes) > 1:
+            pop.resize(0, pop.popSize() * len(self.sizes), propagate=True)
+            pop.splitSubPop(0, [pop.popSize()] * len(self.sizes()))
+        pop.evolve(
+            matingScheme=sim.RandomMating(
+                ops=[
+                    sim.MendelianGenoTransmitter(),
+                    # apply a penetrance model 
+                    self.qtrait
+                ] + [
+                    # an individual will be discarded if _selectInds returns False
+                    sim.DiscardIf('not (' + cond + ')', subPops=sp)
+                for sp,cond in self.condistions],
+                subPopSize=self.sizes
+            ),
+            gen = 1
+        )
+        # 
+        if 'migrate_to' in pop.infoFields():
+            pop.removeInfoFields('migrate_to')
+        if 'fitness' in pop.infoFields():
+            pop.removeInfoFields('fitness')
+        env.logger.info('Saving samples to population {}'.format(output))
+        pop.save(output)
 
