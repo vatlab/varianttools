@@ -774,7 +774,7 @@ class PipelineDescription:
         # validate
         for pname in self.pipeline_descriptions:
             if pname not in [x.lower() for x in  self.pipelines.keys()]:
-                raise ValueError('Invalid item {0}_description because pipeline '
+                env.logger.warning('Invalid item {0}_description because pipeline '
                     '{0} is not defined in this file (available: {1}).'
                     .format(pname, ', '.join(self.pipelines.keys())))
         for pname, pipeline in self.pipelines.items():
@@ -3616,6 +3616,9 @@ def initArguments(parser):
             with the same names from multiple samples will be merged. Samples from the
             children projects will be copied even if they were identical samples
             imported from the same source files.''')
+    parser.add_argument('--build',
+        help='''Set the build (hg18 or hg19) of the primary reference genome
+            of the project.''')
 
 
 def init(args):
@@ -3645,6 +3648,8 @@ def init(args):
                 verbosity='1' if parent_path == '.' else '0') as parent_proj:
                 env.logger.info('Extracting snapshot {} to {}'.format(args.parent, parent_path))
                 parent_proj.loadSnapshot(parent_snapshot)
+                if args.build is not None:
+                    parent_proj.setRefGenome(args.build)
             os.chdir(saved_dir)
             args.parent = parent_path
             if parent_path == '.':
@@ -3680,6 +3685,8 @@ def init(args):
                         mode=['NEW_PROJ', 'REMOVE_EXISTING'] if args.force else 'NEW_PROJ', 
                         verbosity='1' if len(args.children) == 1 else '0') as child_proj:
                         child_proj.loadSnapshot(child_snapshot)
+                        if args.build is not None:
+                            child_proj.setRefGenome(args.build)
                     os.chdir(saved_dir)
                     dirs.append(child_path)
                     if len(args.children) == 1:
@@ -3702,6 +3709,8 @@ def init(args):
                 # do not improve effiency
                 merger = ProjectsMerger(proj, args.children, 4)
                 merger.merge()
+            if args.build is not None:
+                proj.setRefGenome(args.build)
         # clean up directories created from snapshots
         for temp_dir in temp_dirs:
             try:
