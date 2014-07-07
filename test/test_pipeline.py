@@ -33,10 +33,44 @@ from testUtils import ProcessTestCase, runCmd, numOfVariant, numOfSample, output
 
 class TestPipeline(ProcessTestCase):
     def testCheckVariantToolsVersion(self):
-        'Test command vtools init'
+        'Test functor CheckVariantToolsVersion'
         self.assertSucc('vtools execute test_pipeline.pipeline checkvtools')
         self.assertFail('vtools execute test_pipeline.pipeline checkvtools_fail')
     
+    def testCheckCommand(self):
+        'Test functor CheckCommand'
+        self.assertSucc('vtools execute test_pipeline.pipeline checkcommand')
+        self.assertFail('vtools execute test_pipeline.pipeline checkcommand_fail')
+
+    def testRunCommand(self):
+        self.assertSucc('vtools execute test_pipeline.pipeline runcommand')
+        self.assertFail('vtools execute test_pipeline.pipeline runcommand_fail')
+
+    def testCreatePopulation(self):
+        self.assertSucc('vtools execute test_pipeline.pipeline createpop1')
+
+    def testEvolvePopulation(self):
+        self.assertFail('vtools execute test_pipeline.pipeline evolvepop_fail')
+        self.assertSucc('vtools execute test_pipeline.pipeline evolvepop1')
+        self.assertSucc('vtools simulate test_pipeline.pipeline evolvepop1')
+        self.assertSucc('vtools simulate test_pipeline.pipeline evolvepop2')
+        self.assertSucc('vtools simulate test_pipeline.pipeline evolvepop3')
+        self.assertSucc('vtools simulate test_pipeline.pipeline evolvepop4')
+
+    def testDrawCaseCtrlSample(self):
+        self.assertSucc('vtools simulate test_pipeline.pipeline casectrl1')
+        self.assertTrue(os.path.isfile('cache/casectrl_sample_12345.pop'))
+        self.assertSucc('vtools simulate test_pipeline.pipeline casectrl2')
+        self.assertTrue(os.path.isfile('cache/casectrl_sample_12345_21.pop'))
+        self.assertTrue(os.path.isfile('cache/casectrl_sample_12345_22.pop'))
+        
+    def testDrawRandomSample(self):
+        self.assertSucc('vtools simulate test_pipeline.pipeline random1')
+        self.assertTrue(os.path.isfile('cache/random_sample_12345.pop'))
+        self.assertSucc('vtools simulate test_pipeline.pipeline random2')
+        self.assertTrue(os.path.isfile('cache/random_sample_12345_21.pop'))
+        self.assertTrue(os.path.isfile('cache/random_sample_12345_22.pop'))
+
 
 if __name__ == '__main__':
     unittest.main()

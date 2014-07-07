@@ -210,7 +210,7 @@ class CreatePopulation(SkiptableAction):
             prog.done()
             return pop
 
-def FineScaleRecombinator(regions, scale, defaultRate=1e-8, output=None):
+def FineScaleRecombinator(regions, scale=1, defaultRate=1e-8, output=None):
     '''For specified regions of the chroosome, find genetic locations of
     all loci using a genetic map downloaded from HapMap. If no genetic
     map is used, a default recombination rate (per bp) is used. If a
@@ -1055,7 +1055,7 @@ class EvolvePopulation(SkiptableAction):
         pop.addInfoFields(['fitness', 'migrate_to'])
         startTime = time.clock()
         # reset RNG to use pipeline seed
-        sim.setRNG(seed=pipeline.VARS['seed'])
+        sim.setRNG(seed=int(pipeline.VARS['seed']))
         #
         # Evolve
         env.logger.info('Start evolving...')

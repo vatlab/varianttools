@@ -344,6 +344,8 @@ class SkiptableAction:
             self.output = [output]
         else:
             self.output = output
+        if not self.output:
+            raise ValueError('Please specify an output file for command {}'.format(self.cmd))
 
     def __call__(self, ifiles, pipeline=None):
         exe_info = '{}.exe_info'.format(self.output[0])
@@ -1807,9 +1809,11 @@ def simulate_replicate(args, rep):
                 pipeline.execute(name, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
     except Exception as e:
         env.logger.error('Failed to simulate replicate {} of model {}: {}'.format(rep, model_name, e))
+        sys.exit(1)
 
 def simulate(args):
     try:
+        ret = 0
         if args.replicates <= 0:
             raise ValueError('No replication studies is requested.')
         #
@@ -1817,6 +1821,10 @@ def simulate(args):
             p = Process(target=simulate_replicate, args=(args, rep))
             p.start()
             p.join()
+            if ret == 0:
+                ret = p.exitcode
+        # return fail if any of the replicates fails
+        sys.exit(ret)
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)

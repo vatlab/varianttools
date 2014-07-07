@@ -1197,7 +1197,6 @@ class GenomicRegions(object):
 
     def chr_pos_region(self, region):
         # first seprate by ,
-        print(region)
         chr, location = region.split(':', 1)
         start, end = location.split('-')
         start = int(start.replace(',', ''))
