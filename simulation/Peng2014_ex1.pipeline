@@ -46,10 +46,14 @@ extracted_vcf_comment=Filename (with dir) to save genotypes (.vcf file extracted
   reused if it already exists. You will need to remove this file if you run the 
   same pipeline using another region.
 
-[ms_0]
+[*_0]
 action=CheckVariantToolsVersion('2.3.1')
 comment=Check the version of variant tools. Version 2.3.1 or higher is required
 	for the execution of this simulation.
+
+[*_1]
+action=ImportModules('simuPOP.demography')
+comment=Import required modules.
 
 [ms_5]
 action=CheckCommands('ms')
@@ -89,11 +93,6 @@ action=RemoveIntermediateFiles(['cache/ex1_ms_${seed}.pop', 'cache/ex1_ms_${seed
 comment=Remove intermediate populations to save diskspace.
 
 
-[neutral_0]
-action=CheckVariantToolsVersion('2.3.1')
-comment=Check the version of variant tools. Version 2.3.1 or higher is required
-	for the execution of this simulation.
-
 [neutral_10]
 input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
 action=RunCommand('vtools init Peng2014_ex1')
@@ -118,7 +117,7 @@ action=EvolvePopulation(
 	output='ex1_neutral_evolved_${seed}.pop',
 	mutator=RefGenomeMutator(regions='%(regions)s', model='JC69', rate=[1.8e-8 * %(scale)s * 4. / 3.]),
 	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
-	demoModel = MultiStageModel([
+	demoModel=MultiStageModel([
         InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
 			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
         ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
@@ -137,12 +136,6 @@ comment=Get allele frequency spectrum in a sample of 700 individuals.
 action=RemoveIntermediateFiles(['ex1_neutral_evolved_${seed}.pop', 'cache/ex1_neutral_init_${seed}.pop'])
 comment=Remove intermediate populations to save diskspace.
 
-
-
-[with_selection_0]
-action=CheckVariantToolsVersion('2.3.1')
-comment=Check the version of variant tools. Version 2.3.1 or higher is required
-	for the execution of this simulation.
 
 [with_selection_10]
 input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
@@ -190,12 +183,6 @@ action=RemoveIntermediateFiles(['ex1_with_selection_evolved_${seed}.pop', 'cache
 comment=Remove intermediate populations to save diskspace.
 
 
-
-[resample_0]
-action=CheckVariantToolsVersion('2.3.1')
-comment=Check the version of variant tools. Version 2.3.1 or higher is required
-	for the execution of this simulation.
-
 [resample_10]
 input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
 action=RunCommand('vtools init Peng2014_ex1')
@@ -235,7 +222,7 @@ action=EvolvePopulation(
 	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
 		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
 	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
-	demoModel = ExponentialGrowthModel(T=10 / %(scale)s,
+	demoModel=ExponentialGrowthModel(T=10 / %(scale)s,
 		NT=10000 / %(scale)s)
     )
 comment=Expand the population exponentially to reach a large population

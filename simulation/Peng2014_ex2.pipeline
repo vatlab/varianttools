@@ -7,13 +7,13 @@
 [pipeline description]
 description=Simulation of case control samples for 20 genes and analyze samples
     of different sizes (1000, 2000, 3000, 4000 cases and matching number of 
-	controls) draw from European, Mexican American (mixed and matched case
-	and control), and from both Asian (cases) and European (controls) populations
-	for a mismatch design. This simulation model has been used to simulate data
-	for the second example in paper "Reproducible Simulations of realistic samples
-	for next-gen sequencing studies using Variant Simulation Tools". The generated
-	samples are analyzed using Variant Association Tools, first for all variants
-	and then for non-synoymous variants.
+    controls) draw from European, Mexican American (mixed and matched case
+    and control), and from both Asian (cases) and European (controls) populations
+    for a mismatch design. This simulation model has been used to simulate data
+    for the second example in paper "Reproducible Simulations of realistic samples
+    for next-gen sequencing studies using Variant Simulation Tools". The generated
+    samples are analyzed using Variant Association Tools, first for all variants
+    and then for non-synoymous variants.
 
 MexicanAmerican_description=This model draws samples from Mexican American population
     which is mixed from Eurpean and Mexican populations.
@@ -45,6 +45,10 @@ action=CheckVariantToolsVersion('2.3.1')
 comment=Check the version of variant tools. Version 2.3.1 or higher is required
 	for the execution of this simulation.
 
+[*_1]
+action=ImportModules('simuPOP.demography')
+comment=Import required modules.
+
 [*_10,*_110,*_210,*_310,*_410]
 # used for data simulation and analyses of 4 different types of samples
 action=RunCommand([
@@ -68,7 +72,7 @@ action=EvolvePopulation(
 	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
 	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
 		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
-	demoModel = SettlementOfNewWorldModel(20000, scale=%(scale)s)
+	demoModel=SettlementOfNewWorldModel(20000, scale=%(scale)s)
 	)
 comment=Evolve and expand the population using a K80 mutation model	and a demographic 
 	model that models the settlement of new world model of the Mexican American population.
@@ -81,7 +85,7 @@ action=EvolvePopulation(
 	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
 	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
 		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
-	demoModel = SettlementOfNewWorldModel(20000, scale=%(scale)s, mix=False)
+	demoModel=SettlementOfNewWorldModel(20000, scale=%(scale)s, outcome=['AF', 'EU', 'AS'])
 	)
 comment=Evolve and expand the population using a K80 mutation model	and a demographic 
 	model that models the settlement of new world model of the Mexican American population,

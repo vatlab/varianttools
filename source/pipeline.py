@@ -63,6 +63,9 @@ try:
 except (ImportError, ValueError) as e:
     hasPySam = False
 
+# a global namespace to store all user imported modules
+VT_GLOBAL = {}
+
 # define a few functions that can be used in the lambda function 
 # of a pipeline to display information about a project
 def projInfo(tables=[], samples=[], format_string=''):
@@ -428,6 +431,27 @@ class OutputText:
         else:
             sys.stdout.write(self.text)        
         return ifiles
+
+class ImportModules:
+    '''Import names from one or more modules to a global dictionary
+    VT_MODULE'''
+    def __init__(self, modules=[]):
+        if isinstance(modules, str):
+            self.modules = [modules]
+        else:
+            self.modules = modules
+
+    def __call__(self, ifiles, pipeline=None):
+        global VT_GLOBAL
+        for module in self.modules:
+            try:
+                local_dict = __import__(module, globals(), locals(), module.split('.', 1)[-1:])
+                env.logger.info('{} symbols are imported form module {}'.format(len(local_dict.__dict__), module))
+                VT_GLOBAL.update(local_dict.__dict__)
+            except ImportError as e:
+                raise RuntimeError('Failed to import module {}: {}'.format(module, e))
+        return ifiles
+
 
 class CheckCommands:
     '''Check the existence of specified commands and raise an error if one of
@@ -1477,6 +1501,7 @@ class Pipeline:
         self.pipeline = PipelineDescription(name, extra_args, pipeline_type)
 
     def execute(self, pname, input_files=[], output_files=[], jobs=1, **kwargs):
+        global VT_GLOBAL
         if pname is None:
             if len(self.pipeline.pipelines) == 1:
                 pname = self.pipeline.pipelines.keys()[0]
@@ -1553,7 +1578,7 @@ class Pipeline:
                     if 'input' in self.VARS:
                         self.VARS.pop('input')
                     # ${CMD_INPUT} etc can be used.
-                    emitter = eval(substituteVars(command.input_emitter, self.VARS))
+                    emitter = eval(substituteVars(command.input_emitter, self.VARS), globals(), VT_GLOBAL)
                 except Exception as e:
                     raise RuntimeError('Failed to group input files: {}'
                         .format(e))
@@ -1571,7 +1596,7 @@ class Pipeline:
                         .format(pname, command.index, ig))
                     env.logger.debug('Action of step {}_{}: {}'
                         .format(pname, command.index, action))
-                    action = eval(action)
+                    action = eval(action, globals(), VT_GLOBAL)
                     if type(action) == tuple:
                         action = SequentialActions(action)
                     # pass the Pipeline object itself to action

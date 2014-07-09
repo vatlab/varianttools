@@ -27,8 +27,6 @@ import simuOpt
 simuOpt.setOptions(alleleType='mutant', optimized=True, quiet=True, version='1.0.5')
 
 import simuPOP as sim
-from simuPOP.demography import *
-from simuPOP.sampling import *
 
 from .utils import env, expandRegions, ProgressBar, RefGenome, existAndNewerThan, \
     calculateMD5, genesInRegions, codon_table, codon_table_reverse_complement, \
