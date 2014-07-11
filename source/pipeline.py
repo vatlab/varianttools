@@ -445,6 +445,8 @@ class ImportModules:
         global VT_GLOBAL
         for module in self.modules:
             try:
+                # allow loading from current directory
+                sys.path.append(os.getcwd())
                 local_dict = __import__(module, globals(), locals(), module.split('.', 1)[-1:])
                 env.logger.info('{} symbols are imported form module {}'.format(len(local_dict.__dict__), module))
                 VT_GLOBAL.update(local_dict.__dict__)
@@ -1497,8 +1499,9 @@ class DownloadResource:
  
 
 class Pipeline:
-    def __init__(self, name, extra_args=[], pipeline_type='pipeline'):
+    def __init__(self, name, extra_args=[], pipeline_type='pipeline', verbosity=None):
         self.pipeline = PipelineDescription(name, extra_args, pipeline_type)
+        self.verbosity = verbosity
 
     def execute(self, pname, input_files=[], output_files=[], jobs=1, **kwargs):
         global VT_GLOBAL
@@ -1527,7 +1530,7 @@ class Pipeline:
         global max_running_jobs 
         max_running_jobs = jobs
         # the project will be opened when needed
-        with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY']) as proj:
+        with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY'], verbosity=self.verbosity) as proj:
             self.VARS = {
                 'cmd_input': input_files,
                 'cmd_output': output_files,
@@ -1741,7 +1744,7 @@ def execute(args):
                 print(sep.join(['{}'.format(x) for x in rec]))
     #
     def executePipeline():                
-        pipeline = Pipeline(args.pipeline[0], extra_args=args.unknown_args)
+        pipeline = Pipeline(args.pipeline[0], extra_args=args.unknown_args, verbosity=args.verbosity)
         # unspecified
         if len(args.pipeline) == 1:
             pipeline.execute(None, args.input, args.output,
@@ -1752,6 +1755,8 @@ def execute(args):
                     args.jobs)
     # 
     try:
+        env.verbosity = args.verbosity
+        env.logger = None
         # definitely a pipeline
         if args.pipeline[0].endswith('.pipeline') or args.input or args.output or args.unknown_args:
             executePipeline()
@@ -1799,6 +1804,8 @@ def simulateArguments(parser):
 
 def simulate_replicate(args, rep):
     try:
+        env.verbosity = args.verbosity
+        env.logger = None
         # step 1, create a simulation configuration file.
         model_name = os.path.basename(args.model[0]).split('.', 1)[0]
         if args.seed is None:
@@ -1825,7 +1832,7 @@ def simulate_replicate(args, rep):
         #
         env.logger.info('Starting simulation [[{}]]'.format(cfg_file))
         pipeline = Pipeline(args.model[0], extra_args=args.unknown_args,
-            pipeline_type='simulation')
+            pipeline_type='simulation', verbosity=args.verbosity)
         # using a pool of simulators 
         if len(args.model) == 1:
             pipeline.execute(None, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)

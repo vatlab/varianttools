@@ -362,7 +362,7 @@ class ExportPopulation(SkiptableAction):
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
         # output genotype
-        with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY']) as proj:
+        with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY'], verbosity=pipeline.verbosity) as proj:
             build = proj.build
         if build is None:
             build = 'hg19'
@@ -585,7 +585,7 @@ def _identifyCodonInRegions(raw_regions):
     # coding_base stores reference sequence at coding regions
     coding_base = {}
     #
-    with Project(verbosity='1') as proj:
+    with Project() as proj:
         # expand user provided regions to one or more (chr,start,end,comment)
         regions = expandRegions(raw_regions, proj)
         #
@@ -771,7 +771,7 @@ class RefGenomeMutator(sim.PyOperator):
     def __init__(self, regions, model, rate):
         # 
         base = {'A': [], 'C': [], 'G': [], 'T': [], 'N': []}
-        with Project(verbosity='1') as proj:
+        with Project() as proj:
             refGenome = RefGenome(proj.build)
             idx = 0
             for reg in expandRegions(regions, proj):
@@ -1039,12 +1039,18 @@ class EvolvePopulation(SkiptableAction):
         selector = None, demoModel=None, 
         mutator = None, 
         transmitter = None,
+        taggers=[],
+        preOps=[],
+        postOps=[],
         output=[]):
         self.mutator = sim.NoneOp() if mutator is None else mutator
         self.selector = sim.NoneOp() if selector is None else selector
         self.demoModel = demoModel
         self.transmitter = sim.MendelianGenoTransmitter() if transmitter is None else transmitter
         self.output = [output]
+        self.taggers = taggers
+        self.preOps = preOps
+        self.postOps = postOps
         SkiptableAction.__init__(self, cmd='EvolvePop output={}\n'
             .format(output), output=output)
 
@@ -1089,9 +1095,10 @@ class EvolvePopulation(SkiptableAction):
                         ' meanOfInfo["fitness"], minOfInfo["fitness"])',
                         output=env.logger.info),
                     ])
-            ],
-            matingScheme=sim.RandomMating(ops=self.transmitter,
+            ] + self.preOps,
+            matingScheme=sim.RandomMating(ops=[self.transmitter] + self.taggers,
                 subPopSize=self.demoModel),
+            postOps=self.postOps,
             finalOps=[
                 # revert fixed sites so that the final population does not have fixed sites
                 sim.RevertFixedSites(),
