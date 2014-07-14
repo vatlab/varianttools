@@ -1041,8 +1041,10 @@ class EvolvePopulation(SkiptableAction):
         mutator = None, 
         transmitter = None,
         taggers=[],
+        initOps=[],
         preOps=[],
         postOps=[],
+        finalOps=[],
         output=[]):
         self.mutator = sim.NoneOp() if mutator is None else mutator
         self.selector = sim.NoneOp() if selector is None else selector
@@ -1050,8 +1052,10 @@ class EvolvePopulation(SkiptableAction):
         self.transmitter = sim.MendelianGenoTransmitter() if transmitter is None else transmitter
         self.output = [output]
         self.taggers = taggers
+        self.initOps = initOps
         self.preOps = preOps
         self.postOps = postOps
+        self.finalOps = finalOps
         SkiptableAction.__init__(self, cmd='EvolvePop output={}\n'
             .format(output), output=output)
 
@@ -1069,7 +1073,7 @@ class EvolvePopulation(SkiptableAction):
             initOps=[
                 sim.InitSex(),
                 sim.PyExec('import time')
-            ],
+            ] + self.initOps,
             preOps=[
                 sim.PyOutput('''Statistics outputted are
     1. Generation number,
@@ -1120,7 +1124,7 @@ class EvolvePopulation(SkiptableAction):
                            r'There are on average %.1f mutants per individual. Mean allele frequency is %.4f%%.\n"'
                            r'% (popSize, numOfSegSites, numOfMutants / popSize, (numOfMutants * 50. / numOfSegSites/ popSize) if numOfSegSites else 0)',
                     output=env.logger.info),
-            ],
+            ] + self.finalOps,
             gen = self.demoModel.num_gens
         )
         #
