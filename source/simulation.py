@@ -358,6 +358,7 @@ class ExportPopulation(SkiptableAction):
             'C': {0: 'C', 1: 'G', 2: 'T', 3: 'A'},
             'G': {0: 'G', 1: 'T', 2: 'A', 3: 'C'},
             'T': {0: 'T', 1: 'A', 2: 'C', 3: 'G'},
+            'N': {0: 'A', 1: 'C', 2: 'G', 3: 'T'},
         }
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
@@ -1064,9 +1065,11 @@ class EvolvePopulation(SkiptableAction):
         # Evolve
         env.logger.info('Start evolving...')
         pop.dvars().last_time = time.time()
-        exec('import time', pop.vars(), pop.vars())
         pop.evolve(
-            initOps=sim.InitSex(),
+            initOps=[
+                sim.InitSex(),
+                sim.PyExec('import time')
+            ],
             preOps=[
                 sim.PyOutput('''Statistics outputted are
     1. Generation number,
