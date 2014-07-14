@@ -451,7 +451,17 @@ class ImportModules:
                 env.logger.info('{} symbols are imported form module {}'.format(len(local_dict.__dict__), module))
                 VT_GLOBAL.update(local_dict.__dict__)
             except ImportError as e:
-                raise RuntimeError('Failed to import module {}: {}'.format(module, e))
+                if os.path.isfile(module):
+                    try:
+                        p,f = os.path.split(os.path.abspath(os.path.expanduser(module)))
+                        sys.path.append(p)
+                        local_dict = __import__(f[:-3] if f.endswith('.py') else f, globals(), locals(), module.split('.', 1)[-1:])
+                        env.logger.info('{} symbols are imported form module {}'.format(len(local_dict.__dict__), module))
+                        VT_GLOBAL.update(local_dict.__dict__)
+                    except Exception as e:
+                        raise RuntimeError('Failed to import module {}: {}'.format(module, e))
+                else: 
+                    raise RuntimeError('Failed to import module {}: {}'.format(module, e))
         return ifiles
 
 
