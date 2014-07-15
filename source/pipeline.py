@@ -385,9 +385,7 @@ try:
 except ImportError as e:
     # The simulation functors will not be available if simulation module cannot
     # be loaded.
-    env.logger.debug('Failed to import module simulation')
-
-
+    env.logger.warning('Failed to import module simulation: {}'.format(e))
 
 class SequentialActions:
     '''Define an action that calls a list of actions, specified by Action1,
@@ -1702,17 +1700,21 @@ def isBamPairedEnd(input_file):
 
 
 def executeArguments(parser):
-    parser.add_argument('pipeline', nargs='+', metavar='PIPELINE/QUERY',
-        help='''Name of a pipeline configuration file with optional names of
-            pipelines to be executed if the configuration file defines more
-            than one pipelines. The configuration file can be identified by
-            path to a .pipeline file (with or without extension), or one
+    parser.add_argument('specfile', metavar='SPECFILE',
+        help='''Name of a pipeline configuration file, which can be a
+            path to a .pipeline file (with or without extension) or one
             of the online pipelines listed by command "vtools show pipelines".
-            If no input and output files are specified (options --input and
-            --output), values of this option is treated as a SQL query that
-            will be executed against the project database, with project genotype
-            database attached as "genotype" and annotation databases attached
-            by their names.''')
+            For backward compatibility, if no input and output files are
+            specified (options --input and --output), values of this option 
+            is treated as a SQL query that will be executed against the project
+            database, with project genotype database attached as "genotype" and
+            annotation databases attached by their names.''')
+    parser.add_argument('pipelines', nargs='*', metavar='PIPELINES',
+        help='''Name of one or more pipelines defined in SPECFILE, which can be
+            ignored if the SPECFILE only defines one pipeline. Please use 
+            command "vtools show pipeline SPECFILE" for details of available
+            pipelines in SPECFILE, including pipeline-specific parameters that
+            could be used to change the default behavior of the pipelines.''')
     parser.add_argument('-i', '--input', nargs='*', metavar='INPUT', default=[],
         help='''Input to the pipelines, usually a list of input files, that
             will bepassed to the pipelines as variable ${CMD_INPUT}.''')
@@ -1736,7 +1738,7 @@ def execute(args):
             proj.db.attach('{}_genotype'.format(proj.name))
             cur = proj.db.cursor()
             # 
-            query = ' '.join(args.pipeline)
+            query = args.specfile + ' ' + ' '.join(args.pipelines)
             if query.upper().startswith('SELECT'):
                 env.logger.debug('Analyze statement: "{}"'.format(query))
                 cur.execute('EXPLAIN QUERY PLAN ' + query)
@@ -1754,13 +1756,13 @@ def execute(args):
                 print(sep.join(['{}'.format(x) for x in rec]))
     #
     def executePipeline():                
-        pipeline = Pipeline(args.pipeline[0], extra_args=args.unknown_args, verbosity=args.verbosity)
+        pipeline = Pipeline(args.specfile, extra_args=args.unknown_args, verbosity=args.verbosity)
         # unspecified
-        if len(args.pipeline) == 1:
+        if not args.pipelines:
             pipeline.execute(None, args.input, args.output,
                 args.jobs)
         else:
-            for name in args.pipeline[1:]:
+            for name in args.pipelines:
                 pipeline.execute(name, args.input, args.output,
                     args.jobs)
     # 
@@ -1768,7 +1770,7 @@ def execute(args):
         env.verbosity = args.verbosity
         env.logger = None
         # definitely a pipeline
-        if args.pipeline[0].endswith('.pipeline') or args.input or args.output or args.unknown_args:
+        if args.specfile.endswith('.pipeline') or args.input or args.output or args.unknown_args:
             executePipeline()
         # definitely a sql query
         elif args.delimiter != '\t':
@@ -1787,21 +1789,23 @@ def execute(args):
         sys.exit(1)
 
 
-
 #
 # vtools simulate is implemented using the pipeline execution mechanism. It 
 # essentially execute a pipeline that calls various simulation functions 
 # to simulate data.
 #
 def simulateArguments(parser):
-    parser.add_argument('model', nargs='+', metavar='MODEL',
-        help='''Name of a model to simulate. It should be the name of a model
-            description file with optional names for specific models within the
-            descrition file to simulate. A list of model-specific parameters could be 
-            specified to change the behavior of these models. Please use command
-            "vtools show simulations" to get a list all available simulation
-            models and "vtools show simulation MODEL" for details of a particular
-            simulation model.''')
+    parser.add_argument('specfile', metavar='SPECFILE',
+        help='''Name of a model specification file, which can be the name of an
+            online specification file, or path to a local .pipeline file. Please
+            use command "vtools show simulations" to get a list all available
+            simulation models.''')
+    parser.add_argument('models', nargs='*', metavar='MODELS',
+        help='''Name of one or more simulation models defined in SPECFILE, which
+            can be ignored if the SPECFILE only defines one simulation model.
+            Please use command "vtools show simulation SPECFILE" for details
+            of available models in SPECFILE, including model-specific parameters
+            that could be used to change the default behavior of these models.''')
     parser.add_argument('--seed', type=int,
         help='''Random seed for the simulation. A random seed will be used by
             default but a specific seed could be used to reproduce a previously
@@ -1817,7 +1821,7 @@ def simulate_replicate(args, rep):
         env.verbosity = args.verbosity
         env.logger = None
         # step 1, create a simulation configuration file.
-        model_name = os.path.basename(args.model[0]).split('.', 1)[0]
+        model_name = os.path.basename(args.specfile).split('.', 1)[0]
         if args.seed is None:
             args.seed = random.randint(1, 2**32-1)
         if not os.path.isdir(env.cache_dir):
@@ -1825,13 +1829,13 @@ def simulate_replicate(args, rep):
 
         # set random seed of simulators
         random.seed(args.seed + rep)
-        if len(args.model) == 1:
+        if not args.models:
             cfg_file = '{}/{}_{}.cfg'.format(env.cache_dir, model_name, args.seed + rep)
         else:
-            cfg_file = '{}/{}_{}_{}.cfg'.format(env.cache_dir, model_name, args.model[1], args.seed + rep)
+            cfg_file = '{}/{}_{}_{}.cfg'.format(env.cache_dir, model_name, '_'.join(args.models), args.seed + rep)
         #
         with open(cfg_file, 'w') as cfg:
-            cfg.write('model={}\n'.format(' '.join(args.model)))
+            cfg.write('model={} {}\n'.format(args.specfile, ' '.join(args.models)))
             cfg.write('seed={}\n'.format(args.seed + rep))
             if '--seed' in sys.argv:
                 # skip the seed option so to stop pipeline from distinguishing the two commands
@@ -1841,13 +1845,13 @@ def simulate_replicate(args, rep):
                 cfg.write("command={}\n".format(env.command_line))
         #
         env.logger.info('Starting simulation [[{}]]'.format(cfg_file))
-        pipeline = Pipeline(args.model[0], extra_args=args.unknown_args,
+        pipeline = Pipeline(args.specfile, extra_args=args.unknown_args,
             pipeline_type='simulation', verbosity=args.verbosity)
         # using a pool of simulators 
-        if len(args.model) == 1:
+        if not args.models:
             pipeline.execute(None, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
         else:
-            for name in args.model[1:]:
+            for name in args.models:
                 pipeline.execute(name, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
     except Exception as e:
         env.logger.error('Failed to simulate replicate {} of model {}: {}'.format(rep, model_name, e))
