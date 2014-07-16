@@ -64,12 +64,16 @@ scale_comment=Scaling factor to speed up the simulation by scaling down the
 
 
 
-[ex1_neutral_0]
+[*_0]
 action=CheckVariantToolsVersion('2.3.1')
 comment=Check the version of variant tools. Version 2.3.1 or higher is required
 	for the execution of this simulation.
 
-[ex1_neutral_10]
+[*_1]
+action=ImportModules(['simuPOP.demography', 'VST_srv.py'])
+comment=Import required models
+
+[*_10]
 input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
 action=RunCommand('vtools init Peng2014_ex1')
 comment=Create a new project if there is no existing project under the current
@@ -150,17 +154,6 @@ action=OutputPopulationStatistics(
 	)
 comment=Get allele frequency spectrum in a sample of 700 individuals.
 
-
-[srv_0]
-action=CheckVariantToolsVersion('2.3.1')
-comment=Check the version of variant tools. Version 2.3.1 or higher is required
-	for the execution of this simulation.
-
-[srv_10]
-input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
-action=RunCommand('vtools init Peng2014_ex1')
-comment=Create a new project if there is no existing project under the current
-	directory.
 
 [srv_20]
 action=RunCommand('vtools use refGene')
