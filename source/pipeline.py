@@ -442,23 +442,37 @@ class ImportModules:
     def __call__(self, ifiles, pipeline=None):
         global VT_GLOBAL
         for module in self.modules:
-            try:
-                # allow loading from current directory
-                sys.path.append(os.getcwd())
-                local_dict = __import__(module, globals(), locals(), module.split('.', 1)[-1:])
-                env.logger.info('{} symbols are imported form module {}'.format(len(local_dict.__dict__), module))
-                VT_GLOBAL.update(local_dict.__dict__)
-            except ImportError as e:
+            # this is a path to a .py file
+            if module.endswith('.py'):
                 if os.path.isfile(module):
+                    pyfile = module
+                # if the .py file locates in the same directory as the pipeline file
+                elif pipeline is not None and pipeline.pipeline_path is not None \
+                    and os.path.isfile(os.path.join(pipeline.pipeline_path, module)):
+                    pyfile = os.path.join(pipeline.pipeline_path, module)
+                else:
+                    # try to download it from online
                     try:
-                        p,f = os.path.split(os.path.abspath(os.path.expanduser(module)))
-                        sys.path.append(p)
-                        local_dict = __import__(f[:-3] if f.endswith('.py') else f, globals(), locals(), module.split('.', 1)[-1:])
-                        env.logger.info('{} symbols are imported form module {}'.format(len(local_dict.__dict__), module))
-                        VT_GLOBAL.update(local_dict.__dict__)
+                        pyfile = downloadFile('simulation/{}'.format(module))
                     except Exception as e:
-                        raise RuntimeError('Failed to import module {}: {}'.format(module, e))
-                else: 
+                        raise ValueError('Failed to download required python module {}'.format(module))
+                try:
+                    p,f = os.path.split(os.path.abspath(os.path.expanduser(pyfile)))
+                    sys.path.append(p)
+                    local_dict = __import__(f[:-3] if f.endswith('.py') else f, globals(), locals(), module.split('.', 1)[-1:])
+                    env.logger.info('{} symbols are imported form module {}'.format(len(local_dict.__dict__), module))
+                    VT_GLOBAL.update(local_dict.__dict__)
+                except Exception as e:
+                    raise RuntimeError('Failed to import module {}: {}'.format(module, e))
+            # now a system module
+            else:
+                try:
+                    # allow loading from current directory
+                    sys.path.append(os.getcwd())
+                    local_dict = __import__(module, globals(), locals(), module.split('.', 1)[-1:])
+                    env.logger.info('{} symbols are imported form module {}'.format(len(local_dict.__dict__), module))
+                    VT_GLOBAL.update(local_dict.__dict__)
+                except ImportError as e:
                     raise RuntimeError('Failed to import module {}: {}'.format(module, e))
         return ifiles
 
@@ -1509,6 +1523,10 @@ class DownloadResource:
 class Pipeline:
     def __init__(self, name, extra_args=[], pipeline_type='pipeline', verbosity=None):
         self.pipeline = PipelineDescription(name, extra_args, pipeline_type)
+        if os.path.isfile(name):
+            self.pipeline_path = os.path.split(os.path.abspath(os.path.expanduser(name)))[0]
+        else:
+            self.pipeline_path = None
         self.verbosity = verbosity
 
     def execute(self, pname, input_files=[], output_files=[], jobs=1, **kwargs):
