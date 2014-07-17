@@ -238,7 +238,7 @@ action=OutputPopulationStatistics(
 comment=Get allele frequency spectrum in a sample of 700 individuals.
 
 [resample_999]
-action=RemoveIntermediateFiles(['ex1_resample_sampled_${seed}.pop', 'cache/ex1_resample_init_${seed}.pop'])
+action=RemoveIntermediateFiles(['ex1_resample_sampled_${seed}.pop'])
 comment=Remove intermediate populations to save diskspace.
 
 
