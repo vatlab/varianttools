@@ -53,18 +53,22 @@ else:
 class ExtractVCF(SkiptableAction):
     '''Use tabix to extract portion of a local or online VCF file '''
     def __init__(self, regions, sourceURL, output):
-        self.sourceURL = sourceURL
+        if isinstance(sourceURL, (list, tuple)):
+            self.sourceURL = sourceURL
+        else:
+            self.sourceURL = [sourceURL]
         self.regions = regions
         SkiptableAction.__init__(self, cmd='ExtractVCF {} {} {}'.format(sourceURL, regions, output),
             output=output)
 
     def _execute(self, ifiles, pipeline):
-        tabixFetch(self.sourceURL, [], self.output[0], True)
+        tabixFetch(self.sourceURL[0], [], self.output[0], True)
         for r in expandRegions(self.regions):
             region = '{}:{}-{}'.format(r[0], r[1], r[2])
             env.logger.info('Retriving genotype for region chr{}{}'.format(region,
                 ' ({})'.format(r[3] if r[3] else '')))
-            tabixFetch(self.sourceURL, [region], self.output[0], False)
+            for URL in self.sourceURL:
+                tabixFetch(URL, [region], self.output[0], False)
 
 
 class CreatePopulation(SkiptableAction):
@@ -126,6 +130,8 @@ class CreatePopulation(SkiptableAction):
                     continue
                 fields = line.split('\t')
                 if pop is None:
+                    if len(fields) <= 10:
+                        raise ValueError('Input vcf file does not contain any genotype information')
                     pop = sim.Population(size=len(fields)-10, loci=[len(lociPos[x]) for x in chroms],
                         chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
                 #

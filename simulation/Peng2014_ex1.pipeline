@@ -196,8 +196,9 @@ comment=Link the refGene database to the project. This database is required
 
 
 [resample_25]
+#sourceURL='ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/ALL.2of4intersection.20100804.genotypes.vcf.gz',
 action=ExtractVCF(
-	sourceURL='ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/ALL.2of4intersection.20100804.genotypes.vcf.gz',
+	sourceURL=['ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/ALL.chr{}.phase3_shapeit2_mvncall_integrated_v2.20130502.genotypes.vcf.gz'.format(x) for x in range(1, 23)],
 	regions='%(regions)s',
 	output='%(extracted_vcf)s')
 input_emitter=EmitInput(select=${:not os.path.isfile('%(extracted_vcf)s')})
