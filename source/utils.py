@@ -1222,13 +1222,25 @@ class GenomicRegions(object):
         # what field is this?
         query, fields = consolidateFieldName(self.proj, 'variant', field, False) 
         # query should be just one of the fields according to things that are passed
+        annoName = query.split('.')[0]
         if query.strip() not in fields:
-            raise ValueError('Could not identify field {} from the present project'.format(field))
+            # try to run 'vtools use XXXX' if the annotation database if not linked.
+            self.proj.close()
+            #
+            env.logger.info('Linking to {}'.format(annoName))
+            try:
+                ret = subprocess.call('vtools use {}'.format(annoName), shell=True)
+                if ret:
+                    raise RuntimeError('Could not locate annotation database {} in the project.'.format(annoName))
+            except Exception as e:
+                raise RuntimeError('Failed to link to annotation database {}: {}'.format(annoName, e))
+            #
+            self.proj = Project()
         # now we have annotation database
         try:
-            annoDB = [x for x in self.proj.annoDB if x.linked_name.lower() == query.split('.')[0].lower()][0]
+            annoDB = [x for x in self.proj.annoDB if x.linked_name.lower() == annoName.lower()][0]
         except:
-            raise ValueError('Could not locate annotation database {} in the project'.format(query.split('.')[0]))
+            raise RuntimeError('Could not locate annotation database {} in the project.'.format(annoName))
         #
         if annoDB.anno_type != 'range':
             raise ValueError('{} is not linked as a range-based annotation database.'.format(annoDB.linked_name))
