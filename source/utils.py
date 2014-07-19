@@ -1816,6 +1816,8 @@ def TEMP(filename):
 # 
 def downloadURL(URL, dest, quiet, message=None):
     # use libcurl? Recommended but not always available
+    if 'VTOOLS_ENV' in os.environ and 'NOWEB' in os.environ['VTOOLS_ENV']:
+         raise RuntimeError('Failed to download from {}: no internet connection (set by NOWEB in VTOOLS_ENV environment variable)'.format(URL))
     env.logger.debug('Download {}'.format(URL))
     filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
     if message is None:
