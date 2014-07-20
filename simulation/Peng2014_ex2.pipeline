@@ -115,8 +115,8 @@ comment=Draw ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[p
 # The difference is that the case control samples are drawn from the European population
 input=${OUTPUT40}
 action=DrawCaseControlSample(
-	cases=[0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}, 0, 0], 
-	controls=[0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}, 0, 0],
+	cases=[0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}, 0], 
+	controls=[0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}, 0],
 	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
 		s_stoploss=0.001, s_stopgain=0.01),
 	output='${pipeline_name}_sample_${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}_${seed}.pop')
@@ -128,8 +128,8 @@ comment=Draw ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[p
 # The difference is that the case control samples are drawn from different populations
 input=${OUTPUT40}
 action=DrawCaseControlSample(
-	cases=[0, 0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}, 0], 
-	controls=[0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}, 0, 0],
+	cases=[0, 0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}], 
+	controls=[0, ${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}, 0],
 	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
 		s_stoploss=0.001, s_stopgain=0.01),
 	output='${pipeline_name}_sample_${pipeline_step: {'100':1000, '200':2000, '300':3000, '400':4000}[pipeline_step]}_${seed}.pop')
