@@ -1044,6 +1044,8 @@ class DrawCaseControlSample(SkiptableAction):
         for idx, output in enumerate(self.output):
             self.selectedCases = [0]*len(self.cases)
             self.selectedCtrls = [0]*len(self.controls)
+            self.parentsOfCases = []
+            self.parentsOfCtrls = []
             self.numOfOffspring = 0
             self.numOfAffected = 0
             # if there is only one sample or the last sample, use the loaded population.
@@ -1062,10 +1064,13 @@ class DrawCaseControlSample(SkiptableAction):
             pop.mergeSubPops()
         self.prog = ProgressBar('Generating %d cases and %d controls' % (sum(self.cases), 
             sum(self.controls)), sum(self.cases) + sum(self.controls))
+        pop.addInfoFields(['father_idx', 'mother_idx'])
+        self.parentalPopSize = pop.popSize()
         pop.evolve(
             matingScheme=sim.RandomMating(
                 ops=[
                     sim.MendelianGenoTransmitter(),
+                    sim.ParentsTagger(),
                     # apply a penetrance model 
                     self.penetrance
                 ] + [
@@ -1078,10 +1083,15 @@ class DrawCaseControlSample(SkiptableAction):
         )
         self.prog.done()
         #
-        if 'migrate_to' in pop.infoFields():
-            pop.removeInfoFields('migrate_to')
-        if 'fitness' in pop.infoFields():
-            pop.removeInfoFields('fitness')
+        for field in ['migrate_to', 'fitness', 'father_idx', 'mother_idx']:
+            if field in pop.infoFields():
+                pop.removeInfoFields(field)
+        uParents = len(set(self.parentsOfCases))
+        env.logger.info('{} cases are produced from {} ({:.2f}% of {}) unique parents'.format(
+            sum(self.selectedCases), uParents, uParents * 100. /self.parentalPopSize, self.parentalPopSize)) 
+        uParents = len(set(self.parentsOfCtrls))
+        env.logger.info('{} controls are produced from {} ({:.2f}% of {}) unique parents'.format(
+            sum(self.selectedCtrls), uParents, uParents * 100. /self.parentalPopSize, self.parentalPopSize)) 
         env.logger.info('Observed prevalence of the disease is {:.3f}% ({}/{})'
             .format(self.numOfAffected * 100. / self.numOfOffspring, self.numOfAffected,
                 self.numOfOffspring))
@@ -1096,11 +1106,13 @@ class DrawCaseControlSample(SkiptableAction):
             self.numOfAffected += 1
             if self.selectedCases[param] < self.cases[param]:
                 self.selectedCases[param] += 1
+                self.parentsOfCases.extend([off.father_idx, off.mother_idx])
                 self.prog.update(sum(self.selectedCases) + sum(self.selectedCtrls))
                 return True
         else:
             if self.selectedCtrls[param] < self.controls[param]:
                 self.selectedCtrls[param] += 1
+                self.parentsOfCtrls.extend([off.father_idx, off.mother_idx])
                 self.prog.update(sum(self.selectedCases) + sum(self.selectedCtrls))
                 return True
         return False
@@ -1130,10 +1142,9 @@ class DrawRandomSample(SkiptableAction):
             gen = 1
         )
         # 
-        if 'migrate_to' in pop.infoFields():
-            pop.removeInfoFields('migrate_to')
-        if 'fitness' in pop.infoFields():
-            pop.removeInfoFields('fitness')
+        for field in ['migrate_to', 'fitness', 'father_idx', 'mother_idx']:
+            if field in pop.infoFields():
+                pop.removeInfoFields(field)
         env.logger.info('Saving samples to population {}'.format(output))
         pop.save(output)
         del pop
@@ -1191,10 +1202,9 @@ class DrawQuanTraitSample(SkiptableAction):
             gen = 1
         )
         # 
-        if 'migrate_to' in pop.infoFields():
-            pop.removeInfoFields('migrate_to')
-        if 'fitness' in pop.infoFields():
-            pop.removeInfoFields('fitness')
+        for field in ['migrate_to', 'fitness', 'father_idx', 'mother_idx']:
+            if field in pop.infoFields():
+                pop.removeInfoFields(field)
         env.logger.info('Saving samples to population {}'.format(output))
         pop.save(output)
 
