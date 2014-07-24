@@ -155,7 +155,7 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
         # order and where clauses are used inside the query in the new from_clause
         query = 'SELECT {} {} {} {} {};'.format(select_clause, from_clause,
             group_clause, order_clause, limit_clause)
-    env.logger.debug('Running query {}'.format(query))
+    env.logger.trace('Running query {}'.format(query))
     # if output to a file
     cur = proj.db.cursor()
     try:
@@ -363,7 +363,7 @@ def select(args, reverse=False):
             if args.count and not args.to_table and not args.output:
                 query = 'SELECT COUNT(DISTINCT {}.variant_id) {} {};'.format(encodeTableName(args.from_table),
                     from_clause, where_clause)
-                env.logger.debug('Running query {}'.format(query))
+                env.logger.trace('Running query {}'.format(query))
                 proj.db.startProgress('Counting variants')
                 cur = proj.db.cursor()
                 cur.execute(query)
@@ -385,7 +385,7 @@ def select(args, reverse=False):
                 else:
                     query = 'INSERT INTO {0} SELECT DISTINCT {1}.variant_id FROM {1} WHERE {1}.variant_id NOT IN (SELECT {1}.variant_id {2} {3});'.\
                         format(encodeTableName(args.to_table), encodeTableName(args.from_table), from_clause, where_clause)
-                env.logger.debug('Running query {}'.format(query))
+                env.logger.trace('Running query {}'.format(query))
                 #
                 cur = proj.db.cursor()
                 proj.db.startProgress('Running')

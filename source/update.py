@@ -286,11 +286,11 @@ class Updater:
                     continue
                 headers = [x.upper() for x in self.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
                 if 'GT' not in headers:  # for genotype
-                    env.logger.debug('Adding column GT to table genotype_{}'.format(id))
+                    env.logger.trace('Adding column GT to table genotype_{}'.format(id))
                     cur.execute('ALTER TABLE {}_genotype.genotype_{} ADD {} {};'.format(self.proj.name, id, 'GT', 'INT'))
                 for field in self.genotype_info:
                     if field.name.upper() not in headers:
-                        env.logger.debug('Adding column {} to table genotype_{}'.format(field.name, id))
+                        env.logger.trace('Adding column {} to table genotype_{}'.format(field.name, id))
                         cur.execute('ALTER TABLE {}_genotype.genotype_{} ADD {} {};'.format(self.proj.name, id, field.name, field.type))
             # if we are updating by variant_id, we will need to create an index for it
             for id in sample_ids:
@@ -376,7 +376,7 @@ def setFieldValue(proj, table, items, build):
     #
     if 'LEFT OUTER JOIN' not in from_clause:  # if everything is done in one table
         query = 'SELECT {} {};'.format(select_clause, from_clause)
-        env.logger.debug('Running {}'.format(query))
+        env.logger.trace('Running {}'.format(query))
         cur.execute(query)
         fldTypes = [None] * len(items)
         for rec in cur:
@@ -411,7 +411,7 @@ def setFieldValue(proj, table, items, build):
                     .format(field, type_map[fldType]))
                 query = 'ALTER TABLE {} ADD {} {} NULL;'.format(table, field,
                     type_map[fldType])
-                env.logger.debug(query)
+                env.logger.trace(query)
                 cur.execute(query)
                 count[1] += 1  # new
             else:
@@ -436,11 +436,11 @@ def setFieldValue(proj, table, items, build):
             v = consolidateFieldName(proj, table, v, build and build == proj.alt_build)[0]
             update_clause.append('{}={}'.format(k, v))
         query = 'UPDATE {} SET {};'.format(table, ', '.join(update_clause))
-        env.logger.debug('Running {}'.format(query))
+        env.logger.trace('Running {}'.format(query))
         cur.execute(query)
     else:
         query = 'SELECT {}, {}.variant_id {};'.format(select_clause, table, from_clause)
-        env.logger.debug('Running {}'.format(query))
+        env.logger.trace('Running {}'.format(query))
         cur.execute(query)
         fldTypes = [None] * len(items)
         s = delayedAction(env.logger.info, 'Evaluating all expressions')
@@ -479,7 +479,7 @@ def setFieldValue(proj, table, items, build):
                      float: 'FLOAT',
                      str: 'VARCHAR(255)',
                      unicode: 'VARCHAR(255)'}[fldType])
-                env.logger.debug(query)
+                env.logger.trace(query)
                 cur.execute(query)
                 count[1] += 1  # new
             else:
@@ -490,7 +490,7 @@ def setFieldValue(proj, table, items, build):
         # really update things
         query = 'UPDATE {} SET {} WHERE variant_id={};'.format(table,
             ','.join(['{}={}'.format(x, proj.db.PH) for x in new_fields]), proj.db.PH)
-        env.logger.debug('Using query {}'.format(query))
+        env.logger.trace('Using query {}'.format(query))
         prog = ProgressBar('Updating {}'.format(decodeTableName(table)), len(results))
         # this particular query will return a bunch of bogus NULL values for range-based databases,
         # which needs to be filtered out.
@@ -736,7 +736,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
 
         query = 'SELECT variant_id {} FROM {}_genotype.genotype_{} {};'.format(' '.join([',' + x for x in fieldSelect]),
                 proj.name, id, whereClause)
-        #env.logger.debug(query)
+        env.logger.trace(query)
         cur.execute(query)
 
         for rec in cur:

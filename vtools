@@ -52,9 +52,9 @@ if sys.platform != 'win32':
     import variant_tools.association as association
 
 def addCommonArgs(parser):
-    parser.add_argument('-v', '--verbosity', choices=['0', '1', '2'],
-        help='''Output error and warning (0), info (1) and debug (2) information
-            to standard output (default to 1).'''),
+    parser.add_argument('-v', '--verbosity', choices=['0', '1', '2', '3'],
+        help='''Output error and warning (0), info (1), debug (2) and trace (3) 
+            information to standard output (default to 1).'''),
 
 if __name__ == '__main__':
     #

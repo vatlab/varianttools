@@ -566,7 +566,7 @@ class CheckOutput:
                 stderr=subprocess.PIPE, shell=True)
             odata, edata = p.communicate()
             output = odata.decode() + edata.decode()
-            env.logger.debug('Output of command "{}" is "{}"'
+            env.logger.trace('Output of command "{}" is "{}"'
                 .format(self.cmd, output))
         except Exception as e:
             raise RuntimeError('Failed to execute command "{}": {}'
@@ -921,7 +921,7 @@ def run_command_in_parallel(cmd, output=None, working_dir=None, max_jobs=1):
         working_dir=working_dir, output=output))
     env.logger.info('Running [[{}]]'.format(cmd[0]))
     if proc_out is not None:
-        env.logger.debug('Output redirected to {0}.out_{1} and {0}.err_{1} and '
+        env.logger.trace('Output redirected to {0}.out_{1} and {0}.err_{1} and '
             'will be saved to {0}.exe_info after completion of command.'
             .format(output[0], os.getpid()))
 
@@ -1287,7 +1287,7 @@ class RemoveIntermediateFiles:
         self.files = files
 
     def __call__(self, ifiles, pipeline=None):
-        env.logger.debug('Remove intermediate files {}'.format(self.files))
+        env.logger.trace('Remove intermediate files {}'.format(self.files))
         for f in shlex.split(self.files) if isinstance(self.files, str) else self.files:
             if not os.path.isfile(f):
                 if os.path.isfile(f + '.file_info'):
@@ -1334,7 +1334,7 @@ class LinkToDir:
                             env.logger.info('Linking {} to {}'.format(filename, self.dest))
                             os.link(filename + '.file_info', os.path.join(self.dest, basename) + '.file_info')
                         else:
-                            env.logger.debug('Reusing existing linked file_info file: {}'
+                            env.logger.trace('Reusing existing linked file_info file: {}'
                                 .format(os.path.join(self.dest, basename) + '.file_info'))
                     else:
                         env.logger.info('Linking {} to {}'.format(filename, self.dest))
@@ -1350,7 +1350,7 @@ class LinkToDir:
                         env.logger.info('Linking {} to {}'.format(filename, self.dest))
                         os.link(filename, dest_file)
                     else:
-                        env.logger.debug('Reusing existing linked file: {}'.format(dest_file))
+                        env.logger.trace('Reusing existing linked file: {}'.format(dest_file))
                 else:
                     env.logger.info('Linking {} to {}'.format(filename, self.dest))
                     os.link(filename, dest_file)
@@ -1621,9 +1621,9 @@ class Pipeline:
                         continue
                     self.VARS['input'] = ig
                     action = substituteVars(command.action, self.VARS)
-                    env.logger.debug('Emitted input of step {}_{}: {}'
+                    env.logger.trace('Emitted input of step {}_{}: {}'
                         .format(pname, command.index, ig))
-                    env.logger.debug('Action of step {}_{}: {}'
+                    env.logger.trace('Action of step {}_{}: {}'
                         .format(pname, command.index, action))
                     action = eval(action, globals(), VT_GLOBAL)
                     if type(action) == tuple:
@@ -1648,7 +1648,7 @@ class Pipeline:
                             .format(f, pname, command.index))
                 for key, val in command.pipeline_vars:
                     self.VARS[key.lower()] = substituteVars(val, self.VARS)
-                    env.logger.debug('Pipeline variable {} is set to {}'
+                    env.logger.trace('Pipeline variable {} is set to {}'
                         .format(key, self.VARS[key.lower()]))
                 #
                 ifiles = step_output
@@ -1758,10 +1758,10 @@ def execute(args):
             # 
             query = args.specfile + ' ' + ' '.join(args.pipelines)
             if query.upper().startswith('SELECT'):
-                env.logger.debug('Analyze statement: "{}"'.format(query))
+                env.logger.trace('Analyze statement: "{}"'.format(query))
                 cur.execute('EXPLAIN QUERY PLAN ' + query)
                 for rec in cur:
-                    env.logger.debug('\t'.join([str(x) for x in rec]))
+                    env.logger.trace('\t'.join([str(x) for x in rec]))
             # really execute the query
             try:
                 cur.execute(query)

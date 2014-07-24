@@ -239,7 +239,7 @@ class RuntimeEnvironments(object):
     # attribute verbosity
     #
     def _set_verbosity(self, v):
-        if v in ['0', '1', '2']:
+        if v in ['0', '1', '2', '3']:
             self._verbosity = v
     #
     verbosity = property(lambda self: self._verbosity, _set_verbosity)
@@ -382,6 +382,7 @@ class RuntimeEnvironments(object):
         def __init__(self, msg):
             logging.Formatter.__init__(self, msg)
             self.LEVEL_COLOR = {
+                'TRACE': 'DARK_CYAN',
                 'DEBUG': 'BLUE',
                 'WARNING': 'PURPLE',
                 'ERROR': 'RED',
@@ -454,6 +455,10 @@ class RuntimeEnvironments(object):
 
     def _set_logger(self, logfile=None):
         # create a logger, but shutdown the previous one
+        if not hasattr(logging, 'TRACE'):
+            logging.TRACE = 5
+            logging.addLevelName(logging.TRACE, "TRACE")
+        #
         if self._logger is not None:
             self._logger.handlers = []
         self._logger = logging.getLogger()
@@ -464,12 +469,14 @@ class RuntimeEnvironments(object):
             '0': logging.WARNING,
             '1': logging.INFO,
             '2': logging.DEBUG,
+            '3': logging.TRACE,
             None: logging.INFO
         }
         #
         cout.setLevel(levels[self._verbosity])
         cout.setFormatter(self.ColoredFormatter('%(levelname)s: %(message)s'))
         self._logger.addHandler(cout)
+        self._logger.trace = lambda msg, *args: self._logger._log(logging.TRACE, msg, args)
         # output to a log file
         if logfile is not None:
             ch = logging.FileHandler(logfile.lstrip('>'), mode = ('a' if logfile.startswith('>>') else 'w'))
@@ -1235,6 +1242,7 @@ class GenomicRegions(object):
             except Exception as e:
                 raise RuntimeError('Failed to link to annotation database {}: {}'.format(annoName, e))
             #
+            from .project import Project
             self.proj = Project()
         # now we have annotation database
         try:

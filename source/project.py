@@ -81,7 +81,7 @@ class AnnoDB:
     various sources.
     '''
     def __init__(self, proj, annoDB, linked_by=[], anno_type=None, linked_fields=None, linked_name=None):
-        env.logger.debug('Loading annotation database {}{}'
+        env.logger.trace('Loading annotation database {}{}'
             .format(annoDB, ' as {}'.format(linked_name) if linked_name else ''))
         self.db = proj.db.newConnection()
         if self.db.hasDatabase(annoDB):
@@ -219,7 +219,7 @@ class AnnoDB:
                 # from an annotation database
                 try:
                     index_name = '{0}_{1}'.format(table.replace('.', '_'), field)
-                    env.logger.debug('CREATE INDEX IF NOT EXISTS {0}.{1} ON {2} ({3} ASC);'
+                    env.logger.trace('CREATE INDEX IF NOT EXISTS {0}.{1} ON {2} ({3} ASC);'
                         .format(table.split('.')[0], index_name, table.split('.')[-1], field))
                     cur.execute('CREATE INDEX IF NOT EXISTS {0}.{1} ON {2} ({3} ASC);'
                         .format(table.split('.')[0], index_name, table.split('.')[-1], field))
@@ -866,7 +866,7 @@ class AnnoDBWriter:
         cur = self.db.cursor()
         #
         # creating the field table
-        env.logger.debug('Creating {}_field table'.format(self.name))
+        env.logger.trace('Creating {}_field table'.format(self.name))
         self.createFieldsTable()
         #
         for field in self.fields:
@@ -875,7 +875,7 @@ class AnnoDBWriter:
         self.db.commit()
         #
         # creating the info table
-        env.logger.debug('Creating {}_info table'.format(self.name))
+        env.logger.trace('Creating {}_info table'.format(self.name))
         query = 'INSERT INTO {0}_info VALUES (?,?);'.format(self.name)
         self.createInfoTable()
         cur.execute(query, ('name', self.name))
@@ -884,7 +884,7 @@ class AnnoDBWriter:
         cur.execute(query, ('version', self.version))
         cur.execute(query, ('build', str(self.build)))
         self.db.commit()
-        env.logger.debug('Creating table {}'.format(self.name))
+        env.logger.trace('Creating table {}'.format(self.name))
         self.createAnnotationTable()
     
     def updateAnnoDB(self, overwrite_existing_fields):
@@ -965,7 +965,7 @@ class AnnoDBWriter:
             items.append('{0} {1}'.format(field.name, field.type))
         query = '''CREATE TABLE IF NOT EXISTS {} ('''.format(self.name) + \
             ',\n'.join(items) + ');'
-        env.logger.debug('Creating annotation table {} using query\n{}'.format(self.name, query))
+        env.logger.trace('Creating annotation table {} using query\n{}'.format(self.name, query))
         cur = self.db.cursor()
         try:
             cur.execute(query)
@@ -1265,7 +1265,7 @@ class Project:
         self.annoDB = []
         #
         # Initialize the core tables
-        env.logger.debug('Creating core tables')
+        env.logger.trace('Creating core tables')
         self.createProjectTable()
         self.saveProperty('version', self.version)
         self.saveProperty('revision', self.revision)
@@ -1287,7 +1287,7 @@ class Project:
     def open(self, verify=True):
         '''Open an existing project'''
         # open the project file
-        env.logger.debug('Opening project {}'.format(self.proj_file))
+        env.logger.trace('Opening project {}'.format(self.proj_file))
         self.db = DatabaseEngine()
         self.db.connect(self.proj_file)
         if not self.db.hasTable('project'):
@@ -1949,7 +1949,7 @@ class Project:
         '''Merge samples with the same name to the same samples'''
         cur = self.db.cursor()
         query = 'SELECT sample_name, sample_id FROM sample ORDER BY sample_name'
-        env.logger.debug('Executing {}'.format(query))
+        env.logger.trace('Executing {}'.format(query))
         cur.execute(query)
         # a map of sample_name to multiple sample ids
         samples = {}
@@ -2018,7 +2018,7 @@ class Project:
                         'get structure of genotype table {}'.format(id))
             #
             query = 'CREATE TABLE {} ({})'.format(new_table, ', '.join(new_fields))
-            env.logger.debug('Executing {}'.format(query))
+            env.logger.trace('Executing {}'.format(query))
             try:
                 cur.execute(query)
             except Exception as e:
@@ -2156,7 +2156,7 @@ class Project:
         numVariants = self.db.numOfRows(table)
         if numVariants == 0:
             return variantIndex
-        env.logger.debug('Creating local indexes for {:,} variants'.format(numVariants));
+        env.logger.trace('Creating local indexes for {:,} variants'.format(numVariants));
         where_clause = 'WHERE variant_id IN (SELECT variant_id FROM {})'.format(table) if table != 'variant' else ''
         if alt_build:
             cur.execute('SELECT variant_id, alt_chr, alt_pos, ref, alt FROM variant {};'.format(where_clause))
@@ -2599,7 +2599,7 @@ class MaintenanceProcess(Process):
             db.close()
             return
         #
-        env.logger.debug('Creating indexes for {} genotype tables'.format(len(missing_indexes)))
+        env.logger.trace('Creating indexes for {} genotype tables'.format(len(missing_indexes)))
         try:
             # we process IDs in sample_IDs first ...
             for idx in [x for x in missing_indexes if int(x[9:-6]) in sample_IDs] + \
@@ -2682,7 +2682,7 @@ class ProjCopier:
             for ID in removed:
                 cur.execute('DELETE FROM sample WHERE sample_id = ?;',
                     (ID,))
-            env.logger.debug('Removing {} unselected samples'.format(len(removed)))
+            env.logger.trace('Removing {} unselected samples'.format(len(removed)))
         self.proj.saveProperty('annoDB', '[]')
         return self.db.numOfRows('variant', False)
 
@@ -2976,7 +2976,7 @@ class VariantProcessor(threading.Thread):
                                     ON v.variant_id = m.old_id;'''.format(
                     ' '.join([', {}'.format(x) for x in headers[1:]]), table)
             if query is not None:
-                env.logger.debug('Caching table {} of project {} ({})'.format(table, self.src_proj,
+                env.logger.trace('Caching table {} of project {} ({})'.format(table, self.src_proj,
                     query))
                 cur.execute(query)
         db.detach('__fromDB')
@@ -3049,7 +3049,7 @@ class SampleProcessor(threading.Thread):
             query = '''INSERT INTO genotype_{0} SELECT new_id {1} FROM __geno.genotype_{2} 
                 LEFT JOIN __proj.__id_map ON __id_map.old_id = __geno.genotype_{2}.variant_id;'''\
                 .format(_old_id, ''.join([', {}'.format(x) for x in headers[1:]]), _old_id)
-            env.logger.debug('Caching sample {} of project {}'.format(_old_id, self.src_proj))
+            env.logger.trace('Caching sample {} of project {}'.format(_old_id, self.src_proj))
             cur.execute(query)
             db.commit()
             self.status.set(self.src_proj, 'completed', 3 + idx)
@@ -3106,7 +3106,7 @@ class VariantCopier(threading.Thread):
                     new_table = encodeTableName(decodeTableName(table) + ' (from {})'.format(proj[:-5]))
                 if new_table not in tables_to_copy:
                     cur.execute('''CREATE TABLE {} (variant_id INTEGER PRIMARY KEY)'''.format(new_table))
-                    env.logger.debug('Copying variants of {} from {} to {}'.format(decodeTableName(table), proj, decodeTableName(new_table)))
+                    env.logger.trace('Copying variants of {} from {} to {}'.format(decodeTableName(table), proj, decodeTableName(new_table)))
                     if identical_ids and (table != 'variant' or keep_all):
                         cur.execute('''INSERT INTO {} SELECT variant_id FROM __fromDB.{}'''.format(new_table, table))
                     else:
@@ -3132,7 +3132,7 @@ class VariantCopier(threading.Thread):
                     query = '''INSERT OR IGNORE INTO {0} ({1}) SELECT * FROM __fromDB.{0};'''.format(table, field_names)
                 else:
                     query = '''INSERT OR IGNORE INTO {0} ({1}) SELECT * FROM __cacheDB.{0};'''.format(table, field_names)
-                env.logger.debug('Copying table {} from project {} ({}, {})'.format(table, proj,
+                env.logger.trace('Copying table {} from project {} ({}, {})'.format(table, proj,
                     identical_ids, keep_all))
                 cur.execute(query)
                 db.commit()
@@ -3185,11 +3185,11 @@ class SampleCopier(threading.Thread):
                 cur.execute('SELECT sql FROM __geno.sqlite_master WHERE type="table" AND name=?;',
                     ('genotype_{}'.format(_old_id),))
                 sql = cur.fetchone()[0].replace('genotype_{}'.format(_old_id), 'genotype_{}'.format(_new_id))
-                env.logger.debug('Running {}'.format(sql))
+                env.logger.trace('Running {}'.format(sql))
                 cur.execute(sql)
                 query = 'INSERT INTO genotype_{} SELECT * FROM __geno.genotype_{};'\
                     .format(_new_id, _old_id)
-                env.logger.debug('Copying sample {} from project {}: {}'.format(_old_id, proj, query))
+                env.logger.trace('Copying sample {} from project {}: {}'.format(_old_id, proj, query))
                 cur.execute(query)
                 count += 1
                 self.status.set('__copySamples', 'completed', count)
@@ -3367,7 +3367,7 @@ class ProjectsMerger:
         for table in structure:
             if table in ['project', 'filename']:
                 continue
-            env.logger.debug('Creating table {} with columns {}'
+            env.logger.trace('Creating table {} with columns {}'
                 .format(table, ', '.join([x[0] for x in structure[table]])))
             cur.execute('CREATE TABLE {} ({});'.format(table, ', '.join([' '.join(x) for x in structure[table]])))
        
@@ -3431,7 +3431,7 @@ class ProjectsMerger:
                 #
                 old_sample_id.extend(old_sid)
                 new_sample_id.extend(new_sid)
-            env.logger.debug('Mapping sample_ids of project {} from {} to {}'
+            env.logger.trace('Mapping sample_ids of project {} from {} to {}'
                 .format(proj, old_sample_id, new_sample_id))
             status.set(proj, 'old_ids', old_sample_id)
             status.set(proj, 'new_ids', new_sample_id)
@@ -3498,11 +3498,11 @@ class ProjectsMerger:
         while True:
             for idx, proj in enumerate(self.projects):
                 if status.canProcessVariant(proj) and self.vcQueue.qsize() < nJobs:
-                    env.logger.debug('Mapping variants in {}'.format(proj))
+                    env.logger.trace('Mapping variants in {}'.format(proj))
                     status.set(proj, 'scheduled', True)
                     self.vcQueue.put(proj)
                 if status.canProcessSample(proj) and self.vcQueue.qsize() + self.scQueue.qsize() < nJobs:
-                    env.logger.debug('Mapping sample variants in {}'.format(proj))
+                    env.logger.trace('Mapping sample variants in {}'.format(proj))
                     status.set(proj, 'scheduled', True)
                     self.scQueue.put(proj)
             if status.canCopyVariants():
@@ -4050,7 +4050,7 @@ def show(args):
                 if proj.name is None:
                     raise ValueError('Cannot find any project in the current directory.')
                 if len(proj.annoDB) == 0:
-                    env.logger.debug('No annotation database is attached.')
+                    env.logger.trace('No annotation database is attached.')
                 for table in proj.getVariantTables():
                     tfields = [field for field in proj.db.getHeaders(table) if field not in ('variant_id', 'bin', 'alt_bin')]
                     if tfields:
@@ -4181,7 +4181,7 @@ def show(args):
                 except Exception as e:
                     # either the database doesn't exist or it's already been attached (should we add a method proj.db.isAttached(...)? and embedding this in the attach() method?
                     if not proj.db.hasDatabase(proj.name + '_genotype'):
-                        env.logger.debug('Trying to attach a database that doesn\'t exist' + e)
+                        env.logger.trace('Trying to attach a database that doesn\'t exist' + e)
                 # sample headers are ID, file, sample, FIELDS
                 prt = PrettyPrinter(max_width={} if args.verbosity == '2' else {1:25})
                 prt.write(['sample_name', 'filename', 'num_genotypes', 'sample_genotype_fields'])

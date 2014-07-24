@@ -103,7 +103,7 @@ class AnnoDBConfiger:
 
     def parseConfigFile(self, filename):
         '''Read from an ini style configuration file'''
-        env.logger.debug('Checking configuration file {}'.format(filename))
+        env.logger.trace('Checking configuration file {}'.format(filename))
         self.path = os.path.split(filename)[0]
         # get filename, remove extension, and keep version as things after -.
         self.name = os.path.splitext(os.path.split(filename)[-1])[0]
@@ -133,7 +133,7 @@ class AnnoDBConfiger:
                     if extractField(field) not in sections:
                         env.logger.error('Invalid reference genome: Unspecified field {}.'.format(field))
                 self.build[item[0]] = fields
-            env.logger.debug('Reference genomes: {}'.format(self.build))
+            env.logger.trace('Reference genomes: {}'.format(self.build))
         except Exception as e:
             env.logger.debug(e)
             raise ValueError('Failed to obtain build information of annotation file {}'.format(filename))
@@ -205,8 +205,8 @@ class AnnoDBConfiger:
                 return False
         # Do not sort fields, use the order sepcified in the .ann file.
         #self.fields.sort(key=lambda k: k.index.split()[0])
-        for field in self.fields:
-            env.logger.debug("Field {0}: index {1},\t{2}".format(field.name, field.index, field.type))
+        #for field in self.fields:
+        #    env.logger.trace("Field {0}: index {1},\t{2}".format(field.name, field.index, field.type))
 
 
     def getSourceFiles(self):
