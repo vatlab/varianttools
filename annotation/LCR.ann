@@ -1,0 +1,112 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+# 
+# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+# for a description of the format of this file.
+
+[linked fields]
+hg19=chr,pos_begin,pos_end
+
+[data sources]
+anno_type=range
+description=Low Complexity, repeat and other regions identified by RepeatMasker. RepeatMasker was run with the -s (sensitive) setting. Using: Jan 29 2009 (open-3-2-7) version of RepeatMasker and RELEASE 20090120 of library RepeatMaskerLib.embl
+delimiter=None
+header=2
+version=hg19_20190320
+source_url=http://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/chromOut.tar.gz
+direct_url=http://vtools.houstonbioinformatics.org/annoDB/LCR-hg19_20090320.DB.gz
+source_type=txt
+source_pattern=fa.out
+
+[SW_score]
+index=1
+type=INTEGER
+comment=Smith-Waterman score of the match, usually complexity adjusted
+        The SW scores are not always directly comparable. Sometimes
+        the complexity adjustment has been turned off, and a variety of
+        scoring-matrices are used.
+
+[perc_div]
+index=2
+type=FLOAT
+comment=%% substitutions in matching region compared to the consensus
+
+[perc_del]
+index=3
+type=FLOAT
+comment=%% of bases opposite a gap in the query sequence (deleted bp)
+
+[perc_ins]
+index=4
+type=FLOAT
+comment=%% of bases opposite a gap in the repeat consensus (inserted bp)
+
+[chr]
+index=5
+adj=RemoveLeading('chr')
+type=VARCHAR(20)
+comment=Name of query sequence (chromosome)
+
+[pos_begin]
+index=6
+type=INTEGER
+adj=IncreaseBy(1)
+comment=starting position of match in query sequence
+
+[pos_end]
+index=7
+type=INTEGER
+comment=ending position of match in query sequence
+
+[pos_left]
+index=8
+type=INTEGER
+adj=lambda x: ('-' + x[1:-1]) if x.startswith('(') else x
+comment=no. of bases in query sequence past the ending position of match
+	Negative number (-XXX) is stored for number in parenthesis (XXX) in the output.
+
+[matching_repeat]
+index=9
+type=VARCHAR(255)
+comment=If C, match is with the Complement of the consensus sequence in the database
+
+[repeat_name]
+index=10
+type=VARCHAR(255)
+comment=name of the matching interspersed repeat
+
+[repeat_class]
+index=11
+type=VARCHAR(255)
+comment=the class of the repeat, in this case a DNA transposon 
+            fossil of the MER2 group (see below for list and references)
+
+[repeat_begin]
+index=12
+type=VARCHAR(255)
+#  this is not right because some recrods show (-2642), I do not know
+#  what it means
+comment=starting position of match in database sequence (using top-strand numbering)
+	It is saved as string because I do not under what is the meaning of the parenthesis
+	(I see (-2642), (0), (123) etc)
+
+[repeat_end]
+index=13
+type=VARCHAR(255)
+comment=ending position of match in database sequence
+	It is saved as string because I do not under what is the meaning of the parenthesis
+	(I see (-2642), (0), (123) etc)
+
+[repeat_left]
+index=14
+type=VARCHAR(255)
+comment=no. of bases in (complement of) the repeat consensus sequence 
+    prior to beginning of the match (so 0 means that the match extended 
+    all the way to the end of the repeat consensus sequence)
+	It is saved as string because I do not under what is the meaning of the parenthesis
+	(I see (-2642), (0), (123) etc)
+
+[mask_id]
+index=15
+type=INTEGER
+comment=ID of the mask
