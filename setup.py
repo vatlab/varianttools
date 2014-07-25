@@ -555,7 +555,10 @@ if not EMBEDED_BOOST:
             sys.stdout.write('.' * (perc - downloadProgress.counter))
             downloadProgress.counter = perc
         sys.stdout.flush()
-    import urllib
+    if sys.version_info.major == 2:
+        from urllib import urlretrieve
+    else:
+        from urllib.request import urlretrieve
     import tarfile
     downloadProgress.counter = 0
     try:
@@ -563,7 +566,7 @@ if not EMBEDED_BOOST:
         sys.stdout.write('Downloading boost C++ library 1.49.0 ')
         sys.stdout.flush()
         if not os.path.isfile('boost_1_49_0.tar.gz'):
-            urllib.urlretrieve(BOOST_URL, 'boost_1_49_0.tar.gz', downloadProgress)
+            urlretrieve(BOOST_URL, 'boost_1_49_0.tar.gz', downloadProgress)
         sys.stdout.write('\n')
         # extract needed files
         with tarfile.open('boost_1_49_0.tar.gz', 'r:gz') as tar:
