@@ -36,7 +36,6 @@ import getpass
 import time
 import tempfile
 import tokenize
-import cStringIO
 import gzip
 import copy
 import threading
@@ -62,6 +61,7 @@ except:
 
 try:
     if sys.version_info.major == 2:
+        from cStringIO import StringIO
         import urlparse
         import cPickle as pickle
         import vt_sqlite3_py2 as sqlite3
@@ -69,6 +69,7 @@ try:
         from vt_sqlite3_py2 import OperationalError
     else:
         import pickle
+        from io import StringIO
         import urllib.parse as urlparse
         import vt_sqlite3_py3 as sqlite3
         from cgatools_py3 import CrrFile, Location, Range
@@ -1819,6 +1820,43 @@ def TEMP(filename):
     return '_tmp{}.'.format(os.getpid()).join(filename.rsplit('.', 1))
 
 
+# the following is copied from shutils.which from Python 3.3
+def which(cmd, mode=os.F_OK | os.X_OK, path=None):
+    """Given a command, mode, and a PATH string, return the path which
+    conforms to the given mode on the PATH, or None if there is no such
+    file.
+
+    `mode` defaults to os.F_OK | os.X_OK. `path` defaults to the result
+    of os.environ.get("PATH"), or can be overridden with a custom search
+    path.
+
+    """
+    # Check that a given file can be accessed with the correct mode.
+    # Additionally check that `file` is not a directory, as on Windows
+    # directories pass the os.access check.
+    def _access_check(fn, mode):
+        return (os.path.exists(fn) and os.access(fn, mode)
+                and not os.path.isdir(fn))
+
+    # Short circuit. If we're given a full path which matches the mode
+    # and it exists, we're done here.
+    if _access_check(cmd, mode):
+        return cmd
+
+    path = (path or os.environ.get("PATH", os.defpath)).split(os.pathsep)
+    files = [cmd]
+
+    seen = set()
+    for dir in path:
+        dir = os.path.normcase(dir)
+        if not dir in seen:
+            seen.add(dir)
+            for thefile in files:
+                name = os.path.join(dir, thefile)
+                if _access_check(name, mode):
+                    return name
+    return None
+
 #
 # Well, it is not easy to do reliable download
 # 
@@ -1862,7 +1900,7 @@ def downloadURL(URL, dest, quiet, message=None):
         # no pycurl module
         pass
     # use wget? Almost universally available under linux
-    try:
+    if which('wget'):
         # for some strange reason, passing wget without shell=True can fail silently.
         dest_tmp = TEMP(dest)
         p = subprocess.Popen('wget {} -O {} {}'.format('-q' if quiet else '',
@@ -1877,10 +1915,6 @@ def downloadURL(URL, dest, quiet, message=None):
             except OSError:
                 pass
             raise RuntimeError('Failed to download {} using wget'.format(URL))
-    except (RuntimeError, ValueError, OSError):
-        # no wget command
-        pass
-    
     # use python urllib?
     if not quiet:
         prog = ProgressBar(message)
@@ -2699,7 +2733,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
     in this case). It also change pos to alt_pos if alt_build is true.
     We are using a Python tokenizer here so the result might be wrong.
     '''
-    tokens = [x for x in tokenize.generate_tokens(cStringIO.StringIO(clause).readline)]
+    tokens = [x for x in tokenize.generate_tokens(StringIO(clause).readline)]
     res = []
     fields = []
     has_ref_query = False
@@ -2966,7 +3000,7 @@ def extractField(field):
     '''Extract pos from strings such as pos + 100'''
     if field.isalnum():
         return field
-    tokens = [x for x in tokenize.generate_tokens(cStringIO.StringIO(field).readline)]
+    tokens = [x for x in tokenize.generate_tokens(StringIO(field).readline)]
     for i in range(len(tokens)):
         toktype, toval, _, _, _ = tokens[i]
         if toktype == token.NAME:
@@ -2980,7 +3014,7 @@ def splitField(clause):
         return []
     if ',' not in clause:
         return [clause]
-    tokens = [x for x in tokenize.generate_tokens(cStringIO.StringIO(clause).readline)]
+    tokens = [x for x in tokenize.generate_tokens(StringIO(clause).readline)]
     fields = []
     cache = []
     level = 0
