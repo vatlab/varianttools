@@ -178,8 +178,16 @@ class Sample:
                 headers = header
         # num sample, num new field, num update field
         count = [0, 0, 0]
-        csv_dialect = csv.Sniffer().sniff(open(filename, 'rU').readline())
+        # grab 4 lines from text for csv to sniff the delimiter
+        example_lines = []
+        for l in open(filename, 'rU'):
+            if not l.startswith('#'):
+                example_lines.append(l)
+            if len(example_lines) >= 4:
+                break
+        csv_dialect = csv.Sniffer().sniff(''.join(example_lines))
         delimiter = csv_dialect.delimiter
+        #
         with open(filename, 'rU') as input:
             reader = csv.reader(input, dialect=csv_dialect)
             if header is None:
