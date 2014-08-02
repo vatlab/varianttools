@@ -280,6 +280,7 @@ def compareTables(proj, args):
                 if args.union is not None:
                     # in any of them
                     site_union = {x:(y if x not in v else (y|v[x])) for x,y in site_union.items()}
+                    site_union.update({x:y for x,y in v.items() if x not in site_union})
                 if args.intersection is not None:
                     # in both, need to combine ids
                     site_intersect = {x:(y|v[x]) for x,y in site_intersect.items() if x in v}
