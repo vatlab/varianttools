@@ -146,7 +146,16 @@ class TestUpdate(ProcessTestCase):
         self.assertSucc('vtools update variant --set "res=mut-hom-het-other"')
         self.assertEqual(output2list('vtools output variant res'), ['0']*6)
         
-        #Add fields based on other variants or annotation fields( --set)
+
+    def testSet(self):
+        'Testing vtools update --set'
+        runCmd('vtools init test -f')
+        runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        runCmd('''vtools select variant "chr='1'" -t chr1''')
+        runCmd('vtools update chr1 --from_stat "num=#(alt)" "total=#(GT)"')
+        runCmd('vtools update chr1 --set "ratio=num/(total*1.0)"')
+        self.assertSucc('vtools show fields')
+
     def testGenoAnnoSet(self):
         'Testing command vtools update --set'
         runCmd('vtools init test -f')
