@@ -396,7 +396,7 @@ def setFieldValue(proj, table, items, build):
         #
         count = [0]*3
         # if adding a new field
-        cur_fields = proj.db.getHeaders(table)[3:]
+        cur_fields = proj.db.getHeaders('variant')[3:]
         type_map = {int: 'INT',
                     float: 'FLOAT',
                     str: 'VARCHAR(255)',
@@ -409,7 +409,7 @@ def setFieldValue(proj, table, items, build):
                 proj.checkFieldName(field, exclude=table)
                 env.logger.info('Adding variant info field {} with type {}'
                     .format(field, type_map[fldType]))
-                query = 'ALTER TABLE {} ADD {} {} NULL;'.format(table, field,
+                query = 'ALTER TABLE variant ADD {} {} NULL;'.format(field,
                     type_map[fldType])
                 env.logger.trace(query)
                 cur.execute(query)
@@ -435,7 +435,7 @@ def setFieldValue(proj, table, items, build):
             k, v = item.split('=', 1)
             v = consolidateFieldName(proj, table, v, build and build == proj.alt_build)[0]
             update_clause.append('{}={}'.format(k, v))
-        query = 'UPDATE {} SET {};'.format(table, ', '.join(update_clause))
+        query = 'UPDATE variant SET {};'.format(', '.join(update_clause))
         env.logger.trace('Running {}'.format(query))
         cur.execute(query)
     else:
@@ -464,7 +464,7 @@ def setFieldValue(proj, table, items, build):
         #
         count = [0]*3
         # if adding a new field
-        cur_fields = proj.db.getHeaders(table)[3:]
+        cur_fields = proj.db.getHeaders('variant')[1:]
         new_fields = [x.split('=', 1)[0] for x in items]
         for field, fldType in zip(new_fields, fldTypes):
             if field.lower() not in [x.lower() for x in cur_fields]:
@@ -474,7 +474,7 @@ def setFieldValue(proj, table, items, build):
                     fldType = str
                 proj.checkFieldName(field, exclude=table)
                 env.logger.info('Adding variant info field {}'.format(field))
-                query = 'ALTER TABLE {} ADD {} {} NULL;'.format(table, field,
+                query = 'ALTER TABLE variant ADD {} {} NULL;'.format(field,
                     {int: 'INT',
                      float: 'FLOAT',
                      str: 'VARCHAR(255)',
@@ -488,7 +488,7 @@ def setFieldValue(proj, table, items, build):
                 count[2] += 1  # updated
         proj.db.commit()
         # really update things
-        query = 'UPDATE {} SET {} WHERE variant_id={};'.format(table,
+        query = 'UPDATE variant SET {} WHERE variant_id={};'.format(
             ','.join(['{}={}'.format(x, proj.db.PH) for x in new_fields]), proj.db.PH)
         env.logger.trace('Using query {}'.format(query))
         prog = ProgressBar('Updating {}'.format(decodeTableName(table)), len(results))
@@ -541,6 +541,8 @@ def setFieldValue(proj, table, items, build):
                     cur.execute(query, last_values[-1])
                 else:
                     cur.execute(query, values[0])
+            elif len(values) == 1:
+                cur.execute(query, values[0])
         prog.done()
         if count_multi_value != 0:
             env.logger.warning('Multiple field values are available for {} variants. Arbitrary valid values are chosen.'.format(count_multi_value))
@@ -822,17 +824,21 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             continue
         # We are setting default values on the count fields to 0. The genotype stat fields are set to NULL by default.
         defaultValue = 0 if field in fieldsDefaultZero else None
+        if variant_table != 'variant':
+            where_clause = 'WHERE variant_id in (SELECT variant_id FROM {})'.format(variant_table)
+        else:
+            where_clause = ''
         if field.lower() in headers:
             if proj.db.typeOfColumn('variant', field) != (fldtype + ' NULL'):
                 env.logger.warning('Type mismatch (existing: {}, new: {}) for column {}. Please remove this column and recalculate statistics if needed.'\
                     .format(proj.db.typeOfColumn('variant', field), fldtype, field))
             env.logger.info('Resetting values at existing field {}'.format(field))
-            proj.db.execute('Update {} SET {} = {};'.format('variant', field, proj.db.PH), (defaultValue, ))
+            proj.db.execute('Update variant SET {} = {} {};'.format(field, proj.db.PH, where_clause), (defaultValue, ))
         else:
             env.logger.info('Adding variant info field {} with type {}'.format(field, fldtype))
-            proj.db.execute('ALTER TABLE {} ADD {} {} NULL;'.format('variant', field, fldtype))
+            proj.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(field, fldtype))
             if defaultValue == 0:
-                proj.db.execute('UPDATE {} SET {} = 0'.format('variant', field))
+                proj.db.execute('UPDATE variant SET {} = 0 {}'.format(field, where_clause))
         # add an description
         try:
             proj.describeField(field, 'Created from stat "{}" {}with type {} on {}'
