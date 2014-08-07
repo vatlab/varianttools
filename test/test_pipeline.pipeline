@@ -10,32 +10,35 @@ description=A pipeline for testing features of VST.
 seed=12345
 
 [checkvtools_0]
-input=test_pipeling.pipeline
+input=test_pipeline.pipeline
 action=CheckVariantToolsVersion('2.3.1')
 
 [checkvtools_fail_10]
-input=test_pipeling.pipeline
+input=test_pipeline.pipeline
 action=CheckVariantToolsVersion('10')
 
 
 [checkcommand_1]
-input=test_pipeling.pipeline
+input=test_pipeline.pipeline
 action=CheckCommands(['vtools', 'vtools_report'])
 
 [checkcommand_fail_1]
-input=test_pipeling.pipeline
+input=test_pipeline.pipeline
 action=CheckCommands(['vtools_unknown', 'vtools_report'])
 
 [runcommand_1]
-input=test_pipeling.pipeline
+input=test_pipeline.pipeline
 action=RunCommand('vtools init test -f')
 
+[evolvepop*_2]
+action=RunCommand('vtools init test --build hg19 -f')
+
 [runcommand_fail_1]
-input=test_pipeling.pipeline
+input=test_pipeline.pipeline
 action=RunCommand('vtools initf test -f')
 
 [createpop_0]
-input=test_pipeling.pipeline
+input=test_pipeline.pipeline
 action=CreatePopulation(
 	size=1000,
 	regions='chr1:1-2000',
@@ -48,29 +51,32 @@ action=CreatePopulation(
 	regions='chr1:1-2000',
 	output='cache/evolvepop_init_${seed}.pop')
 
-[evolvepop_fail_1]
+[evolvepop*_1,casectrl*_1,random*_1]
+action=ImportModules('simuPOP.demography')
+
+[evolvepop_fail_10]
 action=EvolvePopulation(
 	demoModel=ExponentialGrowthModel(r=0.001, T=10),
 	)
 
-[evolvepop1_1]
+[evolvepop1_10]
 action=EvolvePopulation(
 	demoModel=ExponentialGrowthModel(r=0.001, T=10),
 	output='cache/evolvepop_${seed}.pop')
 
-[evolvepop1_2]
+[evolvepop1_20]
 action=EvolvePopulation(
 	transmitter=FineScaleRecombinator(regions='chr1:1-1000'),
 	demoModel=ExponentialGrowthModel(r=0.001, T=10),
 	output='cache/evolvepop_${seed}_2.pop')
 
-[evolvepop3_3]
+[evolvepop3_30]
 action=EvolvePopulation(
 	selector=ProteinSelector(regions='chr1:1-1000'),
 	demoModel=ExponentialGrowthModel(r=0.001, T=10),
 	output='cache/evolvepop_${seed}_3.pop')
 
-[evolvepop4_2]
+[evolvepop4_20]
 action=EvolvePopulation(
 	mutator=RefGenomeMutator(regions='chr1:1-1000', model='K80', 
 		rate=[1e-8, 2]),
@@ -85,37 +91,37 @@ action=CreatePopulation(
 	regions='chr1:1-2000',
 	output='cache/casectrl_init_${seed}.pop')
 
-[casectrl*_2,random*_2]
+[casectrl*_20,random*_20]
 action=RunCommand(['vtools init casectrl --build hg19 -f',
 	'vtools use refGene'])
 
-[casectrl*_3,random*_3]
+[casectrl*_30,random*_30]
 action=EvolvePopulation(
 	mutator=RefGenomeMutator(regions='chr1:1-1000', model='K80', 
 		rate=[1e-3, 2]),
 	demoModel=ExponentialGrowthModel(r=0.001, T=10),
 	output='cache/casectrl_${seed}_1.pop')
 
-[casectrl1_10]
+[casectrl1_100]
 action=DrawCaseControlSample(
 	cases=10, controls=10,
 	penetrance=ProteinPenetrance(regions='chr1:1-1000'),
 	output='cache/casectrl_sample_${seed}.pop')
 
-[casectrl2_10]
+[casectrl2_100]
 action=DrawCaseControlSample(
 	cases=10, controls=10,
 	penetrance=ProteinPenetrance(regions='chr1:1-1000'),
 	output=['cache/casectrl_sample_${seed}_21.pop', 'cache/casectrl_sample_${seed}_22.pop'])
 
-[random1_10]
+[random1_100]
 action=DrawRandomSample(
 	sizes=10,
 	output='cache/random_sample_${seed}.pop')
 
-[random2_10]
+[random2_100]
 action=DrawRandomSample(
-	size=10,
+	sizes=10,
 	output=['cache/random_sample_${seed}_21.pop', 'cache/random_sample_${seed}_22.pop'])
 
 

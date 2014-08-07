@@ -47,13 +47,12 @@ class TestPipeline(ProcessTestCase):
         self.assertFail('vtools execute test_pipeline.pipeline runcommand_fail')
 
     def testCreatePopulation(self):
-        self.assertSucc('vtools execute test_pipeline.pipeline createpop1')
+        self.assertSucc('vtools execute test_pipeline.pipeline createpop')
 
     def testEvolvePopulation(self):
         self.assertFail('vtools execute test_pipeline.pipeline evolvepop_fail')
         self.assertSucc('vtools execute test_pipeline.pipeline evolvepop1')
         self.assertSucc('vtools simulate test_pipeline.pipeline evolvepop1')
-        self.assertSucc('vtools simulate test_pipeline.pipeline evolvepop2')
         self.assertSucc('vtools simulate test_pipeline.pipeline evolvepop3')
         self.assertSucc('vtools simulate test_pipeline.pipeline evolvepop4')
 

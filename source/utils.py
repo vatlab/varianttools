@@ -3558,6 +3558,22 @@ complement_table = {
 def genesInRegions(regions, proj):
     '''Locate isoforms (refGene.name) that overlap with any part of specified
     regions. '''
+    #
+    if 'refgene' not in [x.linked_name.lower() for x in proj.annoDB]:
+        # try to run 'vtools use XXXX' if the annotation database if refGene not linked.
+        proj.close()
+        #
+        env.logger.info('Linking to refGene')
+        try:
+            ret = subprocess.call('vtools use refGene', shell=True)
+            if ret:
+                raise RuntimeError('Could not locate annotation database refGene in the project.')
+        except Exception as e:
+            raise RuntimeError('Failed to link to annotation database refGene: {}'.format(e))
+        #
+        from .project import Project
+        proj = Project()
+    #
     cur = proj.db.cursor()
     # if a record has been processed
     isoforms = []
@@ -3573,6 +3589,20 @@ def genesInRegions(regions, proj):
      
 
 def dissectGene(gene, proj):
+    if 'refgene' not in [x.linked_name.lower() for x in proj.annoDB]:
+        # try to run 'vtools use XXXX' if the annotation database if refGene not linked.
+        proj.close()
+        #
+        env.logger.info('Linking to refGene')
+        try:
+            ret = subprocess.call('vtools use refGene', shell=True)
+            if ret:
+                raise RuntimeError('Could not locate annotation database refGene in the project.')
+        except Exception as e:
+            raise RuntimeError('Failed to link to annotation database refGene: {}'.format(e))
+        #
+        from .project import Project
+        proj = Project()
     cur = proj.db.cursor()
     try:
         cur.execute('SELECT name, chr, strand, txStart, txEnd, cdsStart, cdsEnd, exonCount, exonStarts, exonEnds, name2 '
