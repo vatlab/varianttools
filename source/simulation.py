@@ -74,9 +74,10 @@ class ExtractVCF(SkiptableAction):
 class CreatePopulation(SkiptableAction):
     '''Create a simuPOP population from specified regions and number of individuals.
     '''
-    def __init__(self, regions, size=None, importGenotypeFrom=None, output=[]):
+    def __init__(self, regions, size=None, importGenotypeFrom=None, infoFields=[], output=[]):
         self.regions = regions
         self.size = size
+        self.infoFields = infoFields
         self.sourceFile = importGenotypeFrom
         SkiptableAction.__init__(self, cmd='PopFromRegions {} {}\n'.format(regions, output),
             output=output)
@@ -107,7 +108,8 @@ class CreatePopulation(SkiptableAction):
             chroms = lociPos.keys()
             chroms.sort()
             pop = sim.Population(size=self.size, loci=[len(lociPos[x]) for x in chroms],
-                chromNames=chroms, lociPos=sum([lociPos[x] for x in chroms], []))
+                chromNames=chroms, lociPos=sum([lociPos[x] for x in chroms], []),
+                infoFields=self.infoFields)
                 #chromTypes=[sim.CHROMOSOME_X if x=='X' else (sim.CHROMOSOME_Y if x=='Y' else sim.AUTOSOME) for x in chroms])
         env.logger.info('Saving created population to {}'.format(self.output[0]))
         pop.save(self.output[0])
@@ -133,7 +135,8 @@ class CreatePopulation(SkiptableAction):
                     if len(fields) <= 10:
                         raise ValueError('Input vcf file does not contain any genotype information')
                     pop = sim.Population(size=len(fields)-10, loci=[len(lociPos[x]) for x in chroms],
-                        chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
+                        chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []),
+                        infoFields=self.infoFields)
                 #
                 chr = pop.chromNames().index(fields[0])
                 pos = lociIndex[chr][int(fields[1])]
@@ -200,7 +203,8 @@ class CreatePopulation(SkiptableAction):
             del geno
             #
             pop = sim.Population(size=[len(x)/2 for x in all_geno], loci=[len(lociPos[x]) for x in chroms],
-                chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []))
+                chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []),
+                infoFields=self.infoFields)
             # add genotype
             prog = ProgressBar('Importing from {}'.format(self.sourceFile), pop.popSize() * len(chroms))
             processed = 0
