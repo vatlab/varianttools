@@ -4245,6 +4245,8 @@ def show(args):
                 for idx, (simulation, prop) in enumerate(sorted(res.manifest.iteritems())):
                     if args.limit is not None and idx >= args.limit:
                         break
+                    if simulation.endswith('.py'):
+                        continue
                     if args.verbosity == '0':
                         print(simulation[11:-9])
                     else:
