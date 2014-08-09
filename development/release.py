@@ -205,11 +205,12 @@ def buildExecutables(git_dir, option):
                 dest = os.path.join('dist', exe + '.app')
                 if os.path.isdir(dest):
                     shutil.rmtree(dest)
+            simuPOP_modules = ['simuPOP.demography', 'simuPOP.utils', 'simuPOP.plotter', 'simuPOP.gsl', 'simuPOP.sampling', 'simuPOP.sandbox']
             print('Building executable {} ...'.format(exe))
             with open(os.devnull, 'w') as fnull:
-                ret = subprocess.call('python {} {} --log-level=ERROR {} '
-                    .format(os.path.join(git_dir, 'pyinstaller.py'), option, exe),
-                    shell=True, stdout=fnull)
+                cmd = 'python {} {} --log-level=ERROR {} {} '.format(os.path.join(git_dir, 'pyinstaller.py'), option,
+                    ' '.join(['--hidden-import {}'.format(m) for m in simuPOP_modules]), exe)
+                ret = subprocess.call(cmd, shell=True, stdout=fnull)
                 if ret != 0:
                     sys.exit('Failed to create executable for command {}'.format(exe))
         except Exception as e:
