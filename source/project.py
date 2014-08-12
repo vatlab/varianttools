@@ -399,7 +399,7 @@ class fileFMT:
             self.parseFMT(fmt, defaults=args)
 
     def parseArgs(self, filename, fmt_args):
-        fmt_parser = ConfigParser.SafeConfigParser()
+        fmt_parser = ConfigParser.SafeConfigParser(strict=False)
         fmt_parser.read(filename)
         parameters = fmt_parser.items('DEFAULT')
         parser = argparse.ArgumentParser(prog='vtools CMD --format {}'.format(os.path.split(filename)[-1]),
@@ -420,7 +420,7 @@ class fileFMT:
         return args
 
     def parseFMT(self, filename, defaults):
-        parser = ConfigParser.SafeConfigParser()
+        parser = ConfigParser.SafeConfigParser(strict=False)
         # this allows python3 to read .fmt file with non-ascii characters, but there is no
         # simple way to make it python2 compatible.
         #with open(filename, 'r', encoding='UTF-8') as inputfile:
@@ -544,6 +544,17 @@ class fileFMT:
             self.fields = self.range_fields
             if len(self.fields) != 3:
                 raise ValueError('"range" fields should have three fields for chr and starting and ending position')
+        # check duplicate entry in variant_info and genotype_info
+        if hasattr(self, 'variant_info'):
+            if len(set(self.variant_info)) != len(self.variant_info):
+                env.logger.warning('Removing duplicated variant info field {}'
+                    .format(','.join([x for x in set(self.variant_info) if self.variant_info.count(x) > 1])))
+                self.variant_info = list(set(self.variant_info))
+        if hasattr(self, 'genotype_info'):
+            if len(set(self.genotype_info)) != len(self.genotype_info):
+                env.logger.warning('Removing duplicated variant info field {}'
+                    .format(','.join([x for x in set(self.genotype_info) if self.genotype_info.count(x) > 1])))
+                self.genotype_info = list(set(self.genotype_info))
         #
         if self.input_type != 'variant' and not self.variant_info:
             raise ValueError('Input file with type position or range must specify variant_info')
@@ -679,7 +690,7 @@ class PipelineDescription:
             self.parsePipeline(pipeline, defaults=args)
 
     def parseArgs(self, filename, fmt_args):
-        fmt_parser = ConfigParser.SafeConfigParser()
+        fmt_parser = ConfigParser.SafeConfigParser(strict=False)
         fmt_parser.read(filename)
         parameters = fmt_parser.items('DEFAULT')
         parser = argparse.ArgumentParser(prog='vtools CMD --pipeline {}'
@@ -701,7 +712,7 @@ class PipelineDescription:
         return args
 
     def parsePipeline(self, filename, defaults):
-        parser = ConfigParser.SafeConfigParser()
+        parser = ConfigParser.SafeConfigParser(strict=False)
         # this allows python3 to read .pipeline file with non-ascii characters,
         # but there is no simple way to make it python2 compatible.
         #with open(filename, 'r', encoding='UTF-8') as inputfile:
