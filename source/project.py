@@ -32,7 +32,6 @@ import getpass
 import textwrap
 import tempfile
 import shutil
-import ConfigParser
 import argparse
 import threading
 import Queue
@@ -43,8 +42,10 @@ import tarfile
 import urllib
 if sys.version_info.major == 2:
     from ucsctools_py2 import showTrack
+    from ConfigParser import SafeConfigParser
 else:
     from ucsctools_py3 import showTrack
+    from configparser import ConfigParser
 
 from multiprocessing import Process
 from subprocess import Popen, PIPE
@@ -399,7 +400,10 @@ class fileFMT:
             self.parseFMT(fmt, defaults=args)
 
     def parseArgs(self, filename, fmt_args):
-        fmt_parser = ConfigParser.SafeConfigParser(strict=False)
+        if sys.version_info.major == 2:
+            fmt_parser = SafeConfigParser()
+        else:
+            fmt_parser = ConfigParser(strict=False)
         fmt_parser.read(filename)
         parameters = fmt_parser.items('DEFAULT')
         parser = argparse.ArgumentParser(prog='vtools CMD --format {}'.format(os.path.split(filename)[-1]),
@@ -420,7 +424,10 @@ class fileFMT:
         return args
 
     def parseFMT(self, filename, defaults):
-        parser = ConfigParser.SafeConfigParser(strict=False)
+        if sys.version_info.major == 2:
+            parser = SafeConfigParser()
+        else:
+            parser = ConfigParser(strict=False)
         # this allows python3 to read .fmt file with non-ascii characters, but there is no
         # simple way to make it python2 compatible.
         #with open(filename, 'r', encoding='UTF-8') as inputfile:
@@ -690,7 +697,10 @@ class PipelineDescription:
             self.parsePipeline(pipeline, defaults=args)
 
     def parseArgs(self, filename, fmt_args):
-        fmt_parser = ConfigParser.SafeConfigParser(strict=False)
+        if sys.version_info.major == 2:
+            fmt_parser = SafeConfigParser()
+        else:
+            fmt_parser = ConfigParser(strict=False)
         fmt_parser.read(filename)
         parameters = fmt_parser.items('DEFAULT')
         parser = argparse.ArgumentParser(prog='vtools CMD --pipeline {}'
@@ -712,7 +722,10 @@ class PipelineDescription:
         return args
 
     def parsePipeline(self, filename, defaults):
-        parser = ConfigParser.SafeConfigParser(strict=False)
+        if sys.version_info.major == 2:
+            parser = SafeConfigParser()
+        else:
+            parser = ConfigParser(strict=False)
         # this allows python3 to read .pipeline file with non-ascii characters,
         # but there is no simple way to make it python2 compatible.
         #with open(filename, 'r', encoding='UTF-8') as inputfile:
