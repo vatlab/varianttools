@@ -552,12 +552,12 @@ class fileFMT:
             if len(self.fields) != 3:
                 raise ValueError('"range" fields should have three fields for chr and starting and ending position')
         # check duplicate entry in variant_info and genotype_info
-        if hasattr(self, 'variant_info'):
+        if hasattr(self, 'variant_info') and self.variant_info:
             if len(set(self.variant_info)) != len(self.variant_info):
                 env.logger.warning('Removing duplicated variant info field {}'
                     .format(','.join([x for x in set(self.variant_info) if self.variant_info.count(x) > 1])))
                 self.variant_info = list(set(self.variant_info))
-        if hasattr(self, 'genotype_info'):
+        if hasattr(self, 'genotype_info') and self.genotype_info:
             if len(set(self.genotype_info)) != len(self.genotype_info):
                 env.logger.warning('Removing duplicated variant info field {}'
                     .format(','.join([x for x in set(self.genotype_info) if self.genotype_info.count(x) > 1])))
