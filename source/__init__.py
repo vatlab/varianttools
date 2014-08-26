@@ -34,7 +34,7 @@ __all__ = ['utils', 'project', 'variant', 'annotation', 'assoTests', 'pipeline',
 
 # This should be updated when vtools is released, or there is a need to mark a
 # revision between release cycles
-VTOOLS_VERSION='2.4.0'
+VTOOLS_VERSION='2.4.1'
 VTOOLS_REVISION='$Rev$'
 VTOOLS_REVISION=VTOOLS_REVISION[VTOOLS_REVISION.find(" ")+1:-2]
 #
