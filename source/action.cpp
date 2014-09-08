@@ -1933,4 +1933,28 @@ bool WeightedGenotypeTester::apply(AssoData & d, int timeout)
 }
 
 
+bool OptimalWeightTester::apply(AssoData & d, int timeout)
+{
+	for (size_t i = 0; i < m_info.size(); ++i) {
+		AssoData * data = d.clone();
+		data->weightX(data->getMatrixVar(m_info[i]));
+		for (size_t j = 0; j < m_actions.size(); ++j) {
+			m_actions[j]->apply(*data);
+		}
+		m_stats[i] = data->statistic();
+	}
+	double stat = 0.0;
+	size_t bidx = 0;
+	for (size_t i = 0; i < m_info.size(); ++i) {
+		if (std::abs(m_stats[i][0]) > stat) {
+			stat = std::abs(m_stats[i][0]);
+			bidx = i + 1;
+		}
+	}
+	d.setStatistic(stat);
+	d.setVar("OptimalWeightIndex", (int)bidx);
+	return true;
+}
+
+
 }

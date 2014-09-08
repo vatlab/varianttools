@@ -1292,5 +1292,40 @@ private:
 	matrixf m_stats;
 };
 
+// this class applies different weighting themes to the same data in one permutation test
+// and use the weight that maximizes the statistic
+// logic similar to WeightedGenotypeTester class
+class OptimalWeightTester : public BasePermutator
+{
+
+public:
+	OptimalWeightTester(const vectors & info, const vectora & actions) :
+		BasePermutator(actions), m_info(info)
+	{
+		vectorf tmp(0);
+
+		m_stats.resize(m_info.size(), tmp);
+	}
+
+
+	BaseAction * clone() const
+	{
+		return new OptimalWeightTester(*this);
+	}
+
+
+	bool apply(AssoData & d, int timeout = 0);
+
+	std::string name()
+	{
+		return "OptimalWeightTester";
+	}
+
+
+private:
+	vectors m_info;
+	matrixf m_stats;
+};
+
 }
 #endif
