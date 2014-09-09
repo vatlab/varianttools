@@ -1952,7 +1952,7 @@ bool OptimalWeightTester::apply(AssoData & d, int timeout)
 		}
 	}
 	d.setStatistic(stat);
-	d.setVar("OptimalWeightIndex", (int)bidx);
+	if (!d.hasVar("OptimalWeightIndex")) d.setVar("OptimalWeightIndex", (int)bidx);
 	return true;
 }
 
