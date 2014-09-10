@@ -154,6 +154,9 @@ class TestUpdate(ProcessTestCase):
         runCmd('''vtools select variant "chr='1'" -t chr1''')
         runCmd('vtools update chr1 --from_stat "num=#(alt)" "total=#(GT)"')
         runCmd('vtools update chr1 --set "ratio=num/(total*1.0)"')
+        runCmd('vtools select variant "ratio is NULL" -t other')
+        lines = output2list('vtools output other chr pos ref alt ratio')
+        self.assertEqual(len(lines), 100)
         self.assertSucc('vtools show fields')
 
     def testGenoAnnoSet(self):

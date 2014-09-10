@@ -435,7 +435,10 @@ def setFieldValue(proj, table, items, build):
             k, v = item.split('=', 1)
             v = consolidateFieldName(proj, table, v, build and build == proj.alt_build)[0]
             update_clause.append('{}={}'.format(k, v))
-        query = 'UPDATE variant SET {};'.format(', '.join(update_clause))
+        if table == 'variant':
+            query = 'UPDATE variant SET {};'.format(', '.join(update_clause))
+        else:
+            query = 'UPDATE variant SET {} WHERE variant_id IN (SELECT variant_id FROM {});'.format(', '.join(update_clause), table)
         env.logger.trace('Running {}'.format(query))
         cur.execute(query)
     else:
