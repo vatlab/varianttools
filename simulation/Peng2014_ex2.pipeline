@@ -41,7 +41,7 @@ scale_comment=Scaling factor to speed up the simulation by scaling down the
   simulation while boosting mutation, selection and recombination rates.
 
 [*_0]
-input_emitter=EmitInput(select=not os.path.isfile('${pipeline_name}_sample_4000_${seed}_ns.res'), pass_unselected=False)
+input_emitter=EmitInput(select=not os.path.isfile('${pipeline_name}_sample_2000_${seed}_ns.res'), pass_unselected=False)
 action=CheckVariantToolsVersion('2.3.1')
 comment=Check the version of variant tools. Version 2.3.1 or higher is required
 	for the execution of this simulation.
