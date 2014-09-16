@@ -25,7 +25,7 @@ comment=Check the version of variant tools. Version 2.3.1 or higher is required
 	for the execution of this simulation.
 
 [*_1]
-action=ImportModules('simuPOP.demography')
+action=ImportModules('simuPOP.demography', 'Lineage.py')
 comment=Import required modules.
 
 [*_10]
@@ -67,7 +67,7 @@ action=EvolvePopulation(
 	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
 	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
 		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
-	demoModel=SettlementOfNewWorldModel(20000, scale=%(scale)s)
+	demoModel=NoAF_OutOfAfricaModel(20000, scale=%(scale)s)
 	)
 comment=Evolve and expand the population using a K80 mutation model	and a demographic 
 	model that models the settlement of new world model of the Mexican American population.
