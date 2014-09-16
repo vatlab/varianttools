@@ -1,4 +1,7 @@
-class NoAF_OutOfAfricaModel(MultiStageModel):
+from simuPOP.demography import *
+from simuPOP import Migrator
+
+class NoAS_OutOfAfricaModel(MultiStageModel):
     '''A dempgrahic model for the CHB, CEU, and YRI populations, as defined in
     Gutenkunst 2009, Plos Genetics. The model is depicted in Figure 2, and the 
     default parameters are listed in Table 1 of this paper. The AF population is
@@ -12,7 +15,8 @@ class NoAF_OutOfAfricaModel(MultiStageModel):
         r_EU=0.004,
         N_AS0=510,
         r_AS=0.0055,
-        m_EU_AS=0.000096,
+        m_AF_B=0.00025,
+        m_AF_EU=0.00003,
         T_AF=220000//25, 
         T_B=140000//25, 
         T_EU_AS=21200//25, 
@@ -45,27 +49,38 @@ class NoAF_OutOfAfricaModel(MultiStageModel):
         scale = float(scale)
         MultiStageModel.__init__(self, [
             InstantChangeModel(
-                T=int((T0-T_EU_AS)/scale),
+                T=int((T0-T_B)/scale),
                 N0=(int(N_A/scale), 'Ancestral'),
                 # change population size twice, one at T_AF, one at T_B
-                G=[int((T0-T_AF)/scale), int((T0-T_B)/scale)],
-                NG=[
-                    (int(N_AF/scale), 'AF'), 
-                    # at T_B, split to population B from subpopulation 1
-                    (int(N_B/scale), 'B')]),
+                G=[int((T0-T_AF)/scale)],
+                NG=[(int(N_AF/scale), 'AF')] 
+            ),
+            #
+            # at T_B, split to population B from subpopulation 1
+            InstantChangeModel(
+                T=int((T_B - T_EU_AS)/scale),
+                # change population size twice, one at T_AF, one at T_B
+                N0=[None, (int(N_B/scale), 'B')],
+                ops=Migrator(rate=[
+                    [0, m_AF_B],
+                    [m_AF_B, 0]])
+                ),
             #
             ExponentialGrowthModel(
                 T=int(T_EU_AS/scale),
-                # split B into EU and AS at the beginning of this
-                # exponential growth stage
-                N0 = [(int(N_EU0/scale), 'EU'), (int(N_AS0/scale), 'AS')],
-                r=[r_EU*scale, r_AS*scale],
+                # 
+                # shrnk Nb to N_EU0
+                N0 = [None, (int(N_EU0/scale), 'EU')],
+                r=[0, r_EU*scale],
                 infoFields='migrate_to',
                 ops=Migrator(rate=[
-                    [0, m_EU_AS],
-                    [m_EU_AS, 0]
+                    [0, m_AF_EU],
+                    [m_AF_EU, 0]
                     ])
                 ),
             ], ops=ops, infoFields=infoFields
         )
 
+
+if __name__ == '__main__':
+    NoAS_OutOfAfricaModel(20000).plot()
