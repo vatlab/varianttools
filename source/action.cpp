@@ -1942,6 +1942,7 @@ bool OptimalWeightTester::apply(AssoData & d, int timeout)
 			m_actions[j]->apply(*data);
 		}
 		m_stats[i] = data->statistic();
+		delete data;
 	}
 	double stat = 0.0;
 	size_t bidx = 0;
