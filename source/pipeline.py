@@ -1745,7 +1745,7 @@ def execute(args):
                 executeQuery()
             except RuntimeError as e:
                 env.logger.debug('Failed to execute {} as SQL query: {}'
-                    .format(' '.join(args.pipeline), e))
+                    .format(' '.join(args.pipelines), e))
                 executePipeline()
     except Exception as e:
         env.unlock_all()
