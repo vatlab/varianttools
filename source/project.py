@@ -4092,7 +4092,7 @@ def show(args):
                                 else:
                                     print('\n'.join(textwrap.wrap(
                                         '{:<23} {}'.format(field_info, field_desc),
-                                        width=textWidth, subsequent_indent=' '*29)))
+                                        width=textWidth, subsequent_indent=' '*24)))
 
                 for db in proj.annoDB:
                     if args.verbosity == '0':

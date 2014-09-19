@@ -844,7 +844,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                 proj.db.execute('UPDATE variant SET {} = 0 {}'.format(field, where_clause))
         # add an description
         try:
-            proj.describeField(field, 'Created from stat "{}" {}with type {} on {}'
+            proj.describeField(field, 'Created from stat "{}" {} with type {} on {}'
                 .format(desc_of_field[field.lower()], 
                     'for samples {}'.format(samples) if samples else '', 
                     fldtype, time.strftime('%b%d', time.localtime())))
