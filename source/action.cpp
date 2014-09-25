@@ -1946,13 +1946,15 @@ bool OptimalWeightTester::apply(AssoData & d, int timeout)
 	}
 	double stat = 0.0;
 	size_t bidx = 0;
+	double sign = 1.0;
 	for (size_t i = 0; i < m_info.size(); ++i) {
 		if (std::abs(m_stats[i][0]) > stat) {
 			stat = std::abs(m_stats[i][0]);
+			sign = (m_stats[i][0] > 0) ? 1.0 : -1.0;
 			bidx = i + 1;
 		}
 	}
-	d.setStatistic(stat);
+	d.setStatistic(stat * sign);
 	if (!d.hasVar("OptimalWeightIndex")) d.setVar("OptimalWeightIndex", (int)bidx);
 	return true;
 }
