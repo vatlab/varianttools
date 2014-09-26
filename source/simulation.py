@@ -680,7 +680,7 @@ class MutantInfo:
                 break
         aa_change = self.findAlteredAminoAcid(mut, pop)
         if not aa_change:
-            return 'silent'
+            return 'synonymous'
         res = []
         for aa, naa, ploidy, start in aa_change:
             # stoploss
@@ -1153,7 +1153,7 @@ class ExportPopulation(SkiptableAction):
                     #
                     if alt and aaInfo is not None:
                         # output mutant info, always assume first homologus copy
-                        varInfo = aaInfo.mutantType(sim.defdict({loc: x for x in alt}), pop)
+                        varInfo = 'MT=' + aaInfo.mutantType(sim.defdict({loc: x for x in alt}), pop)
                     else:
                         varInfo = '.'
                     if len(alt) == 0:

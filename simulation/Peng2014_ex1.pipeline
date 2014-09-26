@@ -127,14 +127,9 @@ comment=Evolve and expand the population using a JC69 mutation model
 	81000 generations before it is expanded to size 900000 in 370 generations.
 
 [neutral_50]
-action=OutputPopulationStatistics(
-	mut_count=['ex1_neutral_freq_spec_${seed}.txt', 700],
-	)
+action=ExportPopulation(output=['neutral.vcf'])
 comment=Get allele frequency spectrum in a sample of 700 individuals.
 
-[neutral_999]
-action=RemoveIntermediateFiles(['ex1_neutral_evolved_${seed}.pop', 'cache/ex1_neutral_init_${seed}.pop'])
-comment=Remove intermediate populations to save diskspace.
 
 
 [with_selection_10]
