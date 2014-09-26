@@ -111,6 +111,8 @@ class CreatePopulation(SkiptableAction):
                 chromNames=chroms, lociPos=sum([lociPos[x] for x in chroms], []),
                 infoFields=self.infoFields)
                 #chromTypes=[sim.CHROMOSOME_X if x=='X' else (sim.CHROMOSOME_Y if x=='Y' else sim.AUTOSOME) for x in chroms])
+        # save regions for later use.
+        pop.dvars().regions = self.regions
         env.logger.info('Saving created population to {}'.format(self.output[0]))
         pop.save(self.output[0])
 
@@ -355,107 +357,6 @@ def FineScaleRecombinator(regions, scale=1, defaultRate=1e-8, output=None):
     return sim.Recombinator(rates=rec_rates, loci=sum([[(ch,pos) for pos in lociPos[ch]] for ch in chroms], []))
 
 
-class ExportPopulation(SkiptableAction):
-    def __init__(self, output, sample_names=[]):
-        self.sample_names = sample_names
-        SkiptableAction.__init__(self, cmd='ExportPopulation {} {}\n'.format(sample_names, output),
-            output=output)
-
-    def _execute(self, ifiles, pipeline):
-        # import variants to the current project
-        # translate 0,1,2,3 to A,C,G,T
-        alleleMap = {
-            'A': {0: 'A', 1: 'C', 2: 'G', 3: 'T'},
-            'C': {0: 'C', 1: 'G', 2: 'T', 3: 'A'},
-            'G': {0: 'G', 1: 'T', 2: 'A', 3: 'C'},
-            'T': {0: 'T', 1: 'A', 2: 'C', 3: 'G'},
-            'N': {0: 'A', 1: 'C', 2: 'G', 3: 'T'},
-        }
-        env.logger.info('Loading {}'.format(ifiles[0]))
-        pop = sim.loadPopulation(ifiles[0])
-        # output genotype
-        with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY'], verbosity=pipeline.verbosity) as proj:
-            build = proj.build
-        if build is None:
-            build = 'hg19'
-        with open(self.output[0], 'w') as vcf:
-            vcf.write('##fileformat=VCFv4.1\n')
-            vcf.write('##fileData={}\n'.format(datetime.date.today().strftime("%Y%m%d")))
-            vcf.write('##source=Variant Simulation Tools\n')
-            vcf.write('##reference={}\n'.format(build))
-            vcf.write('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n')
-            vcf.write('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t')
-            if self.sample_names:
-                if len(self.sample_names) != pop.popSize():
-                    raise ValueError('Sample names, if specified, should be assigned to'
-                        'all {} individuals.'.format(pop.popSize()))
-                vcf.write('\t'.join(self.sample_names) + '\n')
-            else:
-                vcf.write('\t'.join(['S_{}'.format(x) for x in range(1, pop.popSize()+1)]) + '\n')
-            #
-            # get reference genome
-            refGenome = RefGenome(build)
-            sim.stat(pop, alleleFreq=sim.ALL_AVAIL, vars='alleleNum')
-            nAlleles = 2*pop.popSize()
-            segregated = [loc for loc,nums in pop.dvars().alleleNum.items() if nums[0] == nAlleles]
-            env.logger.info('Genetic variants identified on {} loci'.format(len(segregated)))
-            prog = ProgressBar('Exporting simulated population', pop.totNumLoci())
-            for chr in range(pop.numChrom()):
-                chr_name = pop.chromName(chr)
-                for loc in range(pop.chromBegin(chr), pop.chromEnd(chr)):
-                    if pop.dvars().alleleNum[loc][0] == nAlleles:
-                        continue
-                    pos = int(pop.locusPos(loc))
-                    ref = refGenome.getBase(chr_name, pos)
-                    # genotypes
-                    geno1 = [ind.allele(loc, 0) for ind in pop.individuals()]
-                    geno2 = [ind.allele(loc, 1) for ind in pop.individuals()]
-                    #
-                    alt = list((set(geno1) | set(geno2)) - set([0]))
-                    #
-                    if len(alt) == 0:
-                        env.logger.error('No alternative allele at locus {}:{}'.format(chr_name, pos))
-                        continue
-                    elif len(alt) == 1:
-                        # easier...
-                        vcf.write('{}\t{}\t.\t{}\t{}\t.\tPASS\t.\tGT\t'.format(
-                            chr_name, pos, ref, alleleMap[ref][alt[0]]))
-                        vcf.write('\t'.join(['{}/{}'.format(x if x==0 else 1, 
-                            y if y == 0 else 1) for x,y in zip(geno1, geno2)]) + '\n')
-                    else:
-                        # we need to figure out the index of geno in alt
-                        vcf.write('{}\t{}\t.\t{}\t{}\t.\tPASS\t.\tGT\t'.format(
-                            chr_name, pos, ref, ','.join([alleleMap[ref][a] for a in alt])))
-                        vcf.write('\t'.join(['{}/{}'.format(x if x==0 else alt.index(x) + 1, 
-                            y if y == 0 else alt.index(y) + 1) for x,y in zip(geno1, geno2)]) + '\n')
-                    #
-                    prog.update(loc)
-            prog.done()
-        #
-        if len(self.output) == 1:
-            return
-        # output phenotype
-        with open(self.output[1], 'w') as phe:
-            fields = pop.infoFields()
-            phe.write('sample_name\taff' + '\t'.join(fields) + '\n')
-            prog = ProgressBar('Exporting phenotype {}'.format(','.join(fields)), pop.popSize())
-            for i in range(pop.popSize()):
-                if self.sample_names:
-                    phe.write(self.sample_names[i])
-                else:
-                    phe.write('S_{}'.format(i+1))
-                #
-                if pop.individual(i).affected():
-                    phe.write('\t2')
-                else:
-                    phe.write('\t1')
-                for info in fields:
-                    phe.write('\t{}'.format(pop.individual(i).info(info)))
-                phe.write('\n')
-                prog.update(i+1)
-            prog.done()
-
-
 class OutputPopulationStatistics(SkiptableAction):
     def __init__(self, mut_count=None):
         output = []
@@ -608,7 +509,7 @@ class RefGenomeMutator(sim.PyOperator):
         return True
         
 
-class ProteinInfo:
+class MutantInfo:
     def __init__(self, raw_regions):
         '''Identify codon of a region'''
         # 
@@ -710,6 +611,9 @@ class ProteinInfo:
         #    coding.write(''.join([str(x)+'\n' for x in sorted(self.codon_info.keys())]))
     
     def _updatePosWithIndexes(self, pop):
+        # The class saves loci information as (chr, pos), which is very slow to access
+        # when a true population is sent, we are translating them to idx.
+        #
         all_pos = sorted(self.coding_base.keys())
         indexes = pop.indexesOfLoci(all_pos)
         posMap = {x:y for x,y in zip(all_pos, indexes)}
@@ -766,8 +670,30 @@ class ProteinInfo:
                         aa_change.add(aa_change_at_m[0])
         return aa_change
         
+    def mutantType(self, mut, pop):
+        if self._codon_info is None:
+            self._updatePosWithIndexes(pop)
+        for k in mut.keys():
+            if k not in self._coding_base:
+                return 'non-coding'
+            else:
+                break
+        aa_change = self.findAlteredAminoAcid(mut, pop)
+        if not aa_change:
+            return 'silent'
+        res = []
+        for aa, naa, ploidy, start in aa_change:
+            # stoploss
+            if aa == '*': 
+                res.append('stoploss')
+            elif naa == '*':
+                res.append('stopgain')
+            else:
+                res.append('missense')
+        return ','.join(res)
+        
 
-class ProteinSelector(sim.PySelector, ProteinInfo):
+class ProteinSelector(sim.PySelector, MutantInfo):
     def __init__(self, regions, s_missense=0.001, s_stoploss=0.002, s_stopgain=0.01):
         '''A protein selection operator that, for specified regions
             1. find coding regions and pass them to PySelector
@@ -787,7 +713,7 @@ class ProteinSelector(sim.PySelector, ProteinInfo):
         self.s_stoploss = s_stoploss
         self.s_stopgain = s_stopgain
         #
-        ProteinInfo.__init__(self, regions)
+        MutantInfo.__init__(self, regions)
         if (not self.codon_info) or (s_missense == 0 and s_stoploss == 0 and s_stopgain == 0):
             env.logger.warning('Specified region does not contain any gene or all selection coefficient is zero. A neutral model will be used.')
             sim.PySelector.__init__(self, func=self._neutral, loci=[])
@@ -814,7 +740,7 @@ class ProteinSelector(sim.PySelector, ProteinInfo):
         return fitness
 
 
-class ProteinPenetrance(sim.PyPenetrance, ProteinInfo):
+class ProteinPenetrance(sim.PyPenetrance, MutantInfo):
     def __init__(self, regions, s_sporadic=0.0001, s_missense=0.001, 
             s_stoploss=0.002, s_stopgain=0.01):
         '''A protein penetrance model that is identical to ProteinSelector, but 
@@ -825,7 +751,7 @@ class ProteinPenetrance(sim.PyPenetrance, ProteinInfo):
         self.s_stoploss = s_stoploss
         self.s_stopgain = s_stopgain
         #
-        ProteinInfo.__init__(regions)
+        MutantInfo.__init__(regions)
         if not self.codon_info:
             env.logger.warning('Specified region does not contain any gene. A neutral model will be used.')
             sim.PyPenetrance.__init__(self, func=self._neutral, loci=[])
@@ -1143,4 +1069,133 @@ class DrawQuanTraitSample(SkiptableAction):
                 pop.removeInfoFields(field)
         env.logger.info('Saving samples to population {}'.format(output))
         pop.save(output)
+
+
+
+class ExportPopulation(SkiptableAction):
+    '''
+    '''
+    def __init__(self, output, sample_names=[], var_info=[]):
+        '''var_info: output variant info if any of the variable is specified
+            MT
+        '''
+        self.sample_names = sample_names
+        self.var_info = var_info
+        for vi in var_info:
+            if vi != 'MT':
+                env.logger.warning('Unrecognized variant info field. Only MT (mutant type) is supported now.')
+        SkiptableAction.__init__(self, cmd='ExportPopulation {} {}\n'.format(sample_names, output),
+            output=output)
+
+    def _execute(self, ifiles, pipeline):
+        # import variants to the current project
+        # translate 0,1,2,3 to A,C,G,T
+        alleleMap = {
+            'A': {0: 'A', 1: 'C', 2: 'G', 3: 'T'},
+            'C': {0: 'C', 1: 'G', 2: 'T', 3: 'A'},
+            'G': {0: 'G', 1: 'T', 2: 'A', 3: 'C'},
+            'T': {0: 'T', 1: 'A', 2: 'C', 3: 'G'},
+            'N': {0: 'A', 1: 'C', 2: 'G', 3: 'T'},
+        }
+        env.logger.info('Loading {}'.format(ifiles[0]))
+        pop = sim.loadPopulation(ifiles[0])
+        # if we need to output variant information
+        aaInfo = None
+        if self.var_info:
+            if 'regions' not in pop.vars():
+                env.logger.warning('No mutation type can be obtained because population object does not have variable "regions".')
+            else:
+                # figure out regions of the population
+                aaInfo = MutantInfo(pop.dvars().regions)
+        # output genotype
+        with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY'], verbosity=pipeline.verbosity) as proj:
+            build = proj.build
+        if build is None:
+            build = 'hg19'
+        with open(self.output[0], 'w') as vcf:
+            vcf.write('##fileformat=VCFv4.1\n')
+            vcf.write('##fileData={}\n'.format(datetime.date.today().strftime("%Y%m%d")))
+            vcf.write('##source=Variant Simulation Tools\n')
+            vcf.write('##reference={}\n'.format(build))
+            if self.var_info:
+                for vi in self.var_info:
+                    if vi == 'MT':
+                        vcf.write('#INFO=<ID=MT,Number=1,Type=String,Description="Mutant type">\n')
+            vcf.write('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n')
+            vcf.write('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t')
+            if self.sample_names:
+                if len(self.sample_names) != pop.popSize():
+                    raise ValueError('Sample names, if specified, should be assigned to'
+                        'all {} individuals.'.format(pop.popSize()))
+                vcf.write('\t'.join(self.sample_names) + '\n')
+            else:
+                vcf.write('\t'.join(['S_{}'.format(x) for x in range(1, pop.popSize()+1)]) + '\n')
+            #
+            # get reference genome
+            refGenome = RefGenome(build)
+            sim.stat(pop, alleleFreq=sim.ALL_AVAIL, vars='alleleNum')
+            nAlleles = 2*pop.popSize()
+            segregated = [loc for loc,nums in pop.dvars().alleleNum.items() if nums[0] == nAlleles]
+            env.logger.info('Genetic variants identified on {} loci'.format(len(segregated)))
+            prog = ProgressBar('Exporting simulated population', pop.totNumLoci())
+            for chr in range(pop.numChrom()):
+                chr_name = pop.chromName(chr)
+                for loc in range(pop.chromBegin(chr), pop.chromEnd(chr)):
+                    if pop.dvars().alleleNum[loc][0] == nAlleles:
+                        continue
+                    pos = int(pop.locusPos(loc))
+                    ref = refGenome.getBase(chr_name, pos)
+                    # genotypes
+                    geno1 = [ind.allele(loc, 0) for ind in pop.individuals()]
+                    geno2 = [ind.allele(loc, 1) for ind in pop.individuals()]
+                    #
+                    alt = list((set(geno1) | set(geno2)) - set([0]))
+                    #
+                    if alt and aaInfo is not None:
+                        # output mutant info, always assume first homologus copy
+                        varInfo = aaInfo.mutantType(sim.defdict({loc: x for x in alt}), pop)
+                    else:
+                        varInfo = '.'
+                    if len(alt) == 0:
+                        env.logger.error('No alternative allele at locus {}:{}'.format(chr_name, pos))
+                        continue
+                    elif len(alt) == 1:
+                        # easier...
+                        vcf.write('{}\t{}\t.\t{}\t{}\t.\tPASS\t{}\tGT\t'.format(
+                            chr_name, pos, ref, alleleMap[ref][alt[0]], varInfo))
+                        vcf.write('\t'.join(['{}/{}'.format(x if x==0 else 1, 
+                            y if y == 0 else 1) for x,y in zip(geno1, geno2)]) + '\n')
+                    else:
+                        # we need to figure out the index of geno in alt
+                        vcf.write('{}\t{}\t.\t{}\t{}\t.\tPASS\t{}\tGT\t'.format(
+                            chr_name, pos, ref, ','.join([alleleMap[ref][a] for a in alt]), varInfo))
+                        vcf.write('\t'.join(['{}/{}'.format(x if x==0 else alt.index(x) + 1, 
+                            y if y == 0 else alt.index(y) + 1) for x,y in zip(geno1, geno2)]) + '\n')
+                    #
+                    prog.update(loc)
+            prog.done()
+        #
+        if len(self.output) == 1:
+            return
+        # output phenotype
+        with open(self.output[1], 'w') as phe:
+            fields = pop.infoFields()
+            phe.write('sample_name\taff' + '\t'.join(fields) + '\n')
+            prog = ProgressBar('Exporting phenotype {}'.format(','.join(fields)), pop.popSize())
+            for i in range(pop.popSize()):
+                if self.sample_names:
+                    phe.write(self.sample_names[i])
+                else:
+                    phe.write('S_{}'.format(i+1))
+                #
+                if pop.individual(i).affected():
+                    phe.write('\t2')
+                else:
+                    phe.write('\t1')
+                for info in fields:
+                    phe.write('\t{}'.format(pop.individual(i).info(info)))
+                phe.write('\n')
+                prog.update(i+1)
+            prog.done()
+
 
