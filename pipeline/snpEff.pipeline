@@ -50,7 +50,7 @@ action=CheckOutput('%(java)s -jar %(snpEff_path)s/snpEff.jar -h', 'snpEff versio
 comment=Check if snpEff is installed and executable
 
 [eff_12]
-action=RunCommand('cat %(snpEff_path)s/snpEff.config | grep "data_dir =" | cut -d= -f2 > ${CACHE_DIR}/snpEff.data_dir',
+action=RunCommand('cat %(snpEff_path)s/snpEff.config | grep "data.dir =" | cut -d= -f2 > ${CACHE_DIR}/snpEff.data_dir',
     output='${CACHE_DIR}/snpEff.data_dir')
 DATA_DIR=${CACHE_DIR: open(CACHE_DIR + "/snpEff.data_dir").read().strip()}
 comment=Check the data storage location in snpEff.config file.
