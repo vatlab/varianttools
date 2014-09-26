@@ -1,3 +1,5 @@
+#!/usr/bin/env
+# -*- coding: utf8 -*-
 # The libplinkio software library is distributed under the following terms:
 
 # Copyright (c) 2012-2013, Matias Frånberg
