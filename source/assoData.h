@@ -192,7 +192,19 @@ public:
 	}
 
 
+	vectorf getPhenotype()
+	{
+		return m_phenotype;
+	}
+
+
 	vectorf & genotype()
+	{
+		return m_X;
+	}
+
+
+	vectorf getGenotype()
 	{
 		return m_X;
 	}
@@ -210,7 +222,19 @@ public:
 	}
 
 
+	matrixf getRawGenotype()
+	{
+		return m_genotype;
+	}
+
+
 	matrixf & covariates()
+	{
+		return m_C;
+	}
+
+
+	matrixf getCovariates()
 	{
 		return m_C;
 	}
