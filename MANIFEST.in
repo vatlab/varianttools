@@ -45,6 +45,7 @@ include source/preprocessor.py
 include source/simulation.py
 include source/meta.py
 include source/plot.py
+include source/site_options.py
 include source/assoTests.i
 include source/cgatools.i
 include source/ucsctools.i
