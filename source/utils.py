@@ -51,6 +51,7 @@ import tarfile
 import binascii
 from collections import namedtuple
 from itertools import chain
+import site_options
 
 try:
     # not all platforms/installations of python support bz2
@@ -112,14 +113,14 @@ class RuntimeEnvironments(object):
                 'This option can be set during vtools init where the verbosity level set by option'
                 ' --verbosity will be set as the project default.'),
             # 'check_update': (True, 'Automatically check update of variant tools and resources.'),
-            'sqlite_pragma': ('', 'pragmas for sqlite database that can be used to optimize the '
+            'sqlite_pragma': (site_options.sqlite_pragma, 'pragmas for sqlite database that can be used to optimize the '
                 'performance of database operations.'),
-            'import_num_of_readers': (2, 'variant tools by default uses two processes to read from '
+            'import_num_of_readers': (site_options.import_num_of_readers, 'variant tools by default uses two processes to read from '
                 'input files during multi-process importing (--jobs > 0). You can want to set it '
                 'to zero if a single process provides better performance or reduces disk traffic.'),
             # a temporary directory that is used to store temporary files. Will be
             # cleared after project is closed.
-            'temp_dir': (None, 'Use the specified temporary directory to store temporary files '
+            'temp_dir': (os.path.expanduser(site_options.temp_dir), 'Use the specified temporary directory to store temporary files '
                 'to improve performance (use separate disks for project and temp files), or '
                 'avoid problems due to insufficient disk space.'),
             'treat_missing_as_wildtype': ('False', 'Treat missing values as wildtype alleles for '
@@ -131,17 +132,17 @@ class RuntimeEnvironments(object):
             'association_timeout': (None, 'Cancel associate test and return special values '
                 'when a test lasts more than specified time (in seconds). The default '
                 'value of this option is None, which stands for no time limit.'),
-            'associate_num_of_readers': (None, 'Use specified number of processes to read '
+            'associate_num_of_readers': (site_options.associate_num_of_readers, 'Use specified number of processes to read '
                 'genotype data for association tests. The default value is the minimum of value '
                 'of option --jobs and 8. Note that a large number of reading processes might '
                 'lead to degraded performance or errors due to disk access limits.'),
-            'search_path': ('http://vtools.houstonbioinformatics.org/', 'A ;-separated list of '
+            'search_path': (site_options.search_path, 'A ;-separated list of '
                 'directories and URLs that are used to locate annotation database (.ann, .DB), '
                 'file format (.fmt) and other files. Reset this option allows alternative '
                 'local or online storage of such files. variant tools will append trailing '
                 'directories such as annoDB for certain types of data so only root directories '
                 'should be listed in this search path.'),
-            'local_resource': ('~/.variant_tools', 'A directory to store variant tools related '
+            'local_resource': (site_options.local_resource, 'A directory to store variant tools related '
                 'resources such as reference genomes and annotation database.')
         }
         # a default value
@@ -305,6 +306,8 @@ class RuntimeEnvironments(object):
     def _set_temp_dir(self, path=None):
         # user can explicitly set a path ('None' could be saved by a previous version of vtools)
         if path not in [None, 'None', '']:
+            if not os.path.isdir(path):
+                raise ValueError('Temp directory {} does not exist'.format(path))
             if os.path.isdir(path) and (os.listdir(path) or 
                     (not os.access(path, os.R_OK)) or (not os.access(path, os.W_OK)) or
                     (os.stat(path).st_mode & stat.S_ISVTX == 512)):
@@ -313,13 +316,25 @@ class RuntimeEnvironments(object):
                     'command "vtools admin --set_runtime_option temp_dir=DIR" to set it to another path, '
                     'or a random path (empty DIR).')
             self._temp_dir = path
-            self._proj_temp_dir = path
+            # create a random subdirectory in this directory
+            while True:
+                subdir = os.path.join(path, '_tmp_{}'.format(random.randint(1, 1000000)))
+                if not os.path.isdir(subdir):
+                    self._proj_temp_dir = subdir
+                    os.mkdir(subdir)
+                    break
         # the usual case
         if self._temp_dir is None:
             self._proj_temp_dir = tempfile.mkdtemp() 
         try:
             if not os.path.isdir(os.path.expanduser(self._proj_temp_dir)):
                 os.makedirs(os.path.expanduser(self._proj_temp_dir))
+            while True:
+                subdir = os.path.join(self._proj_temp_dir, '_tmp_{}'.format(random.randint(1, 1000000)))
+                if not os.path.isdir(subdir):
+                    self._proj_temp_dir = subdir
+                    os.mkdir(subdir)
+                    break
         except:
             sys.stderr.write('Failed to create a temporary directory {}.\n'.format(self._proj_temp_dir))
             self._proj_temp_dir = tempfile.mkdtemp()
