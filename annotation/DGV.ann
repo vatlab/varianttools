@@ -13,7 +13,7 @@ anno_type=range
 header=1
 version=hg19_20130723
 source_url=http://dgv.tcag.ca/dgv/docs/GRCh37_hg19_variants_2013-07-23.txt
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/DGV-hg19_20130723.DB.gz
+direct_url=annoDB/DGV-hg19_20130723.DB.gz
 source_type=txt
 delimiter="\t"
 

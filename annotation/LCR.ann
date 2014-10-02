@@ -14,7 +14,7 @@ delimiter=None
 header=2
 version=hg19_20090320
 source_url=http://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/chromOut.tar.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/LCR-hg19_20090320.DB.gz
+direct_url=annoDB/LCR-hg19_20090320.DB.gz
 source_type=txt
 source_pattern=fa.out
 

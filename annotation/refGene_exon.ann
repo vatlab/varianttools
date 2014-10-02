@@ -12,7 +12,7 @@ anno_type=range
 description=RefGene specifies known human protein-coding and non-protein-coding genes taken from the NCBI RNA reference sequences collection (RefSeq). This database contains all exome regions of the refSeq genes.
 version=hg19_20130904
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/refGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/refGene_exon-hg19_20130904.DB.gz
+direct_url=annoDB/refGene_exon-hg19_20130904.DB.gz
 source_type=txt
 
 [name]

@@ -12,7 +12,7 @@ anno_type=variant
 description=dbSNP version 137
 version=hg19_137
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/snp137.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/dbSNP-hg19_137.DB.gz
+direct_url=annoDB/dbSNP-hg19_137.DB.gz
 source_type=txt
 
 [chr]

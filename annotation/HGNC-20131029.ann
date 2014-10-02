@@ -18,7 +18,7 @@ version=20131029
 anno_type=field
 encoding=ISO-8859-1
 source_url=ftp://ftp.ebi.ac.uk/pub/databases/genenames/hgnc_complete_set.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/HGNC-20131029.DB.gz
+direct_url=annoDB/HGNC-20131029.DB.gz
 source_type=txt
 
 [name]

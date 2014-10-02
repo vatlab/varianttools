@@ -13,7 +13,7 @@ description=Gene predictions based on data from RefSeq, Genbank, CCDS and UniPro
   database contains all exome regions of the UCSC known gene database.
 version=hg19_20130904
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/knownGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/knownGene_exon-hg19_20130904.DB.gz
+direct_url=annoDB/knownGene_exon-hg19_20130904.DB.gz
 source_type=txt
 
 [chr]

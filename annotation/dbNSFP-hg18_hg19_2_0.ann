@@ -28,7 +28,7 @@ description=dbNSFP version 2.0, maintained by Xiaoming Liu from UTSPH. Please ci
 version=hg18_hg19_2_0
 anno_type=variant
 source_url=http://dbnsfp.houstonbioinformatics.org/dbNSFPzip/dbNSFP2.0.zip
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/dbNSFP-hg18_hg19_2_0.DB.gz
+direct_url=annoDB/dbNSFP-hg18_hg19_2_0.DB.gz
 source_type=txt
 source_pattern=dbNSFP2.0_variant.chr
 

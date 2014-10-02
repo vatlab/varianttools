@@ -18,7 +18,7 @@ description=This database is a comprehensive report of the accessions that are
 version=20131028
 anno_type=field
 source_url=ftp://ftp.ncbi.nih.gov/gene/DATA/gene2refseq.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/EntrezGene2RedSeq-20131028.DB.gz
+direct_url=annoDB/EntrezGene2RedSeq-20131028.DB.gz
 source_type=txt
 header=1
 

@@ -18,7 +18,7 @@ version=20120315
 encoding=ISO-8859-1
 anno_type=field
 header=1
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/CancerGeneCensus-20120315.DB.gz
+direct_url=annoDB/CancerGeneCensus-20120315.DB.gz
 source_url=
 source_type=txt
 

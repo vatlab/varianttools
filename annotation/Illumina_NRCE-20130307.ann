@@ -13,7 +13,7 @@ description=This annotation database contains expanded exome targeted regions co
 	the Nextera Rapid Capture Expanded platform from illumina. 
 version=20130307
 source_url=http://supportres.illumina.com/documents/documentation/chemistry_documentation/samplepreps_nextera/nexterarapidcapture/nexterarapidcapture_expandedexome_targetedregions.txt
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/Illumina_NRCE-20130307.DB.gz
+direct_url=annoDB/Illumina_NRCE-20130307.DB.gz
 header=7
 source_type=txt
 

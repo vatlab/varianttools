@@ -38,7 +38,7 @@ source_url=http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_f
 	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chrX_LWK_r28_nr.b36_fwd.txt.gz
 	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chrY_LWK_r28_nr.b36_fwd.txt.gz
 	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chrM_LWK_r28_nr.b36_fwd.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/hapmap_LWK_freq-hg18_20100817.DB.gz
+direct_url=annoDB/hapmap_LWK_freq-hg18_20100817.DB.gz
 source_type=txt
 
 #

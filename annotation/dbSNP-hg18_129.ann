@@ -17,7 +17,7 @@ anno_type=variant
 description=dbSNP version 129
 version=hg18_129
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snp129.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/dbSNP-hg18_129.DB.gz
+direct_url=annoDB/dbSNP-hg18_129.DB.gz
 source_type=txt
 
 [chr]

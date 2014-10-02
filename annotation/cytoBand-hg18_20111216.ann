@@ -34,7 +34,7 @@ anno_type=range
 description=Cyto Band
 version=hg18_20111216
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/cytoBand.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/cytoBand-hg18_20111216.DB.gz
+direct_url=annoDB/cytoBand-hg18_20111216.DB.gz
 source_type=txt
 
 [chr]

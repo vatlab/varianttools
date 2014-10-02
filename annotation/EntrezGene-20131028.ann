@@ -18,7 +18,7 @@ description=Entrez Gene (www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=gene) is NCBI
 version=20131028
 anno_type=range
 source_url=ftp://ftp.ncbi.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/EntrezGene-20131028.DB.gz
+direct_url=annoDB/EntrezGene-20131028.DB.gz
 source_type=txt
 header=1
 

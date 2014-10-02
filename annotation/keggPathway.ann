@@ -30,8 +30,8 @@
 description=kegg pathway for CCDS genes
 version=20110823
 anno_type=field
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/keggPathway-20110823.DB.gz
-source_url=http://vtools.houstonbioinformatics.org/annoDB/keggPathway-20110823.txt.gz
+direct_url=annoDB/keggPathway-20110823.DB.gz
+source_url=annoDB/keggPathway-20110823.txt.gz
 source_type=txt
 
 [ccdsId]

@@ -16,7 +16,7 @@ description=This database contains single nucleotide polymorphisms (SNPs) identi
 
 version=hg19_20140112
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/gwasCatalog.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/gwasCatalog-hg19_20140112.DB.gz
+direct_url=annoDB/gwasCatalog-hg19_20140112.DB.gz
 source_type=txt
 encoding=ISO-8859-1
 

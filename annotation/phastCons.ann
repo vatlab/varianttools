@@ -11,7 +11,7 @@ hg19=chr, start, end
 anno_type=range
 description=PhastCons Conservation Scores
 version=hg19_20130322
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/phastCons-hg19_20130322.DB.gz
+direct_url=annoDB/phastCons-hg19_20130322.DB.gz
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/phastCons46way.txt.gz
 source_type=txt
 

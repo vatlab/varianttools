@@ -12,7 +12,7 @@ description=Cosmic non-coding mutation database.  This data contains mutations a
 version=v67_241013
 anno_type=variant
 source_url=ftp://ngs.sanger.ac.uk/production/cosmic/CosmicNonCodingVariants_v67_20131024.vcf.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/CosmicNonCodingVariants-v67_241013.DB.gz
+direct_url=annoDB/CosmicNonCodingVariants-v67_241013.DB.gz
 source_type=txt
 source_pattern=
 

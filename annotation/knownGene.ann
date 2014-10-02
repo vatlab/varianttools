@@ -12,7 +12,7 @@ anno_type=range
 description=Gene predictions based on data from RefSeq, Genbank, CCDS and UniProt, from the UCSC KnownGene track. 
 version=hg19_20130904
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/knownGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/knownGene-hg19_20130904.DB.gz
+direct_url=annoDB/knownGene-hg19_20130904.DB.gz
 source_type=txt
 
 [name]

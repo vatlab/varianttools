@@ -12,7 +12,7 @@ anno_type=variant
 description=dbSNP version 138, created using vcf file downloaded from NCBI
 version=hg19_138
 source_url=ftp://ftp.ncbi.nih.gov/snp/organisms/human_9606/VCF/00-All.vcf.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/dbSNP-hg19_138.DB.gz
+direct_url=annoDB/dbSNP-hg19_138.DB.gz
 source_type=txt
 
 

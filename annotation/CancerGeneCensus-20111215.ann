@@ -17,7 +17,7 @@ description=Cancer Genome Project
 version=20111215
 encoding=ISO-8859-1
 anno_type=field
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/CancerGeneCensus-20111215.DB.gz
+direct_url=annoDB/CancerGeneCensus-20111215.DB.gz
 source_url=
 source_type=txt
 

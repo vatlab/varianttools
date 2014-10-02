@@ -12,7 +12,7 @@ anno_type=range
 description=UCSC Known Genes
 version=hg18_20110909
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/knownGene.txt.gz
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/knownGene-hg18_20110909.DB.gz
+direct_url=annoDB/knownGene-hg18_20110909.DB.gz
 source_type=txt
 
 [chr]

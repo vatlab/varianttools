@@ -11,7 +11,7 @@ hg19=chr, start, end
 anno_type=range
 description=Duplications of >1000 Bases of Non-RepeatMasked Sequence (>90 percent similar).
 version=hg19_20130626
-direct_url=http://vtools.houstonbioinformatics.org/annoDB/genomicSuperDups-hg19_20130626.DB.gz
+direct_url=annoDB/genomicSuperDups-hg19_20130626.DB.gz
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/genomicSuperDups.txt.gz
 source_type=txt
 
