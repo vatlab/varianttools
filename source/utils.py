@@ -1949,11 +1949,22 @@ def downloadURL(URL, dest, quiet, message=None):
     raise RuntimeError('Failed to download {}'.format(fileToGet))
 
 
+def locateFile(fileToGet):
+    '''Locate file from one of the mirrors'''
+    # TO BE COMPLETED
+    #
+    # get mirror, check each mirror's manifest and see
+    # if the mirror has the file
+    pass
+
+
 def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
     message=None):
     '''Download file from URL to filename.'''
     #
-    # if a complete URL is given, local file is something like 
+    # if a complete URL is given, DO NOT download from variant tools repository
+    # 
+    # Downloaded file will look similar to
     #
     # ~/.variant_tools/ftp.completegenomics.com/refgenome/build36.crr
     # 
@@ -1961,50 +1972,44 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
     #
     if '://' in fileToGet:
         filename = os.path.split(urlparse.urlsplit(fileToGet).path)[-1]
-        in_search_path = False
-        for path in env.search_path.split(';'):
-            # if a path within the search path
-            if fileToGet.startswith(path):
-                local_fileToGet = fileToGet[len(path):]
-                in_search_path = True
-                break
-        #
-        if not in_search_path:
-            # get filename from URL
-            local_fileToGet = fileToGet.split('://', 1)[1]
+        # get filename from URL
+        local_fileToGet = fileToGet.split('://', 1)[1]
         # use root local_resource directory if dest_dir is None
         if dest_dir is not None:
             dest = os.path.join(dest_dir, filename)
         else:
             dest_dir = os.path.join(env.local_resource, os.path.split(local_fileToGet)[0])
             dest = os.path.join(env.local_resource, local_fileToGet)
+        #
+        if not os.path.isdir(dest_dir):
+            os.makedirs(dest_dir)
+        #
+        # FIXME: also check md5
+        #
+        # if dest already exists, return it directly
+        if (not checkUpdate) and os.path.isfile(dest):
+            return dest
+        #
+        try:
+            return downloadURL(fileToGet, dest, quiet, message)
+        except:
+            raise ValueError('Failed to download URL {}'.format(fileToGet))
     # 
-    # otherwise, local file is like
+    # otherwise, download from variant tools repository, but first let us check
+    # if the file is in the repository
+    #
+    # local file is like
     #
     # ~/.variant_tools/format/vcf.fmt
     #
+    filename = os.path.split(fileToGet)[-1]
+    local_fileToGet = fileToGet
+    if dest_dir is not None:
+        dest = os.path.join(dest_dir, os.path.split(filename)[-1])
     else:
-        filename = os.path.split(fileToGet)[-1]
-        local_fileToGet = fileToGet
-        if dest_dir is not None:
-            dest = os.path.join(dest_dir, os.path.split(filename)[-1])
-        else:
-            # use structured local_resource directory if dest_dir is None
-            dest = os.path.join(env.local_resource, fileToGet)
-            dest_dir = os.path.split(dest)[0]
-    #
-    deprecated = os.path.join(env.local_resource, 'DEPRECATED.txt')
-    if not os.path.isfile(deprecated) and fileToGet != 'DEPRECATED.txt':
-        try:
-            downloadFile('DEPRECATED.txt')
-        except Exception as e:
-            env.logger.debug('Failed to download list of deprecated resources:'.format(e))
-    if os.path.isfile(deprecated):
-        deprecated_files = [x.strip() for x in open(deprecated).readlines()]
-        if fileToGet in deprecated_files:
-            raise RuntimeError('Resource file {} is deprecated and cannot be used. '
-                'Please use command "vtools admin --update_resource existing" to update your '
-                'resource files.'.format(fileToGet))
+        # use structured local_resource directory if dest_dir is None
+        dest = os.path.join(env.local_resource, fileToGet)
+        dest_dir = os.path.split(dest)[0]
     #
     if not os.path.isdir(dest_dir):
         os.makedirs(dest_dir)
@@ -2012,19 +2017,20 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
     # if dest already exists, return it directly
     if (not checkUpdate) and os.path.isfile(dest):
         return dest
-    # 
-    # if a URL is given, try that URL first
-    if '://' in fileToGet:
-        try:
-            return downloadURL(fileToGet, dest, quiet, message)
-        except:
-            pass
     #
+    # if the file is in the repository, try to find a mirror
     # use a search path
     for path in env.search_path.split(';'):
-        if checkUpdate and '://' not in path:
+        # 
+        # try to download from a local or online repository
+        #
+        manifest = ResourceManager(path)
+        manifest.getRemoteManifest()
+        if fileToGet not in manifest.manifest:
             continue
-        if '://' not in path:
+        #
+        # if the path is a local file repository, do not check for mirrors
+        if path.startswith('file://') or '://' not in path:
             # if path is a local directory
             source_file = '{}/{}'.format(path, local_fileToGet)
             #
@@ -2033,8 +2039,9 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
                 return dest
         else:
             # is path is a URL
-            URL = '{}/{}'.format(path, local_fileToGet)
+            URL = locateFile(fileToGet)
             try:
+                # FIXME: also check md5
                 return downloadURL(URL, dest, quiet, message)
             except:
                 continue
