@@ -1424,6 +1424,8 @@ class Project:
                 env.logger.warning('Resource files {} have been updated. Please '
                     'update them using command "vtools admin --update_resource '
                     'existing".'.format(', '.join(changed)))
+            # write a local manifest with URLs of servers containing the file
+            res.writeManifest(URLs=True)
         except Exception as e:
             # if the machine is not connected to the internet,
             # do not get any update
@@ -3741,6 +3743,8 @@ def init(args):
                 shutil.rmtree(temp_dir)
             except:
                 pass
+        # for testing
+        downloadFile('format/vcf.fmt')
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
