@@ -146,7 +146,12 @@ class AnnoDBConfiger:
         self.source_type = None
         for item in parser.items('data sources'):
             if item[0] == 'direct_url':
-                self.direct_url = item[1]
+                # for backward compatibility, change old houstonbioinformatics.org host
+                # to new one
+                if item[1].startswith('http://vtools.houstonbioinformatics.org/'):
+                    self.direct_url = item[1][len('http://vtools.houstonbioinformatics.org/'):]
+                else:
+                    self.direct_url = item[1]
             elif item[0] == 'encoding':
                 self.encoding = item[1]
             elif item[0] == 'preprocessor':

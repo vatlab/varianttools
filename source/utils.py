@@ -1533,9 +1533,9 @@ class ResourceManager:
         if dest_file is None:
             if os.path.isdir(env.local_resource) and \
                 os.access(env.local_resource, os.W_OK):
-                dest_file = os.path.join(env.local_resource, 'MANIFEST.txt')
-            elif os.path.isdir(os.path.expanduser('~/.variant_tools')) and \
-                dest_file = os.path.expanduser('~/.variant_tools/MANIFEST.txt')
+                dest_file = os.path.join(env.local_resource, 'MANIFEST_ALL.txt')
+            elif os.path.isdir(os.path.expanduser('~/.variant_tools')):
+                dest_file = os.path.expanduser('~/.variant_tools/MANIFEST_ALL.txt')
         #
         keys = self.manifest.keys()
         keys.sort()
@@ -1621,13 +1621,13 @@ class ResourceManager:
         '''Get a manifest of files from local resource'''
         if os.path.isdir(env.local_resource) and \
             os.access(env.local_resource, os.W_OK) and \
-            os.path.isfile(os.path.join(env.local_resource, 'MANIFEST.txt')):
+            os.path.isfile(os.path.join(env.local_resource, 'MANIFEST_ALL.txt')):
             # if a local MANIFEST is there in env.local_resource, use it
-            manifest_file = os.path.join(env.local_resource, 'MANIFEST.txt')
+            manifest_file = os.path.join(env.local_resource, 'MANIFEST_ALL.txt')
         elif os.path.isdir(os.path.expanduser('~/.variant_tools')) and \
-            os.path.isfile(os.path.expanduser('~/.variant_tools/MANIFEST.txt')):
+            os.path.isfile(os.path.expanduser('~/.variant_tools/MANIFEST_ALL.txt')):
             # if a local resource is not writable, check user's MANIFEST
-            manifest_file = os.path.expanduser('~/.variant_tools/MANIFEST.txt')
+            manifest_file = os.path.expanduser('~/.variant_tools/MANIFEST_ALL.txt')
         else:
             # if not, we will have to download a file.
             self.getRemoteManifest()
@@ -1645,9 +1645,10 @@ class ResourceManager:
         '''Get manifest files from servers (mirrors) and parse it.'''
         try:
             self.manifest = {}
-            servers = []
+            servers = {}
             for path in env.search_path.split(';'):
                 try:
+                    env.logger.trace('Downloading mirrors.txt from {}'.format(path))
                     mirror_file = downloadURL(path + '/MIRRORS.txt', dest=env.temp_dir, quiet=True)
                     with open(mirror_file) as m:
                         for line in m:
@@ -1656,7 +1657,7 @@ class ResourceManager:
                             fields = line.split()
                             if len(fields) != 2 or not fields[1].isnumeric() or int(fields[1]) == 0:
                                 continue
-                            servers[fields[-]] = int(fields[1])
+                            servers[fields[0]] = int(fields[1])
                 except Exception as e:
                     env.logger.trace('Failed to read MIRRORS.txt from {}'.format(path))
                     servers[path] = 1
@@ -1666,7 +1667,7 @@ class ResourceManager:
                     # try to download from a local or online repository
                     manifest_file = downloadURL(server + '/MANIFEST.txt', dest=env.temp_dir, quiet=True)
                 except Exception as e:
-                    env.logger.trace('Failed to read manifest.txt from {}'.format(server))
+                    env.logger.trace('Failed to read MANIFEST.txt from {}: {}'.format(server, e))
                     continue
                 #
                 with open(manifest_file, 'r') as manifest:
@@ -1687,9 +1688,6 @@ class ResourceManager:
         except Exception as e:
             raise RuntimeError('Failed to connect to variant tools resource website: {}'
                 .format(e))
-        finally:
-            # remove manifest_file
-            urllib.urlcleanup()
 
     def selectFiles(self, resource_type):
         '''Select files from the remote manifest and see what needs to be downloaded'''
@@ -1950,6 +1948,9 @@ def downloadURL(URL, dest, quiet, message=None):
         message = filename
     if len(message) > 30:
         message = message[:10] + '...' + message[-16:]
+    if os.path.isdir(dest):
+        dest = os.path.join(dest, filename)
+    #
     try:
         import pycurl
         if not quiet:
@@ -2030,6 +2031,11 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
     # 
     # unless a specific dest_dir is given. NO md5 check is possible.
     #
+    # for backward compatibility, remove http://vtools.houstonbioinformatics.org and
+    # use new server
+    if fileToGet.startswith('http://vtools.houstonbioinformatics.org/'):
+        fileToGet = fileToGet[len('http://vtools.houstonbioinformatics.org/'):]
+    #
     if '://' in fileToGet:
         filename = os.path.split(urlparse.urlsplit(fileToGet).path)[-1]
         # get filename from URL
@@ -2087,7 +2093,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
             if calculateMD5(dest, partial=True) != fileSig[1]:
                 env.logger.warning('Local file {} is different from remote copy. You might '
                     'want to remove local file and try again to update your local copy.'
-                    .format(fielToGet))
+                    .format(fileToGet))
             return dest
     else:
         # look for the file in local resource directory
@@ -2099,7 +2105,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
             if calculateMD5(dest, partial=True) != fileSig[1]:
                 env.logger.warning('Local file {} is different from remote copy. You might '
                     'want to remove local file and try again to update your local copy.'
-                    .format(fielToGet))
+                    .format(fileToGet))
             return dest
         # if the local resource is not writable, write to ~/.variant_tools
         if not os.access(env.local_resource, os.W_OK):
@@ -2113,7 +2119,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
                 if calculateMD5(dest, partial=True) != fileSig[1]:
                     env.logger.warning('Local file {} is different from remote copy. You might '
                         'want to remove local file and try again to update your local copy.'
-                        .format(fielToGet))
+                        .format(fileToGet))
                 return dest
     #
     if not os.path.isdir(dest_dir):
@@ -2138,13 +2144,13 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
         else:
             # if this is a small file, download directly
             if fileSig[0] < 5000:
-                URL = '{}/{}'.format(sever, fileToGet)
+                URL = '{}/{}'.format(server, fileToGet)
             else:
                 # otherwise try to see if we have mirrors
                 URLs = fileSig[4]
                 # only one server
                 if len(URLs) == 2:
-                    URL = '{}/{}'.format(sever, fileToGet)
+                    URL = '{}/{}'.format(server, fileToGet)
                 else:
                     sum_of_weight = sum([URLs[i+i+1] for i in range(len(URLs)/2)])
                     r = random.randint(0, sum_of_weight)
