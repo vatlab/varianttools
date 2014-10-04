@@ -142,8 +142,10 @@ class RuntimeEnvironments(object):
                 'local or online storage of such files. variant tools will append trailing '
                 'directories such as annoDB for certain types of data so only root directories '
                 'should be listed in this search path.'),
-            'local_resource': (site_options.local_resource, 'A directory to store variant tools related '
-                'resources such as reference genomes and annotation database.')
+            'local_resource': ('~/.variant_tools', 'A directory to store variant tools related '
+                'resources such as reference genomes and annotation database. This option will '
+                'be ignored if a writable shared resource directory is specified by the system '
+                'admin.')
         }
         # a default value
         self.command_line = ''
@@ -151,6 +153,10 @@ class RuntimeEnvironments(object):
         self._cache_dir = 'cache'
         #
         self._local_resource = self.persistent_options['local_resource'][0]
+        if self.hidden_option['shared_resource'][0] is None:
+            self._shared_resource = self._local_resource
+        else:
+            self._shared_resource = self.hidden_option['shared_resource'][0]
         #
         self._logfile_verbosity = self.persistent_options['logfile_verbosity'][0]
         self._verbosity = self.persistent_options['verbosity'][0]
@@ -286,6 +292,11 @@ class RuntimeEnvironments(object):
             raise RuntimeError('Failed to create cache directory '.format(self._cache_dir))
     #
     cache_dir = property(lambda self: 'cache', _set_cache_dir)
+    #
+    # attribute shared_resource
+    #
+    shared_resource = property(lambda self: os.path.expanduser(self._local_resource) if site_options.shared_resource is None else site_options.shared_resource,
+        lambda self, path: 0)
     #
     # attribute local_resource
     #
@@ -2052,18 +2063,16 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
                 return dest
         else:
             # look for the file in local resource directory
-            dest_dir = os.path.join(env.local_resource, os.path.split(local_fileToGet)[0])
-            dest = os.path.join(env.local_resource, local_fileToGet)
+            dest_dir = os.path.join(env.shared_resource, os.path.split(local_fileToGet)[0])
+            dest = os.path.join(env.shared_resource, local_fileToGet)
             # if the file is there, return it directly
             if (not checkUpdate) and os.path.isfile(dest):
                 env.logger.trace('Using existing file {}'.format(dest))
                 return dest
-            # if the local resource is not writable, write to ~/.variant_tools
+            # if the shared resource is not writable, write to local_resource
             if not os.access(env.local_resource, os.W_OK):
-                dest_dir = os.path.join(os.path.expanduser('~/.variant_tools'),
-                    os.path.split(local_fileToGet)[0])
-                dest = os.path.join(os.path.expanduser('~/.variant_tools'), 
-                    local_fileToGet)
+                dest_dir = os.path.join(env.local_resource, os.path.split(local_fileToGet)[0])
+                dest = os.path.join(env.local_resource, local_fileToGet)
                 # if exists in local user-specific .variant_tools, return it
                 if (not checkUpdate) and os.path.isfile(dest):
                     env.logger.trace('Using existing file {}'.format(dest))
@@ -2101,8 +2110,8 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
             return dest
     else:
         # look for the file in local resource directory
-        dest_dir = os.path.join(env.local_resource, os.path.split(local_fileToGet)[0])
-        dest = os.path.join(env.local_resource, local_fileToGet)
+        dest_dir = os.path.join(env.shared_resource, os.path.split(local_fileToGet)[0])
+        dest = os.path.join(env.shared_resource, local_fileToGet)
         # if the file is there, return it directly
         if (not checkUpdate) and os.path.isfile(dest):
             env.logger.trace('Using existing file {}'.format(dest))
@@ -2112,11 +2121,9 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
                     .format(fileToGet))
             return dest
         # if the local resource is not writable, write to ~/.variant_tools
-        if not os.access(env.local_resource, os.W_OK):
-            dest_dir = os.path.join(os.path.expanduser('~/.variant_tools'),
-                os.path.split(local_fileToGet)[0])
-            dest = os.path.join(os.path.expanduser('~/.variant_tools'), 
-                local_fileToGet)
+        if not os.access(env.shared_resource, os.W_OK):
+            dest_dir = os.path.join(env.local_resource, os.path.split(local_fileToGet)[0])
+            dest = os.path.join(env.local_resource, local_fileToGet)
             # if exists in local user-specific .variant_tools, return it
             if (not checkUpdate) and os.path.isfile(dest):
                 env.logger.trace('Using existing file {}'.format(dest))

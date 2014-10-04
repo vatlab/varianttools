@@ -32,10 +32,19 @@ temp_dir=None
 # but not recommended.
 search_path='http://bioinformatics.mdanderson.org/Software/VariantTools/repository/'
 
-# Default local_resource directory for users. Users by default will have their
-# own copies of downloaded resources but a system admin can set a shared directory
-# so that users can share those files. User-specific directory will be used
-# if the system wide directory is not writable.
-local_resource='~/.variant_tools'
-
+# A directory for shared resource files. It can be configured as 
+# 1. NO shared resource (default). All users maintain their own resource 
+#   directory ($local_resource, which is usually ~/.variant_tools).
+#
+# 2. A read-only directory with a mirror of the variant tools repository, with
+#   .DB.gz files decompressed in the annoDB directory. This is important because
+#   otherwise each user will have to decompress the files in their local resource
+#   directory. The system admin can choose to remove outdated databases to reduce
+#   the use of disk space. This option requires regular update of the resources.
+#    
+# 3. A directory that is writable by all users. The resources will be downloaded
+#   to this directory by users, and shared by all users. This option is easier
+#   to implement and requires less maintenance. The system admin can choose to
+#   mirror the variant tools repository and let the users to keep it up to date.
+shared_resource=None
 
