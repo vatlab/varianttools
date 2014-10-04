@@ -1655,13 +1655,17 @@ class ResourceManager:
                             if line.startswith('#'):
                                 continue
                             fields = line.split()
-                            if len(fields) != 2 or not fields[1].isnumeric() or int(fields[1]) == 0:
+                            if len(fields) != 2 or (not fields[1].isdigit()) or int(fields[1]) == 0:
                                 continue
-                            servers[fields[0]] = int(fields[1])
+                            if fields[0] in servers:
+                                servers[fields[0]] = max(servers[fields[0]], int(fields[1]))
+                            else:
+                                servers[fields[0]] = int(fields[1])
                 except Exception as e:
-                    env.logger.trace('Failed to read MIRRORS.txt from {}'.format(path))
+                    env.logger.trace('Failed to read MIRRORS.txt from {}: {}'.format(path, e))
                     servers[path] = 1
-
+            #
+            env.logger.trace('{} mirrors are identified.'.format(len(servers)))
             for server in servers.keys():
                 try:
                     # try to download from a local or online repository
@@ -2126,13 +2130,16 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
         os.makedirs(dest_dir)
     # 
     # if the file is in the repository, try to find a mirror
-    # use a search path
-    for server in env.search_path.split(';'):
-        # 
+    servers = [fileSig[4][2*i] for i in range(len(fileSig[4])/2)]
+    weights = [fileSig[4][2*i+1] for i in range(len(fileSig[4])/2)]
+    #
+    # if there is a local server, use it regardless of weight
+    for server in servers:
         # if the path is a local file repository, do not check for mirrors
         if server.startswith('file://') or '://' not in server:
-            # if path is a local directory
             source_file = '{}/{}'.format(server, local_fileToGet)
+            if source_file.startswith('file://'):
+                source_file = source_file[len('file://'):]
             #
             if os.path.isfile(source_file):
                 shutil.copyfile(source_file, dest)
@@ -2141,36 +2148,33 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
                         'want to remove local file and try again to update your local copy.'
                         .format(dest))
                 return dest
-        else:
-            # if this is a small file, download directly
-            if fileSig[0] < 5000:
-                URL = '{}/{}'.format(server, fileToGet)
             else:
-                # otherwise try to see if we have mirrors
-                URLs = fileSig[4]
-                # only one server
-                if len(URLs) == 2:
-                    URL = '{}/{}'.format(server, fileToGet)
-                else:
-                    sum_of_weight = sum([URLs[i+i+1] for i in range(len(URLs)/2)])
-                    r = random.randint(0, sum_of_weight)
-                    s = 0
-                    for i in range(len(URLs)/2):
-                        s = URLs[i+i+1]
-                        if s >= r:
-                            URL = '{}/{}'.format(servers[i+i], fileToGet)
-                            break
-            #
-            try:
-                env.logger.trace('Download {} from {}'.format(dest, URL))
-                downloaded = downloadURL(URL, dest, quiet, message)
-                if calculateMD5(downloaded, partial=True) != fileSig[1]:
-                    env.logger.warning('Downloaded file {} is different from remote copy. You might '
-                        'want to remove local file and try again to update your local copy.'
-                        .format(downloaded))
-                return downloaded
-            except:
-                continue
+                env.logger.warning('Cannot locate {} from a local file server {}.'.format(fileToGet, server))
+    #
+    # no local file server
+    while servers:
+        if len(servers) == 1:
+            idx = 0
+        else:
+            r = random.random() * sum(weights)
+            s = 0
+            for idx in range(len(servers)):
+                s += weights[idx]
+                if s >= r:
+                    break
+        #
+        try:
+            env.logger.trace('Download {} from {}'.format(fileToGet, servers[idx]))
+            downloaded = downloadURL('{}/{}'.format(servers[idx], fileToGet), dest, quiet, message)
+            if calculateMD5(downloaded, partial=True) != fileSig[1]:
+                env.logger.warning('Downloaded file {} is different from remote copy. You might '
+                    'want to remove local file and try again to update your local copy.'
+                    .format(downloaded))
+            return downloaded
+        except:
+            env.logger.warning('Failed to download {} from {}'.format(fileToGet, servers[idx]))
+            servers.pop(idx)
+            weights.pop(idx)
     # failed to get file
     raise Exception('Failed to download file {}'.format(fileToGet))
 

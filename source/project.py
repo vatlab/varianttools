@@ -1434,7 +1434,8 @@ class Project:
         #
         # check current version of variant tools.
         try:
-            version_file = downloadFile('CURRENT_VERSION.txt', checkUpdate=True, quiet=True)
+            version_file = downloadFile('{}/CURRENT_VERSION.txt'.format(env.search_path.split(';')[0]),
+                dest_dir=env.temp_dir, checkUpdate=True, quiet=True)
             with open(version_file, 'r') as version:
                 current_version = version.readline().strip()
             if [int(x) for x in re.sub('\D', ' ', current_version).split()] > \
@@ -3743,8 +3744,6 @@ def init(args):
                 shutil.rmtree(temp_dir)
             except:
                 pass
-        # for testing
-        downloadFile('format/vcf.fmt')
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
