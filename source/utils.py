@@ -1753,10 +1753,10 @@ class ResourceManager:
             self.manifest = {x:y for x,y in self.manifest.iteritems() if not x.startswith('annoDB/') or x.endswith('.ann') or \
                 (x.split('-', 1)[1] if '-' in x else None) == versions[y[2]][x.split('-', 1)[0]]}
 
-    def excludeExistingLocalFiles(self):
+    def excludeExistingLocalFiles(self, resource_dir):
         '''Go throughlocal files, check if they are in manifest. If they are
         check if they are identical to remote files'''
-        resource_dir = os.path.expanduser(env.local_resource)
+        resource_dir = os.path.expanduser(resource_dir)
         # go through directories
         filenames = []
         for root, dirs, files in os.walk(resource_dir):
@@ -1806,14 +1806,12 @@ class ResourceManager:
             if fileprop[0] > 15*(1024**3):
                 excluded.append(filename)
                 continue
-            dest_dir = os.path.join(env.local_resource, os.path.split(filename)[0])
-            if not os.path.isdir(dest_dir):
-                os.makedirs(dest_dir)
+            #
             try:
-                downloadFile(filename, checkUpdate=True, quiet=False, 
+                downloaded = downloadFile(filename, checkUpdate=True, quiet=False, 
                     message='{}/{} {}'.format(cnt+1, len(self.manifest), filename))
                 # check md5
-                md5 = calculateMD5(os.path.join(env.local_resource, filename), partial=True)
+                md5 = calculateMD5(downloaded, partial=True)
                 if md5 != fileprop[1]:
                     env.logger.error('Failed to download {}: file signature mismatch.'.format(filename))
             except KeyboardInterrupt as e:
@@ -1823,8 +1821,7 @@ class ResourceManager:
             # decompress .DB file because it might be outdated
             if filename.endswith('.DB.gz'):
                 s = delayedAction(env.logger.info, 'Decompressing {}'.format(filename))
-                decompressGzFile(os.path.join(env.local_resource, filename),
-                    inplace=False, force=True)
+                decompressGzFile(downloaded, inplace=False, force=True)
                 del s
         if excluded:
             env.logger.warning('Resource files larger then 15GB ({}) are not downloaded.'
