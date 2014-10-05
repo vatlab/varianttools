@@ -153,10 +153,10 @@ class RuntimeEnvironments(object):
         self._cache_dir = 'cache'
         #
         self._local_resource = self.persistent_options['local_resource'][0]
-        if self.hidden_option['shared_resource'][0] is None:
+        if site_options.shared_resource is None:
             self._shared_resource = self._local_resource
         else:
-            self._shared_resource = self.hidden_option['shared_resource'][0]
+            self._shared_resource = site_options.shared_resource
         #
         self._logfile_verbosity = self.persistent_options['logfile_verbosity'][0]
         self._verbosity = self.persistent_options['verbosity'][0]
@@ -1796,21 +1796,6 @@ class ResourceManager:
             # check all files, but only update small files during casualUpdate
             if filename.rsplit('.', 1)[-1] not in ['ann', 'fmt', 'pipeline']:
                 continue
-            env.logger.debug('Download resource {}'.format(filename))
-            try:
-                downloadFile(filename, checkUpdate=True, quiet=True)
-                # check md5
-                if calculateMD5(dest_file, partial=True) != fileprop[1]:
-                    env.logger.error('Failed to download {}: file signature mismatch.'
-                        .format(filename))
-                added += 1
-                if added == max_updates or time.time() - start_time > max_updates:
-                    return
-            except KeyboardInterrupt as e:
-                raise e
-            except Exception as e:
-                env.logger.warning('Failed to download {}: {} {}'
-                    .format(filename, type(e).__name__, e)) 
         return changed
 
     def downloadResources(self):
@@ -1870,7 +1855,17 @@ def decompressGzFile(filename, inplace=True, force=False):
                     tar.extract(f, path)
         return dest_files
     elif filename.lower().endswith('.gz'):
-        new_filename = filename[:-3]
+        dest_dir = os.path.dirname(filename)
+        if not os.access(dest_dir, os.W_OK):
+            # if we are decompressing files from a read-only shared repository
+            if os.path.abspath(dest_dir).startswith(os.path.abspath(env.shared_resource)):
+                new_filename = '{}/{}'.format(env.local_resource, 
+                    os.path.abspath(filename)[len(os.path.abspath(env.shared_resource)):-3])
+            else:
+                raise RuntimeError('Failed to decompress file {}: directory or writable'.format(filename))
+        else:
+            new_filename = filename[:-3]
+        env.logger.trace('Decompressing {} to {}'.format(filename, new_filename))
         # if the decompressed file exists, and is newer than the .gz file, ignore
         if os.path.isfile(new_filename) \
             and os.path.getmtime(new_filename) > os.path.getmtime(filename) \
@@ -2070,7 +2065,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
                 env.logger.trace('Using existing file {}'.format(dest))
                 return dest
             # if the shared resource is not writable, write to local_resource
-            if not os.access(env.local_resource, os.W_OK):
+            if not os.access(env.shared_resource, os.W_OK):
                 dest_dir = os.path.join(env.local_resource, os.path.split(local_fileToGet)[0])
                 dest = os.path.join(env.local_resource, local_fileToGet)
                 # if exists in local user-specific .variant_tools, return it
@@ -2113,12 +2108,8 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
         dest_dir = os.path.join(env.shared_resource, os.path.split(local_fileToGet)[0])
         dest = os.path.join(env.shared_resource, local_fileToGet)
         # if the file is there, return it directly
-        if (not checkUpdate) and os.path.isfile(dest):
-            env.logger.trace('Using existing file {}'.format(dest))
-            if calculateMD5(dest, partial=True) != fileSig[1]:
-                env.logger.warning('Local file {} is different from remote copy. You might '
-                    'want to remove local file and try again to update your local copy.'
-                    .format(fileToGet))
+        if (not checkUpdate) and os.path.isfile(dest) and \
+            calculateMD5(dest, partial=True) == fileSig[1]:
             return dest
         # if the local resource is not writable, write to ~/.variant_tools
         if not os.access(env.shared_resource, os.W_OK):
@@ -2149,6 +2140,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
                 source_file = source_file[len('file://'):]
             #
             if os.path.isfile(source_file):
+                env.logger.trace('Copying {} to {}'.format(source_file, dest))
                 shutil.copyfile(source_file, dest)
                 if calculateMD5(dest, partial=True) != fileSig[1]:
                     env.logger.warning('Downloaded file {} is different from remote copy. You might '
