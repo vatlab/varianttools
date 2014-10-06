@@ -221,22 +221,37 @@ class CreatePopulation(SkiptableAction):
             prog.done()
             return pop
 
-def FineScaleRecombinator(regions, scale=1, defaultRate=1e-8, output=None):
-    '''For specified regions of the chroosome, find genetic locations of
+def FineScaleRecombinator(regions=None, positions=None, scale=1, defaultRate=1e-8, output=None):
+    '''For specified regions of the chromosome, find genetic locations of
     all loci using a genetic map downloaded from HapMap. If no genetic
     map is used, a default recombination rate (per bp) is used. If a
     output file is specified, the physical/genetic map will be written
-    to the file.
+    to the file. Alternatively, you can specify a list of chromosomal locations
+    as a list of (chr, pos) pair, or a population object. 
     '''
     if scale == 0:
         return sim.MendelianGenoTransmitter()
     #
+    if (regions is None) + (positions is None) != 1:
+        raise ValueError('Please specify one and only one of parameters regions or positions')
+    #
     lociPos = {}
-    for reg in expandRegions(regions):
-        if reg[0] in lociPos:
-            lociPos[reg[0]].extend(range(reg[1], reg[2]+1))
-        else:
-            lociPos[reg[0]] = range(reg[1], reg[2]+1)
+    if positions is None:
+        for reg in expandRegions(regions):
+            if reg[0] in lociPos:
+                lociPos[reg[0]].extend(range(reg[1], reg[2]+1))
+            else:
+                lociPos[reg[0]] = range(reg[1], reg[2]+1)
+        #
+    elif type(positions) in [tuple, list]:
+        for (chr, pos) in positions:
+            if chr in lociPos:
+                lociPos[chr].append(pos)
+            else:
+                lociPos[chr] = [pos]
+    else:
+        for ch in range(positions.numChrom()):
+            lociPos[positions.chromName(ch)] = [int(positions.locusPos(x)) for x in range(positions.chromBegin(ch), positions.chromEnd(ch))]
     #
     chroms = lociPos.keys()
     chroms.sort()
