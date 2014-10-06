@@ -32,7 +32,7 @@ from variant_tools.utils import ResourceManager, env, calculateMD5
 import base64
 
 repoURL = 'bpeng1@bcbweb'
-repoDir = '/var/www/html/Software/VariantTools/backup_Oct6'
+repoDir = '/var/www/html/Software/VariantTools/repository'
 
 def remoteDo(cmd):
     if type(cmd) in (tuple, list):
