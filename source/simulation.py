@@ -221,37 +221,41 @@ class CreatePopulation(SkiptableAction):
             prog.done()
             return pop
 
-def FineScaleRecombinator(regions=None, positions=None, scale=1, defaultRate=1e-8, output=None):
+def FineScaleRecombinator(regions=None, scale=1, defaultRate=1e-8, output=None):
     '''For specified regions of the chromosome, find genetic locations of
     all loci using a genetic map downloaded from HapMap. If no genetic
     map is used, a default recombination rate (per bp) is used. If a
     output file is specified, the physical/genetic map will be written
-    to the file. Alternatively, you can specify a list of chromosomal locations
-    as a list of (chr, pos) pair, or a population object. 
+    to the file. If each element in regions has only length two, it is 
+    assumed to be a single-locus region. Finally, if a population object
+    is specified, the regions will be obtained automatically from all loci
+    of the population object.
     '''
     if scale == 0:
         return sim.MendelianGenoTransmitter()
     #
-    if (regions is None) + (positions is None) != 1:
-        raise ValueError('Please specify one and only one of parameters regions or positions')
-    #
     lociPos = {}
-    if positions is None:
-        for reg in expandRegions(regions):
-            if reg[0] in lociPos:
-                lociPos[reg[0]].extend(range(reg[1], reg[2]+1))
-            else:
-                lociPos[reg[0]] = range(reg[1], reg[2]+1)
-        #
-    elif type(positions) in [tuple, list]:
-        for (chr, pos) in positions:
-            if chr in lociPos:
-                lociPos[chr].append(pos)
-            else:
-                lociPos[chr] = [pos]
+    if type(regions) in [tuple, list]:
+        if not regions:
+            return sim.MendelianGenoTransmitter()
+        if len(regions[0]) > 2:
+            for reg in expandRegions(regions):
+                if reg[0] in lociPos:
+                    lociPos[reg[0]].extend(range(reg[1], reg[2]+1))
+                else:
+                    lociPos[reg[0]] = range(reg[1], reg[2]+1)
+        elif len(regions[0]) == 2:
+            # single-locus regions
+            for (chr, pos) in regions:
+                if chr in lociPos:
+                    lociPos[chr].append(pos)
+                else:
+                    lociPos[chr] = [pos]
+        else:
+            raise ValueError('Incorrect parameter regions: {}'.format(regions))
     else:
-        for ch in range(positions.numChrom()):
-            lociPos[positions.chromName(ch)] = [int(positions.locusPos(x)) for x in range(positions.chromBegin(ch), positions.chromEnd(ch))]
+        for ch in range(regions.numChrom()):
+            lociPos[regions.chromName(ch)] = [int(regions.locusPos(x)) for x in range(regions.chromBegin(ch), regions.chromEnd(ch))]
     #
     chroms = lociPos.keys()
     chroms.sort()
