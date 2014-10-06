@@ -3412,6 +3412,18 @@ def pairwise(x,y):
 def convertDoubleQuote(x):
     return '"{}"'.format(x.replace('"', "'"))
 
+def make_unique(lst):
+    extension = 1
+    used = set()
+    result = []
+    for xname in lst:
+        if xname in used:
+            xname = '{}V{}'.format(xname, extension)
+            extension += 1
+        result.append(xname)
+        used.add(xname)
+    return result 
+
 class VariableSubstitutor:
     def __init__(self, text):
         self.text = text

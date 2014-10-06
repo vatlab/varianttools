@@ -27,7 +27,7 @@
 import sys, os, re
 import time
 import argparse
-from .utils import env, downloadFile, runCommand, mkdir_p, flatten, pairwise
+from .utils import env, downloadFile, runCommand, mkdir_p, flatten, pairwise, make_unique
 from .project import Field
 from .tester import freq, ExternTest
 if sys.version_info.major == 2:
@@ -457,6 +457,8 @@ class RTest(ExternTest):
         self.Rdata.append('''{0} = new(Class="VATData")'''.format(self.datvar))
         self.nvar = len(self.pydata['genotype'][0])
         self.nsample = len(self.pydata['genotype'])
+        # handle duplicate coordinate names
+        self.pydata['coordinate'] = make_unique(self.pydata['coordinate'])
         # Group name
         self.Rdata.append('''{0}@name = "{1}"'''.format(self.datvar, self.pydata['name']))
         # X matrix
