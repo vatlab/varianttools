@@ -30,7 +30,7 @@ temp_dir=None
 # repository. Adding the URL before the default URL might provide better 
 # downloading performance for your users. Removing the default URL is possible
 # but not recommended.
-search_path='http://bioinformatics.mdanderson.org/Software/VariantTools/repository/'
+search_path='http://bioinformatics.mdanderson.org/Software/VariantTools/repository/;http://bioinformatics.mdanderson.org/Software/VariantTools/archive/'
 
 # A directory for shared resource files. It can be configured as 
 # 1. NO shared resource (default). All users maintain their own resource 

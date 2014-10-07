@@ -1652,12 +1652,15 @@ class ResourceManager:
                 refGenome = ','.join(sorted(refGenome.split(',')))
                 self.manifest[filename] = (int(sz), md5, refGenome, comment.strip(), eval(URLs))
 
-    def getRemoteManifest(self):
+    def getRemoteManifest(self, URL=None):
         '''Get manifest files from servers (mirrors) and parse it.'''
         try:
             self.manifest = {}
             servers = {}
             for path in env.search_path.split(';'):
+                if URL is not None and path != URL:
+                    continue
+                #
                 try:
                     env.logger.trace('Downloading mirrors.txt from {}'.format(path))
                     mirror_file = downloadURL(path + '/MIRRORS.txt', dest=env.temp_dir, quiet=True)
