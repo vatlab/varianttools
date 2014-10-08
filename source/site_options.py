@@ -47,4 +47,3 @@ search_path='http://bioinformatics.mdanderson.org/Software/VariantTools/reposito
 #   to implement and requires less maintenance. The system admin can choose to
 #   mirror the variant tools repository and let the users to keep it up to date.
 shared_resource=None
-

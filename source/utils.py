@@ -3420,18 +3420,22 @@ def installRPackage(libloc, package):
         runCommand(["R", "-e", "library('{1}', lib.loc='{0}')".format(libloc, package)])
     except Exception as e:
         raise ValueError("Cannot auto-install / load R library {1}: {0}".format(e, package))
+    return libloc
 
 def whereisRPackage(package):
-    libloc = None
-    try:
-        runCommand(["R", "-e", "library('{}')".format(package)])
-    except:
-        libloc = os.path.join(env.local_resource, 'Rlib')
+    libloc = 'NULL'
+    for item in [None, os.path.join(env.shared_resource, 'Rlib'),
+                     os.path.join(env.local_resource, 'Rlib')]:
         try:
-            runCommand(["R", "-e", "library('{1}', lib.loc='{0}')".format(libloc, package)])
+            library = "'{}'{}".format(package, '' if item is None else ", lib.loc='{0}'".format(item))
+            runCommand(["R", "-e", "library({})".format(library)])
+            libloc = item
+            break
         except:
-            installRPackage(libloc, package)
-    return libloc
+            continue
+    if libloc == 'NULL': 
+        libloc = installRPackage(os.path.join(env.local_resource, 'Rlib'), package)
+    return libloc 
 
 def flatten(listOfLists):
     "Flatten one level of nesting"

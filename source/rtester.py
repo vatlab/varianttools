@@ -354,7 +354,8 @@ class RTest(ExternTest):
                                  format(self.script, basename))
             # look for file
             found = False
-            for path in [None, '.', os.path.join(env.local_resource, 'programs'), env.cache_dir]:
+            for path in [None, '.', os.path.join(env.shared_resource, 'programs'),
+                         os.path.join(env.local_resource, 'programs'), env.cache_dir]:
                 if path is None:
                     script = os.path.expanduser(self.script)
                 else:
@@ -887,16 +888,20 @@ class SKAT(RTest):
             runCommand(["R", "-e", "library('SKAT', lib.loc='{0}')".format(skat_dir)])
         except Exception as e:
             raise ValueError("Cannot auto-install / load R library SKAT: {0}".format(e))
+        return skat_dir
 
     def _check_skat(self):
-        skat_dir = None
         # Check for R/SKAT installation
-        try:
-            runCommand(["R", "-e", "library('SKAT')"])
-        except:
-            skat_dir = os.path.join(env.local_resource, 'Rlib')
+        skat_dir = 'NULL'
+        for item in [None, os.path.join(env.shared_resource, 'Rlib'),
+                         os.path.join(env.local_resource, 'Rlib')]:
             try:
-                runCommand(["R", "-e", "library('SKAT', lib.loc='{0}')".format(skat_dir)])
+                library = "'SKAT'{}".format('' if item is None else ", lib.loc='{0}'".format(item))
+                runCommand(["R", "-e", "library({})".format(library)])
+                skat_dir = item
+                break
             except:
-                self._install_skat(skat_dir)
-        return skat_dir
+                continue
+        if skat_dir == 'NULL':
+            skat_dir = self._install_skat(os.path.join(env.local_resource, 'Rlib'))
+        return skat_dir 
