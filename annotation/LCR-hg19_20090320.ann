@@ -1,7 +1,7 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 
 [linked fields]
@@ -14,7 +14,7 @@ delimiter=None
 header=2
 version=hg19_20090320
 source_url=http://hgdownload.cse.ucsc.edu/goldenPath/hg19/bigZips/chromOut.tar.gz
-direct_url=annoDB/LCR-hg19_20090320.DB.gz
+direct_url=annoDB/LCR-hg19_20090320.DB.gz	ab6a6665fedf2046588713bd51219348
 source_type=txt
 source_pattern=fa.out
 
@@ -78,7 +78,7 @@ comment=name of the matching interspersed repeat
 [repeat_class]
 index=11
 type=VARCHAR(255)
-comment=the class of the repeat, in this case a DNA transposon 
+comment=the class of the repeat, in this case a DNA transposon
             fossil of the MER2 group (see below for list and references)
 
 [repeat_begin]
@@ -100,8 +100,8 @@ comment=ending position of match in database sequence
 [repeat_left]
 index=14
 type=VARCHAR(255)
-comment=no. of bases in (complement of) the repeat consensus sequence 
-    prior to beginning of the match (so 0 means that the match extended 
+comment=no. of bases in (complement of) the repeat consensus sequence
+    prior to beginning of the match (so 0 means that the match extended
     all the way to the end of the repeat consensus sequence)
 	It is saved as string because I do not under what is the meaning of the parenthesis
 	(I see (-2642), (0), (123) etc)

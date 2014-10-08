@@ -1,7 +1,7 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 #
 
@@ -12,7 +12,7 @@ hg19=chr, pos, ref, alt
 description=NHLBI GO Exome Sequencing Project (Exome Variant Server, NHLBI Exome Sequencing Project (ESP), Seattle, WA (URL: http://evs.gs.washington.edu/EVS/) [6500 samples, February, 2013].)
 version=6500SI-V2-SSA137
 source_url=http://evs.gs.washington.edu/evs_bulk_data/ESP6500SI-V2-SSA137.snps_indels.vcf.tar.gz
-direct_url=annoDB/ESP-6500SI-V2-SSA137.DB.gz
+direct_url=annoDB/ESP-6500SI-V2-SSA137.DB.gz	41ec24038da494b260b1cd69ffc0b8ed
 anno_type=variant
 source_type=txt
 
@@ -25,13 +25,13 @@ comment=Chromosome that the variant was found in.
 [pos]
 index=2
 type=INTEGER NOT NULL
-comment=Location on the chromosome (NCBI 37 or hg19), 1-based. 
+comment=Location on the chromosome (NCBI 37 or hg19), 1-based.
 
 [rs_id]
 index=3
 type=VARCHAR(20)
 adj=Nullify('.')
-comment=dbSNP reference SNP identifier (if available) 
+comment=dbSNP reference SNP identifier (if available)
 
 [ref]
 index=4
@@ -54,51 +54,51 @@ comment=dbSNP version which established the rs_id
 index=8
 type=INTEGER NOT NULL
 adj=ExtractValue('EA_AC=', ';'), ExtractField(1, ',')
-comment=The observed ref allele counts for the European American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
+comment=The observed ref allele counts for the European American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10.
 
 [EuropeanAmericanRefCount]
 index=8
 type=INTEGER NOT NULL
 adj=ExtractValue('EA_AC=', ';'), ExtractField(2, ',')
-comment=The observed ref allele counts for the European American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
+comment=The observed ref allele counts for the European American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10.
 
 [AfricanAmericanAltCount]
 index=8
 type=INTEGER NOT NULL
 adj=ExtractValue('AA_AC=', ';'), ExtractField(1, ',')
-comment=The observed alt allele counts for the African American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
+comment=The observed alt allele counts for the African American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10.
 
 [AfricanAmericanRefCount]
 index=8
 type=INTEGER NOT NULL
 adj=ExtractValue('AA_AC=', ';'), ExtractField(2, ',')
-comment=The observed ref allele counts for the African American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
+comment=The observed ref allele counts for the African American population. Allele counts only include genotypes with quality >= 30 and read depth >= 10.
 
 [AllAltCount]
 index=8
 type=INTEGER NOT NULL
 adj=ExtractValue('TAC=', ';'), ExtractField(1, ',')
-comment=The observed alt allele counts for all populations. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
+comment=The observed alt allele counts for all populations. Allele counts only include genotypes with quality >= 30 and read depth >= 10.
 
 [AllRefCount]
 index=8
 type=INTEGER NOT NULL
 adj=ExtractValue('TAC=', ';'), ExtractField(2, ',')
-comment=The observed ref allele counts for all populations. Allele counts only include genotypes with quality >= 30 and read depth >= 10. 
+comment=The observed ref allele counts for all populations. Allele counts only include genotypes with quality >= 30 and read depth >= 10.
 
-[EuropeanAmericanMaf] 
+[EuropeanAmericanMaf]
 index=8
 type=FLOAT NOT NULL
 adj=ExtractValue('MAF=', ';'), ExtractField(1, ','), lambda x: float(x)/100.0
 comment=The European American minor-allele frequency in percent.
 
-[AfricanAmericanMaf] 
+[AfricanAmericanMaf]
 index=8
 type=FLOAT NOT NULL
 adj=ExtractValue('MAF=', ';'), ExtractField(2, ','), lambda x: float(x)/100.0
 comment=The African American minor-allele frequency in percent.
 
-[AllMaf] 
+[AllMaf]
 index=8
 type=FLOAT NOT NULL
 adj=ExtractValue('MAF=', ';'), ExtractField(3, ','), lambda x: float(x)/100.0
@@ -112,19 +112,19 @@ comment=The average sample read depth.
 
 [Genes]
 index=8
-type=VARCHAR(255) 
+type=VARCHAR(255)
 adj=ExtractValue('GL=', ';'), Nullify('none')
-comment=One or more genes for which the SNP is in the coding region (CCDS). 
+comment=One or more genes for which the SNP is in the coding region (CCDS).
 
 [GeneAccession]
 index=8
-type=VARCHAR(255) 
+type=VARCHAR(255)
 adj=ExtractValue('GM=', ';'), Nullify('none')
 comment=NCBI mRNA transcripts accession number.
 
 [FunctionGvs]
 index=8
-type=VARCHAR(255) 
+type=VARCHAR(255)
 adj=ExtractValue('FG=', ';')
 comment=The GVS functions are calculated by the Exome Variant Server; they are based on the alleles for all populations and individuals; the bases in the coding region are divided into codons (if a multiple of 3), and the resulting amino acids are examined.
 
@@ -132,60 +132,60 @@ comment=The GVS functions are calculated by the Exome Variant Server; they are b
 index=8
 type=VARCHAR(20)
 adj=ExtractValue('AAC=', ';'), Nullify('none'), Nullify('none, none')
-comment=The corresponding amino acid change for a SNP. 
+comment=The corresponding amino acid change for a SNP.
 
 [ProteinPos]
 index=8
 type=VARCHAR(20)
 adj=ExtractValue('PP=', ';'), Nullify('NA,NA'), Nullify('NA')
-comment=The coresponding amino acid postion in a protein relative to the whole protein length. 
+comment=The coresponding amino acid postion in a protein relative to the whole protein length.
 
 [cDNAPos]
 index=8
 type=INTEGER
 adj=ExtractValue('CDP=', ';'), Nullify('NA,NA'), Nullify('NA')
-comment=The coresponding cDNA postion for a SNP. 
+comment=The coresponding cDNA postion for a SNP.
 
 [ConservationScorePhastCons]
 index=8
 type=FLOAT
 adj=ExtractValue('CP=', ';'), Nullify('NA')
-comment=A number between 0 and 1 that describes the degree of sequence conservation among 17 vertebrate species; these numbers are downloaded from the UCSC Genome site and are defined as the "posterior probability that the corresponding alignment column was generated by the conserved state of the phylo-HMM, given the model parameters and the multiple alignment" (see UCSC description). 
+comment=A number between 0 and 1 that describes the degree of sequence conservation among 17 vertebrate species; these numbers are downloaded from the UCSC Genome site and are defined as the "posterior probability that the corresponding alignment column was generated by the conserved state of the phylo-HMM, given the model parameters and the multiple alignment" (see UCSC description).
 
 [ConservationScoreGERP]
 index=8
 type=FLOAT
 adj=ExtractValue('CG=', ';'), Nullify('NA')
-comment=The rejected-substitution score from the program GERP, a number between -11.6 and 5.82 that describes the degree of sequence conservation among 34 mammalian species, with 5.82 being the most conserved; these scores were provided by Gregory M. Cooper of the University of Washington Department of Genome Sciences to the EVS project. 
+comment=The rejected-substitution score from the program GERP, a number between -11.6 and 5.82 that describes the degree of sequence conservation among 34 mammalian species, with 5.82 being the most conserved; these scores were provided by Gregory M. Cooper of the University of Washington Department of Genome Sciences to the EVS project.
 
 [GranthamScore]
 index=8
 type=INTEGER
 adj=ExtractValue('GS=', ';'), Nullify('NA,NA'), Nullify('NA')
-comment=Grantham Scores categorize codon replacements into classes of increasing chemical dissimilarity based on the publication by Granthan R.in 1974, Amino acid difference formula to help explain protein evolution. Science 1974 185:862-864.	
+comment=Grantham Scores categorize codon replacements into classes of increasing chemical dissimilarity based on the publication by Granthan R.in 1974, Amino acid difference formula to help explain protein evolution. Science 1974 185:862-864.
 
 [PolyPhenPrediction]
 index=8
 type=VARCHAR(20)
 adj=ExtractValue('PH=', ';')
-comment=Prediction of possible impact of an amino acid substitution on protein structure and function based on Polymorphism Phenotyping (PolyPhen) program. 
+comment=Prediction of possible impact of an amino acid substitution on protein structure and function based on Polymorphism Phenotyping (PolyPhen) program.
 
 [ChimpAllele]
 index=8
 type=CHAR(1)
-adj=ExtractValue('AA=', ';')  
-comment=Chimp alleles are acquired from UCSC human/chimp alignment files. If the variation does not fall within an alignment block, or if it is an indel, the chimp allele is listed as "unknown". If the variation falls within a gap in the alignment, it is listed as "-". 
+adj=ExtractValue('AA=', ';')
+comment=Chimp alleles are acquired from UCSC human/chimp alignment files. If the variation does not fall within an alignment block, or if it is an indel, the chimp allele is listed as "unknown". If the variation falls within a gap in the alignment, it is listed as "-".
 
 [ClinicalLink]
 index=8
 type=VARCHAR(100)
-adj=ExtractValue('CA=', ';')  
-comment=The potential clinical implications associated with a SNP (limited). 
+adj=ExtractValue('CA=', ';')
+comment=The potential clinical implications associated with a SNP (limited).
 
 [ExomeChip]
 index=8
 type=VARCHAR(20)
-adj=ExtractValue('EXOME_CHIP=', ';')  
+adj=ExtractValue('EXOME_CHIP=', ';')
 comment=Whether a SNP is on the Illumina HumanExome Chip
 
 [FilterStatus]

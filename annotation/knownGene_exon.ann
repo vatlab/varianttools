@@ -1,7 +1,7 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 
 [linked fields]
@@ -13,7 +13,7 @@ description=Gene predictions based on data from RefSeq, Genbank, CCDS and UniPro
   database contains all exome regions of the UCSC known gene database.
 version=hg19_20130904
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/knownGene.txt.gz
-direct_url=annoDB/knownGene_exon-hg19_20130904.DB.gz
+direct_url=annoDB/knownGene_exon-hg19_20130904.DB.gz	b944475f2b889f6d545d39682ec5b066
 source_type=txt
 
 [chr]
@@ -64,4 +64,3 @@ index=10
 adj=SplitField(',')
 type=INTEGER NOT NULL
 comment=exon end position
-

@@ -1,7 +1,7 @@
 # Copyright (C) 2012 Jerry Fowler (rgfowler@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 #
 
@@ -18,7 +18,7 @@ description=dbNSFP_gene version 2.4, maintained by Dr. Xiaoming Liu from UTSPH. 
 version=2_4
 anno_type=field
 source_url=http://dbnsfp.houstonbioinformatics.org/dbNSFPzip/dbNSFPv2.4.zip
-direct_url=annoDB/dbNSFP_gene-2_4.DB.gz
+direct_url=annoDB/dbNSFP_gene-2_4.DB.gz	e70052349dfc468175cfecafb499900c
 source_type=txt
 header=1
 source_pattern=dbNSFP2.4_gene
@@ -220,6 +220,5 @@ comment= Known recessive status of the gene (from DOI] 10.1126/science.1215040)
 index=32
 type=VARCHAR(255)
 adj=Nullify('.')
-comment=Essential ("E") or Non-essential phenotype-changing ("N") based on 
+comment=Essential ("E") or Non-essential phenotype-changing ("N") based on
 		Mouse Genome Informatics database. from doi:10.1371/journal.pgen.1003484
-

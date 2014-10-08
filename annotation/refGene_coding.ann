@@ -1,7 +1,7 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 
 [linked fields]
@@ -13,7 +13,7 @@ description=RefGene specifies known human protein-coding and non-protein-coding 
 	from the NCBI RNA reference sequences collection (RefSeq). This database contains all coding regions of the refSeq genes.
 version=hg19_20130904
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/refGene.txt.gz
-direct_url=annoDB/refGene_coding-hg19_20130904.DB.gz
+direct_url=annoDB/refGene_coding-hg19_20130904.DB.gz	9d18a1faecf2f533a036a683dcd948b1
 source_type=txt
 
 [name]
@@ -95,4 +95,3 @@ comment=cds start stat, can be 'non', 'unk', 'incompl', and 'cmp1'
 index=15
 type=VARCHAR(10)
 comment=cds end stat, can be 'non', 'unk', 'incompl', and 'cmp1'
-

@@ -1,9 +1,9 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
-# 
+#
 [linked fields]
 hg19=chr, start, end
 
@@ -11,7 +11,7 @@ hg19=chr, start, end
 anno_type=range
 description=PhastCons Conservation Scores
 version=hg19_20130622
-direct_url=annoDB/phastConsElements-hg19_20130622.DB.gz
+direct_url=annoDB/phastConsElements-hg19_20130622.DB.gz	c212ac8711f0e5194777e7dc9a61b447
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/phastConsElements46way.txt.gz
 source_type=txt
 
@@ -40,4 +40,3 @@ comment=Name of conserved region
 index=6
 type=INTEGER
 comment=Phast cons score from 0 to 1000
-

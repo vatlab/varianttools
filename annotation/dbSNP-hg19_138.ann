@@ -1,7 +1,7 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 
 [linked fields]
@@ -12,7 +12,7 @@ anno_type=variant
 description=dbSNP version 138, created using vcf file downloaded from NCBI
 version=hg19_138
 source_url=ftp://ftp.ncbi.nih.gov/snp/organisms/human_9606/VCF/00-All.vcf.gz
-direct_url=annoDB/dbSNP-hg19_138.DB.gz
+direct_url=annoDB/dbSNP-hg19_138.DB.gz	0decf95892d14a25c683979eeb05f76a
 source_type=txt
 
 
@@ -412,4 +412,3 @@ index=8
 adj=ExtractValue('CLNACC=', ';')
 type=VARCHAR(255)
 comment=Variant Accession and Versions
-

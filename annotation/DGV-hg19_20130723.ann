@@ -1,7 +1,7 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 
 [linked fields]
@@ -13,7 +13,7 @@ anno_type=range
 header=1
 version=hg19_20130723
 source_url=http://dgv.tcag.ca/dgv/docs/GRCh37_hg19_variants_2013-07-23.txt
-direct_url=annoDB/DGV-hg19_20130723.DB.gz
+direct_url=annoDB/DGV-hg19_20130723.DB.gz	a9c4f9f23ce4595d9c33b0a499273d53
 source_type=txt
 delimiter="\t"
 
@@ -96,4 +96,3 @@ type=VARCHAR(412)
 [samples]
 index=20
 type=VARCHAR(951)
-

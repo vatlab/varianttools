@@ -1,9 +1,9 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
-# 
+#
 [linked fields]
 hg19=chr, start, end
 
@@ -11,7 +11,7 @@ hg19=chr, start, end
 anno_type=range
 description=Duplications of >1000 Bases of Non-RepeatMasked Sequence (>90 percent similar).
 version=hg19_20130626
-direct_url=annoDB/genomicSuperDups-hg19_20130626.DB.gz
+direct_url=annoDB/genomicSuperDups-hg19_20130626.DB.gz	2bf334b2edafeba116ebd50d0981e8b1
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/genomicSuperDups.txt.gz
 source_type=txt
 
@@ -113,4 +113,3 @@ comment=K-value calculated with Jukes-Cantor
 index=29
 type=FLOAT
 comment=Kimura K
-

@@ -1,7 +1,7 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 
 [linked fields]
@@ -12,7 +12,7 @@ anno_type=range
 description=UCSC Known Genes
 version=hg19_20121219
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/knownGene.txt.gz
-direct_url=annoDB/knownGene-hg19_20121219.DB.gz
+direct_url=annoDB/knownGene-hg19_20121219.DB.gz	c07367da2392c5e0277e232c89f49c68
 source_type=txt
 
 [name]
@@ -56,4 +56,3 @@ comment=Coding region end
 index=8
 type=INTEGER NULL
 comment=Number of exons
-

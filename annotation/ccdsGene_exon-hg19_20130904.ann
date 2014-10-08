@@ -1,7 +1,7 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 
 
@@ -13,7 +13,7 @@ anno_type=range
 description=High-confidence human gene annotations from the Consensus Coding Sequence (CCDS) project. This database contains all exon regions of the CCDS genes.
 version=hg19_20130904
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/ccdsGene.txt.gz
-direct_url=annoDB/ccdsGene_exon-hg19_20130904.DB.gz
+direct_url=annoDB/ccdsGene_exon-hg19_20130904.DB.gz	0e903b09c1c2bcd9f636d9477874dd82
 source_type=txt
 
 [name]

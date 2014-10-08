@@ -1,4 +1,4 @@
-# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org) 
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
 #
 # Please refer to http://varianttools.sourceforge.net/Format/New for
@@ -12,7 +12,7 @@ description=Cosmic non-coding mutation database.  This data contains mutations a
 version=v67_241013
 anno_type=variant
 source_url=ftp://ngs.sanger.ac.uk/production/cosmic/CosmicNonCodingVariants_v67_20131024.vcf.gz
-direct_url=annoDB/CosmicNonCodingVariants-v67_241013.DB.gz
+direct_url=annoDB/CosmicNonCodingVariants-v67_241013.DB.gz	07366d9d5ba0cd79e03893263d31b7ea
 source_type=txt
 source_pattern=
 
@@ -53,4 +53,3 @@ index=8
 adj=ExtractValue('STRAND=', ';')
 type=VARCHAR(255)
 comment=strand
-

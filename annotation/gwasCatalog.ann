@@ -1,7 +1,7 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 #
 
@@ -16,7 +16,7 @@ description=This database contains single nucleotide polymorphisms (SNPs) identi
 
 version=hg19_20140112
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/gwasCatalog.txt.gz
-direct_url=annoDB/gwasCatalog-hg19_20140112.DB.gz
+direct_url=annoDB/gwasCatalog-hg19_20140112.DB.gz	d425d79e01a334b08de533e84c3ea4bb
 source_type=txt
 encoding=ISO-8859-1
 
@@ -43,7 +43,7 @@ comment=PubMed ID of publication of the study
 [author]
 index=7
 type=VARCHAR(255)
-comment=First author of publication 
+comment=First author of publication
 
 [pubDate]
 index=8
@@ -124,4 +124,3 @@ comment=Platform and [SNPs passing QC]
 index=23
 type=VARCHAR(255)
 comment=Y if copy number variant
-

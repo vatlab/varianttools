@@ -1,7 +1,7 @@
 # Copyright (C) 2012 Jerry Fowler (rgfowler@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 #
 
@@ -19,7 +19,7 @@ description=dbNSFP version 2.4, maintained by Xiaoming Liu from UTSPH. Please ci
 version=hg18_hg19_2_4
 anno_type=variant
 source_url=http://dbnsfp.houstonbioinformatics.org/dbNSFPzip/dbNSFPv2.4.zip
-direct_url=annoDB/dbNSFP-hg18_hg19_2_4.DB.gz
+direct_url=annoDB/dbNSFP-hg18_hg19_2_4.DB.gz	f0c9733887dc1984162913cb5181ac78
 source_type=txt
 source_pattern=dbNSFP2.4_variant.chr
 
@@ -168,16 +168,16 @@ comment=The same as SIFT_score_all but is of type FLOAT and is the minimal score
 index=24
 type=VARCHAR(24) NULL
 adj=Nullify('.')
-comment=SIFT scores. If a score is smaller than 0.05 the corresponding NS is predicted as "D(amaging)"; 
+comment=SIFT scores. If a score is smaller than 0.05 the corresponding NS is predicted as "D(amaging)";
 	otherwise it is predicted as "T(olerated)". Multiple scores are separated by ;
 
 [SIFT_score_rankscore]
 index=25
 type=FLOAT NULL
 adj=Nullify('.')
-comment=Original scores were first converted to SIFTnew=1-SIFTori, 
-		then ranked among all SIFTnew scores in dbNSFP. The rankscore is the ratio of 
-		the rank the SIFTnew score over the total number of SIFTnew scores in dbNSFP. 
+comment=Original scores were first converted to SIFTnew=1-SIFTori,
+		then ranked among all SIFTnew scores in dbNSFP. The rankscore is the ratio of
+		the rank the SIFTnew score over the total number of SIFTnew scores in dbNSFP.
 		If there are multiple scores, only the most damaging (largest) rankscore is presented.
 		The rankscores range from 0.02654 to 0.87932.
 
@@ -191,14 +191,14 @@ comment="D" if "D" appears in SIFT_pred_all, "T" otherwise.
 index=26
 type=VARCHAR(255) NULL
 adj=Nullify('.')
-comment=If SIFTori is smaller than 0.05 (SIFTnew>0.95) the corresponding NS is predicted as 
+comment=If SIFTori is smaller than 0.05 (SIFTnew>0.95) the corresponding NS is predicted as
 	"D(amaging)"; otherwise it is predicted as "T(olerated)".
 
 [Polyphen2_HDIV_score]
 index=27
 type=FLOAT NULL
 adj=lambda x: None if x.strip() == '.' else max([float(z) for z in x.split(';')])
-comment=The maximum (most damaging) value of Polyphen2 score based on HumDiv, i.e. hdiv_prob. 
+comment=The maximum (most damaging) value of Polyphen2 score based on HumDiv, i.e. hdiv_prob.
 	Use Polyphen2_HDIV_score_all to get a list of all scores.
 
 [Polyphen2_HDIV_score_all]
@@ -212,9 +212,9 @@ comment=Polyphen2 score based on HumDiv, i.e. hdiv_prob. The score ranges from 0
 index=28
 type=VARCHAR(255)
 adj=Nullify('.')
-comment=Polyphen2 HDIV scores were first ranked among all HDIV scores 
-		in dbNSFP. The rankscore is the ratio of the rank the score over the total number of 
-		the scores in dbNSFP. If there are multiple scores, only the most damaging (largest) 
+comment=Polyphen2 HDIV scores were first ranked among all HDIV scores
+		in dbNSFP. The rankscore is the ratio of the rank the score over the total number of
+		the scores in dbNSFP. If there are multiple scores, only the most damaging (largest)
 		rankscore is presented. The scores range from 0.02656 to 0.89917.
 
 [Polyphen2_HDIV_pred]
@@ -236,25 +236,25 @@ comment=Polyphen2 prediction based on HumDiv, "D" ("probably damaging"), "P" ("p
 index=30
 type=FLOAT NULL
 adj=lambda x: None if x.strip() == '.' else max([float(z) for z in x.split(';')])
-comment=The maximum (most damaging) value of all Polyphen2 score based on HumVar, i.e. hvar_prob. 
+comment=The maximum (most damaging) value of all Polyphen2 score based on HumVar, i.e. hvar_prob.
 	Use Polyphen2_HVAR_score_all to get a list of all scores.
 
 [Polyphen2_HVAR_score_all]
 index=30
 type=VARCHAR(255) NULL
 adj=Nullify('.')
-comment=Polyphen2 scores based on HumVar, i.e. hvar_prob. The score ranges from 0 to 1, and the corresponding prediction is 
+comment=Polyphen2 scores based on HumVar, i.e. hvar_prob. The score ranges from 0 to 1, and the corresponding prediction is
 	"probably damaging" if it is in [0.909,1]; "possibly damaging" if it is in [0.447,0.908]; "benign" if it is in [0,0.446].
-	Score cutoff for binary classification is 0.5, i.e. the prediction is "neutral" if the score is smaller than 0.5 and "deleterious" 
+	Score cutoff for binary classification is 0.5, i.e. the prediction is "neutral" if the score is smaller than 0.5 and "deleterious"
 	if the score is larger than 0.5. Multiple entries separated by ";".
 
 [Polyphen2_HVAR_rankscore]
 index=31
 type=VARCHAR(255) NULL
 adj=Nullify('.')
-comment=Polyphen2 HVAR scores were first ranked among all HVAR scores 
-		in dbNSFP. The rankscore is the ratio of the rank the score over the total number of 
-		the scores in dbNSFP. If there are multiple scores, only the most damaging (largest) 
+comment=Polyphen2 HVAR scores were first ranked among all HVAR scores
+		in dbNSFP. The rankscore is the ratio of the rank the score over the total number of
+		the scores in dbNSFP. If there are multiple scores, only the most damaging (largest)
 		rankscore is presented. The scores range from 0.01281 to 0.9711.
 
 [Polyphen2_HVAR_pred]
@@ -268,13 +268,13 @@ comment="D" if any of the predictions in Polyphen2_HVAR_pred_all is "D". Otherwi
 index=32
 type=VARCHAR(255) NULL
 adj=Nullify('.')
-comment=Polyphen2 prediction based on HumVar, "D" ("porobably damaging", 
-		HVAR score in [0.909,1] or rankscore in [0.62955,0.9711]), "P" ("possibly damaging", 
-		HVAR in [0.447,0.908] or rankscore in [0.44359,0.62885]) and "B" ("benign", HVAR 
-		score in [0,0.446] or rankscore in [0.01281,0.44315]). Score cutoff for binary 
-		classification is 0.5 for HVAR score or 0.45998 for rankscore, i.e. the prediction 
-		is "neutral" if the HVAR score is smaller than 0.5 (rankscore is smaller than 
-		0.45998), and "deleterious" if the HVAR score is larger than 0.5 (rankscore is larger 
+comment=Polyphen2 prediction based on HumVar, "D" ("porobably damaging",
+		HVAR score in [0.909,1] or rankscore in [0.62955,0.9711]), "P" ("possibly damaging",
+		HVAR in [0.447,0.908] or rankscore in [0.44359,0.62885]) and "B" ("benign", HVAR
+		score in [0,0.446] or rankscore in [0.01281,0.44315]). Score cutoff for binary
+		classification is 0.5 for HVAR score or 0.45998 for rankscore, i.e. the prediction
+		is "neutral" if the HVAR score is smaller than 0.5 (rankscore is smaller than
+		0.45998), and "deleterious" if the HVAR score is larger than 0.5 (rankscore is larger
 		than 0.45998). Multiple entries are separated by ";".
 
 [LRT_score]
@@ -287,9 +287,9 @@ comment=The original LRT two-sided p-value (LRTori).
 index=34
 type=FLOAT NULL
 adj=Nullify('.')
-comment= LRTori scores were first converted as LRTnew=1-LRTori*0.5 if 
-		Omega<1, or LRTnew=LRTori*0.5 if Omega>=1. Then LRTnew scores were ranked among all 
-		LRTnew scores in dbNSFP. The rankscore is the ratio of the rank over the total number 
+comment= LRTori scores were first converted as LRTnew=1-LRTori*0.5 if
+		Omega<1, or LRTnew=LRTori*0.5 if Omega>=1. Then LRTnew scores were ranked among all
+		LRTnew scores in dbNSFP. The rankscore is the ratio of the rank over the total number
 		of the scores in dbNSFP. The scores range from 0.00166 to 0.85682.
 
 [LRT_pred]
@@ -308,8 +308,8 @@ comment=MutationTaster score
 index=37
 type=FLOAT NULL
 adj=Nullify('.')
-comment=The MTori scores were first converted: if the prediction 
-		is "A" or "D" MTnew=MTori; if the prediction is "N" or "P", MTnew=1-MTori. Then MTnew 
+comment=The MTori scores were first converted: if the prediction
+		is "A" or "D" MTnew=MTori; if the prediction is "N" or "P", MTnew=1-MTori. Then MTnew
 		scores were ranked among all MTnew scores in dbNSFP. The rankscore is the ratio of the
 		rank of the score over the total number of MTnew scores in dbNSFP. The scores range
 		from 0.0931 to 0.80722.
@@ -319,14 +319,14 @@ index=38
 type=CHAR(1) NULL
 adj=Nullify('.')
 comment= MutationTaster prediction, "A" ("disease_causing_automatic"),
-		"D" ("disease_causing"), "N" ("polymorphism") or "P" ("polymorphism_automatic"). The 
+		"D" ("disease_causing"), "N" ("polymorphism") or "P" ("polymorphism_automatic"). The
 		score cutoff between "D" and "N" is 0.5 for MTori and 0.328 for the rankscore.
 
 [MutationAssessor_score]
 index=39
 type=FLOAT NULL
 adj=Nullify('.')
-comment=MutationAssessor functional impact combined score (MAori). The 
+comment=MutationAssessor functional impact combined score (MAori). The
 		score ranges from -5.545 to 5.975 in dbNSFP. Please refer to Reva et al. (2011)
 		Nucl. Acids Res. 39(17):e118 for details.
 
@@ -334,19 +334,19 @@ comment=MutationAssessor functional impact combined score (MAori). The
 index=40
 type=FLOAT NULL
 adj=Nullify('.')
-comment=MAori scores were ranked among all MAori scores in dbNSFP. 
-		The rankscore is the ratio of the rank of the score over the total number of MAori 
+comment=MAori scores were ranked among all MAori scores in dbNSFP.
+		The rankscore is the ratio of the rank of the score over the total number of MAori
 		scores in dbNSFP. The scores range from 0 to 1.
 
 [MutationAssessor_pred]
 index=41
 type=CHAR(16) NULL
 adj=Nullify('.')
-comment=MutationAssessor's functional impact of a variant : 
+comment=MutationAssessor's functional impact of a variant :
 		predicted functional, i.e. high ("H") or medium ("M"), or predicted non-functional,
-		i.e. low ("L") or neutral ("N"). The MAori score cutoffs between "H" and "M", 
-		"M" and "L", and "L" and "N", are 3.5, 1.9 and 0.8, respectively. The rankscore cutoffs 
-		between "H" and "M", "M" and "L", and "L" and "N", are 0.9416, 0.61387 and 0.26162, 
+		i.e. low ("L") or neutral ("N"). The MAori score cutoffs between "H" and "M",
+		"M" and "L", and "L" and "N", are 3.5, 1.9 and 0.8, respectively. The rankscore cutoffs
+		between "H" and "M", "M" and "L", and "L" and "N", are 0.9416, 0.61387 and 0.26162,
 		respectively.
 
 [FATHMM_score]
@@ -360,17 +360,17 @@ index=42
 type=VARCHAR(255) NULL
 adj=Nullify('.')
 comment=FATHMM default score (weighted for human inherited-disease mutations with
-		Disease Ontology) (FATHMMori). Scores range from -18.09 to 11.0. Multiple scores 
-		separated by ";" Please refer to Shihab et al. (2013) Human Mutation 34(1):57-65 for 
+		Disease Ontology) (FATHMMori). Scores range from -18.09 to 11.0. Multiple scores
+		separated by ";" Please refer to Shihab et al. (2013) Human Mutation 34(1):57-65 for
 		details.
 
 [FATHMM_rankscore]
 index=43
 type=FLOAT NULL
 adj=Nullify('.')
-comment=FATHMMori scores were ranked among all FATHMMori scores in dbNSFP. 
-		The rankscore is the ratio of the rank of the score over the total number of FATHMMori 
-		scores in dbNSFP. If there are multiple scores, only the most damaging (largest) 
+comment=FATHMMori scores were ranked among all FATHMMori scores in dbNSFP.
+		The rankscore is the ratio of the rank of the score over the total number of FATHMMori
+		scores in dbNSFP. If there are multiple scores, only the most damaging (largest)
 		rankscore is presented. The scores range from 0 to 1.
 
 
@@ -384,7 +384,7 @@ comment="D" is any of the prediction of FATHMM_pred_all is "D"
 index=44
 type=CHAR(16) NULL
 adj=Nullify('.')
-comment= If a FATHMMori score is <=-1.5 (or rankscore <=0.81415) the corresponding NS 
+comment= If a FATHMMori score is <=-1.5 (or rankscore <=0.81415) the corresponding NS
 		is predicted as "D(AMAGING)"; otherwise it is predicted as "T(OLERATED)".
 		Multiple predictions separated by ";"
 
@@ -392,25 +392,25 @@ comment= If a FATHMMori score is <=-1.5 (or rankscore <=0.81415) the correspondi
 index=45
 type=FLOAT NULL
 adj=Nullify('.')
-comment=Our support vector machine (SVM) based ensemble prediction score, which 
-	incorporated 10 scores (SIFT, PolyPhen-2 HDIV, PolyPhen-2 HVAR, GERP++, MutationTaster, 
-	Mutation Assessor, FATHMM, LRT, SiPhy, PhyloP) and the maximum frequency observed in 
-	the 1000 genomes populations. Larger value means the SNV is more likely to be damaging. 
+comment=Our support vector machine (SVM) based ensemble prediction score, which
+	incorporated 10 scores (SIFT, PolyPhen-2 HDIV, PolyPhen-2 HVAR, GERP++, MutationTaster,
+	Mutation Assessor, FATHMM, LRT, SiPhy, PhyloP) and the maximum frequency observed in
+	the 1000 genomes populations. Larger value means the SNV is more likely to be damaging.
 	The threshold seperationg "T(olerated)" and "D(amaging)" is 0.
 
 [RadialSVM_rankscore]
 index=46
 type=FLOAT NULL
 adj=Nullify('.')
-comment= RadialSVM scores were ranked among all RadialSVM scores in dbNSFP. 
-		The rankscore is the ratio of the rank of the screo over the total number of RadialSVM 
+comment= RadialSVM scores were ranked among all RadialSVM scores in dbNSFP.
+		The rankscore is the ratio of the rank of the screo over the total number of RadialSVM
 		scores in dbNSFP. The scores range from 0 to 1.
 
 [RadialSVM_pred]
 index=47
 type=VARCHAR(20)
 adj=Nullify('.')
-comment=Prediction of our SVM based ensemble prediction score,"T(olerated)" or 
+comment=Prediction of our SVM based ensemble prediction score,"T(olerated)" or
 		"D(amaging)". The score cutoff between "D" and "T" is 0. The rankscore cutoff between
 		"D" and "T" is 0.83357.
 
@@ -418,17 +418,17 @@ comment=Prediction of our SVM based ensemble prediction score,"T(olerated)" or
 index=48
 type=FLOAT NULL
 adj=Nullify('.')
-comment=Our logistic regression (LR) based ensemble prediction score, which 
-	incorporated 10 scores (SIFT, PolyPhen-2 HDIV, PolyPhen-2 HVAR, GERP++, MutationTaster, 
-	Mutation Assessor, FATHMM, LRT, SiPhy, PhyloP) and the maximum frequency observed in 
-	the 1000 genomes populations. Larger value means the SNV is more likely to be damaging. 
+comment=Our logistic regression (LR) based ensemble prediction score, which
+	incorporated 10 scores (SIFT, PolyPhen-2 HDIV, PolyPhen-2 HVAR, GERP++, MutationTaster,
+	Mutation Assessor, FATHMM, LRT, SiPhy, PhyloP) and the maximum frequency observed in
+	the 1000 genomes populations. Larger value means the SNV is more likely to be damaging.
 	The threshold seperationg "T(olerated)" and "D(amaging)" is 0.5.
 
 [LR_rankscore]
 index=49
 type=FLOAT NULL
 adj=Nullify('.')
-comment=LR scores were ranked among all LR scores in dbNSFP. The rankscore is the 
+comment=LR scores were ranked among all LR scores in dbNSFP. The rankscore is the
 		ratio of the rank of the score over the total number of LR scores in dbNSFP. The scores
 		range from 0 to 1.
 
@@ -442,10 +442,10 @@ comment=Prediction of our LR based ensemble prediction score,"T(olerated)" or "D
 index=51
 type=FLOAT NULL
 adj=Nullify('.')
-comment=Number of observed component scores (except the maximum frequency in 
-	the 1000 genomes populations) for RadialSVM and LR. Ranges from 1 to 10. As RadialSVM 
-	and LR scores are calculated based on imputed data, the less missing component scores, 
-	the higher the reliability of the scores and predictions. 
+comment=Number of observed component scores (except the maximum frequency in
+	the 1000 genomes populations) for RadialSVM and LR. Ranges from 1 to 10. As RadialSVM
+	and LR scores are calculated based on imputed data, the less missing component scores,
+	the higher the reliability of the scores and predictions.
 
 [CADD_raw]
 index=52
@@ -459,8 +459,8 @@ comment=: CADD raw score for funtional prediction of a SNP. Please refer to Kirc
 index=53
 type=FLOAT NULL
 adj=Nullify('.')
-comment=CADD raw scores were ranked among all CADD raw scores in dbNSFP. The 
-		rankscore is the ratio of the rank of the score over the total number of CADD 
+comment=CADD raw scores were ranked among all CADD raw scores in dbNSFP. The
+		rankscore is the ratio of the rank of the score over the total number of CADD
 		raw scores in dbNSFP.
 
 [CADD_phred]
@@ -487,125 +487,125 @@ comment=GERP++ RS score, the larger the score, the more conserved the site.
 index=57
 type=FLOAT NULL
 adj=Nullify('.')
-comment=GERP++ RS scores were ranked among all GERP++ RS scores in dbNSFP. 
-		The rankscore is the ratio of the rank of the score over the total number of GERP++ RS 
+comment=GERP++ RS scores were ranked among all GERP++ RS scores in dbNSFP.
+		The rankscore is the ratio of the rank of the score over the total number of GERP++ RS
 		scores in dbNSFP.
 
 [phyloP46way_primate]
 index=58
 type=FLOAT NULL
 adj=Nullify('.')
-comment=phyloP (phylogenetic p-values) conservation score based on the 
-		multiple alignments of 10 primate genomes (including human). The larger the score, 
+comment=phyloP (phylogenetic p-values) conservation score based on the
+		multiple alignments of 10 primate genomes (including human). The larger the score,
 		the more conserved the site.
 
 [phyloP46way_primate_rankscore]
 index=59
 type=FLOAT NULL
 adj=Nullify('.')
-comment=phyloP46way_primate scores were ranked among all 
-		phyloP46way_primate scores in dbNSFP. The rankscore is the ratio of the rank of the 
+comment=phyloP46way_primate scores were ranked among all
+		phyloP46way_primate scores in dbNSFP. The rankscore is the ratio of the rank of the
 		score over the total number of phyloP46way_primate scores in dbNSFP.
 
 [phyloP46way_placental]
 index=60
 type=FLOAT NULL
 adj=Nullify('.')
-comment=phyloP (phylogenetic p-values) conservation score based on the 
-		multiple alignments of 33 placental mammal genomes (including human). The larger the 
+comment=phyloP (phylogenetic p-values) conservation score based on the
+		multiple alignments of 33 placental mammal genomes (including human). The larger the
 		score, the more conserved the site.
 
 [phyloP46way_placental_rankscore]
 index=61
 type=FLOAT NULL
 adj=Nullify('.')
-comment=phyloP46way_placental scores were ranked among all 
-		phyloP46way_placental scores in dbNSFP. The rankscore is the ratio of the rank of the 
+comment=phyloP46way_placental scores were ranked among all
+		phyloP46way_placental scores in dbNSFP. The rankscore is the ratio of the rank of the
 		score over the total number of phyloP46way_placental scores in dbNSFP.
 
 [phyloP100way_vertebrate]
 index=62
 type=FLOAT NULL
 adj=Nullify('.')
-comment=phyloP (phylogenetic p-values) conservation score based on the 
-		multiple alignments of 100 vertebrate genomes (including human). The larger the score, 
+comment=phyloP (phylogenetic p-values) conservation score based on the
+		multiple alignments of 100 vertebrate genomes (including human). The larger the score,
 		the more conserved the site.
 
 [phyloP100way_vertebrate_rankscore]
 index=63
 type=FLOAT NULL
 adj=Nullify('.')
-comment=phyloP100way_vertebrate scores were ranked among all 
-		phyloP100way_vertebrate scores in dbNSFP. The rankscore is the ratio of the rank of the 
+comment=phyloP100way_vertebrate scores were ranked among all
+		phyloP100way_vertebrate scores in dbNSFP. The rankscore is the ratio of the rank of the
 		score over the total number of phyloP100way_vertebrate scores in dbNSFP.
 
 [phastCons46way_primate]
 index=64
 type=FLOAT NULL
 adj=Nullify('.')
-comment=phastCons conservation score based on the multiple alignments of 
+comment=phastCons conservation score based on the multiple alignments of
 		10 primate genomes (including human). The larger the score, the more conserved the site.
 
 [phastCons46way_primate_rankscore]
 index=65
 type=FLOAT NULL
 adj=Nullify('.')
-comment=phastCons46way_primate scores were ranked among all 
-		phastCons46way_primate scores in dbNSFP. The rankscore is the ratio of the rank of the 
+comment=phastCons46way_primate scores were ranked among all
+		phastCons46way_primate scores in dbNSFP. The rankscore is the ratio of the rank of the
 		score over the total number of phastCons46way_primate scores in dbNSFP.
 
 [phastCons46way_placental]
 index=66
 type=FLOAT NULL
 adj=Nullify('.')
-comment=phastCons conservation score based on the multiple alignments of 
-		33 placental mammal genomes (including human). The larger the score, the more conserved 
+comment=phastCons conservation score based on the multiple alignments of
+		33 placental mammal genomes (including human). The larger the score, the more conserved
 		the site.
 
 [phastCons46way_placental_rankscore]
 index=67
 type=FLOAT NULL
 adj=Nullify('.')
-comment=phastCons46way_placental scores were ranked among all 
-		phastCons46way_placental scores in dbNSFP. The rankscore is the ratio of the rank of the 
+comment=phastCons46way_placental scores were ranked among all
+		phastCons46way_placental scores in dbNSFP. The rankscore is the ratio of the rank of the
 		score over the total number of phastCons46way_placental scores in dbNSFP.
 
 [phastCons100way_vertebrate]
 index=68
 type=FLOAT NULL
 adj=Nullify('.')
-comment=phastCons conservation score based on the multiple alignments 
-		of 100 vertebrate genomes (including human). The larger the score, the more conserved 
+comment=phastCons conservation score based on the multiple alignments
+		of 100 vertebrate genomes (including human). The larger the score, the more conserved
 		the site.
 
 [phastCons100way_vertebrate_rankscore]
 index=69
 type=FLOAT NULL
 adj=Nullify('.')
-comment=phastCons100way_vertebrate scores were ranked among 
-		all phastCons100way_vertebrate scores in dbNSFP. The rankscore is the ratio of the rank 
+comment=phastCons100way_vertebrate scores were ranked among
+		all phastCons100way_vertebrate scores in dbNSFP. The rankscore is the ratio of the rank
 		of the score over the total number of phastCons100way_vertebrate scores in dbNSFP.
 
 
 [SiPhy_29way_pi]
 index=70
 type=VARCHAR(255) NULL
-comment=The estimated stationary distribution of A, C, G and T at the site, 
-		using SiPhy algorithm based on 29 mammals genomes. 
+comment=The estimated stationary distribution of A, C, G and T at the site,
+		using SiPhy algorithm based on 29 mammals genomes.
 
 [SiPhy_29way_logOdds]
 index=71
 type=FLOAT NULL
 adj=Nullify('.')
-comment=SiPhy score based on 29 mammals genomes. The larger the score, 
+comment=SiPhy score based on 29 mammals genomes. The larger the score,
 		the more conserved the site.
 
 [SiPhy_29way_logOdds_rankscore]
 index=72
 type=FLOAT NULL
 adj=Nullify('.')
-comment=SiPhy_29way_logOdds scores were ranked among all 
-		SiPhy_29way_logOdds scores in dbNSFP. The rankscore is the ratio of the rank 
+comment=SiPhy_29way_logOdds scores were ranked among all
+		SiPhy_29way_logOdds scores in dbNSFP. The rankscore is the ratio of the rank
 		of the score over the total number of SiPhy_29way_logOdds scores in dbNSFP.
 
 [LRT_Omega]

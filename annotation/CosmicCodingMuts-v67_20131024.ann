@@ -1,4 +1,4 @@
-# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org) 
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
 #
 # Please refer to http://varianttools.sourceforge.net/Format/New for
@@ -8,11 +8,11 @@
 hg19=chr, pos, ref, alt
 
 [data sources]
-description=Cosmic coding mutation database.  This data contains mutations affecting 10 or less nucleotides in REF.  The mutation data was obtained from the Sanger Institute Catalogue Of Somatic Mutations In Cancer web site, http://www.sanger.ac.uk/cosmic.  Bamford et al (2004). The COSMIC (Catalogue of Somatic Mutations in Cancer) database and website. Br J Cancer, 91,355-358. 
+description=Cosmic coding mutation database.  This data contains mutations affecting 10 or less nucleotides in REF.  The mutation data was obtained from the Sanger Institute Catalogue Of Somatic Mutations In Cancer web site, http://www.sanger.ac.uk/cosmic.  Bamford et al (2004). The COSMIC (Catalogue of Somatic Mutations in Cancer) database and website. Br J Cancer, 91,355-358.
 version=v67_20131024
 anno_type=variant
 source_url=ftp://ngs.sanger.ac.uk/production/cosmic/CosmicCodingMuts_v67_20131024.vcf.gz
-direct_url=annoDB/CosmicCodingMuts-v67_20131024.DB.gz
+direct_url=annoDB/CosmicCodingMuts-v67_20131024.DB.gz	ad998078fab6ee4c225ab438f75f2360
 source_type=txt
 source_pattern=
 
@@ -71,5 +71,3 @@ index=8
 adj=ExtractValue('CNT=', ';')
 type=INT
 comment=Number of samples with this mutation
-
-

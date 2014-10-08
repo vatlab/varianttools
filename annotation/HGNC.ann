@@ -1,7 +1,7 @@
 # Copyright (C) 2012 Jerry Fowler (rgfowler@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 #
 
@@ -10,15 +10,15 @@
 
 [data sources]
 description=The HUGO Gene Nomenclature Committee (HGNC) has assigned unique gene symbols
-	and names to almost 38,000 human loci, of which around 19,000 are protein coding. 
-	genenames.org is a curated online repository of HGNC-approved gene nomenclature and 
+	and names to almost 38,000 human loci, of which around 19,000 are protein coding.
+	genenames.org is a curated online repository of HGNC-approved gene nomenclature and
 	associated resources including links to genomic, proteomic and phenotypic information,
 	as well as dedicated gene family pages
 version=20131029
 anno_type=field
 encoding=ISO-8859-1
 source_url=ftp://ftp.ebi.ac.uk/pub/databases/genenames/hgnc_complete_set.txt.gz
-direct_url=annoDB/HGNC-20131029.DB.gz
+direct_url=annoDB/HGNC-20131029.DB.gz	80bd9bc0697631a6280c39f8e349415d
 source_type=txt
 
 [name]
@@ -61,7 +61,7 @@ comment=Indicates whether the gene is classified as:
 
 [Locus_Type]
 index=5
-type=VARCHAR(100) 
+type=VARCHAR(100)
 comment=Specifies the type of locus described by the given entry: gene with protein product, RNA, cluster, etc (http://www.genenames.org/data/gdlw_columndef.html#gd_app_sym)
 
 [Locus_Group]
@@ -71,7 +71,7 @@ comment=Groups locus types together into related sets. See http://www.genenames.
 
 [Previous_Symbols]
 index=7
-type=VARCHAR(255) 
+type=VARCHAR(255)
 comment=Symbols previously approved by the HGNC for this gene
 
 
@@ -82,7 +82,7 @@ comment=Gene names previously approved by the HGNC for this gene
 
 [Synonyms]
 index=9
-type=VARCHAR(255) 
+type=VARCHAR(255)
 adj=Nullify('.')
 comment=Other symbols used to refer to this gene
 
@@ -247,4 +247,3 @@ comment=MGI identifier. In the HTML results page this ID links to the MGI Report
 index=40
 type=VARCHAR(255)
 comment=RGD identifier. In the HTML results page this ID links to the RGD Report for that gene.
-

@@ -1,7 +1,7 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 
 [linked fields]
@@ -9,10 +9,10 @@ hg19=chr, txStart, txEnd
 
 [data sources]
 anno_type=range
-description=Gene predictions based on data from RefSeq, Genbank, CCDS and UniProt, from the UCSC KnownGene track. 
+description=Gene predictions based on data from RefSeq, Genbank, CCDS and UniProt, from the UCSC KnownGene track.
 version=hg19_20130904
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/knownGene.txt.gz
-direct_url=annoDB/knownGene-hg19_20130904.DB.gz
+direct_url=annoDB/knownGene-hg19_20130904.DB.gz	0dfff9b8e479bbae7f0d8cb4fb406a29
 source_type=txt
 
 [name]
@@ -56,4 +56,3 @@ comment=Coding region end
 index=8
 type=INTEGER NULL
 comment=Number of exons
-

@@ -1,7 +1,7 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 
 [linked fields]
@@ -10,10 +10,10 @@ hg19=Chromosome,Start,End
 [data sources]
 anno_type=range
 description=This annotation database contains expanded exome targeted regions covered by
-	the Nextera Rapid Capture Expanded platform from illumina. 
+	the Nextera Rapid Capture Expanded platform from illumina.
 version=20130307
 source_url=http://supportres.illumina.com/documents/documentation/chemistry_documentation/samplepreps_nextera/nexterarapidcapture/nexterarapidcapture_expandedexome_targetedregions.txt
-direct_url=annoDB/Illumina_NRCE-20130307.DB.gz
+direct_url=annoDB/Illumina_NRCE-20130307.DB.gz	b6480f4d89cf763924a7d22207c89057
 header=7
 source_type=txt
 

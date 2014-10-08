@@ -1,7 +1,7 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 
 [linked fields]
@@ -38,7 +38,7 @@ source_url=http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_f
 	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chrX_CHD_r28_nr.b36_fwd.txt.gz
 	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chrY_CHD_r28_nr.b36_fwd.txt.gz
 	http://ftp.hapmap.org/hapmap/frequencies/2010-08_phaseII+III/allele_freqs_chrM_CHD_r28_nr.b36_fwd.txt.gz
-direct_url=annoDB/hapmap_CHD_freq-hg18_20100817.DB.gz
+direct_url=annoDB/hapmap_CHD_freq-hg18_20100817.DB.gz	ba0256a15c2e0bbb56d1841f2654883b
 source_type=txt
 
 #
@@ -102,7 +102,5 @@ comment=Count of other allele
 index=17
 type=INT
 comment=Total allele count
-
-
 
 

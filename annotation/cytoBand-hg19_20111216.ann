@@ -34,7 +34,7 @@ anno_type=range
 description=Cyto Band
 version=hg19_20111216
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/cytoBand.txt.gz
-direct_url=annoDB/cytoBand-hg19_20111216.DB.gz
+direct_url=annoDB/cytoBand-hg19_20111216.DB.gz	9599356253ee9c6f8b0f0210e8182e7a
 source_type=txt
 
 [chr]
@@ -63,4 +63,3 @@ comment=name of cytogenic band
 index=5
 type=VARCHAR(255)
 comment=giemsa stain results
-

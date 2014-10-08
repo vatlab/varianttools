@@ -1,7 +1,7 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 #
 # To rebuild this database using a new version of data
@@ -13,19 +13,19 @@
 *=GeneSymbol
 
 [data sources]
-description=This database contains variants from the Cancer Genome Project. It is 
+description=This database contains variants from the Cancer Genome Project. It is
   an ongoing effort to catalogue those genes for which mutations have been causally
-  implicated in cancer. The original census and analysis was published in Nature 
+  implicated in cancer. The original census and analysis was published in Nature
   Reviews Cancer and supplemental analysis information related to the paper is also
   available. Currently, more than 1%% of all human genes are implicated via mutation
   in cancer. Of these, approximately 90%% have somatic mutations in cancer, 20%% bear
-  germline mutations that predispose to cancer and 10%% show both somatic and 
+  germline mutations that predispose to cancer and 10%% show both somatic and
   germline mutations.
 version=20130711
 encoding=ISO-8859-1
 anno_type=field
 header=1
-direct_url=annoDB/CancerGeneCensus-20130711.DB.gz
+direct_url=annoDB/CancerGeneCensus-20130711.DB.gz	a74f51975d39de7d44d64643e51eed60
 source_url=http://cancer.sanger.ac.uk/cancergenome/assets/cancer_gene_census.tsv
 # the input file is \r delimited and will be read as one single line
 preprocessor=Dos2Unix()
@@ -35,18 +35,18 @@ source_type=txt
 index=1
 # some symbols need to be handled manually, SEPT6 is wrongly converted by excel to 6-SEP
 adj=MapValue({'AF15Q14': 'CASC5', 'AMER1': 'FAM123B',
-	'CDKN2a(p14)': 'CDKN2a', 'C15orf21': 'HMGN2P46', 
+	'CDKN2a(p14)': 'CDKN2a', 'C15orf21': 'HMGN2P46',
 	'TRD@': 'TRD', 'TRB@': 'TCRB', 'HCMOGT-1': 'SPECC1',
-	'IGH@': 'IGH', 
+	'IGH@': 'IGH',
 	'PRO1073':'UNQ530/PRO1073'}), ConvertGeneName(convertTo='geneSymbol')
 type=VARCHAR(255)
 
 [kgID]
 index=1
 adj=MapValue({'AF15Q14': 'CASC5', 'AMER1': 'FAM123B',
-	'CDKN2a(p14)': 'CDKN2a', 'C15orf21': 'HMGN2P46', 
+	'CDKN2a(p14)': 'CDKN2a', 'C15orf21': 'HMGN2P46',
 	'TRD@': 'TRD', 'TRB@': 'TCRB', 'HCMOGT-1': 'SPECC1',
-	'IGH@': 'IGH', 
+	'IGH@': 'IGH',
 	'PRO1073':'UNQ530/PRO1073'}), ConvertGeneName(convertTo='kgID')
 type=VARCHAR(255)
 
@@ -110,4 +110,3 @@ type=VARCHAR(255)
 [OtherSyndromeOrDisease]
 index=16
 type=VARCHAR(255)
-

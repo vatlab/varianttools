@@ -1,7 +1,7 @@
 # Copyright (C) 2012 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 #
 
@@ -12,13 +12,13 @@ hg19=chr,start,end
 description=Entrez Gene (www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=gene) is NCBI's database
 	for gene-specific information. It does not include all known or predicted genes; instead
 	Entrez Gene focuses on the genomes that have been completely sequenced, that have an active
-	research community to contribute gene-specific information, or that are scheduled for 
+	research community to contribute gene-specific information, or that are scheduled for
 	intense sequence analysis. This database contains Entrez gene info database for Homo Sapiens,
 	downloaded from ftp://ftp.ncbi.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz.
 version=20131028
 anno_type=range
 source_url=ftp://ftp.ncbi.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
-direct_url=annoDB/EntrezGene-20131028.DB.gz
+direct_url=annoDB/EntrezGene-20131028.DB.gz	9f547ad64e7623a2c1c74ceaa8dcdb2f
 source_type=txt
 header=1
 
@@ -130,5 +130,3 @@ index=15
 type=VARCHAR(10)
 adj=Nullify('-')
 comment=the last date a gene record was updated, in YYYYMMDD format
-
-
