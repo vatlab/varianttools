@@ -157,8 +157,8 @@ class AnnoDBConfiger:
                 #
                 # if a md5 signature is put after the URL, in the format of
                 # fileToGet md5=xxxxxxxxxx, assign self.db_md5
-                if self.direct_url.rsplit(None, 1)[-1].startswith('md5='):
-                    url, md5 = self.direct_url.rsplit(None, 1)
+                if '\t' in self.direct_url:
+                    url, md5 = self.direct_url.rsplit('\t', 1)
                     self.direct_url = url
                     self.db_md5 = md5
             elif item[0] == 'encoding':
@@ -507,7 +507,7 @@ def use(args):
                     args.source = 'annoDB/{}.ann'.format(args.source)
                 # download?
                 #
-                env.logger.info('Downloading annotation database from {}'.format(args.source))
+                env.logger.info('Downloading annotation database {}'.format(args.source))
                 try:
                     annoDB = downloadFile(args.source, None if args.source.endswith('.ann') else '.', quiet=args.source.endswith('.ann'))
                     s = delayedAction(env.logger.info, 'Decompressing {}'.format(annoDB))
@@ -515,8 +515,7 @@ def use(args):
                     annoDB = decompressGzFile(annoDB, inplace=True)
                     del s
                 except Exception as e:
-                    raise ValueError('Database {} not found: {}'
-                        .format(args.source, e))
+                    raise ValueError('Database {} not found: {}' .format(args.source, e))
             #
             # annDB is now a local file
             if annoDB.endswith('.ann'):

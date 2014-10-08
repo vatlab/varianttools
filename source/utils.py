@@ -1809,17 +1809,15 @@ class ResourceManager:
                 continue
         return changed
 
-    def downloadResources(self):
+    def downloadResources(self, dest_dir=None):
         '''Download resources'''
         excluded = []
         for cnt, filename in enumerate(sorted(self.manifest.keys())):
             fileprop = self.manifest[filename]
-            if fileprop[0] > 15*(1024**3):
-                excluded.append(filename)
-                continue
             #
             try:
-                downloaded = downloadFile(filename, checkUpdate=True, quiet=False, 
+                downloaded = downloadFile(filename, dest_dir=dest_dir, 
+                    checkUpdate=True, quiet=False, 
                     message='{}/{} {}'.format(cnt+1, len(self.manifest), filename))
                 # check md5
                 md5 = calculateMD5(downloaded, partial=True)
@@ -1829,14 +1827,6 @@ class ResourceManager:
                 raise e
             except Exception as e:
                 env.logger.error('Failed to download {}: {} {}'.format(filename, type(e).__name__, e))
-            # decompress .DB file because it might be outdated
-            if filename.endswith('.DB.gz'):
-                s = delayedAction(env.logger.info, 'Decompressing {}'.format(filename))
-                decompressGzFile(downloaded, inplace=False, force=True)
-                del s
-        if excluded:
-            env.logger.warning('Resource files larger then 15GB ({}) are not downloaded.'
-                .format(', '.join(excluded)))
 
 def compressFile(infile, outfile):
     '''Compress a file from infile to outfile'''
@@ -1863,18 +1853,15 @@ def decompressGzFile(filename, inplace=True, force=False, md5=None):
                     tar.extract(f, path)
         return dest_files
     elif filename.lower().endswith('.gz'):
-        #
         new_filename = filename[:-3]
         # if the decompressed file exists, and is newer than the .gz file, ignore
-        if os.path.isfile(new_filename) \
-            and os.path.getmtime(new_filename) > os.path.getmtime(filename) \
-            and os.path.getsize(new_filename) > os.path.getsize(filename) \
-            and not force:
+        if os.path.isfile(new_filename) and not force:
             if md5 is not None and md5 != calculateMD5(new_filename, partial=True):
-                env.logger.warning('Mismatch MD5 signature of an existing database. Please remove it for re-decompressing {}'
+                env.logger.warning('MD5 signature mismatch: {}'
                     .format(new_filename))
-            env.logger.debug('Reusing existing decompressed file {}'.format(new_filename))
-            return new_filename
+            else:
+                env.logger.debug('Reusing existing decompressed file {}'.format(new_filename))
+                return new_filename
         #
         # check if dest_dir is writable
         dest_dir = os.path.dirname(filename)
@@ -1884,15 +1871,13 @@ def decompressGzFile(filename, inplace=True, force=False, md5=None):
             if os.path.abspath(dest_dir).startswith(os.path.abspath(env.shared_resource)):
                 new_filename = '{}/{}'.format(env.local_resource, 
                     os.path.abspath(filename)[len(os.path.abspath(env.shared_resource)):-3])
-                if os.path.isfile(new_filename) \
-                    and os.path.getmtime(new_filename) > os.path.getmtime(filename) \
-                    and os.path.getsize(new_filename) > os.path.getsize(filename) \
-                    and not force:
+                if os.path.isfile(new_filename) and not force:
                     if md5 is not None and md5 != calculateMD5(new_filename, partial=True):
-                        env.logger.warning('Mismatch MD5 signature of an existing database. Please remove it for re-decompressing {}'
+                        env.logger.warning('MD5 signature mismatch: {}'
                             .format(new_filename))
-                    env.logger.debug('Reusing existing decompressed file {}'.format(new_filename))
-                    return new_filename
+                    else:
+                        env.logger.debug('Reusing existing decompressed file {}'.format(new_filename))
+                        return new_filename
             else:
                 raise RuntimeError('Failed to decompress file {}: directory not writable'.format(filename))
         #
@@ -1907,7 +1892,7 @@ def decompressGzFile(filename, inplace=True, force=False, md5=None):
                     output.write(buffer)
                     buffer = input.read(100000)
             if md5 is not None and md5 != calculateMD5(new_filename, partial=True):
-                env.logger.warning('Mismatch MD5 signature: {}'.format(new_filename))
+                env.logger.warning('MD5 signature mismatch: {}'.format(new_filename))
         # Python 2.7.4 and 3.3.1 have a regression bug that prevents us from opening
         # certain types of gzip file (http://bugs.python.org/issue17666).
         except TypeError as e:
@@ -2127,8 +2112,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
         if (not checkUpdate) and os.path.isfile(dest):
             env.logger.trace('Using existing file {}'.format(dest))
             if calculateMD5(dest, partial=True) != fileSig[1]:
-                env.logger.warning('Local file {} is different from remote copy. You might '
-                    'want to remove local file and try again to update your local copy.'
+                env.logger.warning('MD5 signature mismatch: {}'
                     .format(fileToGet))
             return dest
     else:
@@ -2136,8 +2120,11 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
         dest_dir = os.path.join(env.shared_resource, os.path.split(local_fileToGet)[0])
         dest = os.path.join(env.shared_resource, local_fileToGet)
         # if the file is there, return it directly
-        if (not checkUpdate) and os.path.isfile(dest) and \
-            calculateMD5(dest, partial=True) == fileSig[1]:
+        if (not checkUpdate) and os.path.isfile(dest):
+            env.logger.trace('Using existing file {}'.format(dest))
+            if calculateMD5(dest, partial=True) != fileSig[1]:
+                env.logger.warning('MD5 signature mismatch: {}'
+                    .format(fileToGet))
             return dest
         # if the share resource is not writable, write to ~/.variant_tools
         if not os.access(env.shared_resource, os.W_OK):
@@ -2147,8 +2134,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
             if (not checkUpdate) and os.path.isfile(dest):
                 env.logger.trace('Using existing file {}'.format(dest))
                 if calculateMD5(dest, partial=True) != fileSig[1]:
-                    env.logger.warning('Local file {} is different from remote copy. You might '
-                        'want to remove local file and try again to update your local copy.'
+                    env.logger.warning('MD5 signature mismatch: {}'
                         .format(fileToGet))
                 return dest
     #
@@ -2171,8 +2157,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
                 env.logger.trace('Copying {} to {}'.format(source_file, dest))
                 shutil.copyfile(source_file, dest)
                 if calculateMD5(dest, partial=True) != fileSig[1]:
-                    env.logger.warning('Downloaded file {} is different from remote copy. You might '
-                        'want to remove local file and try again to update your local copy.'
+                    env.logger.warning('MD5 signature mismatch: {}'
                         .format(dest))
                 return dest
             else:
