@@ -4508,7 +4508,8 @@ def admin(args):
                 res.getRemoteManifest()
                 res.selectFiles(resource_type=args.update_resource)
                 res.excludeExistingLocalFiles(env.shared_resource)
-                if env.shared_resource != env.local_resource:
+                if env.shared_resource != env.local_resource and \
+                    not os.access(env.shared_resource, os.W_OK):
                     res.excludeExistingLocalFiles(env.local_resource)
                 env.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
                 res.downloadResources()
