@@ -1715,11 +1715,17 @@ class ResourceManager:
         if resource_type == 'all':
             return
         elif resource_type == 'existing':
-            resource_dir = os.path.expanduser(env.local_resource)
+            resource_dir = os.path.expanduser(env.shared_resource)
             # go through directories
             filenames = set()
             for root, dirs, files in os.walk(resource_dir):
                 filenames |= set([os.path.relpath(os.path.join(root, f), resource_dir) for f in files])
+            #
+            if not os.access(env.shared_resource, os.W_OK) and \
+                env.shared_resource != env.local_resource:
+                for root, dirs, files in os.walk(env.local_resource):
+                    filenames |= set([os.path.relpath(os.path.join(root, f), env.local_resource) for f in files])
+            #
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x in filenames}
             return
         elif resource_type == 'format':
@@ -2106,14 +2112,14 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
                     .format(fileToGet))
             return dest
     else:
-        # look for the file in local resource directory
+        # look for the file in shared resource directory
         dest_dir = os.path.join(env.shared_resource, os.path.split(local_fileToGet)[0])
         dest = os.path.join(env.shared_resource, local_fileToGet)
         # if the file is there, return it directly
         if (not checkUpdate) and os.path.isfile(dest) and \
             calculateMD5(dest, partial=True) == fileSig[1]:
             return dest
-        # if the local resource is not writable, write to ~/.variant_tools
+        # if the share resource is not writable, write to ~/.variant_tools
         if not os.access(env.shared_resource, os.W_OK):
             dest_dir = os.path.join(env.local_resource, os.path.split(local_fileToGet)[0])
             dest = os.path.join(env.local_resource, local_fileToGet)
