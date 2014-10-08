@@ -80,7 +80,7 @@ class LiftOverTool:
         chainFile = '{0}To{1}.over.chain.gz'.format(from_build, to_build.title())
         if not os.path.isfile(chainFile):
             try:
-                chainFileURL = 'http://hgdownload-test.cse.ucsc.edu/goldenPath/{0}/liftOver/{1}'.format(
+                chainFileURL = 'http://hgdownload.cse.ucsc.edu/goldenPath/{0}/liftOver/{1}'.format(
                     from_build, chainFile)
                 env.logger.info('Downloading liftOver chain file from UCSC')
                 chainFile = downloadFile(chainFileURL, env.cache_dir)

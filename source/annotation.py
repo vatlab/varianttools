@@ -38,7 +38,8 @@ from multiprocessing import Process, Pipe
 from .project import AnnoDB, Project, Field, AnnoDBWriter
 from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressGzFile, \
-    compressFile, SQL_KEYWORDS, extractField, env, isAnnoDB
+    compressFile, SQL_KEYWORDS, extractField, env, isAnnoDB, \
+    calculateMD5
 from .importer import LineProcessor, TextReader
 from .preprocessor import *
   
@@ -68,6 +69,7 @@ class AnnoDBConfiger:
         self.build = []
         self.descrption = ''
         self.direct_url = None
+        self.db_md5 = None
         self.source_type = None
         self.source_url = None
         self.source_files = None
@@ -149,9 +151,16 @@ class AnnoDBConfiger:
                 # for backward compatibility, change old houstonbioinformatics.org host
                 # to new one
                 if item[1].startswith('http://vtools.houstonbioinformatics.org/'):
-                    self.direct_url = item[1][len('http://vtools.houstonbioinformatics.org/'):]
+                    self.direct_url = item[1][len('http://vtools.houstonbioinformatics.org/'):].strip()
                 else:
-                    self.direct_url = item[1]
+                    self.direct_url = item[1].strip()
+                #
+                # if a md5 signature is put after the URL, in the format of
+                # fileToGet md5=xxxxxxxxxx, assign self.db_md5
+                if self.direct_url.rsplit(None, 1)[-1].startswith('md5='):
+                    url, md5 = self.direct_url.rsplit(None, 1)
+                    self.direct_url = url
+                    self.db_md5 = md5
             elif item[0] == 'encoding':
                 self.encoding = item[1]
             elif item[0] == 'preprocessor':
@@ -392,7 +401,7 @@ class AnnoDBConfiger:
                 try:
                     dbFile = downloadFile(self.direct_url)
                     s = delayedAction(env.logger.info, 'Decompressing {}'.format(dbFile))
-                    dbFile = decompressGzFile(dbFile, inplace=False)
+                    dbFile = decompressGzFile(dbFile, inplace=False, md5=self.db_md5)
                     del s
                     return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields, linked_name)
                 except RuntimeError as e:
@@ -405,7 +414,8 @@ class AnnoDBConfiger:
         #
         if rebuild:
             dbFile = self.name + ('-' + self.version if self.version else '') + '.DB.gz'
-            env.logger.info('Creating compressed database {}'.format(dbFile))
+            env.logger.info('Creating compressed database {} for DB with md5 {}'
+                .format(dbFile, calculateMD5(self.name + '.DB', partial=True)))
             compressFile(self.name + '.DB', dbFile)
         return AnnoDB(self.proj, self.name, linked_by, anno_type, linked_fields, linked_name)
 

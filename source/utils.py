@@ -1847,7 +1847,7 @@ def compressFile(infile, outfile):
                 buffer = input.read(100000)
     return outfile
 
-def decompressGzFile(filename, inplace=True, force=False):
+def decompressGzFile(filename, inplace=True, force=False, md5=None):
     '''Decompress a file.gz and return file if needed'''
     if filename.lower().endswith('.tar.gz') or filename.lower().endswith('.tar.bz2'):
         dest_files = []
@@ -1863,31 +1863,51 @@ def decompressGzFile(filename, inplace=True, force=False):
                     tar.extract(f, path)
         return dest_files
     elif filename.lower().endswith('.gz'):
-        dest_dir = os.path.dirname(filename)
-        if not os.access(dest_dir, os.W_OK):
-            # if we are decompressing files from a read-only shared repository
-            if os.path.abspath(dest_dir).startswith(os.path.abspath(env.shared_resource)):
-                new_filename = '{}/{}'.format(env.local_resource, 
-                    os.path.abspath(filename)[len(os.path.abspath(env.shared_resource)):-3])
-            else:
-                raise RuntimeError('Failed to decompress file {}: directory or writable'.format(filename))
-        else:
-            new_filename = filename[:-3]
-        env.logger.trace('Decompressing {} to {}'.format(filename, new_filename))
+        #
+        new_filename = filename[:-3]
         # if the decompressed file exists, and is newer than the .gz file, ignore
         if os.path.isfile(new_filename) \
             and os.path.getmtime(new_filename) > os.path.getmtime(filename) \
             and os.path.getsize(new_filename) > os.path.getsize(filename) \
             and not force:
+            if md5 is not None and md5 != calculateMD5(new_filename, partial=True):
+                env.logger.warning('Mismatch MD5 signature of an existing database. Please remove it for re-decompressing {}'
+                    .format(new_filename))
             env.logger.debug('Reusing existing decompressed file {}'.format(new_filename))
             return new_filename
         #
+        # check if dest_dir is writable
+        dest_dir = os.path.dirname(filename)
+        if not os.access(dest_dir, os.W_OK):
+            # if we are decompressing files from a read-only shared repository
+            # write to local_resource
+            if os.path.abspath(dest_dir).startswith(os.path.abspath(env.shared_resource)):
+                new_filename = '{}/{}'.format(env.local_resource, 
+                    os.path.abspath(filename)[len(os.path.abspath(env.shared_resource)):-3])
+                if os.path.isfile(new_filename) \
+                    and os.path.getmtime(new_filename) > os.path.getmtime(filename) \
+                    and os.path.getsize(new_filename) > os.path.getsize(filename) \
+                    and not force:
+                    if md5 is not None and md5 != calculateMD5(new_filename, partial=True):
+                        env.logger.warning('Mismatch MD5 signature of an existing database. Please remove it for re-decompressing {}'
+                            .format(new_filename))
+                    env.logger.debug('Reusing existing decompressed file {}'.format(new_filename))
+                    return new_filename
+            else:
+                raise RuntimeError('Failed to decompress file {}: directory not writable'.format(filename))
+        #
+        if not os.path.isdir(dest_dir):
+            os.makedirs(dest_dir)
+        #
+        env.logger.trace('Decompressing {} to {}'.format(filename, new_filename))
         try:
             with gzip.open(filename, 'rb') as input, open(new_filename, 'wb') as output:
                 buffer = input.read(100000)
                 while buffer:
                     output.write(buffer)
                     buffer = input.read(100000)
+            if md5 is not None and md5 != calculateMD5(new_filename, partial=True):
+                env.logger.warning('Mismatch MD5 signature: {}'.format(new_filename))
         # Python 2.7.4 and 3.3.1 have a regression bug that prevents us from opening
         # certain types of gzip file (http://bugs.python.org/issue17666).
         except TypeError as e:
