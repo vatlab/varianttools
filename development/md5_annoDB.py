@@ -35,17 +35,28 @@ import argparse
 import time
 from variant_tools.utils import calculateMD5
 
-def fixMD5(annFile, dbFile):
+def fixMD5(annFile):
     #
-    md5 = calculateMD5(dbFile, partial=True)
     lines = []
+    d, f = os.path.split(annFile)
     with open(annFile) as ann:
         for line in ann:
-            if ann.startswith('direct_URL'):
-                direct_URL = line.lsplit('=')[1].strip()
-                if 'md5=' in direct_URL:
-                    direct_URL = direct_URL.rsplit(None, 1)[0]
-                lines.append('direct_URL={}\tmd5={}'.format(direct_URL, md5))
+            if line.startswith('direct_url'):
+                direct_URL = line.split('=')[1].strip()
+                if '\t' in direct_URL:
+                    direct_URL = direct_URL.rsplit('\t', 1)[0]
+                # file name
+                if not direct_URL.endswith('.DB.gz'):
+                    print('No .DB.gz file is specified in direct_URL: {}'.format(direct_URL))
+                    return
+                gzFile = os.path.split(direct_URL)[-1]
+                unzippedFile = os.path.join(d, gzFile[:-3])
+                if not os.path.isfile(unzippedFile):
+                    print('Cannot find unzipped file {}'.format(unzippedFile))
+                    return
+                md5 = calculateMD5(unzippedFile, partial=True)
+                lines.append('direct_url={}\t{}'.format(direct_URL, md5))
+                print('md5 signature of {} added to {}'.format(unzippedFile, annFile))
             else:
                 lines.append(line.rstrip())
                 
@@ -56,22 +67,16 @@ def fixMD5(annFile, dbFile):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''Manage variant tools resources''')
-    parser.add_argument('annFile', 
-        help='''A .ann file that will be modified for md5 information.''')
-    parser.add_argument('dbFile', nargs='*',
-        help='''A corresponding .DB file whose md5 signature will be added to field
-            direct_URL of the .ann file. If unspecified, $name.DB corresponding to
-            $name.ann will be used.'''
+    parser.add_argument('annFiles', nargs='+',
+        help='''One or more .ann files that will be modified for md5 information. For 
+            each file with name $name.ann, a $name.DB file is expected. ''')
     args = parser.parse_args()
-    if not args.annFile.endswith('.ann'):
-        raise ValueError('The first file should be an .ann file')
-    if not args.dbFile:
-        args.dbFile = args.annFile[:-3] + '.DB'
-    if not os.path.isfile(args.annFile):
-        raise ValueError('Missing .ann file {}'.format(args.annFile))
-    if not os.path.isfile(args.dbFile):
-        raise ValueError('Missing .DB file {}'.format(args.dbFile))
-    #
-    fixMD5(args.annFile, args.dbFile)
+    for ann in args.annFiles:
+        if not ann.endswith('.ann'):
+            raise ValueError('The first file should be an .ann file')
+        if not os.path.isfile(ann):
+            raise ValueError('Missing .ann file {}'.format(ann))
+        #
+        fixMD5(ann)
 
 
