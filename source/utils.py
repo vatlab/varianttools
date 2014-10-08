@@ -157,6 +157,8 @@ class RuntimeEnvironments(object):
             self._shared_resource = self._local_resource
         else:
             self._shared_resource = site_options.shared_resource
+            if not os.path.isdir(site_options.shared_resource):
+                os.makedirs(site_options.shared_resource)
         #
         self._logfile_verbosity = self.persistent_options['logfile_verbosity'][0]
         self._verbosity = self.persistent_options['verbosity'][0]
@@ -1542,11 +1544,11 @@ class ResourceManager:
     
     def writeManifest(self, dest_file=None, URLs=False):
         if dest_file is None:
-            if os.path.isdir(env.local_resource) and \
-                os.access(env.local_resource, os.W_OK):
+            if os.path.isdir(env.shared_resource) and \
+                os.access(env.shared_resource, os.W_OK):
+                dest_file = os.path.join(env.shared_resource, 'MANIFEST_ALL.txt')
+            elif os.path.isdir(env.local_resource):
                 dest_file = os.path.join(env.local_resource, 'MANIFEST_ALL.txt')
-            elif os.path.isdir(os.path.expanduser('~/.variant_tools')):
-                dest_file = os.path.expanduser('~/.variant_tools/MANIFEST_ALL.txt')
         #
         keys = self.manifest.keys()
         keys.sort()
@@ -1630,15 +1632,15 @@ class ResourceManager:
         
     def getLocalManifest(self):
         '''Get a manifest of files from local resource'''
-        if os.path.isdir(env.local_resource) and \
-            os.access(env.local_resource, os.W_OK) and \
-            os.path.isfile(os.path.join(env.local_resource, 'MANIFEST_ALL.txt')):
+        if os.path.isdir(env.shared_resource) and \
+            os.access(env.shared_resource, os.W_OK) and \
+            os.path.isfile(os.path.join(env.shared_resource, 'MANIFEST_ALL.txt')):
             # if a local MANIFEST is there in env.local_resource, use it
-            manifest_file = os.path.join(env.local_resource, 'MANIFEST_ALL.txt')
-        elif os.path.isdir(os.path.expanduser('~/.variant_tools')) and \
-            os.path.isfile(os.path.expanduser('~/.variant_tools/MANIFEST_ALL.txt')):
+            manifest_file = os.path.join(env.shared_resource, 'MANIFEST_ALL.txt')
+        elif os.path.isdir(env.local_resource) and \
+            os.path.isfile(os.path.join(env.local_resource, 'MANIFEST_ALL.txt')):
             # if a local resource is not writable, check user's MANIFEST
-            manifest_file = os.path.expanduser('~/.variant_tools/MANIFEST_ALL.txt')
+            manifest_file = os.path.join(env.local_resource, 'MANIFEST_ALL.txt')
         else:
             # if not, we will have to download a file.
             self.getRemoteManifest()
