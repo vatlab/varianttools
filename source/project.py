@@ -4442,6 +4442,11 @@ def adminArguments(parser):
             databases which can be slow and take a lot of disk spaces. Note
             that files larger than 15G are excluded from batch download and
             can only be downloaded individually.''')
+    resource.add_argument('--mirror_repository', metavar='dest',
+        help='''Mirror the main variant tools repository to a local directory. This 
+            command will check files under dest, download all missing or outdated
+            files. Existing files that do not belong to the repository will not
+            be removed.''')
     merge = parser.add_argument_group('Merge samples')
     merge.add_argument('--merge_samples', action='store_true',
         help='''Merge samples with the same sample names by combining genotypes
@@ -4513,6 +4518,21 @@ def admin(args):
                     res.excludeExistingLocalFiles(env.local_resource)
                 env.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
                 res.downloadResources()
+            sys.exit(0)
+        elif args.mirror_repository:
+            with Project(verbosity=args.verbosity, mode='ALLOW_NO_PROJ') as proj:
+                res = ResourceManager()
+                res.getRemoteManifest('http://bioinformatics.mdanderson.org/Software/VariantTools/repository/')
+                if not os.path.isdir(args.mirror_repository):
+                    os.makedirs(args.mirror_repository)
+                res.excludeExistingLocalFiles(args.mirror_repository)
+                if env.shared_resource != env.local_resource and \
+                    not os.access(env.shared_resource, os.W_OK):
+                    res.excludeExistingLocalFiles(env.local_resource)
+                env.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
+                res.downloadResources(dest_dir=args.mirror_repository)
+                res.writeManifest(dest_file=os.path.join(args.mirror_repository, 'MANIFEST.txt'), 
+                    URLs=False)
             sys.exit(0)
         # other options requires a project
         with Project(verbosity=args.verbosity) as proj:
