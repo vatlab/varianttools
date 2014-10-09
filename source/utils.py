@@ -1665,7 +1665,10 @@ class ResourceManager:
                 #
                 try:
                     env.logger.trace('Downloading mirrors.txt from {}'.format(path))
-                    mirror_file = downloadURL(path + '/MIRRORS.txt', dest=env.temp_dir, quiet=True)
+                    if '://' not in path:
+                        mirror_file = os.path.join(path, 'MIRRORs.txt')
+                    else:
+                        mirror_file = downloadURL(path + '/MIRRORS.txt', dest=env.temp_dir, quiet=True)
                     with open(mirror_file) as m:
                         for line in m:
                             if line.startswith('#'):
@@ -1685,7 +1688,10 @@ class ResourceManager:
             for server in servers.keys():
                 try:
                     # try to download from a local or online repository
-                    manifest_file = downloadURL(server + '/MANIFEST.txt', dest=env.temp_dir, quiet=True)
+                    if '://' not in server:
+                        manifest_file = os.path.join(server, 'MANIFEST.txt')
+                    else:
+                        manifest_file = downloadURL(server + '/MANIFEST.txt', dest=env.temp_dir, quiet=True)
                 except Exception as e:
                     env.logger.trace('Failed to read MANIFEST.txt from {}: {}'.format(server, e))
                     continue

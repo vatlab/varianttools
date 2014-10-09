@@ -46,4 +46,4 @@ search_path='http://bioinformatics.mdanderson.org/Software/VariantTools/reposito
 #   to this directory by users, and shared by all users. This option is easier
 #   to implement and requires less maintenance. The system admin can choose to
 #   mirror the variant tools repository and let the users to keep it up to date.
-shared_resource=None
+shared_resource='/Users/bpeng1/shared'
