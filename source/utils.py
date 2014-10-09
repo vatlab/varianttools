@@ -2109,7 +2109,11 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
     resource = ResourceManager()
     resource.getLocalManifest()
     if fileToGet not in resource.manifest:
-        raise RuntimeError('Cannot download {} because it is not in the variant tools online repository.'.format(fileToGet))
+        # update to the latest manifest and see if we still 
+        # cannot find the file
+        resource.getRemoteManifest()
+        if fileToGet not in resource.manifest:
+            raise RuntimeError('Cannot download {} because it is not in the variant tools online repository.'.format(fileToGet))
     #
     fileSig = resource.manifest[fileToGet]
     if dest_dir is not None:
