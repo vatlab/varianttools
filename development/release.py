@@ -207,9 +207,14 @@ def buildExecutables(git_dir, option):
                     shutil.rmtree(dest)
             simuPOP_modules = ['simuPOP.demography', 'simuPOP.utils', 'simuPOP.plotter', 'simuPOP.gsl', 'simuPOP.sampling', 'simuPOP.sandbox']
             print('Building executable {} ...'.format(exe))
+            # pyinstaller unfornately needs these files but cannot process them...
+            # I have to overwrite these files with the py2 version.
+            for f in ['source/assoTests_py3.py', 'source/cgatools_py3.py', 'source/ucsctools_py3.py']:
+                shutil.copy(f.replace('py3', 'py2'), f)
             with open(os.devnull, 'w') as fnull:
                 cmd = 'python {} {} --log-level=ERROR {} {} '.format(os.path.join(git_dir, 'pyinstaller.py'), option,
                     ' '.join(['--hidden-import {}'.format(m) for m in simuPOP_modules]), exe)
+                print('Running {}'.format(cmd))
                 ret = subprocess.call(cmd, shell=True, stdout=fnull)
                 if ret != 0:
                     sys.exit('Failed to create executable for command {}'.format(exe))
