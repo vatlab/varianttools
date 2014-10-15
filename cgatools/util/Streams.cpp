@@ -419,7 +419,7 @@ namespace cgatools { namespace util {
         std::getline(in, line);
         if (line.size() > 0 && '\r' == line[line.size()-1])
             line.resize(line.size()-1);
-        return 0 != static_cast<void*>(in);
+        return in.good();
     }
 
     void OutputStream::open(const char* fn)
