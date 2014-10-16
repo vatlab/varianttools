@@ -382,9 +382,10 @@ def sequenceArguments(parser):
             boundaries of specified regions. If one or more names (refGene.name) are 
             specified, only specified genes will be translated.''')
     parser.add_argument('--mark', nargs='*',
-        help='''Mark a location (--mark chr pos) or a variant (--mark chr pos ref alt) in red
-            in the output. If a variant is specified, the changed nuclotide or amino acid will
-            be printed. Currently only single nucleotide polymorphisms are supported.''')
+        help='''Mark a location (--mark chr pos), a variant (--mark chr pos ref alt), or 
+            a region (e.g. refGene_exon.name:NM_000947) in red in the output. If a variant
+            is specified, the changed nucleotide or amino acid will be printed. Currently 
+            only single nucleotide polymorphisms are supported.''')
 
 def sequence(args):
     #
@@ -405,6 +406,19 @@ def sequence(args):
             args.build = proj.build
         #
         regions = expandRegions(';'.join(args.regions), proj, mergeRegions=False)
+        # if a region is specified
+        if args.mark:
+            if len(args.mark) == 1:
+                regs = expandRegions(args.mark[0], proj, mergeRegions=True)
+                args.mark = []
+                for r in regs:
+                    args.mark.extend([r[0],x] for x in range(r[1], r[2]+1))
+            else:
+                # only one position or variant will be marked
+                if len(args.mark) > 2:
+                    if args.mark[2] == '-' or args.mark[3] == '-' or len(args.mark[2]) != 1 or len(args.mark[3]) != 1:
+                        env.logger.warning('Get protein sequence does not support indels yet.')
+                args.mark = [[args.mark[0][3:] if args.mark[0].startswith('chr') else args.mark[0], int(args.mark[1])] + args.mark[2:]]
     #
     if not args.build:
         raise RuntimeError('Failed to get build of reference from the current project.')
@@ -424,35 +438,32 @@ def printDNASequence(args, regions):
     # get chromosomal region
     for chr, start, end, comment in regions:
         # get reference seq
-        reversed_seq = False
         seq = ref.getSequence(chr, start, end)
         # right now, we only support marking one locus with chr pos, or chr pos ref alt
         mut_idx = None
         if args.mark:
-            if len(args.mark) > 2:
-                if args.mark[2] == '-' or args.mark[3] == '-' or len(args.mark[2]) != 1 or len(args.mark[3]) != 1:
-                    env.logger.warning('Get protein sequence does not support indels yet.')
-            if args.mark[0].startswith('chr'):
-                loc = (args.mark[0][3:], int(args.mark[1]))
-            else:
-                loc = (args.mark[0], int(args.mark[1]))
-            if loc[0] == chr and loc[1] >= start and loc[1] <= end:
-                idx = loc[1] - start
-                if len(args.mark) > 2:
-                    if args.mark[2] != seq[idx]:
-                        env.logger.warning('Reference alleles mismatch (chr {}, pos {}, ref {}, mutant ref {})'
-                            .format(args.mark[0], args.mark[1], seq[idx], args.mark[2]))
-                    seq = seq[:idx] + args.mark[3].lower() + seq[idx+1:]
+            seq = [x for x in seq]
+            for m in args.mark:
+                if m[0] == chr and m[1] >= start and m[1] <= end:
+                    idx = m[1] - start
+                    if len(m) > 2:
+                        if m[2] != seq[idx]:
+                            env.logger.warning('Reference alleles mismatch (chr {}, pos {}, ref {}, mutant ref {})'
+                                .format(m[0], m[1], seq[idx], m[2]))
+                        seq[idx] = m[3].lower()
+                    else:
+                        seq[idx] = seq[idx].lower()
+                    mut_idx = idx
                 else:
-                    seq = seq[:idx] + seq[idx].lower() + seq[idx+1:]
-                mut_idx = idx
-            else:
-                env.logger.debug('Failed to mark mutant {}'.format(loc))
+                    env.logger.debug('Failed to mark mutant {}'.format(loc))
         #
         if 'reverse' in comment:
             start, end = end, start
             reversed_seq = True
             seq = ''.join([complement_table[x] for x in seq[::-1]])
+        else:
+            reversed_seq = False
+            seq = ''.join(seq)
         print('>ref|{}|{}:{}-{} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr,
             start, end, '({})'.format(comment) if comment else ''))
         # break into pieces of 70 bp
@@ -506,7 +517,7 @@ def printProteinSequence(args, regions):
                     chr if chr.startswith('chr') else 'chr' + chr,
                     ','.join(['{}-{}'.format(y,x) for ch,x,y in coding[::-1]]),
                     sum([y-x+1 for ch,x,y in coding])))
-            seq = getProteinSequence(structure, mutants=[args.mark])
+            seq = getProteinSequence(structure, mutants=args.mark)
             # break into pieces of 70 bp
             if args.numbered:
                 char_per_line = 60 if args.char_per_line is None else args.char_per_line

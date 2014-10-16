@@ -3861,8 +3861,8 @@ def getProteinSequence(structure, mutants=[]):
                             .format(m[0], m[1], seq[idx], m[2]))
                     seq = seq[:idx] + m[3] + seq[idx+1:]
                 mut_idx.append(idx)
-            else:
-                env.logger.debug('Failed to mark mutant {}'.format(loc))
+            #else:
+            #    env.logger.debug('Failed to mark mutant {}'.format(loc))
     #
     if len(seq) // 3 * 3 != len(seq):
         raise ValueError('Translated sequence should have length that is multiple of 3')
