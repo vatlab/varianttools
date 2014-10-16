@@ -3829,17 +3829,55 @@ def dissectGene(gene, proj):
         'coding': coding, 'upstream': upstream, 'downstream': downstream,
         'build': proj.build}
 
-def getProteinSequence(structure):
+def getProteinSequence(structure, mutants=[]):
+    '''Get protein sequence, mark locations of mutants if a list of variants
+    are given (as a list of (chr, pos, ref, alt))'''
     ref = RefGenome(structure['build'])
     seq = ''
     for reg in structure['coding']:
         seq += ref.getSequence(reg[0], reg[1], reg[2])
+    mut_idx = []
+    if mutants:
+        loc_map = {}
+        index = 0
+        for reg in structure['coding']:
+            for pos in range(reg[1], reg[2]+1):
+                loc_map[(reg[0], pos)] = index
+                index += 1
+        for m in mutants:
+            if len(m) > 2:
+                if m[2] == '-' or m[3] == '-' or len(m[2]) != 1 or len(m[3]) != 1:
+                    env.logger.warning('Get protein sequence does not support indels yet.')
+                    continue
+            if m[0].startswith('chr'):
+                loc = (m[0][3:], int(m[1]))
+            else:
+                loc = (m[0], int(m[1]))
+            if loc in loc_map:
+                idx = loc_map[loc]
+                if len(m) > 2:
+                    if m[2] != seq[idx]:
+                        env.logger.warning('Reference alleles mismatch (chr {}, pos {}, ref {}, mutant ref {})'
+                            .format(m[0], m[1], seq[idx], m[2]))
+                    seq = seq[:idx] + m[3] + seq[idx+1:]
+                mut_idx.append(idx)
+            else:
+                env.logger.debug('Failed to mark mutant {}'.format(loc))
+    #
     if len(seq) // 3 * 3 != len(seq):
         raise ValueError('Translated sequence should have length that is multiple of 3')
     if structure['strand'] == '+':
         # if len(seq) == 9, range(0, 9, 3) ==> 0, 3, 6
-        return ''.join([codon_table[seq[i:i+3]] for i in range(0, len(seq), 3)])
+        pseq = [codon_table[seq[i:i+3]] for i in range(0, len(seq), 3)]
     else:
         # if len(seq) == 9, range(6, -1, -3) ==> 6, 3, 0
-        return ''.join([codon_table_reverse_complement[seq[i:i+3]] for i in range(len(seq)-3, -1, -3)])
+        pseq = [codon_table_reverse_complement[seq[i:i+3]] for i in range(len(seq)-3, -1, -3)]
+    if mut_idx:
+        if structure['strand'] == '+':
+            for i in mut_idx:
+                pseq[i//3] = pseq[i//3].lower()
+        else:
+            for i in mut_idx:
+                pseq[-(1+i//3)] = pseq[-(1+i//3)].lower()
+    return ''.join(pseq)
 

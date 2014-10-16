@@ -381,6 +381,10 @@ def sequenceArguments(parser):
             sequence. The complete protein sequence will be printed regardless of the
             boundaries of specified regions. If one or more names (refGene.name) are 
             specified, only specified genes will be translated.''')
+    parser.add_argument('--mark', nargs='*',
+        help='''Mark a location (--mark chr pos) or a variant (--mark chr pos ref alt) in red
+            in the output. If a variant is specified, the changed nuclotide or amino acid will
+            be printed. Currently only single nucleotide polymorphisms are supported.''')
 
 def sequence(args):
     #
@@ -409,18 +413,46 @@ def sequence(args):
     else:
         printProteinSequence(args, regions)
 
+
+def markLowerCase(seq):
+    '''Given a string, mark small characters with color.'''
+    return ''.join([('\033[41m' + x.upper() + '\033[0m') if x.islower() else x for x in seq])
+
+
 def printDNASequence(args, regions):
     ref = RefGenome(args.build)
     # get chromosomal region
     for chr, start, end, comment in regions:
         # get reference seq
+        reversed_seq = False
+        seq = ref.getSequence(chr, start, end)
+        # right now, we only support marking one locus with chr pos, or chr pos ref alt
+        mut_idx = None
+        if args.mark:
+            if len(args.mark) > 2:
+                if args.mark[2] == '-' or args.mark[3] == '-' or len(args.mark[2]) != 1 or len(args.mark[3]) != 1:
+                    env.logger.warning('Get protein sequence does not support indels yet.')
+            if args.mark[0].startswith('chr'):
+                loc = (args.mark[0][3:], int(args.mark[1]))
+            else:
+                loc = (args.mark[0], int(args.mark[1]))
+            if loc[0] == chr and loc[1] >= start and loc[1] <= end:
+                idx = loc[1] - start
+                if len(args.mark) > 2:
+                    if args.mark[2] != seq[idx]:
+                        env.logger.warning('Reference alleles mismatch (chr {}, pos {}, ref {}, mutant ref {})'
+                            .format(args.mark[0], args.mark[1], seq[idx], args.mark[2]))
+                    seq = seq[:idx] + args.mark[3].lower() + seq[idx+1:]
+                else:
+                    seq = seq[:idx] + seq[idx].lower() + seq[idx+1:]
+                mut_idx = idx
+            else:
+                env.logger.debug('Failed to mark mutant {}'.format(loc))
+        #
         if 'reverse' in comment:
             start, end = end, start
             reversed_seq = True
-            seq = ''.join([complement_table[x] for x in ref.getSequence(chr, start, end)[::-1]])
-        else:
-            seq = ref.getSequence(chr, start, end)
-            reversed_seq = False
+            seq = ''.join([complement_table[x] for x in seq[::-1]])
         print('>ref|{}|{}:{}-{} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr,
             start, end, '({})'.format(comment) if comment else ''))
         # break into pieces of 70 bp
@@ -432,20 +464,21 @@ def printDNASequence(args, regions):
             if args.numbered == 'left':
                 fmt = '{{:>{0}}} '.format(len(str(end)))
                 print('\n'.join([
-                    fmt.format(end - i if reversed_seq else start + i) + ' '.join([seq[i+10*j:i+10*j+10] for j in range(block_per_line)])
+                    fmt.format(end - i if reversed_seq else start + i) + ' '.join([
+                        markLowerCase(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)])
                     for i in range(0, len(seq), char_per_line)]))
             else:
                 fmt = ' {{:>{0}}}'.format(len(str(end)))
                 last_line = len(seq) / char_per_line * char_per_line
                 residue = last_line + char_per_line - len(seq)
                 print('\n'.join([
-                    ' '.join([seq[i+10*j:i+10*j+10] for j in range(block_per_line)]) + 
+                    ' '.join([markLowerCase(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) + 
                     ((' ' * residue + fmt.format(start if reversed_seq else end)) if i == last_line \
                         else fmt.format(end - i - char_per_line + 1 if reversed_seq else start + i + char_per_line - 1)) \
                     for i in range(0, len(seq), char_per_line)]))
         else:
             char_per_line = 70 if args.char_per_line is None else args.char_per_line
-            print('\n'.join([seq[i:i+char_per_line] for i in range(0, len(seq), char_per_line)]))
+            print('\n'.join([markLowerCase(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)]))
 
 
 def printProteinSequence(args, regions):
@@ -473,7 +506,7 @@ def printProteinSequence(args, regions):
                     chr if chr.startswith('chr') else 'chr' + chr,
                     ','.join(['{}-{}'.format(y,x) for ch,x,y in coding[::-1]]),
                     sum([y-x+1 for ch,x,y in coding])))
-            seq = getProteinSequence(structure)
+            seq = getProteinSequence(structure, mutants=[args.mark])
             # break into pieces of 70 bp
             if args.numbered:
                 char_per_line = 60 if args.char_per_line is None else args.char_per_line
@@ -483,20 +516,20 @@ def printProteinSequence(args, regions):
                 if args.numbered == 'left':
                     fmt = '{{:>{0}}} '.format(len(str(len(seq))))
                     print('\n'.join([
-                        fmt.format(i+1) + ' '.join([seq[i+10*j:i+10*j+10] for j in range(block_per_line)])
+                        fmt.format(i+1) + ' '.join([markLowerCase(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)])
                         for i in range(0, len(seq), char_per_line)]))
                 else:
                     fmt = ' {{:>{0}}}'.format(len(str(end)))
                     last_line = len(seq) / char_per_line * char_per_line
                     residue = last_line + char_per_line - len(seq)
                     print('\n'.join([
-                        ' '.join([seq[i+10*j:i+10*j+10] for j in range(block_per_line)]) + 
+                        ' '.join([markLowerCase(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) + 
                         ((' ' * residue + fmt.format(len(seq))) if i == last_line \
                             else fmt.format(i + char_per_line)) \
                         for i in range(0, len(seq), char_per_line)]))
             else:
                 char_per_line = 70 if args.char_per_line is None else args.char_per_line
-                print('\n'.join([seq[i:i+char_per_line] for i in range(0, len(seq), char_per_line)]))
+                print('\n'.join([markLowerCase(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)]))
 
 
 
