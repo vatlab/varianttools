@@ -743,7 +743,7 @@ class PipelineDescription:
                     if item[0] == 'description':
                         self.description = item[1]
                     elif item[0].endswith('_description'):
-                        self.pipeline_descriptions[item[0].rsplit('_', 1)[0]] = item[1]
+                        self.pipeline_descriptions[item[0].strip().rsplit('_', 1)[0]] = item[1]
                     elif item[0] in defaults or item[0].endswith('_comment'):
                         pass
                     else:
@@ -753,8 +753,8 @@ class PipelineDescription:
                 # section header can contain multiple steps
                 # [A_1,B_1,*_3]
                 try:
-                    pnames = [x.rsplit('_', 1)[0] for x in section.split(',')]
-                    pidxs = [x.rsplit('_', 1)[1] for x in section.split(',')]
+                    pnames = [x.strip().rsplit('_', 1)[0] for x in section.split(',')]
+                    pidxs = [x.strip().rsplit('_', 1)[1] for x in section.split(',')]
                 except Exception as e:
                     raise ValueError('Invalid section name {} in pipeline description file {}'
                         .format(section, filename))
@@ -793,7 +793,7 @@ class PipelineDescription:
         self.pipelines = {x:y for x,y in self.pipelines.items() if '*' not in x and '?' not in x}
         # sort steps
         for pname in self.pipelines:
-            self.pipelines[pname].sort(key=lambda x: int(x[0].rsplit('_')[-1]))
+            self.pipelines[pname].sort(key=lambda x: int(x[0].strip().rsplit('_')[-1]))
         # 
         # validate
         for pname in self.pipeline_descriptions:
