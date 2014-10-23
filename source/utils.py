@@ -353,7 +353,12 @@ class RuntimeEnvironments(object):
             sys.stderr.write('Failed to create a temporary directory {}.\n'.format(self._proj_temp_dir))
             self._proj_temp_dir = tempfile.mkdtemp()
     #
-    temp_dir = property(lambda self: os.path.expanduser(self._proj_temp_dir), _set_temp_dir)
+    def _get_temp_dir(self):
+        if self._proj_temp_dir is None:
+            self._set_temp_dir()
+        return os.path.expanduser(self._proj_temp_dir)
+    #
+    temp_dir = property(_get_temp_dir, _set_temp_dir)
     #
     # attribute treat_missing_as_wildtype
     def _set_treat_missing_as_wildtype(self, val):
