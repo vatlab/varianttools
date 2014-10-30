@@ -44,8 +44,8 @@ env.command_line = 'vtools_report ' + ' '.join([x if (x.isalnum() or x.startswit
 # These functions are utility functions used by all reports
 #
 def addCommonArgs(parser):
-    parser.add_argument('-v', '--verbosity', choices=['0', '1', '2'],
-        help='''Output error and warning (0), info (1) and debug (2) information
+    parser.add_argument('-v', '--verbosity', choices=['0', '1', '2', '3'],
+        help='''Output error and warning (0), info (1), debug (2) and trace (3) information
             to standard output (default to 1).'''),
 
 def getoutput(cmd):
@@ -79,8 +79,8 @@ def genotypeOfSample(name=None, ID=None, cond='GT != 0'):
     '''return a list of genotypes for a sample with specified name '''
     with Project(verbosity=env.verbosity) as proj:
         proj.db.attach('{}_genotype'.format(proj.name))
+        cur = proj.db.cursor()
         if name is not None:
-            cur = proj.db.cursor()
             cur.execute("SELECT sample_id FROM sample WHERE sample_name = '{}' "
                 .format(name))
             IDs = cur.fetchall()
@@ -108,12 +108,14 @@ def getSamples(samples, group_by=[]):
     output = getoutput(['vtools', 'execute', 'SELECT {} FROM sample LEFT OUTER JOIN filename ON sample.file_id = filename.file_id {} {};'\
         .format('sample_id, sample_name, {}'.format(', '.join(group_by)) if group_by else 'sample_id, sample_name',
             'WHERE {}'.format(' AND '.join(samples)) if samples else '',
-            'GROUP BY {}'.format(', '.join(group_by)) if group_by else '')]).split('\n')
+            'GROUP BY {}'.format(', '.join(group_by)) if group_by else '')])
+    if not output.strip():
+        sys.exit('There are no available samples to analyze {}.\n'.format(('given {}'.format(samples)) if samples else ''))
     # we return results batch by batch as a generator
     IDs = []
     names = []
     group = ()
-    for line in output:
+    for line in output.split('\n'):
         fields = [x.strip() for x in line.split('\t')]
         ID = fields[0]
         name = fields[1]
@@ -258,8 +260,6 @@ def variantStat(args):
             min_deletion_size, avg_deletion_size, max_deletion_size]))
     else:
         for group, sample_ids, sample_names in getSamples(args.samples, args.group_by):
-            if len(sample_ids) == 0:
-                sys.exit('There are no available samples to analyze {}.\n'.format(('given {}'.format(args.samples)) if args.samples else ''))
             #
             # 2a) Get the counts for snps and substitutions:
             #     command: vtools select __tmp_vs "ref != '-' and alt != '-' and (length(ref) = 1 and length(alt) = 1)" --samples 'sample_id in $sample_ids' --count
