@@ -322,7 +322,7 @@ class RuntimeEnvironments(object):
             path = os.path.expanduser(path)
             if not os.path.isdir(path):
                 raise ValueError('Temp directory {} does not exist'.format(path))
-            if os.path.isdir(path) and (os.listdir(path) or 
+            if os.path.isdir(path) and (
                     (not os.access(path, os.R_OK)) or (not os.access(path, os.W_OK)) or
                     (os.stat(path).st_mode & stat.S_ISVTX == 512)):
                 raise ValueError('Cannot set temporary directory to directory {} because '.format(path) + \
@@ -337,21 +337,22 @@ class RuntimeEnvironments(object):
                     self._proj_temp_dir = subdir
                     os.mkdir(subdir)
                     break
-        # the usual case
-        if self._temp_dir is None:
-            self._proj_temp_dir = tempfile.mkdtemp() 
-        try:
-            if not os.path.isdir(os.path.expanduser(self._proj_temp_dir)):
-                os.makedirs(os.path.expanduser(self._proj_temp_dir))
-            while True:
-                subdir = os.path.join(self._proj_temp_dir, '_tmp_{}'.format(random.randint(1, 1000000)))
-                if not os.path.isdir(subdir):
-                    self._proj_temp_dir = subdir
-                    os.mkdir(subdir)
-                    break
-        except:
-            sys.stderr.write('Failed to create a temporary directory {}.\n'.format(self._proj_temp_dir))
-            self._proj_temp_dir = tempfile.mkdtemp()
+        else:
+            # the usual case
+            if self._temp_dir is None:
+                self._proj_temp_dir = tempfile.mkdtemp() 
+            try:
+                if not os.path.isdir(os.path.expanduser(self._proj_temp_dir)):
+                    os.makedirs(os.path.expanduser(self._proj_temp_dir))
+                while True:
+                    subdir = os.path.join(self._proj_temp_dir, '_tmp_{}'.format(random.randint(1, 1000000)))
+                    if not os.path.isdir(subdir):
+                        self._proj_temp_dir = subdir
+                        os.mkdir(subdir)
+                        break
+            except:
+                sys.stderr.write('Failed to create a temporary directory {}.\n'.format(self._proj_temp_dir))
+                self._proj_temp_dir = tempfile.mkdtemp()
     #
     def _get_temp_dir(self):
         if self._proj_temp_dir is None:

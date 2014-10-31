@@ -4682,8 +4682,8 @@ def admin(args):
                     except Exception as e:
                         raise ValueError('Failed to set value {} to runtime options {}: {}'
                             .format(value, opt, e))
-                    proj.saveProperty('__option_{}'.format(opt), getattr(env, opt))
-                    env.logger.info('Option {} is set to {}'.format(opt, getattr(env, opt)))
+                    proj.saveProperty('__option_{}'.format(opt), getattr(env, '_' + opt))
+                    env.logger.info('Option {} is set to {}'.format(opt, getattr(env, '_' + opt)))
             elif args.reset_runtime_option is not None:
                 if args.reset_runtime_option not in env.persistent_options:
                     raise ValueError('Option {} is not a valid runtime option. '
