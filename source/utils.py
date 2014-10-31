@@ -3085,7 +3085,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                     .format(cond))
             with open(filename, 'w') as idMap:
                 for rec in cur:
-                    idMap.write('{}\t{}\n'.format(rec[0], rec[1]))
+                    idMap.write('{}\t{}\n'.format(rec[0], rec[1] if rec[1].strip() else '.'))
             return filename
         #
         def handleGenotypeParams(matchObj):
