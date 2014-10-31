@@ -334,6 +334,11 @@ class RuntimeEnvironments(object):
             while True:
                 subdir = os.path.join(path, '_tmp_{}'.format(random.randint(1, 1000000)))
                 if not os.path.isdir(subdir):
+                    if self._proj_temp_dir is not None and os.path.isdir(self._proj_temp_dir):
+                        try:
+                            shutil.rmtree(env._proj_temp_dir)
+                        except:
+                            pass
                     self._proj_temp_dir = subdir
                     os.mkdir(subdir)
                     break
@@ -347,6 +352,11 @@ class RuntimeEnvironments(object):
                 while True:
                     subdir = os.path.join(self._proj_temp_dir, '_tmp_{}'.format(random.randint(1, 1000000)))
                     if not os.path.isdir(subdir):
+                        if self._proj_temp_dir is not None and os.path.isdir(self._proj_temp_dir):
+                            try:
+                                shutil.rmtree(env._proj_temp_dir)
+                            except:
+                                pass
                         self._proj_temp_dir = subdir
                         os.mkdir(subdir)
                         break
