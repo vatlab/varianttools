@@ -340,7 +340,7 @@ class RuntimeEnvironments(object):
                         except:
                             pass
                     self._proj_temp_dir = subdir
-                    os.mkdir(subdir)
+                    os.makedirs(subdir)
                     break
         else:
             # the usual case
@@ -358,7 +358,7 @@ class RuntimeEnvironments(object):
                             except:
                                 pass
                         self._proj_temp_dir = subdir
-                        os.mkdir(subdir)
+                        os.makedirs(subdir)
                         break
             except:
                 sys.stderr.write('Failed to create a temporary directory {}.\n'.format(self._proj_temp_dir))
