@@ -1224,15 +1224,14 @@ class Importer:
         for filename in files:
             if filename in existing_files:
                 if force:
-                    env.logger.info('Re-importing imported file {}'.format(filename))
-                    IDs = proj.selectSampleByPhenotype('filename = "{}"'.format(filename))
-                    self.proj.db.attach(self.proj.name + '_genotype')
-                    proj.removeSamples(IDs)
-                    self.proj.db.detach(self.proj.name + '_genotype')
-                    # remove file record
-                    cur = self.db.cursor()
-                    cur.execute('DELETE FROM filename WHERE filename={};'.format(self.db.PH), (filename,))
-                    self.db.commit()
+                    env.logger.warning('Re-importing imported file {}, duplicated samples may occur.'.format(filename))
+                    #IDs = proj.selectSampleByPhenotype('filename = "{}"'.format(filename))
+                    #self.proj.db.attach(self.proj.name + '_genotype')
+                    #proj.removeSamples(IDs)
+                    #self.proj.db.detach(self.proj.name + '_genotype')
+                    #cur = self.db.cursor()
+                    #cur.execute('DELETE FROM filename WHERE filename={};'.format(self.db.PH), (filename,))
+                    #self.db.commit()
                     self.files.append(filename)
                 else:
                     env.logger.info('Ignoring imported file {}'.format(filename))
@@ -1306,8 +1305,13 @@ class Importer:
 
     def recordFileAndSample(self, filename, sampleNames):
         cur = self.db.cursor()
-        cur.execute("INSERT INTO filename (filename) VALUES ({0});".format(self.db.PH), (filename,))
-        filenameID = cur.lastrowid
+        cur.execute('SELECT file_id FROM filename WHERE filename={0}'.format(self.db.PH), (filename,))
+        rec = cur.fetchall()
+        if rec:
+            filenameID = rec[0][0]
+        else:
+            cur.execute("INSERT INTO filename (filename) VALUES ({0});".format(self.db.PH), (filename,))
+            filenameID = cur.lastrowid
         sample_ids = []
         s = delayedAction(env.logger.info, 'Creating {} genotype tables'.format(len(sampleNames)))
         #
