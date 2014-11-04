@@ -2934,6 +2934,9 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
             'samples': '__SAMPLES__',
             'genotype': '__GENOTYPE__'
     }
+    has_in_table_query = False
+    in_table_tokens = {'in_table': '__IN_TABLE__'}
+    #
     for i in range(len(tokens)):
         before_dot = (i + 1 != len(tokens)) and tokens[i+1][1] == '.'
         after_dot = i > 1 and tokens[i-1][1] == '.'
@@ -2952,6 +2955,9 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
         elif toval.lower() in samples_tokens:
             toval = samples_tokens[toval.lower()]
             has_samples_query = True
+        elif toval.lower() in in_table_tokens:
+            toval = in_table_tokens[toval.lower()]
+            has_in_table_query = True
         #
         if toktype == token.NAME and toval.upper() not in SQL_KEYWORDS:
             if before_dot:
@@ -3162,6 +3168,8 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
         # variant_id will be passed to samples() and genotype() function and is 
         # therefore needed.
         fields.append('variant.variant_id')
+    if has_in_table_query:
+        query = re.sub("__IN_TABLE__\s*\(", 'in_table(variant_id, ', query)
     #
     return query, fields
 

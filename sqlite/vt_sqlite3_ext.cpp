@@ -1835,6 +1835,36 @@ static void track(
 }
 
 
+static void in_table(
+                     sqlite3_context * context,
+                     int argc,
+                     sqlite3_value ** argv
+                     )
+{
+	// parameters passed:
+	// name of variant table
+	int variant_id = sqlite3_value_int(argv[0]);
+	char * var_table = (char *)sqlite3_value_text(argv[1]);
+
+	char sql[255];
+	sprintf(sql, "SELECT 1 FROM %s WHERE variant_id = %d LIMIT 0,1",
+			var_table, variant_id);
+	sqlite3_stmt * stmt;
+	int result = sqlite3_prepare_v2(sqlite3_context_db_handle(context), sql, -1, &stmt, NULL);
+	if (result != SQLITE_OK) {
+		//sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
+		sqlite3_result_null(context);
+		return;
+	}
+	// there should be zero or one matching record
+	result = sqlite3_step(stmt);
+	sqlite3_result_int(context, result == SQLITE_ROW);
+	return;
+}
+
+
+
+
 sqlite3 * geno_db;
 typedef std::map<std::string, int> SampleNameIdMap;
 SampleNameIdMap nameIdMap;
@@ -2378,6 +2408,7 @@ int sqlite3_my_extension_init(
 	// pad_variant(file, chr, pos, ref, alt, name)  ==> 10 - A ==> 9 name G GA
 	sqlite3_create_function(db, "vcf_variant", -1, SQLITE_ANY, 0, vcf_variant, 0, 0);
 	sqlite3_create_function(db, "track", -1, SQLITE_ANY, 0, track, 0, 0);
+	sqlite3_create_function(db, "in_table", 2, SQLITE_ANY, 0, in_table, 0, 0);
 	sqlite3_create_function(db, "genotype", -1, SQLITE_ANY, 0, genotype, 0, 0);
 	sqlite3_create_function(db, "samples", -1, SQLITE_ANY, 0, samples, 0, 0);
 	return 0;
