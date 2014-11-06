@@ -1902,8 +1902,8 @@ def decompressGzFile(filename, inplace=True, force=False, md5=None):
                         return new_filename
             else:
                 raise RuntimeError('Failed to decompress file {}: directory not writable'.format(filename))
-        #
-        if not os.path.isdir(dest_dir):
+        # dest_dir can be '' if there is no path for filename
+        if dest_dir and not os.path.isdir(dest_dir):
             os.makedirs(dest_dir)
         #
         env.logger.trace('Decompressing {} to {}'.format(filename, new_filename))

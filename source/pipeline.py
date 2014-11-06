@@ -430,6 +430,17 @@ class OutputText:
             sys.stdout.write(self.text)        
         return ifiles
 
+class TerminateIf:
+    '''Terminate a pipeline if a condition is not met'''
+    def __init__(self, cond, message):
+        self.cond = cond
+        self.message = message
+
+    def __call__(self, ifiles, pipeline=None):
+        if self.cond:
+            raise RuntimeError(self.message)
+        return ifiles
+
 class ImportModules:
     '''Import names from one or more modules to a global dictionary
     VT_MODULE'''
@@ -1084,11 +1095,6 @@ class RunCommand:
         # the input can be fake .file_info files
         if not all([os.path.isfile(x) for x in ifiles]):
             raise RewindExecution()
-        if self.max_jobs == 1:
-            run_command(self.cmd, output=self.output, working_dir=self.working_dir)
-        else:
-            run_command_in_parallel(self.cmd, output=self.output, working_dir=self.working_dir,
-                max_jobs=self.max_jobs)
         # add md5 signature of input and output files
         if self.output:
             with open(self.output[0] + '.exe_info', 'w') as exe_info:
@@ -1098,6 +1104,11 @@ class RunCommand:
                     # for performance considerations, use partial MD5
                     exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
                         calculateMD5(f, partial=True)))
+        if self.max_jobs == 1:
+            run_command(self.cmd, output=self.output, working_dir=self.working_dir)
+        else:
+            run_command_in_parallel(self.cmd, output=self.output, working_dir=self.working_dir,
+                max_jobs=self.max_jobs)
         if self.output:
             return self.output
         else:
@@ -1360,7 +1371,7 @@ class DownloadResource:
     resource directory is $local_resource/pipeline_resource/NAME where NAME
     is the name of the pipeline.'''
     def __init__(self, resource, dest_dir):
-        self.resource = resource.split()
+        self.resource = [x for x in resource.split() if x]
         if not dest_dir or type(dest_dir) != str:
             raise ValueError('Invalid resource directory {}'.format(dest_dir))
         else:
@@ -1515,6 +1526,9 @@ class Pipeline:
                 'vtools_version': proj.version,
             }
         self.VARS.update(**kwargs)
+        # we need to put self.pipeline.pipeline_vars in self.VARS because
+        # they might refer to each other
+        self.VARS.update(self.pipeline.pipeline_vars)
         for key, val in self.pipeline.pipeline_vars.items():
             self.VARS[key.lower()] = substituteVars(val, self.VARS)
         #
