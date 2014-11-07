@@ -441,6 +441,17 @@ class TerminateIf:
             raise RuntimeError(self.message)
         return ifiles
 
+class WarnIf:
+    '''Send a warning message if a condition is not met'''
+    def __init__(self, cond, message):
+        self.cond = cond
+        self.message = message
+
+    def __call__(self, ifiles, pipeline=None):
+        if self.cond:
+            env.logger.warning(self.message)
+        return ifiles
+
 class ImportModules:
     '''Import names from one or more modules to a global dictionary
     VT_MODULE'''
