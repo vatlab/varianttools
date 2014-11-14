@@ -796,9 +796,9 @@ def run_command(cmd, output=None, working_dir=None, max_jobs=1):
         env.lock(proc_lck, str(os.getpid()))
     start_time=time.time()
     for cur_cmd in cmd:
+        env.logger.info('Running [[{}]]'.format(cur_cmd))
         ret = subprocess.call(cur_cmd, shell=True, stdout=proc_out, stderr=proc_err,
             cwd=working_dir)
-        env.logger.info('Running [[{}]]'.format(cur_cmd))
         if ret < 0:
             if output:
                 try:
