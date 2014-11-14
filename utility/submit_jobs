@@ -118,7 +118,8 @@ class Jobs:
                 keys['output'] = None
             # replace $1, etc in script with values of keys
             s = script
-            for k,v in keys.items():
+            for k in sorted(keys.keys(), reverse=True):
+                v = keys[k]
                 # first protect double $ sign.
                 s = re.sub(r'\$\$', r'%%%', s)
                 # subsitute in script
