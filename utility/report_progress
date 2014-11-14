@@ -54,9 +54,9 @@ except ImportError:
 
 def extractEpoch(logfile):
     # this marks the start of pipeline (another pattern is 'Executing ...'
-    start_pattern = re.compile(r'(\d+-\d+-\d+\s\d+:\d+:\d+),\d+:\sDEBUG:\sINPUT of step\s([^_]+)_(\w+)')
-    end_pattern = re.compile(r'(\d+-\d+-\d+\s\d+:\d+:\d+),\d+:\sDEBUG:\sStep\s[^.]+.([^_]+)_(\w+) is executed successfully.')
-    failed_pattern = re.compile(r'(\d+-\d+-\d+\s\d+:\d+:\d+),\d+:\sDEBUG:\sFailed to execute\s[^.]+.([^_]+)_(\w+).')
+    start_pattern = re.compile(r'(\d+-\d+-\d+\s\d+:\d+:\d+),\d+:\sDEBUG:\sINPUT of step\s([a-zA-Z0-9_]+)_(\w+)')
+    end_pattern = re.compile(r'(\d+-\d+-\d+\s\d+:\d+:\d+),\d+:\sDEBUG:\sStep\s[^.]+.([a-zA-Z0-9_]+)_(\w+) is executed successfully.')
+    failed_pattern = re.compile(r'(\d+-\d+-\d+\s\d+:\d+:\d+),\d+:\sDEBUG:\sFailed to execute\s[^.]+.([a-zA-Z0-9_]+)_(\w+).')
     #
     step_times = []
     with open(logfile) as logfile:
