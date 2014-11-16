@@ -1401,20 +1401,7 @@ class DownloadResource:
     def __call__(self, ifiles, pipeline=None):
         saved_dir = os.getcwd()
         os.chdir(self.pipeline_resource)
-        lockfile = os.path.join(self.pipeline_resource, '.varianttools.lck')
-        while True:
-            if os.path.isfile(lockfile):
-                env.logger.warning('Wait till file lock {} is release.'.format(lockfile))
-                time.sleep(10)
-            else:
-                break
-        # if there is no lock file, proceed
-        # create a lock file
-        env.lock(lockfile)
-        try:
-            ofiles, md5files = self._downloadFiles(ifiles)
-        finally:
-            env.unlock(lockfile)
+        ofiles, md5files = self._downloadFiles(ifiles)
         self._validate(md5files)
         os.chdir(saved_dir)
         return ofiles
