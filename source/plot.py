@@ -561,12 +561,12 @@ QQplot <- function(dat, multiple=T, color='default', shapeFixed=F, shapeValue=1,
 			pobj <- pobj + scale_colour_manual(values=mycols)
 		}
 		pobj <- pobj +
-		opts(legend.key = theme_rect(colour = 'white', fill = 'white', size = 0.5, linetype='blank')) +
-		opts(legend.justification=c(1,0), legend.position=c(1,0)) +
-		opts(legend.background = theme_rect(fill="transparent", size=.5, linetype="blank")) +
-		opts(legend.title=theme_blank()) +
+		theme(legend.key = element_rect(colour = 'white', fill = 'white', size = 0.5, linetype='blank')) +
+		theme(legend.justification=c(1,0), legend.position=c(1,0)) +
+		theme(legend.background = element_rect(fill="transparent", size=.5, linetype="blank")) +
+		theme(legend.title=element_blank()) +
 		scale_x_continuous(limits=c(0,max(qqDat$ept)), breaks=0:max(qqDat$ept), labels=0:max(qqDat$ept))
-		if(label && nrow(qqTopHit)>0) pobj <- pobj + geom_text(data = qqTopHit, aes(ept, logObs, label = gene, colour=factor(method)), vjust = 1.5, size = as.numeric(topFont), show_guide = FALSE, legend = FALSE)
+		if(label && nrow(qqTopHit)>0) pobj <- pobj + geom_text(data = qqTopHit, aes(ept, logObs, label = gene, colour=factor(method)), vjust = 1.5, size = as.numeric(topFont), show_guide = FALSE)
 	} else {
 		if(!shapeFixed) shapeValue <- (shapeValue+as.numeric(index))%%20
         mycols <- NA
@@ -577,27 +577,27 @@ QQplot <- function(dat, multiple=T, color='default', shapeFixed=F, shapeValue=1,
 		} else {
 		    pobj <- ggplot(qqDat, aes(x=ept, y=logObs)) + geom_point(binwidth = 0.8, size=2.0, shape=shapeValue)
         }
-		pobj <- pobj + opts(legend.position="none") + scale_x_continuous(limits=c(0,max(qqDat$ept)), breaks=0:max(qqDat$ept), labels=0:max(qqDat$ept))
+		pobj <- pobj + theme(legend.position="none") + scale_x_continuous(limits=c(0,max(qqDat$ept)), breaks=0:max(qqDat$ept), labels=0:max(qqDat$ept))
 		if(label && nrow(qqTopHit)>0) {
             if (!is.na(mycols)) {
-                pobj <- pobj + geom_text(data = qqTopHit, aes(ept, logObs, label = gene), colour=mycols, vjust = 1.5, size = as.numeric(topFont), show_guide = FALSE, legend = FALSE)
+                pobj <- pobj + geom_text(data = qqTopHit, aes(ept, logObs, label = gene), colour=mycols, vjust = 1.5, size = as.numeric(topFont), show_guide = FALSE)
             } else {
-                pobj <- pobj + geom_text(data = qqTopHit, aes(ept, logObs, label = gene), vjust = 1.5, size = as.numeric(topFont), show_guide = FALSE, legend = FALSE)
+                pobj <- pobj + geom_text(data = qqTopHit, aes(ept, logObs, label = gene), vjust = 1.5, size = as.numeric(topFont), show_guide = FALSE)
             }
         }
 	}
 	pobj <- pobj +
-	opts(title=paste(title,'\\n')) +
-	opts(axis.text.x = theme_text(angle=0, size=12)) +
-	opts(axis.text.y = theme_text(angle=0, size=12)) +
-	opts(axis.title.y = theme_text(face="bold", colour= "black", angle=90, size=13)) +
-	opts(axis.title.x = theme_text(face="bold", colour= "black", size=13)) +
-	#opts(plot.title = theme_text(size=16, face="bold")) +
-	opts(plot.title = theme_text(size=14)) +
-    opts(panel.background = theme_rect(fill = "white",colour = "black")) +
-	opts(panel.grid.minor=theme_blank()) +
-	opts(plot.background = theme_rect(fill = "transparent",colour = NA)) +
-	#opts(strip.text.x = theme_text(face = 'bold')) +
+	ggtitle(paste(title,'\\n')) +
+	theme(axis.text.x = element_text(angle=0, size=12)) +
+	theme(axis.text.y = element_text(angle=0, size=12)) +
+	theme(axis.title.y = element_text(face="bold", colour= "black", angle=90, size=13)) +
+	theme(axis.title.x = element_text(face="bold", colour= "black", size=13)) +
+	#theme(plot.title = element_text(size=16, face="bold")) +
+	theme(plot.title = element_text(size=14)) +
+    theme(panel.background = element_rect(fill = "white",colour = "black")) +
+	theme(panel.grid.minor=element_blank()) +
+	theme(plot.background = element_rect(fill = "transparent",colour = NA)) +
+	#theme(strip.text.x = element_text(face = 'bold')) +
 	#xlab(expression(-log[10](italic(p[expected])))) + ylab(expression(-log[10](italic(p[observed]))))
 	xlab(expression(paste(-log[10], " " ,italic(p)[expected]))) + ylab(expression(paste(-log[10], " " ,italic(p)[observed])))
 
@@ -703,7 +703,7 @@ manhattanplot <- function(dataframe, facet=F, color='default', title='', chroms=
     if (facet) plotObj <- plotObj + facet_grid(FACET ~ ., scales = "free", space="free")
     if(length(annotate)>0){
         d.annotate <- d[which(d$GENE %in% annotate), ]
-        if (nrow(d.annotate)) plotObj <- plotObj + geom_text(data = d.annotate, aes(pos, logp, label = GENE), face='bold', colour='black', vjust = -1.0, size = as.numeric(topFont)+1, show_guide = FALSE, legend = FALSE)
+        if (nrow(d.annotate)) plotObj <- plotObj + geom_text(data = d.annotate, aes(pos, logp, label = GENE), face='bold', colour='black', vjust = -1.0, size = as.numeric(topFont)+1, show_guide = FALSE)
     }
     if(labelTopGenes > 0){
         d.tops=data.frame()
@@ -714,20 +714,20 @@ manhattanplot <- function(dataframe, facet=F, color='default', title='', chroms=
             d.tops <- d[which(d$logp>=sort(d$logp, decreasing=TRUE, na.last=NA)[labelTopGenes]), ]
             if(length(annotate)>0) d.tops <- d.tops[which(!(d.tops$GENE %in% annotate)), ]
         }
-        if (nrow(d.tops)) plotObj <- plotObj + geom_text(data = d.tops, aes(pos, logp, label = GENE, colour=factor(CHR)), vjust = -1.0, size = as.numeric(topFont), show_guide = FALSE, legend = FALSE)
+        if (nrow(d.tops)) plotObj <- plotObj + geom_text(data = d.tops, aes(pos, logp, label = GENE, colour=factor(CHR)), vjust = -1.0, size = as.numeric(topFont), show_guide = FALSE)
     }
     agl = 90
     if (is.null(chrprefix)) agl = 0
     plotObj <- plotObj +
-    opts(legend.position = "none") +
-    opts(title=paste(title, '\\n')) +
-    opts(panel.background=theme_rect(fill="white", colour="black")) +
-    opts(panel.grid.minor=theme_blank()) +
-    opts(axis.text.x = theme_text(angle=agl, size=11)) +
-    opts(axis.text.y = theme_text(angle=0, size=12)) +
-    opts(axis.title.y = theme_text(colour= "black", angle=90, size=13)) +
-    opts(axis.title.x = theme_text(colour= "black", size=13))
-    #opts(axis.ticks=theme_segment(colour=NA))
+    theme(legend.position = "none") +
+    ggtitle(paste(title, '\\n')) +
+    theme(panel.background=element_rect(fill="white", colour="black")) +
+    theme(panel.grid.minor=element_blank()) +
+    theme(axis.text.x = element_text(angle=agl, size=11)) +
+    theme(axis.text.y = element_text(angle=0, size=12)) +
+    theme(axis.title.y = element_text(colour= "black", angle=90, size=13)) +
+    theme(axis.title.x = element_text(colour= "black", size=13))
+    #theme(axis.ticks=element_segment(colour=NA))
 
     gwPval = -log10(0.05/length(unique(d$GENE)))
     if (gwLine) plotObj <- plotObj + geom_hline(yintercept=gwPval,colour="red", linetype="dashed")
