@@ -4431,17 +4431,15 @@ def adminArguments(parser):
         choices=['current', 'all', 'existing', 'hg18', 'hg19', 'annotation', 
             'format', 'snapshot', 'pipeline'],
         help='''Download resources of specified type, which can be 'current' 
-            (latest version of all resources excluding snapshots), 'all' (all 
-            resources including obsolete databases), 'existing' (only update
-            resources that exist locally), 'hg18' or 'hg19' (all resources for
-            reference genome hg18 or hg19), 'annotation' (all current annotation
-            databases), 'format' (all formats), and 'snapshot' (all online
-            snapshots). Identical resources that are available locally (under
-            ~/.variant_tools or runtime option $local_resource) are ignored.
-            Note that option 'all' will download all versions of annotation 
-            databases which can be slow and take a lot of disk spaces. Note
-            that files larger than 15G are excluded from batch download and
-            can only be downloaded individually.''')
+            (latest version of all resources), 'all' (all resources including
+            obsolete databases), 'existing' (only update resources that exist
+            locally), 'hg18' or 'hg19' (all resources for reference genome hg18
+            or hg19), 'annotation' (all current annotation databases), 'format'
+            (all formats), and 'snapshot' (all online snapshots). Identical
+            resources that are available locally (under ~/.variant_tools or
+            runtime option $local_resource) are ignored. Note that option 
+            'all' will download all versions of annotation databases which
+            can be slow and take a lot of disk spaces. ''')
     resource.add_argument('--mirror_repository', metavar='dest',
         help='''Mirror the main variant tools repository to a local directory. This 
             command will check files under dest, download all missing or outdated
@@ -4525,14 +4523,11 @@ def admin(args):
                 res.getRemoteManifest('http://bioinformatics.mdanderson.org/Software/VariantTools/repository/')
                 if not os.path.isdir(args.mirror_repository):
                     os.makedirs(args.mirror_repository)
-                res.excludeExistingLocalFiles(args.mirror_repository)
-                if env.shared_resource != env.local_resource and \
-                    not os.access(env.shared_resource, os.W_OK):
-                    res.excludeExistingLocalFiles(env.local_resource)
-                env.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
-                res.downloadResources(dest_dir=args.mirror_repository)
                 res.writeManifest(dest_file=os.path.join(args.mirror_repository, 'MANIFEST.txt'), 
                     URLs=False)
+                res.excludeExistingLocalFiles(args.mirror_repository)
+                env.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
+                res.downloadResources(dest_dir=args.mirror_repository)
             sys.exit(0)
         # other options requires a project
         with Project(verbosity=args.verbosity) as proj:

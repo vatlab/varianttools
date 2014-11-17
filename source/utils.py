@@ -1838,7 +1838,7 @@ class ResourceManager:
             fileprop = self.manifest[filename]
             #
             try:
-                downloaded = downloadFile(filename, dest_dir=dest_dir, 
+                downloaded = downloadFile(filename, dest_dir=dest_dir if dest_dir is None else os.path.join(dest_dir, os.path.split(filename)[0]), 
                     checkUpdate=True, quiet=False, 
                     message='{}/{} {}'.format(cnt+1, len(self.manifest), filename))
                 # check md5
