@@ -201,6 +201,7 @@ def plotEventSummary(output, events):
     #
     plt.figure(figsize=[8, 0.2*len(events)+2])
     plt.rc('font', size=6)
+    plt.subplots_adjust(left=0.2, right=0.95, top=0.95, bottom=0.05)
     plt.plot([], [], '-')
     plt.grid(True, linestyle=':', color='0.75')
     total_time = (end_time - start_time).total_seconds()
@@ -249,7 +250,7 @@ def plotEventSummary(output, events):
                 x = [epo.start_time, epo.ongoing_time]
                 duration = epo.ongoing_time - epo.start_time
                 duration = timedelta(seconds=int(duration.total_seconds()))
-                c = 'purple'
+                c = colors[all_steps.index((epo.name, epo.step)) % len(colors)]
                 bw = 0.05
             else:  # unknown
                 style = '-'
@@ -278,6 +279,8 @@ if __name__ == '__main__':
     parser.add_argument('--output', default='progress',
         help='''Name of the output file (in pdf format). progress.pdf will be 
             used if no file is specified.''')
+    parser.add_argument('--separated', default=False, action='store_true',
+        help='''Plot separate figures for each jobs''')
     #
     args = parser.parse_args()
     #
@@ -301,5 +304,7 @@ if __name__ == '__main__':
     print('{} steps for piplines {} from {} to {} are identified'.format(
         len(steps), ', '.join(sorted(pipelines)), start_time, end_time))
     #
-    plotEvents(args.output, steps, events)
-    plotEventSummary(args.output + '_summary', events)
+    if args.separated:
+        plotEvents(args.output, steps, events)
+    else:
+        plotEventSummary(args.output, events)
