@@ -132,10 +132,14 @@ def retrieveLogFiles(files):
     return logfiles
 
 
-def plotEvents(output, steps, events):
-    #fig, ax = plt.subplots()
-    filename = output if output.endswith('.pdf') else output + '.pdf'
-    pp = PdfPages(filename)
+def plotEvents(steps, events):
+    start_time = min([min([y.start_time for y in x]) for x in events.values()])
+    # the latested completed, failed or start time
+    end_time = max([max([max([z for z in (y.start_time, y.end_time, y.failed_time, y.ongoing_time) if z is not None]) for y in x]) for x in events.values()])
+    # normalize to seconds
+    end_time = start_time + timedelta(seconds=int((end_time - start_time).total_seconds()))
+    pad = timedelta(seconds=(end_time - start_time).total_seconds()/40.)
+    #
     for name in sorted(events.keys()):
         epochs = events[name]
         print('Drawing figure for log file {}'.format(name))
@@ -187,35 +191,35 @@ def plotEvents(output, steps, events):
                 x = [epo.start_time, epo.start_time]
                 c = 'purple'
             plt.plot(x, y, style, color=c)
-        pp.savefig()
-    pp.close()
     print('Figures saved to {}'.format(filename))
 
 
-def plotEventSummary(output, events):
-    #fig, ax = plt.subplots()
-    filename = output if output.endswith('.pdf') else output + '.pdf'
-    pp = PdfPages(filename)
-    #
+def plotEventSummary(output, steps, events):
     jobs = sorted(events.keys())
+    # the earliest start time
+    start_time = min([min([y.start_time for y in x]) for x in events.values()])
+    # the latested completed, failed or start time
+    end_time = max([max([max([z for z in (y.start_time, y.end_time, y.failed_time, y.ongoing_time) if z is not None]) for y in x]) for x in events.values()])
+    # normalize to seconds
+    end_time = start_time + timedelta(seconds=int((end_time - start_time).total_seconds()))
+    pad = timedelta(seconds=(end_time - start_time).total_seconds()/40.)
     #
-    plt.figure(figsize=[8, 0.2*len(events)+2])
     plt.rc('font', size=6)
-    plt.subplots_adjust(left=0.2, right=0.95, top=0.95, bottom=0.05)
+    plt.subplots_adjust(left=0.2, right=0.95, top=0.90, bottom=0.05)
     plt.plot([], [], '-')
     plt.grid(True, linestyle=':', color='0.75')
     total_time = (end_time - start_time).total_seconds()
     plt.xlim(start_time - pad, end_time + pad)
     plt.ylim(-1, len(jobs))
-    plt.yticks(range(len(jobs)), [x.rsplit('.', 1)[0] for x in jobs], fontsize=5)
-    plt.xlabel('Time', fontsize=5)
+    plt.yticks(range(len(jobs)), [x.rsplit('.', 1)[0] for x in jobs], fontsize=6)
+    plt.xlabel('Time')
     plt.ylabel('Jobs')
     plt.plot([start_time, start_time], [-1, 0], '-', color='black', linewidth=0.5)
-    plt.text(start_time, -0.8, ' {}'.format(start_time), fontsize=5)
+    plt.text(start_time, -0.8, ' {}'.format(start_time), fontsize=6)
     plt.text(start_time + timedelta(seconds=int((end_time - start_time).total_seconds()/2.)), -0.8,
-        '{} '.format(timedelta(seconds=int((end_time - start_time).total_seconds()))), fontsize=5, ha='center')
+        '{} '.format(timedelta(seconds=int((end_time - start_time).total_seconds()))), fontsize=6, ha='center')
     plt.plot([end_time, end_time], [-1, 0], '-', color='black', linewidth=0.5)
-    plt.text(end_time, -0.8, '{} '.format(end_time), fontsize=5, ha='right')
+    plt.text(end_time, -0.8, '{} '.format(end_time), fontsize=6, ha='right')
     plt.gcf().autofmt_xdate()
     #plt.xticks([0, 1], ['0', '1'], fontsize=8)
     plt.title('Progress of {} jobs'.format(len(jobs)))
@@ -262,9 +266,6 @@ def plotEventSummary(output, events):
             if duration.total_seconds() > total_time / 20:
                 plt.text(epo.start_time + duration/2, y[0], epo.step, ha='center', va='center', fontsize=5)
             plt.fill_between(x, [k-bw for k in y], [k+bw for k in y], color=c)
-    pp.savefig()
-    pp.close()
-    print('Figures saved to {}'.format(filename))
 
 
 if __name__ == '__main__':
@@ -276,35 +277,45 @@ if __name__ == '__main__':
             will be copied to a temporary directory using command scp. No
             password can be specified so public key authentication is needed
             if a password is needed.''')
-    parser.add_argument('--output', default='progress',
+    parser.add_argument('--output', default='progress.pdf',
         help='''Name of the output file (in pdf format). progress.pdf will be 
             used if no file is specified.''')
     parser.add_argument('--separated', default=False, action='store_true',
         help='''Plot separate figures for each jobs''')
+    parser.add_argument('--update', type=int,
+        help='''If an interval is given (in seconds), keep the figure on screen
+            and update it automatically for every such seconds.''')
+    parser.add_argument('--scale', type=int, default=1,
+        help='''Scale up the figure when it is displayed on screen. ''')
     #
     args = parser.parse_args()
     #
-    steps = set()
-    events = {}
-    for logfile in retrieveLogFiles(args.logfiles):
-        e = extractEpoch(logfile)
-        if e:
-            steps |= set([(x.name, x.step) for x in e])
-            events[os.path.split(logfile)[-1]] = e
-    #
-    pipelines = set([x[0] for x in steps])
-    # the earliest start time
-    start_time = min([min([y.start_time for y in x]) for x in events.values()])
-    # the latested completed, failed or start time
-    end_time = max([max([max([z for z in (y.start_time, y.end_time, y.failed_time, y.ongoing_time) if z is not None]) for y in x]) for x in events.values()])
-    # normalize to seconds
-    end_time = start_time + timedelta(seconds=int((end_time - start_time).total_seconds()))
-    pad = timedelta(seconds=(end_time - start_time).total_seconds()/40.)
-    steps = list(sorted(steps))
-    print('{} steps for piplines {} from {} to {} are identified'.format(
-        len(steps), ', '.join(sorted(pipelines)), start_time, end_time))
-    #
-    if args.separated:
-        plotEvents(args.output, steps, events)
-    else:
-        plotEventSummary(args.output, events)
+    while True:
+        steps = set()
+        events = {}
+        for logfile in retrieveLogFiles(args.logfiles):
+            e = extractEpoch(logfile)
+            if e:
+                steps |= set([(x.name, x.step) for x in e])
+                events[os.path.split(logfile)[-1]] = e
+        #
+        pp = PdfPages(args.output)
+        if args.update:
+            fig = plt.figure(1, figsize=[8, 0.2*len(events)+2], dpi=args.scale * 100)
+            fig.patch.set_facecolor('white')
+        else:
+            fig = plt.figure(1, figsize=[8, 0.2*len(events)+2])
+        if args.separated and not args.update:
+            plotEvents(args.output, list(sorted(steps)), events)
+        else:
+            plotEventSummary(args.output, list(sorted(steps)), events)
+        print('Figures saved to {}'.format(args.output))
+        pp.savefig()
+        pp.close()
+        if args.update:
+            plt.draw()
+            plt.show(block=False)
+            time.sleep(args.update)
+        else:
+            break
+
