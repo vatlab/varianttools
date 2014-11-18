@@ -229,6 +229,7 @@ def plotEventSummary(output, steps, events):
         all_steps.extend([(epo.name, epo.step) for epo in e])
     all_steps = sorted(list(set(all_steps)))
     colors = ['blue', 'green', 'cyan', 'magenta', 'yellow']
+    last_steps = ['' for x in jobs]
     for name in jobs:
         idx = jobs.index(name)
         epochs = events[name]
@@ -266,6 +267,14 @@ def plotEventSummary(output, steps, events):
             if duration.total_seconds() > total_time / 20:
                 plt.text(epo.start_time + duration/2, y[0], epo.step, ha='center', va='center', fontsize=5)
             plt.fill_between(x, [k-bw for k in y], [k+bw for k in y], color=c)
+        # record the lasst epo 
+        last_steps[idx] = str(epo.step)
+    # mark the last step on the right axis
+    ax2 = plt.gca().twinx()
+    ax2.set_ylim(-1, len(jobs))
+    ax2.set_yticks(range(len(jobs)))
+    ax2.set_yticklabels(last_steps)
+    ax2.yaxis.tick_right()
 
 
 if __name__ == '__main__':
@@ -302,6 +311,7 @@ if __name__ == '__main__':
         pp = PdfPages(args.output)
         if args.update:
             fig = plt.figure(1, figsize=[8, 0.2*len(events)+2], dpi=args.scale * 100)
+            fig.clf()
             fig.patch.set_facecolor('white')
         else:
             fig = plt.figure(1, figsize=[8, 0.2*len(events)+2])
