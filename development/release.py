@@ -212,7 +212,7 @@ def buildExecutables(git_dir, option):
             for f in ['source/assoTests_py3.py', 'source/cgatools_py3.py', 'source/ucsctools_py3.py']:
                 shutil.copy(f.replace('py3', 'py2'), f)
             with open(os.devnull, 'w') as fnull:
-                cmd = 'python {} {} --log-level=ERROR {} {} '.format(os.path.join(git_dir, 'pyinstaller.py'), option,
+                cmd = 'pyinstaller {} --log-level=ERROR {} {} '.format(option,
                     ' '.join(['--hidden-import {}'.format(m) for m in simuPOP_modules]), exe)
                 print('Running {}'.format(cmd))
                 ret = subprocess.call(cmd, shell=True, stdout=fnull)
