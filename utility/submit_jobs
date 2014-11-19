@@ -157,11 +157,14 @@ class Jobs:
         '''Submit jobs...'''
         # 
         # get a list of running jobs
-        qstat_output = subprocess.check_output(self.qstat_cmd, shell=True)
-        running_jobs = [x.strip() for x in qstat_output.decode().split() if x in self.jobs]
+        qstat_output = subprocess.check_output(self.qstat_cmd, shell=True).decode().split()
+        qstat_jobs = {qstat_output[2*x].rstrip(';'):qstat_output[2*x+1] for x in range(len(qstat_output)//2)}
+        running_jobs = [x.strip() for x in qstat_jobs if qstat_jobs[x] == 'R']
+        pending_jobs = [x.strip() for x in qstat_jobs if qstat_jobs[x] == 'Q']
         #
         nIgnored = 0
         nRunning = 0
+        nPending = 0
         nCompleted = 0
         for name,job in self.jobs.items():
             if not self.match(name):
@@ -170,6 +173,9 @@ class Jobs:
             elif name in running_jobs:
                 job.status = 'running'
                 nRunning += 1
+            elif name in pending_jobs:
+                job.status = 'pending'
+                nPending += 1
             elif job.output is not None and os.path.isfile(job.output):
                 job.status = 'completed'
                 nCompleted += 1
@@ -177,24 +183,24 @@ class Jobs:
                 job.status = 'failed'
             else:
                 job.status = 'unsubmitted'
-        #
+            #
         # submit jobs
         submitted = 0
         for name in [x for x,y in self.jobs.items() if y.status in ['unsubmitted', 'failed']]:
-            if submitted + len(running_jobs) > self.max_jobs:
+            if submitted + len(running_jobs) + len(pending_jobs) > self.max_jobs:
                 break
             if self.jobs[name] == 'failed':
                 self.mailer.sendmail('Failed job {} has been resumitted.'.format(name))
                 print('Resubmitting failed job {}'.format(name))
             else:
                 print('Submitting new job {}'.format(name))
-            self.jobs[name].status = 'running'
+            self.jobs[name].status = 'pending'
             subprocess.call(self.qsub_cmd.replace('$name', name), shell=True)
             submitted += 1
-        print('{} jobs processed: {} submitted, {} running/pending, {} completed, {} remaining.'
-            .format(len(self.jobs) - nIgnored, submitted, nRunning, nCompleted,
-                len(self.jobs) - submitted - nRunning - nCompleted))
-        return nRunning, submitted, len(self.jobs) - nIgnored - submitted - nRunning - nCompleted
+        print('{} jobs processed: {} submitted, {} running, {} pending, {} completed, {} remaining.'
+            .format(len(self.jobs) - nIgnored, submitted, nRunning, nPending, nCompleted,
+                len(self.jobs) - submitted - nRunning - nPending, nCompleted))
+        return nRunning, submitted, len(self.jobs) - nIgnored - submitted - nRunning - nPending - nCompleted
 
 
 if __name__ == '__main__':
@@ -221,8 +227,7 @@ separator (optional): separator to separate joblist, default to ':'
 qsub_cmd (optional): command to submit jobs, with $name representing job name.
     Default: 'qsub < $name.pbs'.
 
-qstat_cmd (optional): command to get a list of running and pending jobs.
-    Default: 'qstat -f | grep Job_Name | cut -d= -f2'
+qstat_cmd (optional): command to get a list of running and pending jobs and their status.
 
 notification_email (optional): an email address to which major events such as
     resubmit of a failed job will be sent. To use this function, you will
@@ -263,7 +268,7 @@ notification_email (optional): an email address to which major events such as
     #
     # add variables defined in configuration file to args
     qsub_cmd = cvars['qsub_cmd'] if 'qsub_cmd' in cvars else 'qsub < $name.pbs'
-    qstat_cmd = cvars['qstat_cmd'] if 'qstat_cmd' in cvars else '''qstat -f | grep 'Job_Name\|job_state' | cut -d= -f2 | awk '{printf $0 ";"; getline; print $0}' | grep -v '; C' | cut -d';' -f1'''
+    qstat_cmd = cvars['qstat_cmd'] if 'qstat_cmd' in cvars else r'''qstat -f | grep 'Job_Name\|job_state' | cut -d= -f2 | awk '{printf $0 ";"; getline; print $0}' | grep -v '; C' '''
     mailer = Mailer(
         cvars['notification_email'] if 'notification_email' in cvars else '',
         cvars['smtp_host'] if 'smtp_host' in cvars else 'localhost',
