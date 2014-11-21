@@ -199,7 +199,7 @@ class Jobs:
             submitted += 1
         print('{} jobs processed: {} submitted, {} running, {} pending, {} completed, {} remaining.'
             .format(len(self.jobs) - nIgnored, submitted, nRunning, nPending, nCompleted,
-                len(self.jobs) - submitted - nRunning - nPending, nCompleted))
+                len(self.jobs) - submitted - nRunning - nPending - nCompleted))
         return nRunning, submitted, len(self.jobs) - nIgnored - submitted - nRunning - nPending - nCompleted
 
 
