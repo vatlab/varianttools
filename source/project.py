@@ -900,14 +900,18 @@ class AnnoDBWriter:
         #
         # creating the info table
         env.logger.trace('Creating {}_info table'.format(self.name))
-        query = 'INSERT INTO {0}_info VALUES (?,?);'.format(self.name)
-        self.createInfoTable()
-        cur.execute(query, ('name', self.name))
-        cur.execute(query, ('anno_type', self.anno_type))
-        cur.execute(query, ('description', self.description))
-        cur.execute(query, ('version', self.version))
-        cur.execute(query, ('build', str(self.build)))
-        self.db.commit()
+        try:
+            query = 'INSERT INTO {0}_info VALUES (?,?);'.format(self.name)
+            self.createInfoTable()
+            cur.execute(query, ('name', self.name))
+            cur.execute(query, ('anno_type', self.anno_type))
+            cur.execute(query, ('description', self.description))
+            cur.execute(query, ('version', self.version))
+            cur.execute(query, ('build', str(self.build)))
+            self.db.commit()
+        except Exception as e:
+            raise ValueError(('Failed to record annotation database, perhaps your .ann '
+                'contains non-ascii characters: {}').format(e))
         env.logger.trace('Creating table {}'.format(self.name))
         self.createAnnotationTable()
     

@@ -230,6 +230,8 @@ class AnnoDBConfiger:
         # download from online? However, users might want to get the latest 
         # version from online, and if they want to use a local copy, they can always
         # use option --files.
+        if not self.source_url:
+            raise ValueError('No source_url is specified in .ann file. Please modify your spec file or use option -f to specify source files.')
         URLs = self.source_url.strip().split()
         ret_files = []
         for URL in URLs:
