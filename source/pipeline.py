@@ -789,7 +789,6 @@ def run_command(cmd, output=None, working_dir=None):
         proc_err = open(output[0] + '.err_{}'.format(os.getpid()), 'w')
         proc_lck = output[0] + '.lck'
     #
-    # wait for empty slot to run the job
     if proc_lck:
         env.lock(proc_lck, str(os.getpid()))
     start_time=time.time()
@@ -816,45 +815,76 @@ def run_command(cmd, output=None, working_dir=None):
                     pass
             raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
                 .format(cur_cmd, elapsed_time(start_time), ret))
+
+
+def submit_command(cmd, output=None, working_dir=None, submitter=None):
+    '''Submit a job and wait for its completion.'''
+    proc_cmd = output[0] + '.sh'
+    proc_done = output[0] + '.done_{}'.format(os.getpid())
+    proc_out = output[0] + '.out_{}'.format(os.getpid())
+    proc_err = output[0] + '.err_{}'.format(os.getpid())
+    proc_lck = output[0] + '.lck'
     #
-    if output:
-        # including output from previous failed runs
-        # this step will fail if the .lck file has been changed by
-        # another process
-        env.unlock(output[0] + '.lck', str(os.getpid()))
-        if not os.path.isfile(output[0] + '.out_{}'.format(os.getpid())) \
-            or not os.path.isfile(output[0] + '.err_{}'.format(os.getpid())):
-            env.logger.warning('Could not locate process-specific output file (id {}), '
-                'which might have been removed by another process that produce '
-                'the same output file {}'.format(os.getpid(), output[0]))
-            # try to rerun this step
-            raise RewindExecution()
-        with open(output[0] + '.exe_info', 'a') as exe_info:
-            exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
-            for f in output:
-                if not os.path.isfile(f):
-                    raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
-                # for performance considerations, use partial MD5
-                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
-                    calculateMD5(f, partial=True)))
-            # write standard output to exe_info
-            exe_info.write('\n\nSTDOUT\n\n')
-            with open(output[0] + '.out_{}'.format(os.getpid())) as stdout:
-                for line in stdout:
-                    exe_info.write(line)
-            # write standard error to exe_info
-            exe_info.write('\n\nSTDERR\n\n')
-            with open(output[0] + '.err_{}'.format(os.getpid())) as stderr:
-                for line in stderr:
-                    exe_info.write(line)
-        # if command succeed, remove all out_ and err_ files, 
-        for filename in glob.glob(output[0] + '.out_*') + \
-            glob.glob(output[0] + '.err_*'):
-            try:
-                os.remove(filename)
-            except Exception as e:
-                env.logger.warning('Fail to remove {}: {}'
-                    .format(filename, e))
+    if proc_lck:
+        env.lock(proc_lck, str(os.getpid()))
+    start_time=time.time()
+    #
+    # create a batch file for execution
+    with open(proc_cmd, 'w') as cmd:
+        cmd.write('#PBS -o {}\n'.format(proc_out))
+        cmd.write('#PBS -e {}\n'.format(proc_err))
+        cmd.write('#PBS -V\n')
+        #
+        if working_dir is not None:
+            cmd.write('[ -d {0} ] || mkdir -p {0}\ncd {0}\n'.format(working_dir))
+        cmd.write('\n'.join(cmd))
+        #
+        # a signal to show the successful completion of the job
+        cmd.write('echo $? >> {}\n'.format(proc_done))
+    #
+    # try to submit command
+    if '{}' in submitter:
+        submit_cmd = submitter.replace('{}', proc_cmd)
+    else:
+        submit_cmd = submitter + ' ' + proc_cmd
+    #
+    ret = subprocess.call(submit_cmd, shell=True, cwd=working_dir)
+    if ret != 0:
+        try:
+            env.unlock(output[0] + '.lck', str(os.getpid()))
+        except:
+            pass
+    if ret < 0:
+        raise RuntimeError("Failed to submit job {} due to signal {}" .format(proc_cmd, -ret))
+    elif ret > 0:
+        raise RuntimeError("Failed to submit job {}".format(proc_cmd))
+    else:
+        # the job has been successfully submitted.
+        while True:
+            if not os.path.isfile(proc_done):
+                time.sleep(60)
+            else:
+                with open(proc_done) as done:
+                    ret = int(done.read().strip())
+            if ret < 0:
+                if output:
+                    try:
+                        env.unlock(output[0] + '.lck', str(os.getpid()))
+                    except:
+                        pass
+                raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
+                    .format(cur_cmd, -ret, elapsed_time(start_time)))
+            elif ret > 0:
+                if output:
+                    with open(output[0] + '.err_{}'.format(os.getpid())) as err:
+                        for line in err.read().split('\n')[-50:]:
+                            env.logger.error(line)
+                    try:
+                        env.unlock(output[0] + '.lck', str(os.getpid()))
+                    except:
+                        pass
+                raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
+                    .format(cur_cmd, elapsed_time(start_time), ret))
 
 
 class RewindExecution(Exception):
@@ -877,7 +907,8 @@ class NullAction:
             return ifiles
         
 class RunCommand:
-    def __init__(self, cmd='', working_dir=None, output=[], locking="exclusive"):
+    def __init__(self, cmd='', working_dir=None, output=[], max_jobs=1, locking="exclusive",
+        submitter=None):
         '''This action execute the specified command under the
         specified working directory, and return specified ofiles.
         #
@@ -890,11 +921,18 @@ class RunCommand:
             self.cmd = [' '.join(cmd.split('\n'))]
         else:
             self.cmd = [' '.join(x.split('\n')) for x in cmd]
+        self.submitter = submitter
         self.working_dir = working_dir
         if type(output) == str:
             self.output = [os.path.expanduser(output)]
         else:
             self.output = [os.path.expanduser(x) for x in output]
+        #
+        if max_jobs > 1 and self.submitter is not None and not self.output:
+            env.logger.warning('Fail to execute in parallel because no output is specified.')
+        # run jobs in parallele only if --jobs > 1, submitter is defined,
+        # and the jobs has output
+        self.run_in_parallel = max_jobs > 1 and submitter is not None and self.output
         #
         for filename in self.output:
             if filename.lower().rsplit('.', 1)[-1] in ['exe_info', 'lck']:
@@ -944,8 +982,52 @@ class RunCommand:
                     # for performance considerations, use partial MD5
                     exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
                         calculateMD5(f, partial=True)))
-        run_command(self.cmd, output=self.output, working_dir=self.working_dir)
+        # Submit the job on a cluster system
+        # 1. if there is output, otherwise we cannot track the status of the job
+        # 2. if resources are specified
+        # 3. if 
+        if self.run_in_parallel:
+            submit_command(self.cmd, output=self.output, working_dir=self.working_dir, submitter=self.submitter)
+        else:
+            run_command(self.cmd, output=self.output, working_dir=self.working_dir)
         if self.output:
+            # including self.output from previous failed runs
+            # this step will fail if the .lck file has been changed by
+            # another process
+            env.unlock(self.output[0] + '.lck', str(os.getpid()))
+            if not os.path.isfile(self.output[0] + '.out_{}'.format(os.getpid())) \
+                or not os.path.isfile(self.output[0] + '.err_{}'.format(os.getpid())):
+                env.logger.warning('Could not locate process-specific self.output file (id {}), '
+                    'which might have been removed by another process that produce '
+                    'the same self.output file {}'.format(os.getpid(), self.output[0]))
+                # try to rerun this step
+                raise RewindExecution()
+            with open(self.output[0] + '.exe_info', 'a') as exe_info:
+                exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
+                for f in self.output:
+                    if not os.path.isfile(f):
+                        raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
+                    # for performance considerations, use partial MD5
+                    exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                        calculateMD5(f, partial=True)))
+                # write standard self.output to exe_info
+                exe_info.write('\n\nSTDOUT\n\n')
+                with open(self.output[0] + '.out_{}'.format(os.getpid())) as stdout:
+                    for line in stdout:
+                        exe_info.write(line)
+                # write standard error to exe_info
+                exe_info.write('\n\nSTDERR\n\n')
+                with open(self.output[0] + '.err_{}'.format(os.getpid())) as stderr:
+                    for line in stderr:
+                        exe_info.write(line)
+            # if command succeed, remove all out_ and err_ files, 
+            for filename in glob.glob(self.output[0] + '.out_*') + \
+                glob.glob(self.output[0] + '.err_*'):
+                try:
+                    os.remove(filename)
+                except Exception as e:
+                    env.logger.warning('Fail to remove {}: {}'
+                        .format(filename, e))
             return self.output
         else:
             # if no output is specified, pass ifiles through
@@ -1375,7 +1457,7 @@ class Pipeline:
             #
             # if there is no input file?
             if not step_input:
-                env.logger.debug('No input file for step {}_{}.'.format(pname, command.index))
+                env.logger.debug('Step ignored because of no input file for step {}_{}.'.format(pname, command.index))
             #
             self.VARS['input{}'.format(command.index)] = step_input
             env.logger.debug('INPUT of step {}_{}: {}'
@@ -1400,14 +1482,35 @@ class Pipeline:
             igroups, step_output = emitter(step_input, self)
             try:
                 for ig in igroups:
-                    #if not ig:
-                    #    continue
+                    if not ig:
+                        continue
                     self.VARS['input'] = ig
                     action = substituteVars(command.action, self.VARS)
                     env.logger.trace('Emitted input of step {}_{}: {}'
                         .format(pname, command.index, ig))
                     env.logger.trace('Action of step {}_{}: {}'
                         .format(pname, command.index, action))
+                    # check if the input file is ready. This is used for
+                    # parallel execution of the pipeline while the input file
+                    # might be worked on by another job
+                    for ifile in ig:
+                        # is ifile in any of the output files?
+                        in_output = any([ifile in x for y,x in self.VARS.items() if y.lower().startswith('output')])
+                        if in_output and os.path.isfile(ifile + '.exe_info'):
+                            while True:
+                                job_completed = False
+                                with open(ifile + '.exe_info') as exe_info:
+                                    for line in exe_info:
+                                        if line.startswith('#End:'):
+                                            job_completed = True
+                                            break
+                                if job_completed:
+                                    break
+                                else:
+                                    env.logger.info('Waiting for the input file {} to be available.'
+                                        .format(ifile))
+                                    time.sleep(60)
+                    #
                     action = eval(action, globals(), VT_GLOBAL)
                     if type(action) == tuple:
                         action = SequentialActions(action)
@@ -1483,8 +1586,6 @@ class Pipeline:
                     .format(pname, command.index, e))
 
 
-
-
 def isBamPairedEnd(input_file):
     # we need pysam for this but pysam does not yet work for Python 3.3.
     if not hasPySam:
@@ -1522,7 +1623,10 @@ def executeArguments(parser):
         help='''Output of the pipelines, usually a list of output files, that
             will be passed to the pipelines as variable ${CMD_OUTPUT}.''')
     parser.add_argument('-j', '--jobs', default=1, type=int,
-        help=argparse.SUPPRESS)
+        help='''Execute the pipeline in parallel model if a number other than
+            1 is specified. In this mode, the RunCommand action will create
+            a shell script and submit the job using a command specified by
+            option ``submitter``,  if this parameter is defined.''')
     parser.add_argument('-d', '--delimiter', default='\t',
         help='''Delimiter used to output results of a SQL query.''')
 
