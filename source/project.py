@@ -776,7 +776,7 @@ class PipelineDescription:
                             step_vars.append([item, parser.get(section, item, vars=defaults)])
                     for pname,pidx in zip(pnames, pidxs):
                         command = PipelineCommand(index=pidx,
-                            input=parser.get(section, 'input', vars=defaults) if 'input' in items else '',
+                            input=parser.get(section, 'input', vars=defaults) if 'input' in items else None,
                             input_emitter=parser.get(section, 'input_emitter', vars=defaults) if 'input_emitter' in items else '',
                             action=parser.get(section, 'action', vars=defaults) if 'action' in items else '',
                             pipeline_vars=step_vars,

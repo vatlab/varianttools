@@ -767,8 +767,6 @@ class GuessReadGroup:
 #   command itself to fail, or stall (which is even worse).
 #
 JOB = namedtuple('JOB', 'proc cmd start_time stdout stderr working_dir output')
-running_jobs = []
-max_running_jobs = 1
 
 def elapsed_time(start):
     '''Return the elapsed time in human readable format since start time'''
@@ -778,7 +776,7 @@ def elapsed_time(start):
         time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
  
   
-def run_command(cmd, output=None, working_dir=None, max_jobs=1):
+def run_command(cmd, output=None, working_dir=None):
     '''Call a list of external command cmd, raise an error if any of them
     fails. '''
     if not output:
@@ -859,173 +857,6 @@ def run_command(cmd, output=None, working_dir=None, max_jobs=1):
                     .format(filename, e))
 
 
-def run_command_in_parallel(cmd, output=None, working_dir=None, max_jobs=1):
-    '''Call a list of external command cmd, raise an error if any of them
-    fails. '''
-    global running_jobs
-    if not output:
-        # subprocess.DEVNULL was introduced in Python 3.3
-        proc_out = None
-        proc_err = None
-        proc_lck = None
-    else:
-        proc_out = open(output[0] + '.out_{}'.format(os.getpid()), 'w')
-        proc_err = open(output[0] + '.err_{}'.format(os.getpid()), 'w')
-        proc_lck = output[0] + '.lck'
-    #
-    # wait for empty slot to run the job
-    while True:
-        if poll_jobs() >= min(max_jobs, max_running_jobs):
-            time.sleep(5)
-        else:
-            break
-    # there is a slot, start running
-    if proc_lck:
-        env.lock(proc_lck, str(os.getpid()))
-    proc = subprocess.Popen(cmd[0], shell=True, stdout=proc_out, stderr=proc_err,
-        cwd=working_dir)
-    running_jobs.append(JOB(proc=proc, cmd=cmd,
-        start_time=time.time(), stdout=proc_out, stderr=proc_err, 
-        working_dir=working_dir, output=output))
-    env.logger.info('Running [[{}]]'.format(cmd[0]))
-    if proc_out is not None:
-        env.logger.trace('Output redirected to {0}.out_{1} and {0}.err_{1} and '
-            'will be saved to {0}.exe_info after completion of command.'
-            .format(output[0], os.getpid()))
-
-def poll_jobs():
-    '''check the number of running jobs.'''
-    global running_jobs
-    count = 0
-    for idx, job in enumerate(running_jobs):
-        if job is None:
-            continue
-        ret = job.proc.poll()
-        if ret is None:  # still running
-            # flush so that we can check output easily
-            if job.stdout is not None:
-                job.stdout.flush()
-                job.stderr.flush()
-            count += 1
-            # if a job is running, wait ... but not to the end
-            time.sleep(10)
-            continue
-        #
-        # job completed, close redirected stdout and stderr
-        if len(job.cmd) == 1 and job.stdout is not None:
-            job.stdout.close()
-            job.stderr.close()
-        #
-        if ret < 0:
-            if job.output:
-                try:
-                    env.unlock(job.output[0] + '.lck', str(os.getpid()))
-                except:
-                    pass
-            raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
-                .format(job.cmd[0], -ret, elapsed_time(job.start_time)))
-        elif ret > 0:
-            if job.output:
-                with open(job.output[0] + '.err_{}'.format(os.getpid())) as err:
-                    for line in err.read().split('\n')[-50:]:
-                        env.logger.error(line)
-                try:
-                    env.unlock(job.output[0] + '.lck', str(os.getpid()))
-                except:
-                    pass
-            raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
-                .format(job.cmd[0], elapsed_time(job.start_time), ret))
-        else:
-            #if job.output:
-            #    with open(job.output[0] + '.err_{}'.format(os.getpid())) as err:
-            #        for line in err.read().split('\n')[-10:]:
-            #            env.logger.info(line)
-            env.logger.info('Command "{}" completed successfully in {}'
-                .format(job.cmd[0], elapsed_time(job.start_time)))
-            # 
-            # if there are no more jobs, complete .exe_info
-            if len(job.cmd) == 1:
-                #
-                if job.output:
-                    # including output from previous failed runs
-                    # this step will fail if the .lck file has been changed by
-                    # another process
-                    env.unlock(job.output[0] + '.lck', str(os.getpid()))
-                    if not os.path.isfile(job.output[0] + '.out_{}'.format(os.getpid())) \
-                        or not os.path.isfile(job.output[0] + '.err_{}'.format(os.getpid())):
-                        env.logger.warning('Could not locate process-specific output file (id {}), '
-                            'which might have been removed by another process that produce '
-                            'the same output file {}'.format(os.getpid(), job.output[0]))
-                        # try to rerun this step
-                        running_jobs[idx] = None
-                        raise RewindExecution()
-                    with open(job.output[0] + '.exe_info', 'a') as exe_info:
-                        exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
-                        for f in job.output:
-                            if not os.path.isfile(f):
-                                raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
-                            # for performance considerations, use partial MD5
-                            exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
-                                calculateMD5(f, partial=True)))
-                        # write standard output to exe_info
-                        exe_info.write('\n\nSTDOUT\n\n')
-                        with open(job.output[0] + '.out_{}'.format(os.getpid())) as stdout:
-                            for line in stdout:
-                                exe_info.write(line)
-                        # write standard error to exe_info
-                        exe_info.write('\n\nSTDERR\n\n')
-                        with open(job.output[0] + '.err_{}'.format(os.getpid())) as stderr:
-                            for line in stderr:
-                                exe_info.write(line)
-                    # if command succeed, remove all out_ and err_ files, 
-                    for filename in glob.glob(job.output[0] + '.out_*') + \
-                        glob.glob(job.output[0] + '.err_*'):
-                        try:
-                            os.remove(filename)
-                        except Exception as e:
-                            env.logger.warning('Fail to remove {}: {}'
-                                .format(filename, e))
-                #
-                running_jobs[idx] = None
-            else:
-                # start the next job in the same slot
-                proc = subprocess.Popen(job.cmd[1], shell=True, stdout=job.stdout,
-                    stderr=job.stderr, cwd=job.working_dir)
-                # use the same slot for the next job
-                running_jobs[idx] = JOB(proc=proc, cmd=job.cmd[1:],
-                    start_time=job.start_time, stdout=job.stdout,
-                    stderr=job.stderr, working_dir=job.working_dir, output=job.output)
-                env.logger.info('Running [[{}]]'.format(job.cmd[1]))
-                # increase the running job count
-                count += 1
-    return count
-
-def wait_all():
-    '''Wait for all pending jobs to complete'''
-    global running_jobs
-    try:
-        while True:
-            if not running_jobs or all([x is None for x in running_jobs]):
-                break
-            # sleep one second, but poll_jobs will wait 10s for each running
-            # job. This avoid waiting at least 10s for simple commands
-            time.sleep(1)
-            if poll_jobs() == 0:
-                break
-    except KeyboardInterrupt:
-        # clean up lock files
-        for job in running_jobs:
-            if job is not None and job.stdout:
-                try:
-                    env.unlock(job.output[0] + '.lck')
-                except:
-                    pass
-        # raise an error instead of exit right now to give vtools
-        # a chance to close databases
-        raise RuntimeError('Keyboard interrupted')
-    running_jobs = []
-
-
 class RewindExecution(Exception):
     pass
 
@@ -1046,8 +877,7 @@ class NullAction:
             return ifiles
         
 class RunCommand:
-    def __init__(self, cmd='', working_dir=None, output=[], max_jobs=1,
-        locking="exclusive"):
+    def __init__(self, cmd='', working_dir=None, output=[], locking="exclusive"):
         '''This action execute the specified command under the
         specified working directory, and return specified ofiles.
         #
@@ -1060,7 +890,6 @@ class RunCommand:
             self.cmd = [' '.join(cmd.split('\n'))]
         else:
             self.cmd = [' '.join(x.split('\n')) for x in cmd]
-        self.max_jobs = max_jobs
         self.working_dir = working_dir
         if type(output) == str:
             self.output = [os.path.expanduser(output)]
@@ -1115,11 +944,7 @@ class RunCommand:
                     # for performance considerations, use partial MD5
                     exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
                         calculateMD5(f, partial=True)))
-        if self.max_jobs == 1:
-            run_command(self.cmd, output=self.output, working_dir=self.working_dir)
-        else:
-            run_command_in_parallel(self.cmd, output=self.output, working_dir=self.working_dir,
-                max_jobs=self.max_jobs)
+        run_command(self.cmd, output=self.output, working_dir=self.working_dir)
         if self.output:
             return self.output
         else:
@@ -1484,7 +1309,7 @@ class Pipeline:
             self.pipeline_path = None
         self.verbosity = verbosity
 
-    def execute(self, pname, input_files=[], output_files=[], jobs=1, **kwargs):
+    def execute(self, pname, input_files=[], output_files=[], **kwargs):
         global VT_GLOBAL
         if pname is None:
             if len(self.pipeline.pipelines) == 1:
@@ -1508,8 +1333,6 @@ class Pipeline:
             ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
             env.logger.addHandler(ch)
         #
-        global max_running_jobs 
-        max_running_jobs = jobs
         # the project will be opened when needed
         with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY'], verbosity=self.verbosity) as proj:
             self.VARS = {
@@ -1542,15 +1365,17 @@ class Pipeline:
                 .format(self.pipeline.name, pname, command.index, 
                     ' '.join(command.comment.split())))
             # substitute ${} variables
-            if command.input:
-                step_input = shlex.split(substituteVars(command.input, self.VARS))
-            else:
+            if command.input is None:
                 step_input = ifiles
+            # if this is an empty string
+            elif not command.input.strip():
+                step_input = []
+            else:
+                step_input = shlex.split(substituteVars(command.input, self.VARS))
             #
             # if there is no input file?
             if not step_input:
-                raise RuntimeError('Pipeline stops at step {}_{}: No input file is available.'
-                    .format(pname, command.index))
+                env.logger.debug('No input file for step {}_{}.'.format(pname, command.index))
             #
             self.VARS['input{}'.format(command.index)] = step_input
             env.logger.debug('INPUT of step {}_{}: {}'
@@ -1575,8 +1400,8 @@ class Pipeline:
             igroups, step_output = emitter(step_input, self)
             try:
                 for ig in igroups:
-                    if not ig:
-                        continue
+                    #if not ig:
+                    #    continue
                     self.VARS['input'] = ig
                     action = substituteVars(command.action, self.VARS)
                     env.logger.trace('Emitted input of step {}_{}: {}'
@@ -1595,7 +1420,6 @@ class Pipeline:
                     else:
                         step_output.extend(ofiles)
                 # wait for all pending jobs to finish
-                wait_all()
                 self.VARS['output{}'.format(command.index)] = step_output
                 env.logger.debug('OUTPUT of step {}_{}: {}'
                     .format(pname, command.index, step_output))
@@ -1698,8 +1522,7 @@ def executeArguments(parser):
         help='''Output of the pipelines, usually a list of output files, that
             will be passed to the pipelines as variable ${CMD_OUTPUT}.''')
     parser.add_argument('-j', '--jobs', default=1, type=int,
-        help='''Maximum number of concurrent jobs to execute, for steps
-            of a pipeline that allows multi-processing.''')
+        help=argparse.SUPPRESS)
     parser.add_argument('-d', '--delimiter', default='\t',
         help='''Delimiter used to output results of a SQL query.''')
 
@@ -1735,12 +1558,10 @@ def execute(args):
         pipeline = Pipeline(args.specfile, extra_args=args.unknown_args, verbosity=args.verbosity)
         # unspecified
         if not args.pipelines:
-            pipeline.execute(None, args.input, args.output,
-                args.jobs)
+            pipeline.execute(None, args.input, args.output)
         else:
             for name in args.pipelines:
-                pipeline.execute(name, args.input, args.output,
-                    args.jobs)
+                pipeline.execute(name, args.input, args.output)
     # 
     try:
         env.verbosity = args.verbosity
@@ -1825,10 +1646,10 @@ def simulate_replicate(args, rep):
             pipeline_type='simulation', verbosity=args.verbosity)
         # using a pool of simulators 
         if not args.models:
-            pipeline.execute(None, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
+            pipeline.execute(None, [cfg_file], [], seed=args.seed+rep)
         else:
             for name in args.models:
-                pipeline.execute(name, [cfg_file], [], jobs=args.jobs, seed=args.seed+rep)
+                pipeline.execute(name, [cfg_file], [], seed=args.seed+rep)
     except Exception as e:
         env.logger.error('Failed to simulate replicate {} of model {}: {}'.format(rep, model_name, e))
         sys.exit(1)
