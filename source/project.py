@@ -1071,7 +1071,7 @@ class AnnoDBWriter:
                 if len(isfloat) != nonmissing:
                     wrong = [x for x in distinct if not isinstance(x, float)][:100]
                     env.logger.warning('{} values are not integers for field {}: {}'
-                        .format(len(values) - len(isint), field.name,
+                        .format(len(values) - len(isfloat), field.name,
                         ', '.join([str(x) for x in wrong])))
                 #
                 if len(isfloat) == 0:
