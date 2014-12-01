@@ -936,15 +936,18 @@ class RunCommand:
             raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
                 .format('; '.join(self.cmd), self.elapsed_time(), ret))
         # remove the .done file
-        self.write_info()
-        #
         if not self.output[0] in VT_THREADS:
             raise RuntimeError('Output is not waited by any threads')
         else:
             VT_THREADS.pop(self.output[0])
         # the thread will end here
         env.logger.trace('Thread for output {} ends.'.format(self.output[0]))
-
+        for filename in glob.glob(self.output[0] + '.done_*'):
+            try:
+                os.remove(filename)
+            except Exception as e:
+                env.logger.warning('Fail to remove {}: {}'
+                    .format(filename, e))
 
     def submit_command(self):
         '''Submit a job and wait for its completion.'''
@@ -967,8 +970,10 @@ class RunCommand:
                 sh_file.write('[ -d {0} ] || mkdir -p {0}\ncd {0}\n'.format(self.working_dir))
             sh_file.write('\n'.join(self.cmd))
             #
+            sh_file.write('\n\nCMD_RET=$?\nif [ $CMD_RET == 0 ]; then vtools admin --record_exe_info {} {}; fi\n'
+                .format(os.getpid(), ' '.join(self.output)))
             # a signal to show the successful completion of the job
-            sh_file.write('\n\necho $? > {}\n'.format(self.proc_done))
+            sh_file.write('\necho $CMD_RET > {}\n'.format(self.proc_done))
         #
         # try to submit command
         if '{}' in self.submitter:

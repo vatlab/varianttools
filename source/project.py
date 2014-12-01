@@ -57,7 +57,7 @@ from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName, \
     PrettyPrinter, determineSexOfSamples, getVariantsOnChromosomeX, \
     getVariantsOnChromosomeY, getTermWidth, matchName, ProgressFileObj, \
-    substituteVars
+    substituteVars, calculateMD5
 
 # define a field type
 Field = namedtuple('Field', ['name', 'index', 'adj', 'fmt', 'type', 'comment'])
@@ -4504,6 +4504,8 @@ def adminArguments(parser):
         all currently supported runtime options.''')
     options.add_argument('--reset_runtime_option', metavar='OPT',
         help='''Reset value to a runtime option to its default value.''')
+    options.add_argument('--record_exe_info', nargs='+', metavar='EXE_INFO',
+        help=argparse.SUPPRESS)
 
 
 def admin(args):
@@ -4532,6 +4534,37 @@ def admin(args):
                 res.excludeExistingLocalFiles(args.mirror_repository)
                 env.logger.info('{} files need to be downloaded or updated'.format(len(res.manifest)))
                 res.downloadResources(dest_dir=args.mirror_repository)
+            sys.exit(0)
+        elif args.record_exe_info is not None:
+            pid = args.record_exe_info[0]
+            output = args.record_exe_info[1:]
+            proc_out = '{}.out_{}'.format(output[0], pid)
+            proc_err = '{}.err_{}'.format(output[0], pid)
+            proc_info = '{}.exe_info'.format(output[0])
+            #
+            if not os.path.isfile(proc_out) \
+                or not os.path.isfile(proc_err):
+                env.logger.warning('Could not locate process-specific output file (id {}), '
+                    'which might have been removed by another process that produce '
+                    'the same output file {}'.format(os.getpid(), output[0]))
+            with open(proc_info, 'a') as exe_info:
+                exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
+                for f in output:
+                    if not os.path.isfile(f):
+                        raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
+                    # for performance considerations, use partial MD5
+                    exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                        calculateMD5(f, partial=True)))
+                # write standard output to exe_info
+                exe_info.write('\n\nSTDOUT\n\n')
+                with open(proc_out) as stdout:
+                    for line in stdout:
+                        exe_info.write(line)
+                # write standard error to exe_info
+                exe_info.write('\n\nSTDERR\n\n')
+                with open(proc_err) as stderr:
+                    for line in stderr:
+                        exe_info.write(line)
             sys.exit(0)
         # other options requires a project
         with Project(verbosity=args.verbosity) as proj:
