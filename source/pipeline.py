@@ -992,9 +992,9 @@ class RunCommand:
         # 
         global VT_THREADS
         if ret < 0:
-            raise RuntimeError("Failed to submit job {} due to signal {}" .format(proc_cmd, -ret))
+            raise RuntimeError("Failed to submit job {} due to signal {} (submitter='{}')" .format(self.proc_cmd, -ret, self.submitter))
         elif ret > 0:
-            raise RuntimeError("Failed to submit job {}".format(proc_cmd))
+            raise RuntimeError("Failed to submit job {} using submiter '{}'".format(proc_cmd, self.submitter))
         else:
             t = threading.Thread(target=self.monitor)
             t.daemon = True
