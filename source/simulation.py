@@ -809,16 +809,16 @@ class EvolvePopulation(SkiptableAction):
         postOps=[],
         finalOps=[],
         output=[]):
-        self.mutator = sim.NoneOp() if mutator is None else mutator
-        self.selector = sim.NoneOp() if selector is None else selector
+        self.mutator = [] if mutator is None else (mutator if isinstance(mutator, (list, tuple)) else [mutator])
+        self.selector = [] if selector is None else (selector if isinstance(selector, (list, tuple)) else [selector])
         self.demoModel = demoModel
-        self.transmitter = sim.MendelianGenoTransmitter() if transmitter is None else transmitter
+        self.transmitter = [sim.MendelianGenoTransmitter()] if transmitter is None else (transmitter if isinstance(transmitter, (list, tuple)) else [transmitter])
         self.output = [output]
-        self.taggers = taggers
-        self.initOps = initOps
-        self.preOps = preOps
-        self.postOps = postOps
-        self.finalOps = finalOps
+        self.taggers = taggers if isinstance(taggers, (list, tuple)) else [taggers]
+        self.initOps = initOps  if isinstance(initOps, (list, tuple)) else [initOps]
+        self.preOps = preOps if isinstance(preOps, (list, tuple)) else [preOps]
+        self.postOps = postOps if isinstance(postOps, (list, tuple)) else [postOps]
+        self.finalOps = finalOps if isinstance(finalOps, (list, tuple)) else [finalOps]
         SkiptableAction.__init__(self, cmd='EvolvePop output={}\n'
             .format(output), output=output)
 
@@ -848,12 +848,12 @@ class EvolvePopulation(SkiptableAction):
     7. minimal fitness value of the parental population
     ''', at = 0),
                 # revert alleles at fixed loci to wildtype
-                sim.RevertFixedSites(),
+                sim.RevertFixedSites() ] +
                 # 
                 # 'A' is zero, no need to map in and out
-                self.mutator,
+                self.mutator + 
                 #sim.TicToc(),
-                self.selector,
+                self.selector + [
                 sim.IfElse('time.time() - last_time > 30', [
                     sim.PyExec('last_time = time.time()'),
                     # output statistics in verbose mode
@@ -865,16 +865,16 @@ class EvolvePopulation(SkiptableAction):
                         ' meanOfInfo["fitness"], minOfInfo["fitness"])',
                         output=env.logger.info),
                     ])
-            ] + self.preOps,
-            matingScheme=sim.RandomMating(ops=[self.transmitter] + self.taggers,
+                ] + self.preOps,
+            matingScheme=sim.RandomMating(ops=self.transmitter + self.taggers,
                 subPopSize=self.demoModel),
             postOps=self.postOps,
             finalOps=[
                 # revert fixed sites so that the final population does not have fixed sites
-                sim.RevertFixedSites(),
+                sim.RevertFixedSites()] + 
                 #
                 # apply fitness to get final statistics and facilitate sampling
-                self.selector,
+                self.selector + [
                 # statistics after evolution
                 sim.Stat(popSize=True, meanOfInfo='fitness', minOfInfo='fitness',
                     numOfSegSites=sim.ALL_AVAIL, numOfMutants=sim.ALL_AVAIL),
@@ -887,7 +887,7 @@ class EvolvePopulation(SkiptableAction):
                            r'There are on average %.1f mutants per individual. Mean allele frequency is %.4f%%.\n"'
                            r'% (popSize, numOfSegSites, numOfMutants / popSize, (numOfMutants * 50. / numOfSegSites/ popSize) if numOfSegSites else 0)',
                     output=env.logger.info),
-            ] + self.finalOps,
+                ] + self.finalOps,
             gen = self.demoModel.num_gens
         )
         #
