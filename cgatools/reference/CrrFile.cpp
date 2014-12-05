@@ -113,7 +113,14 @@ namespace cgatools { namespace reference {
             if (chromosomeName == chromosomes_[ii].getName())
                 return ii;
         }
-        throw Exception("unrecognized chromosome name: "+chromosomeName);
+		// added by Bo Peng for better error message.
+		std::string names = "";
+        for(size_t ii=0; ii<chromosomes_.size(); ii++)
+        {
+            names += (ii == 0 ? " " : ", ") + chromosomes_[ii].getName();
+        }
+
+        throw Exception("unrecognized chromosome name: " + chromosomeName + " (available: " + names + ")");
     }
 
     void CrrFile::validate() const

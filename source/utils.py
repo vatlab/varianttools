@@ -1370,7 +1370,7 @@ class GenomicRegions(object):
         self.proj = proj
         #
         # first, let us identify pieces of the string
-        pieces = re.split('(\w+:\d+-\d+(?:,\d+-\d+)*|\w+\.\w+:[\w.]+(?:,[\w.]+)*)', self.raw_regions)
+        pieces = re.split('(\w+:\d+-\d+(?:,\d+-\d+)*|[\w-]+\.\w+:[\w.]+(?:,[\w.]+)*)', self.raw_regions)
         expr = ''
         var_regs = []
         var_idx = 0
@@ -1385,7 +1385,7 @@ class GenomicRegions(object):
                         var_regs[-1].append(self.chr_pos_region(chromosome + ':' + reg))
                 expr += 'var_regs[{}]'.format(var_idx)
                 var_idx += 1
-            elif re.match('\w+\.\w+:[\w.]+(:?,[\w.]+)*', piece):
+            elif re.match('[\w-]+\.\w+:[\w.]+(:?,[\w.]+)*', piece):
                 var_regs.append([])
                 field = piece.split(':', 1)[0]
                 for reg in piece.split(','):
@@ -1616,6 +1616,8 @@ class ResourceManager:
             return 'hg18'
         elif filename.endswith('build37.crr'):
             return 'hg19'
+        elif filename.endswith('.crr'):
+            return os.path.basename(filename)[:-4]
         else:
             return '*'
         try:
@@ -1640,6 +1642,8 @@ class ResourceManager:
             return self.getCommentFromConfigFile(filename, 'data sources', 'description')
         elif filename.lower().endswith('.pipeline'):      # pipeline
             return self.getCommentFromConfigFile(filename, 'pipeline description', 'description')
+        elif filename.lower().endswith('.crr'):           # pipeline
+            return 'Reference genome {}'.format(os.path.basename(filename)[:-4])
         elif 'snapshot' in filename and filename.lower().endswith('.tar.gz'):  # snapshot
             (name, date, message) = getSnapshotInfo(filename)
             return '' if message is None else message
@@ -1760,6 +1764,8 @@ class ResourceManager:
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('pipeline/')}
         elif resource_type == 'simulation':
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('simulation/')}
+        elif resource_type == 'reference':
+            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('reference/')}
         elif resource_type == 'hg18':
             self.manifest = {x:y for x,y in self.manifest.iteritems() if '*' in y[2] or 'hg18' in y[2]}
         elif resource_type == 'hg19':
@@ -2460,17 +2466,22 @@ class RefGenome:
         if build in ['hg18', 'build36']:
             crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build36.crr')
             self.crr = CrrFile(crrFile)
+            self.name = 'hg18'
         elif build in ['hg19', 'build37']:
             crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
             self.crr = CrrFile(crrFile)
+            self.name = 'hg19'
         elif os.path.isfile('{}.crr'.format(build)):
             self.crr = CrrFile('{}.crr'.format(build))
-        elif os.path.isfile(os.path.join(env.local_resource, 'ReferenceFiles', '{}.crr'.format(build))):
-            self.crr = CrrFile(os.path.join(env.local_resource, 'ReferenceFiles', '{}.crr'.format(build)))
+            self.name = build
+        elif os.path.isfile(os.path.join(env.local_resource, 'reference', '{}.crr'.format(build))):
+            self.crr = CrrFile(os.path.join(env.local_resource, 'reference', '{}.crr'.format(build)))
+            self.name = build
         else:
             try:
-                crrFile = downloadFile('ReferenceFiles/{}.crr'.format(build))
+                crrFile = downloadFile('reference/{}.crr'.format(build))
                 self.crr = CrrFile(crrFile)
+                self.name = build
             except Exception as e:
                 raise ValueError('Cannot find reference genome for build {}: {}'.format(build, e))
         #
@@ -2483,9 +2494,17 @@ class RefGenome:
             try:
                 self.chrIdx[chr] = self.crr.getChromosomeId('chr{}'.format(chr)) 
             except ValueError:
-                self.chrIdx[chr] = self.crr.getChromosomeId(str(chr))
-            # ok?
-            return self.crr.getBase(Location(self.chrIdx[chr], pos - 1))
+                try:
+                    self.chrIdx[chr] = self.crr.getChromosomeId(str(chr))
+                except Exception as e:
+                    raise ValueError('Failed to locate chromosome {} in reference genome {}: e'
+                        .format(chr, self.name, e))
+            try:
+                # ok?
+                return self.crr.getBase(Location(self.chrIdx[chr], pos - 1))
+            except Exception as e:
+                raise ValueError('Failed to get base {}:{}from reference genome {}: {}'
+                    .format(chr, pos, self.name, e))
 
     def getSequence(self, chr, start, end):
         try:
@@ -2494,9 +2513,17 @@ class RefGenome:
             try:
                 self.chrIdx[chr] = self.crr.getChromosomeId('chr{}'.format(chr)) 
             except ValueError:
-                self.chrIdx[chr] = self.crr.getChromosomeId(str(chr))
+                try:
+                    self.chrIdx[chr] = self.crr.getChromosomeId(str(chr))
+                except Exception as e:
+                    raise ValueError('Failed to locate chromosome {} in reference genome {}: {}'
+                        .format(chr, self.name, e))
             # ok?
-            return self.crr.getSequence(Range(self.chrIdx[chr], start - 1, end))
+            try:
+                return self.crr.getSequence(Range(self.chrIdx[chr], start - 1, end))
+            except Exception as e:
+                raise ValueError('Failed to get sequence {}:{}-{} from reference genome {}: {}'
+                    .format(chr, start, end, self.name, e))
    
     def verify(self, chr, pos, ref):   
         try:

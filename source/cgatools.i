@@ -99,7 +99,7 @@ bool fasta2crr(const std::vector<std::string> & fasta_files, const std::string &
     std::vector<std::string>::const_iterator it_end = fasta_files.end();
     for (; it != it_end; ++it) {
         std::cerr << "Reading from " << *it << std::endl;
-        static boost::shared_ptr<std::istream> in = cgatools::util::InputStream::openCompressedInputStreamByExtension(*it);
+        const boost::shared_ptr<std::istream> & in = cgatools::util::InputStream::openCompressedInputStreamByExtension(*it);
 
         std::string line;
         for(int lineNumber=1; InputStream::getline(*in, line); lineNumber++)
@@ -110,6 +110,7 @@ bool fasta2crr(const std::vector<std::string> & fasta_files, const std::string &
                 {
                     std::string name = parseFastaHeader(line);
                     // here we only assume chrM is circular...
+                    std::cerr << "Adding chromosome " << name << std::endl;
                     writer.newChromosome(name, name == "chrM");
                     continue;
                 }
