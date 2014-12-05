@@ -861,7 +861,7 @@ class RunCommand:
                 raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
                     .format(cur_cmd, -ret, self.elapsed_time()))
             elif ret > 0:
-                if output:
+                if self.output:
                     with open(self.proc_err) as err:
                         for line in err.read().split('\n')[-50:]:
                             env.logger.error(line)

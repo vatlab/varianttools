@@ -2463,8 +2463,16 @@ class RefGenome:
         elif build in ['hg19', 'build37']:
             crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
             self.crr = CrrFile(crrFile)
+        elif os.path.isfile('{}.crr'.format(build)):
+            self.crr = CrrFile('{}.crr'.format(build))
+        elif os.path.isfile(os.path.join(env.local_resource, 'ReferenceFiles', '{}.crr'.format(build))):
+            self.crr = CrrFile(os.path.join(env.local_resource, 'ReferenceFiles', '{}.crr'.format(build)))
         else:
-            raise ValueError('Cannot find reference genome for build {}'.format(build))
+            try:
+                crrFile = downloadFile('ReferenceFiles/{}.crr'.format(build))
+                self.crr = CrrFile(crrFile)
+            except Exception as e:
+                raise ValueError('Cannot find reference genome for build {}: {}'.format(build, e))
         #
         self.chrIdx = {}
 

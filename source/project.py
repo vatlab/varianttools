@@ -42,9 +42,11 @@ import tarfile
 import urllib
 if sys.version_info.major == 2:
     from ucsctools_py2 import showTrack
+    from cgatools_py2 import fasta2crr
     from ConfigParser import SafeConfigParser
 else:
     from ucsctools_py3 import showTrack
+    from cgatools_py3 import fasta2crr
     from configparser import ConfigParser
 
 from multiprocessing import Process
@@ -4504,8 +4506,17 @@ def adminArguments(parser):
         all currently supported runtime options.''')
     options.add_argument('--reset_runtime_option', metavar='OPT',
         help='''Reset value to a runtime option to its default value.''')
-    options.add_argument('--record_exe_info', nargs='+', metavar='EXE_INFO',
+    utils = parser.add_argument_group('Misc utilities')
+    utils.add_argument('--record_exe_info', nargs='+', metavar='EXE_INFO',
         help=argparse.SUPPRESS)
+    utils.add_argument('--fasta2crr', nargs='+', metavar='FASTA',
+        help='''Convert fasta files to a crr file (a binary format for faster
+        access) that can be used by variant tools. This is only needed if you
+        are working with a reference genome that is not supported by variant 
+        tools. This parameter accepts a list of fastq files (URLs and .gz format
+        are acceptable) followed by the name of the .crr file. The .crr file should
+        be put under the project directory or the local resource directory (under
+        directory ReferenceFiles) to be usable by variant tools.''')
 
 
 def admin(args):
@@ -4565,6 +4576,24 @@ def admin(args):
                 with open(proc_err) as stderr:
                     for line in stderr:
                         exe_info.write(line)
+            sys.exit(0)
+        elif args.fasta2crr is not None:
+            #
+            if len(args.fasta2crr) < 2:
+                raise ValueError('Please specify at least one fasta file followed by an output .crr file')
+            fasta_URLs = args.fasta2crr[:-1]
+            crr_file = args.fasta2crr[-1]
+            if not crr_file.endswith('.crr'):
+                raise ValueError('The output file should have extension .crr')
+            fasta_files = []
+            for url in fasta_URLs:
+                if '://' in url:
+                    fasta_files.append(downloadFile(url, dest_dir=env.cache_dir))
+                elif not os.path.isfile(url):
+                    raise ValueError('File not found: {}'.format(url))
+                else:
+                    fasta_files.append(url)
+            fasta2crr(fasta_files, crr_file)
             sys.exit(0)
         # other options requires a project
         with Project(verbosity=args.verbosity) as proj:
