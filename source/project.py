@@ -2220,7 +2220,8 @@ class Project:
         info += 'Secondary reference genome:  {}\n'.format('' if self.alt_build is None else self.alt_build)
         #
         # list all runtime options as (name, val) pairs
-        opts = [(x, self.loadProperty('__option_{}'.format(x), None)) for x in env.persistent_options]
+        opts = [(x, self.loadProperty('__option_{}'.format(x), None)) for x in env.persistent_options] \
+            + [(x, getattr(env, x)) for x in ('shared_resource', 'local_resource', '_temp_dir')]
         info += 'Runtime options:             {}\n'.format(
             ', '.join(['{}={}'.format(name, val) for name,val in opts if val is not None]))
         tables = [decodeTableName(x) for x in self.getVariantTables()]
@@ -4509,6 +4510,8 @@ def adminArguments(parser):
     utils = parser.add_argument_group('Misc utilities')
     utils.add_argument('--record_exe_info', nargs='+', metavar='EXE_INFO',
         help=argparse.SUPPRESS)
+    utils.add_argument('--partial_md5', nargs='+', metavar='FILES',
+        help=argparse.SUPPRESS)
     utils.add_argument('--fasta2crr', nargs='+', metavar='FASTA',
         help='''Convert fasta files to a crr file (a binary format for faster
         access) that can be used by variant tools. This is only needed if you
@@ -4516,7 +4519,7 @@ def adminArguments(parser):
         tools. This parameter accepts a list of fastq files (URLs and .gz format
         are acceptable) followed by the name of the .crr file. The .crr file should
         be put under the project directory or the local resource directory (under
-        directory ReferenceFiles) to be usable by variant tools.''')
+        directory reference) to be usable by variant tools.''')
 
 
 def admin(args):
@@ -4594,6 +4597,13 @@ def admin(args):
                 else:
                     fasta_files.append(url)
             fasta2crr(fasta_files, crr_file)
+            sys.exit(0)
+        elif args.partial_md5 is not None:
+            for ifile in args.partial_md5:
+                if os.path.isfile(ifile):
+                    print('{}\t{}'.format(ifile, calculateMD5(ifile, partial=True)))
+                else:
+                    raise ValueError('File does not exist: {}'.format(ifile))
             sys.exit(0)
         # other options requires a project
         with Project(verbosity=args.verbosity) as proj:
