@@ -374,14 +374,14 @@ def sequenceArguments(parser):
     parser.add_argument('--char_per_line', type=int,
         help='''Number of characters (excluding space and leading numbers) per line. Default to
             70 in regular and 60 in numbered format.''')
-    parser.add_argument('--transcribe', nargs='*',
+    parser.add_argument('--transcribe', nargs='*', metavar='GENE',
         help='''Transcribe DNA sequence into RNA sequence. variant tools will look
             in the refGene database, find all genes that overlap with the region, locate
             exons and coding regions, transcribe the DNA sequence to RNA sequence (basically
             discard introns, and complement if on reverse strand). The complete mRNA sequence
             will be printed regardless of the bounaries of specified regions. If one or more
             names (refGene.name) are specified, only specified genes will be translated.''')
-    parser.add_argument('--translate', nargs='*',
+    parser.add_argument('--translate', nargs='*', metavar='GENE',
         help='''Translate DNA sequence into protein sequence. variant tools will look
             in the refGene database, find all genes that overlap with the region, locate
             exons and coding regions, transcribe and translate the DNA sequence to protein
@@ -547,7 +547,7 @@ def printRNASequence(args, regions):
                         fmt.format(i+1) + ' '.join([markSequence(seq[i+10*j:i+10*j+10], args.mark_sequence) for j in range(block_per_line)])
                         for i in range(0, len(seq), char_per_line)]))
                 else:
-                    fmt = ' {{:>{0}}}'.format(len(str(end)))
+                    fmt = ' {{:>{0}}}'.format(len(str(len(seq))))
                     last_line = len(seq) / char_per_line * char_per_line
                     residue = last_line + char_per_line - len(seq)
                     print('\n'.join([
@@ -600,7 +600,7 @@ def printProteinSequence(args, regions):
                         fmt.format(i+1) + ' '.join([markSequence(seq[i+10*j:i+10*j+10], args.mark_sequence) for j in range(block_per_line)])
                         for i in range(0, len(seq), char_per_line)]))
                 else:
-                    fmt = ' {{:>{0}}}'.format(len(str(end)))
+                    fmt = ' {{:>{0}}}'.format(len(str(len(seq))))
                     last_line = len(seq) / char_per_line * char_per_line
                     residue = last_line + char_per_line - len(seq)
                     print('\n'.join([
