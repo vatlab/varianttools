@@ -443,10 +443,8 @@ def sequence(args):
         printDNASequence(args, regions)
 
 
-def markSequence(seq, seq_to_mark=''):
+def markSequence(seq):
     '''Given a string, mark small characters or specified sequence with color.'''
-    if seq_to_mark:
-        seq = seq.upper().replace(seq_to_mark.upper(), seq_to_mark.lower())
     return ''.join([('\033[41m' + x.upper() + '\033[0m') if x.islower() else x for x in seq])
 
 
@@ -483,6 +481,8 @@ def printDNASequence(args, regions):
             seq = ''.join(seq)
         print('>ref|{}|{}:{}-{} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr,
             start, end, '({})'.format(comment) if comment else ''))
+        if args.mark_sequence:
+            seq = seq.upper().replace(args.mark_sequence.upper(), args.mark_sequence.lower())
         # break into pieces of 70 bp
         if args.numbered:
             char_per_line = 60 if args.char_per_line is None else args.char_per_line
@@ -493,20 +493,20 @@ def printDNASequence(args, regions):
                 fmt = '{{:>{0}}} '.format(len(str(end)))
                 print('\n'.join([
                     fmt.format(end - i if reversed_seq else start + i) + ' '.join([
-                        markSequence(seq[i+10*j:i+10*j+10], args.mark_sequence) for j in range(block_per_line)])
+                        markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)])
                     for i in range(0, len(seq), char_per_line)]))
             else:
                 fmt = ' {{:>{0}}}'.format(len(str(end)))
                 last_line = len(seq) / char_per_line * char_per_line
                 residue = last_line + char_per_line - len(seq)
                 print('\n'.join([
-                    ' '.join([markSequence(seq[i+10*j:i+10*j+10], args.mark_sequence) for j in range(block_per_line)]) + 
+                    ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) + 
                     ((' ' * residue + fmt.format(start if reversed_seq else end)) if i == last_line \
                         else fmt.format(end - i - char_per_line + 1 if reversed_seq else start + i + char_per_line - 1)) \
                     for i in range(0, len(seq), char_per_line)]))
         else:
             char_per_line = 70 if args.char_per_line is None else args.char_per_line
-            print('\n'.join([markSequence(seq[i:i+char_per_line], args.mark_sequence) for i in range(0, len(seq), char_per_line)]))
+            print('\n'.join([markSequence(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)]))
 
 
 def printRNASequence(args, regions):
@@ -535,6 +535,8 @@ def printRNASequence(args, regions):
                     ','.join(['{}-{}'.format(y,x) for ch,x,y in coding[::-1]]),
                     sum([y-x+1 for ch,x,y in coding])))
             seq = getRNASequence(structure, mutants=args.mark)
+            if args.mark_sequence:
+                seq = seq.upper().replace(args.mark_sequence.upper(), args.mark_sequence.lower())
             # break into pieces of 70 bp
             if args.numbered:
                 char_per_line = 60 if args.char_per_line is None else args.char_per_line
@@ -544,20 +546,20 @@ def printRNASequence(args, regions):
                 if args.numbered == 'left':
                     fmt = '{{:>{0}}} '.format(len(str(len(seq))))
                     print('\n'.join([
-                        fmt.format(i+1) + ' '.join([markSequence(seq[i+10*j:i+10*j+10], args.mark_sequence) for j in range(block_per_line)])
+                        fmt.format(i+1) + ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)])
                         for i in range(0, len(seq), char_per_line)]))
                 else:
                     fmt = ' {{:>{0}}}'.format(len(str(len(seq))))
                     last_line = len(seq) / char_per_line * char_per_line
                     residue = last_line + char_per_line - len(seq)
                     print('\n'.join([
-                        ' '.join([markSequence(seq[i+10*j:i+10*j+10], args.mark_sequence) for j in range(block_per_line)]) + 
+                        ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) + 
                         ((' ' * residue + fmt.format(len(seq))) if i == last_line \
                             else fmt.format(i + char_per_line)) \
                         for i in range(0, len(seq), char_per_line)]))
             else:
                 char_per_line = 70 if args.char_per_line is None else args.char_per_line
-                print('\n'.join([markSequence(seq[i:i+char_per_line], args.mark_sequence) for i in range(0, len(seq), char_per_line)]))
+                print('\n'.join([markSequence(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)]))
 
 
 
@@ -588,6 +590,8 @@ def printProteinSequence(args, regions):
                     ','.join(['{}-{}'.format(y,x) for ch,x,y in coding[::-1]]),
                     sum([y-x+1 for ch,x,y in coding])))
             seq = getProteinSequence(structure, mutants=args.mark)
+            if args.mark_sequence:
+                seq = seq.upper().replace(args.mark_sequence.upper(), args.mark_sequence.lower())
             # break into pieces of 70 bp
             if args.numbered:
                 char_per_line = 60 if args.char_per_line is None else args.char_per_line
@@ -597,20 +601,20 @@ def printProteinSequence(args, regions):
                 if args.numbered == 'left':
                     fmt = '{{:>{0}}} '.format(len(str(len(seq))))
                     print('\n'.join([
-                        fmt.format(i+1) + ' '.join([markSequence(seq[i+10*j:i+10*j+10], args.mark_sequence) for j in range(block_per_line)])
+                        fmt.format(i+1) + ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)])
                         for i in range(0, len(seq), char_per_line)]))
                 else:
                     fmt = ' {{:>{0}}}'.format(len(str(len(seq))))
                     last_line = len(seq) / char_per_line * char_per_line
                     residue = last_line + char_per_line - len(seq)
                     print('\n'.join([
-                        ' '.join([markSequence(seq[i+10*j:i+10*j+10], args.mark_sequence) for j in range(block_per_line)]) + 
+                        ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) + 
                         ((' ' * residue + fmt.format(len(seq))) if i == last_line \
                             else fmt.format(i + char_per_line)) \
                         for i in range(0, len(seq), char_per_line)]))
             else:
                 char_per_line = 70 if args.char_per_line is None else args.char_per_line
-                print('\n'.join([markSequence(seq[i:i+char_per_line], args.mark_sequence) for i in range(0, len(seq), char_per_line)]))
+                print('\n'.join([markSequence(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)]))
 
 
 
