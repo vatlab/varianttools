@@ -1370,7 +1370,7 @@ class GenomicRegions(object):
         self.proj = proj
         #
         # first, let us identify pieces of the string
-        pieces = re.split('(\w+:\d+-\d+(?:,\d+-\d+)*|[\w-]+\.\w+:[\w.]+(?:,[\w.]+)*)', self.raw_regions)
+        pieces = re.split('(\w+:\d+-\d+(?:,\d+-\d+)*|\w+(-\w+)*\.\w+:[\w.]+(?:,[\w.]+)*)', self.raw_regions)
         expr = ''
         var_regs = []
         var_idx = 0
@@ -1385,7 +1385,7 @@ class GenomicRegions(object):
                         var_regs[-1].append(self.chr_pos_region(chromosome + ':' + reg))
                 expr += 'var_regs[{}]'.format(var_idx)
                 var_idx += 1
-            elif re.match('[\w-]+\.\w+:[\w.]+(:?,[\w.]+)*', piece):
+            elif re.match('\w+(-\w+)*\.\w+:[\w.]+(:?,[\w.]+)*', piece):
                 var_regs.append([])
                 field = piece.split(':', 1)[0]
                 for reg in piece.split(','):
@@ -1545,7 +1545,7 @@ class ResourceManager:
         prog = ProgressBar('Scanning {} files under {}'
             .format(len(filenames), resource_dir), sum([min(x[1], 2**26) for x in filenames]))
         total_size = 0
-        allowed_directory = ['test_data', 'snapshot', 'resource', 'programs', 'pipeline', 'simulation', 'ftp.completegenomics.com', 'format', 'annoDB']
+        allowed_directory = ['test_data', 'snapshot', 'resource', 'programs', 'pipeline', 'simulation', 'ftp.completegenomics.com', 'format', 'annoDB', 'reference']
         for filename, filesize in filenames:
             if (not any([y in allowed_directory for y in filename.split('/')])) or filename.endswith('.DB') or \
                 filename.endswith('.bak') or filename.endswith('.htaccess') or filename.endswith('.log') \
@@ -1885,8 +1885,8 @@ def decompressGzFile(filename, inplace=True, force=False, md5=None):
         # if the decompressed file exists, and is newer than the .gz file, ignore
         if os.path.isfile(new_filename) and not force:
             if md5 is not None and md5 != calculateMD5(new_filename, partial=True):
-                env.logger.warning('MD5 signature mismatch: {}'
-                    .format(new_filename))
+                env.logger.warning('MD5 signature mismatch: {} (signature: {} calculated: {})'
+                    .format(new_filename, md5, calculateMD5(new_filename, partial=True)))
             else:
                 env.logger.debug('Reusing existing decompressed file {}'.format(new_filename))
                 return new_filename
@@ -1901,8 +1901,8 @@ def decompressGzFile(filename, inplace=True, force=False, md5=None):
                     os.path.abspath(filename)[len(os.path.abspath(env.shared_resource)):-3])
                 if os.path.isfile(new_filename) and not force:
                     if md5 is not None and md5 != calculateMD5(new_filename, partial=True):
-                        env.logger.warning('MD5 signature mismatch: {}'
-                            .format(new_filename))
+                        env.logger.warning('MD5 signature mismatch: {} (signature: {} calculated: {})'
+                            .format(new_filename, md5, calculateMD5(new_filename, partial=True)))
                     else:
                         env.logger.debug('Reusing existing decompressed file {}'.format(new_filename))
                         return new_filename
@@ -1920,7 +1920,8 @@ def decompressGzFile(filename, inplace=True, force=False, md5=None):
                     output.write(buffer)
                     buffer = input.read(100000)
             if md5 is not None and md5 != calculateMD5(new_filename, partial=True):
-                env.logger.warning('MD5 signature mismatch: {}'.format(new_filename))
+                env.logger.warning('MD5 signature mismatch: {} (signature {}, calculated {})'
+                    .format(new_filename, md5, calculateMD5(new_filename, partial=True)))
         # Python 2.7.4 and 3.3.1 have a regression bug that prevents us from opening
         # certain types of gzip file (http://bugs.python.org/issue17666).
         except TypeError as e:
@@ -2144,8 +2145,8 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
         if (not checkUpdate) and os.path.isfile(dest):
             env.logger.trace('Using existing file {}'.format(dest))
             if calculateMD5(dest, partial=True) != fileSig[1]:
-                env.logger.warning('MD5 signature mismatch: {}'
-                    .format(fileToGet))
+                env.logger.warning('MD5 signature mismatch: {} (signature {}, calculated {})'
+                    .format(fileToGet, fileSig[1], calculateMD5(dest, partial=True)))
             return dest
     else:
         # look for the file in shared resource directory
@@ -2155,8 +2156,8 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
         if (not checkUpdate) and os.path.isfile(dest):
             env.logger.trace('Using existing file {}'.format(dest))
             if calculateMD5(dest, partial=True) != fileSig[1]:
-                env.logger.warning('MD5 signature mismatch: {}'
-                    .format(fileToGet))
+                env.logger.warning('MD5 signature mismatch: {} (signature {}, calculated {})'
+                    .format(fileToGet, fileSig[1], calculateMD5(dest, partial=True)))
             return dest
         # if the share resource is not writable, write to ~/.variant_tools
         if not os.access(env.shared_resource, os.W_OK):
@@ -2166,8 +2167,8 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
             if (not checkUpdate) and os.path.isfile(dest):
                 env.logger.trace('Using existing file {}'.format(dest))
                 if calculateMD5(dest, partial=True) != fileSig[1]:
-                    env.logger.warning('MD5 signature mismatch: {}'
-                        .format(fileToGet))
+                    env.logger.warning('MD5 signature mismatch: {} (signature {}, calculated {})'
+                        .format(fileToGet, fileSig[1], calculateMD5(dest, partial=True)))
                 return dest
     #
     if not os.path.isdir(dest_dir):
@@ -3887,6 +3888,47 @@ def dissectGene(gene, proj):
     return {'name': gene, 'strand': strand, 'intron': intron, 'exon': exon,
         'coding': coding, 'upstream': upstream, 'downstream': downstream,
         'build': proj.build}
+
+def getRNASequence(structure, mutants=[]):
+    '''Get protein sequence, mark locations of mutants if a list of variants
+    are given (as a list of (chr, pos, ref, alt))'''
+    ref = RefGenome(structure['build'])
+    seq = ''
+    for reg in structure['coding']:
+        seq += ref.getSequence(reg[0], reg[1], reg[2])
+    if mutants:
+        loc_map = {}
+        index = 0
+        for reg in structure['coding']:
+            for pos in range(reg[1], reg[2]+1):
+                loc_map[(reg[0], pos)] = index
+                index += 1
+        for m in mutants:
+            if len(m) > 2:
+                if m[2] == '-' or m[3] == '-' or len(m[2]) != 1 or len(m[3]) != 1:
+                    env.logger.warning('Get RNA sequence does not support indels yet.')
+                    continue
+            if m[0].startswith('chr'):
+                loc = (m[0][3:], int(m[1]))
+            else:
+                loc = (m[0], int(m[1]))
+            if loc in loc_map:
+                idx = loc_map[loc]
+                if len(m) > 2:
+                    if m[2] != seq[idx]:
+                        env.logger.warning('Reference alleles mismatch (chr {}, pos {}, ref {}, mutant ref {})'
+                            .format(m[0], m[1], seq[idx], m[2]))
+                    seq = seq[:idx] + m[3].lower() + seq[idx+1:]
+            #else:
+            #    env.logger.debug('Failed to mark mutant {}'.format(loc))
+    #
+    if len(seq) // 3 * 3 != len(seq):
+        raise ValueError('Transcribed sequence should have length that is multiple of 3')
+    if structure['strand'] == '-':
+        # if len(seq) == 9, range(0, 9, 3) ==> 0, 3, 6
+        seq = [complement_table[x] for x in reversed(seq)]
+    return ''.join(seq)
+
 
 def getProteinSequence(structure, mutants=[]):
     '''Get protein sequence, mark locations of mutants if a list of variants
