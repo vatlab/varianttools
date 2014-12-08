@@ -1107,6 +1107,79 @@ class ExportPopulation(SkiptableAction):
             output=output)
 
     def _execute(self, ifiles, pipeline):
+        if self.output[0].endswith('.vcf'):
+            self._exportVCF(ifiles, pipeline)
+        else:
+            self._exportFasta(ifiles, pipeline)
+        #
+        if len(self.output) == 1:
+            return
+        # output phenotype
+        with open(self.output[1], 'w') as phe:
+            fields = pop.infoFields()
+            phe.write('sample_name\taff' + '\t'.join(fields) + '\n')
+            prog = ProgressBar('Exporting phenotype {}'.format(','.join(fields)), pop.popSize())
+            for i in range(pop.popSize()):
+                if self.sample_names:
+                    phe.write(self.sample_names[i])
+                else:
+                    phe.write('S_{}'.format(i+1))
+                #
+                if pop.individual(i).affected():
+                    phe.write('\t2')
+                else:
+                    phe.write('\t1')
+                for info in fields:
+                    phe.write('\t{}'.format(pop.individual(i).info(info)))
+                phe.write('\n')
+                prog.update(i+1)
+            prog.done()
+
+
+    def _exportFasta(self, ifiles, pipeline):
+        # import variants to the current project
+        # translate 0,1,2,3 to A,C,G,T
+        alleleMap = {
+            'A': {0: 'A', 1: 'C', 2: 'G', 3: 'T'},
+            'C': {0: 'C', 1: 'G', 2: 'T', 3: 'A'},
+            'G': {0: 'G', 1: 'T', 2: 'A', 3: 'C'},
+            'T': {0: 'T', 1: 'A', 2: 'C', 3: 'G'},
+            'N': {0: 'A', 1: 'C', 2: 'G', 3: 'T'},
+        }
+        env.logger.info('Loading {}'.format(ifiles[0]))
+        pop = sim.loadPopulation(ifiles[0])
+        # if we need to output variant information
+        aaInfo = None
+        if self.var_info:
+            if 'regions' not in pop.vars():
+                env.logger.warning('No mutation type can be obtained because population object does not have variable "regions".')
+            else:
+                # figure out regions of the population
+                aaInfo = MutantInfo(pop.dvars().regions)
+        # output genotype
+        with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY'], verbosity=pipeline.verbosity) as proj:
+            build = proj.build
+        if build is None:
+            build = 'hg19'
+        with open(self.output[0], 'w') as fasta:
+            #
+            # get reference genome
+            refGenome = RefGenome(build)
+            # get reference sequence
+            refSeq = []
+            for chr in range(pop.numChrom()):
+                chr_name = pop.chromName(chr)
+                refSeq.extend([refGenome.getBase(chr_name, int(pop.locusPos(loc))) for loc in range(pop.chromBegin(chr), pop.chromEnd(chr))])
+            #
+            prog = ProgressBar('Exporting simulated population', pop.popSize())
+            for idx, ind in enumerate(pop.individuals()):
+                for p in range(2):
+                    geno = [alleleMap[ref][allele] for ref, allele in zip(refSeq, ind.genotype(p))]
+                    fasta.write(''.join(geno) + '\n')
+                prog.update(idx + 1)
+            prog.done()
+
+    def _exportVCF(self, ifiles, pipeline):
         # import variants to the current project
         # translate 0,1,2,3 to A,C,G,T
         alleleMap = {
@@ -1156,7 +1229,7 @@ class ExportPopulation(SkiptableAction):
             nAlleles = 2*pop.popSize()
             segregated = [loc for loc,nums in pop.dvars().alleleNum.items() if nums[0] == nAlleles]
             env.logger.info('Genetic variants identified on {} loci'.format(len(segregated)))
-            prog = ProgressBar('Exporting simulated population', pop.totNumLoci())
+            prog = ProgressBar(self.output[0], pop.totNumLoci())
             for chr in range(pop.numChrom()):
                 chr_name = pop.chromName(chr)
                 for loc in range(pop.chromBegin(chr), pop.chromEnd(chr)):
@@ -1193,28 +1266,4 @@ class ExportPopulation(SkiptableAction):
                     #
                     prog.update(loc)
             prog.done()
-        #
-        if len(self.output) == 1:
-            return
-        # output phenotype
-        with open(self.output[1], 'w') as phe:
-            fields = pop.infoFields()
-            phe.write('sample_name\taff' + '\t'.join(fields) + '\n')
-            prog = ProgressBar('Exporting phenotype {}'.format(','.join(fields)), pop.popSize())
-            for i in range(pop.popSize()):
-                if self.sample_names:
-                    phe.write(self.sample_names[i])
-                else:
-                    phe.write('S_{}'.format(i+1))
-                #
-                if pop.individual(i).affected():
-                    phe.write('\t2')
-                else:
-                    phe.write('\t1')
-                for info in fields:
-                    phe.write('\t{}'.format(pop.individual(i).info(info)))
-                phe.write('\n')
-                prog.update(i+1)
-            prog.done()
-
 

@@ -396,18 +396,6 @@ def sequenceArguments(parser):
 
 def sequence(args):
     #
-    complement_table = {
-        'A': 'T',
-        'T': 'A',
-        'a': 't',
-        't': 'a',
-        'G': 'C',
-        'C': 'G',
-        'g': 'c',
-        'c': 'g',
-        'N': 'N',
-        'n': 'n'
-    }
     with Project(verbosity=0) as proj:
         if args.build is None:
             args.build = proj.build
@@ -449,6 +437,18 @@ def markSequence(seq):
 
 
 def printDNASequence(args, regions):
+    complement_table = {
+        'A': 'T',
+        'T': 'A',
+        'a': 't',
+        't': 'a',
+        'G': 'C',
+        'C': 'G',
+        'g': 'c',
+        'c': 'g',
+        'N': 'N',
+        'n': 'n'
+    }
     ref = RefGenome(args.build)
     # get chromosomal region
     for chr, start, end, comment in regions:
