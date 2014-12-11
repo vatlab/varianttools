@@ -159,6 +159,9 @@ comment=Check path to GATK jar file
 action=TerminateIf(cond=not '%(picard_path)s', message='Please specify path to Picard jar file')
 comment=Check path to Picard jar file
 
+[*_5]
+action=ImportModules('DNASeq_tools.py')
+comment=Import module DNASeq_tools with some utility functions and actions
 
 [align_10]
 action=CheckCommands(['bwa', 'samtools'])
@@ -279,8 +282,7 @@ input=${OUTPUT101}
 action=RunCommand(cmd='bwa aln ${ALN_PARAM}
         %(opt_bwa_aln)s -t 4 ${RESOURCE_DIR}/ucsc.hg19.fasta 
         ${INPUT} > ${INPUT: INPUT[0] + '.sai'}',
-    output="${INPUT: INPUT[0] + '.sai'}",
-	max_jobs=10)
+    output="${INPUT: INPUT[0] + '.sai'}")
 # remove all non-fastq files that might have been inputted
 input_emitter=EmitInput('single', select='fastq', pass_unselected=False)
 comment=Call bwa aln to produce .sai files
@@ -294,8 +296,7 @@ action=RunCommand(cmd=r"bwa sampe %(opt_bwa_sampe)s
         ${RESOURCE_DIR}/ucsc.hg19.fasta 
         ${INPUT: INPUT[0] + '.sai'} ${INPUT: INPUT[1] + '.sai'}
         ${INPUT: INPUT[0]} ${INPUT: INPUT[1]} > ${INPUT: INPUT[0] + '.sam'}",
-    output="${INPUT: INPUT[0] + '.sam'}",
-	max_jobs=10)
+    output="${INPUT: INPUT[0] + '.sam'}")
 input_emitter=EmitInput(group_by='paired', select='fastq', pass_unselected=False)
 comment=Running bwa sampe for paired end reads, using read group tag saved
     in a .RG file

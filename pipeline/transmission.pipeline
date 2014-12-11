@@ -115,6 +115,10 @@ action=RunCommand(cmd='vtools admin --load_snapshot ${CMD_INPUT}')
 comment=Load specified snapshot if a snapshot is specified. Otherwise use the
    existing project.
 
+[*_1]
+action=ImportModules('transmission.py')
+comment=Import a utility function from transmission.py.
+
 [denovo_5]
 action=CheckVariantToolsVersion('2.2.1')
 comment=Check the version of variant tools (version 2.2.1 and above is required
