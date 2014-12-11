@@ -32,12 +32,12 @@ from variant_tools.utils import ResourceManager, env, calculateMD5
 import base64
 
 repoURL = 'bpeng1@bcbweb'
-repoDir = '/var/www/html/Software/VariantTools/repository'
-archiveDir = '/var/www/html/Software/VariantTools/archive'
+repoDir = '/var/www/html/Software/VariantTools/'
 
 dryrun = False
 
 def remoteDo(cmd):
+    'Run command on the server under directory #repoDir '
     if type(cmd) in (tuple, list):
         cmd = 'ssh {} "cd {}; {}"'.format(repoURL, repoDir, ';'.join(cmd))
     else:
@@ -46,27 +46,18 @@ def remoteDo(cmd):
     if not dryrun:
         os.system(cmd)
 
-def deprecateFile(filename):
-    # go to directory...
+def deprecateFile(filename, repo):
+    'Move a file to the deprecated folder with time stamp'
     d, f = os.path.split(filename)
-    remoteDo('[ ! -d ../deprecated/{} ] && mkdir -p ../deprecated/{}'.format(d, d))
-    remoteDo('[ -f {} ] && mv {} ../deprecated/{}_{}'
-        .format(filename, filename, filename, time.strftime('%b%d', time.gmtime())))
+    remoteDo([
+        '[ ! -d deprecated/{0} ] && mkdir -p deprecated/{0}'.format(d),
+        '[ -f {0}/{1} ] && mv {0}/{1} deprecated/{1}_{2}'.format(repo, filename, time.strftime('%b%d', time.gmtime()))])
 
-def archiveFile(filename):
-    # go to directory...
-    d, f = os.path.split(filename)
-    remoteDo('[ ! -d ../archive/{} ] && mkdir -p ../archive/{}'.format(d, d))
-    remoteDo('mv {} ../archive/{}'.format(filename, filename))
-
-def uploadFile(local_file, remote_file):
-    # upload a local file to houstonbioinformatics.org
-    # This is inefficient for multiple files (repeated login and out), but does not
-    # really matter
-    # go to directory...
+def uploadFile(local_file, remote_file, repo):
     d, f = os.path.split(remote_file)
-    deprecateFile(remote_file)
-    cmd = 'scp {} {}:{}/{}'.format(local_file, repoURL, repoDir, remote_file)
+    deprecateFile(remote_file, repo)
+    remoteDo('[ ! -d {0}/{1} ] && mkdir -p {0}/{1}'.format(repo, d))
+    cmd = 'scp {} {}:{}/{}/{}'.format(local_file, repoURL, repoDir, repo, remote_file)
     env.logger.info(cmd)
     if not dryrun:
         os.system(cmd)
@@ -94,6 +85,12 @@ if __name__ == '__main__':
             (under ~/.variant_tools or runtime option $local_resource) are ignored. Note that
             option 'all' will download all versions of annotation databases which can be
             slow and take a lot of disk spaces.''')
+    parser.add_argument('--repo', metavar='REPOSITORY', default='repository',
+        choices=['repository', 'archive', 'bioinfo', 'devel'],
+        help='''What repository the action will be applied to. The default value is
+            the main repository. If you would like to move a file from one repository
+            to another, you can use options --remove and --upload with different
+            --repo.''')
     parser.add_argument('--upload', metavar='FILE', nargs='+',
         help='''Upload specified files to the server. The file should 
             be under the local resource directory ~/.variant_tools.''')
@@ -101,8 +98,6 @@ if __name__ == '__main__':
         help='''Remove specified files from the online manifest so that it will no
             longer be listed as part of the resource. The file itself, if exists, will
             be renamed but not removed from the server.''') 
-    parser.add_argument('--archive', metavar='FILENAME', nargs='+',
-        help='''Move specified files from the main repository to archive repository.''')
     # this set up and use default temporary directory
     env.temp_dir = None
     args = parser.parse_args()
@@ -144,7 +139,7 @@ if __name__ == '__main__':
         res.downloadResources()
     elif args.upload:
         manager = ResourceManager()
-        manager.getRemoteManifest('http://bioinformatics.mdanderson.org/Software/VariantTools/repository/')
+        manager.getRemoteManifest('http://bioinformatics.mdanderson.org/Software/VariantTools/{}/'.format(args.repo))
         resource_dir = os.path.expanduser('~/.variant_tools')
         # get information about file
         for filename in args.upload:
@@ -161,34 +156,17 @@ if __name__ == '__main__':
                     env.logger.info('Ignoring identical file {}'.format(rel_path))
                     continue
             manager.addResource(filename)
-            uploadFile(filename, rel_path)
+            uploadFile(filename, rel_path, args.repo)
         manager.writeManifest('MANIFEST.tmp')
-        uploadFile('MANIFEST.tmp', 'MANIFEST.txt')
-    elif args.archive:
-        repo = ResourceManager()
-        repo.getRemoteManifest('http://bioinformatics.mdanderson.org/Software/VariantTools/repository/')
-        archive = ResourceManager()
-        archive.getRemoteManifest('http://bioinformatics.mdanderson.org/Software/VariantTools/archive/')
-        for filename in args.archive:
-            if filename in repo.manifest:
-                archive.manifest[filename] = repo.manifest.pop(filename)
-                archiveFile(filename)
-            else:
-                env.logger.warning('{} does not exist in the main manifest'.format(filename))
-        #
-        archive.writeManifest('MANIFEST.archive')
-        uploadFile('MANIFEST.archive', '../archive/MANIFEST.txt')
-        #
-        repo.writeManifest('MANIFEST.main')
-        uploadFile('MANIFEST.main', 'MANIFEST.txt')
+        uploadFile('MANIFEST.tmp', 'MANIFEST.txt', args.repo)
     elif args.remove:
         manager = ResourceManager()
-        manager.getRemoteManifest('http://bioinformatics.mdanderson.org/Software/VariantTools/repository/')
+        manager.getRemoteManifest('http://bioinformatics.mdanderson.org/Software/VariantTools/{}/'.format(args.repo))
         removed_count = 0
         for filename in args.remove:
             if filename in manager.manifest:
                 manager.manifest.pop(filename)
-                deprecateFile(filename)
+                deprecateFile(filename, args.repo)
                 env.logger.info('Remove {} from manifest'.format(filename))
                 removed_count += 1
             else:
@@ -196,7 +174,7 @@ if __name__ == '__main__':
         # upload manifest
         if removed_count > 0:
             manager.writeManifest('MANIFEST.tmp')
-            uploadFile('MANIFEST.tmp', 'MANIFEST.txt')
+            uploadFile('MANIFEST.tmp', 'MANIFEST.txt', args.repo)
     else:
         env.logger.warning('No option has been provided. Please use -h to get a list of actions.')
 

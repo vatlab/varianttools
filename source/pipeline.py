@@ -71,51 +71,109 @@ except (ImportError, ValueError) as e:
 VT_GLOBAL = {}
 VT_THREADS = {}
 
-# define a few functions that can be used in the lambda function 
-# of a pipeline to display information about a project
-def projInfo(tables=[], samples=[], format_string=''):
-    '''Obtain information about one or more tables or samples and output 
-    them according to a format string (using python string format syntax for
-    a dictionary). The table description contains keys name, num, date,
-    cmd, and desc. The sample description contains keys name and num.
+
+class PipelineAction:
+    '''Base class for all pipeline actions. If one or more output files
+    are specified, the pipeline will record the runtime signature of
+    this action is a file ``$OUTPUT[0].exe_info``, which consists of the
+    MD5 signature of input and output files, command used, and additional
+    information such as start and end time, standard and error outputs.
+    This action will be skipped if the action is re-run with the same
+    input, output and command.
     '''
-    try:
-        with Project(verbosity='0') as proj:
-            res = []
-            if tables:
-                if not format_string:
-                    format_string = '{name:20}: {num:12} ({desc})'
-                if isinstance(tables, str):
-                    tables = [tables]
-                for table in tables:
-                    table_name = encodeTableName(table)
-                    desc, date, cmd = proj.descriptionOfTable(table_name)
-                    res.append(format_string.format(name=table, 
-                        num=proj.db.numOfRows(table_name),
-                        desc=desc, date=date, cmd=cmd))
-            if samples:
-                proj.db.attach('{}_genotype'.format(proj.name))
-                cur = proj.db.cursor()
-                # get sample information
-                if not format_string:
-                    format_string = '{name:20}: {num:12}'
-                #
-                if isinstance(samples, str):
-                    samples = [samples]
-                for sample in samples:
-                    IDs = proj.selectSampleByPhenotype("sample_name = '{}'".format(sample))
-                    if len(IDs) == 0:
-                        raise ValueError('No sample with name {} is located'.format(sample))
-                    elif len(IDs) > 1:
-                        raise ValueError('Name {} matches multiple samples.'.format(sample))
-                    cur.execute('SELECT count(*) FROM {}_genotype.genotype_{};'.format(proj.name, IDs[0]))
-                    numGenotypes = cur.fetchone()[0] 
-                    res.append(format_string.format(name=sample,
-                        num=numGenotypes))
-            return r'\n'.join(res)
-    except Exception as e:
-        env.logger.debug('projInfo(tables={},samples={},format_string="{}") failed: {}'.format(tables, samples,format_string, e))
-        return ''
+    def __init__(self, cmd='', output=[]):
+        # multiple command is not allowed.
+        if isinstance(cmd, str):
+            self.cmd = [' '.join(cmd.split('\n'))]
+        else:
+            self.cmd = [' '.join(x.split('\n')) for x in cmd]
+        #
+        if isinstance(output, str):
+            self.output = [output]
+        else:
+            self.output = output
+
+    def _execute(self, ifiles, pipeline=None):
+        raise RuntimeError('Please define your own _execute function in an derived class of PipelineAction.')
+
+    def _write_info(self):
+        if not self.output:
+            return
+        if not os.path.isfile(self.proc_out) \
+            or not os.path.isfile(self.proc_err):
+            env.logger.warning('Could not locate process-specific output file (id {}), '
+                'which might have been removed by another process that produce '
+                'the same output file {}'.format(os.getpid(), self.output[0]))
+            # try to rerun this step
+            raise RewindExecution()
+        with open(self.proc_info, 'a') as exe_info:
+            exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
+            for f in self.output:
+                if not os.path.isfile(f):
+                    raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
+                # for performance considerations, use partial MD5
+                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                    calculateMD5(f, partial=True)))
+            # write standard output to exe_info
+            exe_info.write('\n\nSTDOUT\n\n')
+            with open(self.proc_out) as stdout:
+                for line in stdout:
+                    exe_info.write(line)
+            # write standard error to exe_info
+            exe_info.write('\n\nSTDERR\n\n')
+            with open(self.proc_err) as stderr:
+                for line in stderr:
+                    exe_info.write(line)
+        # if command succeed, remove all out_ and err_ files, 
+        for filename in glob.glob(self.output[0] + '.out_*') + \
+            glob.glob(self.output[0] + '.err_*') + glob.glob(self.output[0] + '.done_*'):
+            try:
+                os.remove(filename)
+            except Exception as e:
+                env.logger.warning('Fail to remove {}: {}'.format(filename, e))
+
+    def __call__(self, ifiles, pipeline=None):
+        if self.output:
+            exe_info_file = '{}.exe_info'.format(self.output[0])
+            if os.path.isfile(exe_info_file):
+                with open(exe_info_file) as exe_info:
+                    cmd = exe_info.readline().strip()
+                if cmd == '; '.join(self.cmd).strip() and existAndNewerThan(self.output, ifiles,
+                    md5file=exe_info_file):
+                    env.logger.info('Reuse existing {}'.format(', '.join(self.output)))
+                    return self.output
+            # create directory if output directory does not exist
+            for d in [os.path.split(os.path.abspath(x))[0] for x in self.output]:
+                if not os.path.isdir(d):
+                    try:
+                        os.makedirs(d)
+                    except Exception as e:
+                        raise RuntimeError('Failed to create directory {} for output file: {}'.format(d, e))
+        # We cannot ignore this step, but do we have all the input files?
+        # If not, we will have to rewind the execution
+        for ifile in ifiles:
+            if not os.path.isfile(ifile):
+                env.logger.warning('Rewind execution because input file {} does not exist.'.format(ifile))
+                raise RewindExecution(ifile)
+        #
+        if self.output:
+            with open(exe_info_file, 'w') as exe_info:
+                exe_info.write('{}\n'.format('; '.join(self.cmd)))
+                exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
+                for f in ifiles:
+                    # for performance considerations, use partial MD5
+                    exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                        calculateMD5(f, partial=True)))
+        # now, run the job, write info if it is successfully finished.
+        # Otherwise the job might be forked and it will record the signature by itself.
+        if self._execute(ifiles, pipeline):
+            self._write_info()#
+        #
+        if self.output:
+            return self.output
+        else:
+            return ifiles
+
 
 class EmitInput:
     '''Select input files of certain types, group them, and send input files
@@ -342,49 +400,9 @@ class EmitInput:
             return self._pairByFileName(selected, unselected)
 
 
-class SkiptableAction:
-    '''Internal actions that can be skipped according to a exe_info file.
-    Actions using this class as a base class should define a _execute() function.
-    '''
-    def __init__(self, cmd, output):
-        self.cmd = cmd.strip()
-        if isinstance(output, str):
-            self.output = [output]
-        else:
-            self.output = output
-        if not self.output:
-            raise ValueError('Please specify an output file for command {}'.format(self.cmd))
-
-    def __call__(self, ifiles, pipeline=None):
-        exe_info = '{}.exe_info'.format(self.output[0])
-        if os.path.isfile(exe_info) and open(exe_info).readline().strip() == self.cmd.strip() \
-            and existAndNewerThan(self.output, ifiles,
-            exe_info):
-            # not that we do not care input file because it might contain different seed
-            env.logger.info('Reuse existing {}'.format(self.output[0]))
-            return self.output
-        for ifile in ifiles:
-            if not os.path.isfile(ifile):
-                raise RewindExecution(ifile)
-        with open(exe_info, 'w') as exe_info:
-            exe_info.write(self.cmd + '\n')
-            exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
-            for f in ifiles:
-                # for performance considerations, use partial MD5
-                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
-                    calculateMD5(f, partial=True)))
-            self._execute(ifiles, pipeline)
-            exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
-            for f in self.output:
-                if not os.path.isfile(f):
-                    raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
-                # for performance considerations, use partial MD5
-                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
-                    calculateMD5(f, partial=True)))
-        return self.output
         
 try:
-    # some functors are subclasses of SkiptableAction and has to be
+    # some functors are subclasses of PipelineAction and has to be
     # imported after the definition of that class.
     from simulation import *
 except ImportError as e:
@@ -458,9 +476,14 @@ class WarnIf:
         return ifiles
 
 class ImportModules:
-    '''Import names from one or more modules to a global dictionary
-    VT_MODULE'''
+    '''Import functions and action from a Python module. This action passed input
+    files to output and does not change the pipeline.'''
     def __init__(self, modules=[]):
+        '''Import one or more modules to be used by the existing pipeline. A module
+        can be either the name of a system module or a .py file. In the latter case,
+        Variant Tools will try to load the file directory (a full path can be given),
+        look for the module in the path of the pipeline (if a local pipeline is used),
+        or download from the Variant Tools Repository under directory pipeline.'''
         if isinstance(modules, str):
             self.modules = [modules]
         else:
@@ -693,83 +716,7 @@ class FieldsFromTextFile:
             raise RuntimeError('Failed to guess fields from {}: {}'.format(ifiles[0], e))
         #
         return self.field_output
-        
-    
-class GuessReadGroup:
-    def __init__(self, bamfile, rgfile):
-        self.output_bam = bamfile
-        self.rg_output = rgfile
-
-    def __call__(self, fastq_filename, pipeline=None):
-        '''Get read group information from names of fastq files.'''
-        # Extract read group information from filename such as
-        # GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt. The files are named 
-        # according to the lane that produced them and whether they
-        # are paired or not: Single-end reads s_1_sequence.txt for lane 1;
-        # s_2_sequence.txt for lane 2 Paired-end reads s_1_1_sequence.txt 
-        # for lane 1, pair 1; s_1_2_sequence.txt for lane 1, pair 2
-        #
-        # This function return a read group string like '@RG\tID:foo\tSM:bar'
-        #
-        # ID* Read group identifier. Each @RG line must have a unique ID. The
-        # value of ID is used in the RG
-        #     tags of alignment records. Must be unique among all read groups
-        #     in header section. Read group
-        #     IDs may be modifid when merging SAM fies in order to handle collisions.
-        # CN Name of sequencing center producing the read.
-        # DS Description.
-        # DT Date the run was produced (ISO8601 date or date/time).
-        # FO Flow order. The array of nucleotide bases that correspond to the
-        #     nucleotides used for each
-        #     flow of each read. Multi-base flows are encoded in IUPAC format, 
-        #     and non-nucleotide flows by
-        #     various other characters. Format: /\*|[ACMGRSVTWYHKDBN]+/
-        # KS The array of nucleotide bases that correspond to the key sequence
-        #     of each read.
-        # LB Library.
-        # PG Programs used for processing the read group.
-        # PI Predicted median insert size.
-        # PL Platform/technology used to produce the reads. Valid values: 
-        #     CAPILLARY, LS454, ILLUMINA,
-        #     SOLID, HELICOS, IONTORRENT and PACBIO.
-        # PU Platform unit (e.g. flowcell-barcode.lane for Illumina or slide for
-        #     SOLiD). Unique identifier.
-        # SM Sample. Use pool name where a pool is being sequenced.
-        #
-        with open(self.rg_output, 'w') as rg_output:
-            filename = os.path.basename(fastq_filename[0])
-            output = os.path.basename(self.output_bam)
-            # sample name is obtained from output filename without file extension
-            SM = output.split('.', 1)[0]
-            # always assume ILLUMINA for this script and BWA for processing
-            PL = 'ILLUMINA'  
-            PG = 'BWA'
-            #
-            # PU is for flowcell and lane information, ID should be unique for each
-            #     readgroup
-            # ID is temporarily obtained from input filename without exteion
-            ID = filename.split('.')[0]
-            # try to get lan information from s_x_1/2 pattern
-            try:
-                PU = re.search('s_([^_]+)_', filename).group(1)
-            except AttributeError:
-                env.logger.warning('Failed to guess lane information from filename {}'
-                    .format(filename))
-                PU = 'NA'
-            # try to get some better ID
-            try:
-                # match GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt
-                m = re.match('([^_]+)_([^_]+)_([^_]+)_s_([^_]+)_([^_]+)_sequence.txt', filename)
-                ID = '{}.{}'.format(m.group(1), m.group(4))
-            except AttributeError as e:
-                env.logger.warning('Input fasta filename {} does not match a known'
-                    ' pattern. ID is directly obtained from filename.'.format(filename))
-            #
-            rg = r'@RG\tID:{}\tPG:{}\tPL:{}\tPU:{}\tSM:{}'.format(ID, PG, PL, PU, SM)
-            env.logger.info('Setting read group tag to {}'.format(rg))
-            rg_output.write(rg)
-        return self.rg_output
-
+       
 class RewindExecution(Exception):
     pass
 
@@ -789,11 +736,11 @@ class NullAction:
             # if no output is specified, pass ifiles through
             return ifiles
         
-class RunCommand:
+class RunCommand(PipelineAction):
     '''This action execute specified commands. If the pipeline is running
     in parallel mode and a submitter is specified, it will use the submitter
     command to submit the jobs as a separate job. '''
-    def __init__(self, cmd='', working_dir=None, output=[], submitter=None):
+    def __init__(self, cmd='', output=[], working_dir=None, submitter=None, max_jobs=None):
         '''This action accepts one (a string) or more command (a list of strings)
         and executes them in a shell environment. It will switch to
         ``working_dir`` if a working directory is specified. The ``output``
@@ -803,14 +750,9 @@ class RunCommand:
         specified, a shell script will be written with its filename appended to
         or substitute ``{}`` in ``submitter``. For example, submitter='sh {} &'
         will run the job as a background job, and submitter='qsub -q long < {}'
-        will submit the shell file to the long queue of a cluster system. '''
-        if not cmd:
-            self.cmd = ['echo "None command executed."']
-        elif isinstance(cmd, str):
-            # newlines are ignored 
-            self.cmd = [' '.join(cmd.split('\n'))]
-        else:
-            self.cmd = [' '.join(x.split('\n')) for x in cmd]
+        will submit the shell file to the long queue of a cluster system. 
+        Parameter ``max_jobs`` is deprecated and is kept for compatibility reasons.
+        '''
         self.submitter = submitter
         self.working_dir = working_dir
         if type(output) == str:
@@ -833,6 +775,9 @@ class RunCommand:
             self.proc_lck = '{}.lck'.format(self.output[0])
             self.proc_info = '{}.exe_info'.format(self.output[0])
         self.start_time = time.time()
+        if not cmd:
+            cmd = ['echo "None command executed."']
+        PipelineAction.__init__(self, cmd=cmd, output=output)
 
     def elapsed_time(self):
         '''Return the elapsed time in human readable format since start time'''
@@ -871,44 +816,6 @@ class RunCommand:
                         pass
                 raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
                     .format(cur_cmd, self.elapsed_time(), ret))
-        self.write_info()
-
-    def write_info(self):
-        if not self.output:
-            return
-        if not os.path.isfile(self.proc_out) \
-            or not os.path.isfile(self.proc_err):
-            env.logger.warning('Could not locate process-specific output file (id {}), '
-                'which might have been removed by another process that produce '
-                'the same output file {}'.format(os.getpid(), self.output[0]))
-            # try to rerun this step
-            raise RewindExecution()
-        with open(self.proc_info, 'a') as exe_info:
-            exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
-            for f in self.output:
-                if not os.path.isfile(f):
-                    raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
-                # for performance considerations, use partial MD5
-                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
-                    calculateMD5(f, partial=True)))
-            # write standard output to exe_info
-            exe_info.write('\n\nSTDOUT\n\n')
-            with open(self.proc_out) as stdout:
-                for line in stdout:
-                    exe_info.write(line)
-            # write standard error to exe_info
-            exe_info.write('\n\nSTDERR\n\n')
-            with open(self.proc_err) as stderr:
-                for line in stderr:
-                    exe_info.write(line)
-        # if command succeed, remove all out_ and err_ files, 
-        for filename in glob.glob(self.output[0] + '.out_*') + \
-            glob.glob(self.output[0] + '.err_*') + glob.glob(self.output[0] + '.done_*'):
-            try:
-                os.remove(filename)
-            except Exception as e:
-                env.logger.warning('Fail to remove {}: {}'
-                    .format(filename, e))
 
     def monitor(self):
         global VT_THREADS
@@ -1004,65 +911,22 @@ class RunCommand:
             VT_THREADS[self.output[0]] = t
 
 
-    def __call__(self, ifiles, pipeline=None):
+    # override PipelineAction.__call__ because possible fork of execution
+    #
+    def _execute(self, ifiles, pipeline=None):
         # substitute cmd by input_files and output_files
         if pipeline.jobs > 1 and self.submitter is not None and not self.output:
             env.logger.warning('Fail to execute in parallel because no output is specified.')
-        #
-        if self.output:
-            #for ofile in self.output:
-            #    nfile = os.path.normpath(os.path.expanduser(ofile))
-            #    under_resource = not os.path.relpath(nfile, os.path.normpath(os.path.expanduser(env.local_resource))).startswith('../')
-            #    under_cache = not os.path.relpath(nfile, os.path.normpath(os.path.expanduser(env.cache_dir))).startswith('../')
-            #    under_temp = not os.path.relpath(nfile, os.path.normpath(os.path.expanduser(env.temp_dir))).startswith('../')
-            #    under_proj = not os.path.relpath(nfile, os.path.realpath('.')).startswith('../')
-            #    if not (under_resource or under_cache or under_temp or under_proj):
-            #        raise RuntimeError('Unable to write to output file ({}) because '
-            #            'output file of a pipeline can can be under project, resource, '
-            #            'temporary or cache directories.'.format(ofile))
-            if os.path.isfile(self.output[0] + '.exe_info'):
-                with open(self.output[0] + '.exe_info') as exe_info:
-                    cmd = exe_info.readline().strip()
-                # if the exact command has been used to produce output, and the
-                # output files are newer than input file, ignore the step
-                if cmd == '; '.join(self.cmd).strip() and existAndNewerThan(ifiles=ifiles,
-                        ofiles=self.output, md5file=self.output[0] + '.exe_info'):
-                    env.logger.info('Reuse existing files {}'.format(', '.join(self.output)))
-                    return self.output
-            # create directory if output directory does not exist
-            for dir in [os.path.split(os.path.abspath(x))[0] for x in self.output]:
-                if not os.path.isdir(dir):
-                    try:
-                        os.makedirs(dir)
-                    except Exception as e:
-                        raise RuntimeError('Failed to create directory {} for output file: {}'.format(dir, e))
-                    if not os.path.isdir(dir):
-                        raise RuntimeError('Failed to create directory {} for output file: {}'.format(dir, e))
-        # now, we cannot ignore this step, but do we have all the input files?
-        # the input can be fake .file_info files
-        if not all([os.path.isfile(x) for x in ifiles]):
-            raise RewindExecution()
-        # add md5 signature of input and output files
-        if self.output:
-            with open(self.output[0] + '.exe_info', 'w') as exe_info:
-                exe_info.write('{}\n'.format('; '.join(self.cmd)))
-                exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
-                for f in ifiles:
-                    # for performance considerations, use partial MD5
-                    exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
-                        calculateMD5(f, partial=True)))
         # Submit the job on a cluster system
         # 1. if there is output, otherwise we cannot track the status of the job
         # 2. if a submit command is specified
         # 3. if --jobs with a value greater than 1 is used.
         if self.output and pipeline.jobs > 1 and self.submitter is not None:
             self.submit_command()
+            return False
         else:
             self.run_command()
-        if self.output:
-            return self.output
-        else:
-            return ifiles
+            return True
 
 class DecompressFiles:
     '''This action gets a list of fastq files from input file, decompressing
@@ -1262,53 +1126,6 @@ class LinkToDir:
             ofiles.append(os.path.join(self.dest, basename))
         return ofiles
 
-        
-class CountMappedReads:
-    '''This action reads the input files in sam format and count the total
-    number of reads and number of mapped reads. It raises a RuntimeError
-    if the proportion of unmapped reads lower than the specified cutoff value
-    (default to 0.8). This action writes a count file to specified output
-    files and read from this file directly if the file already exists.'''
-    def __init__(self, output, cutoff=0.2):
-        self.cutoff = cutoff
-        self.output = output
-
-    def __call__(self, sam_file, pipeline=None):
-        #
-        # count total reads and unmapped reads
-        #
-        # The previous implementation uses grep and wc -l, but
-        # I cannot understand why these commands are so slow...
-        #
-        if not existAndNewerThan(ofiles=self.output, ifiles=sam_file):
-            env.logger.info('Counting unmapped reads in {}'.format(sam_file[0]))
-            unmapped_count = 0
-            total_count = 0
-            with open(sam_file[0]) as sam:
-               for line in sam:
-                   total_count += 1
-                   if 'XT:A:N' in line:
-                       unmapped_count += 1
-            mapped_count = total_count - unmapped_count
-            with open(self.output, 'w') as target:
-                target.write('{}\n{}\n'.format(mapped_count, total_count))
-        else:
-            env.logger.info('Using existing counts in {}'.format(self.output))
-            #
-            with open(self.output) as cnt:
-                mapped_count = int(cnt.readline())
-                total_count = int(cnt.readline())
-        # more than 40% unmapped
-        if total_count == 0 or mapped_count * 1.0 / total_count < self.cutoff:
-            raise RuntimeError('{}: {} out of {} reads ({:.2f}%) are mapped.'
-                .format(sam_file[0], mapped_count, total_count,
-                    0 if total_count == 0 else (100.*mapped_count/total_count)))
-        else:
-            env.logger.info('{}: {} out of {} reads ({:.2f}%) are mapped.'
-                .format(sam_file[0], mapped_count, total_count,
-                    0 if total_count == 0 else (100.*mapped_count/total_count)))
-        return self.output
-
 
 class DownloadResource:
     '''Download resources to specified destination directory. dest_dir can
@@ -1415,7 +1232,7 @@ class DownloadResource:
 class Pipeline:
     def __init__(self, name, extra_args=[], pipeline_type='pipeline', verbosity=None, jobs=1):
         self.pipeline = PipelineDescription(name, extra_args, pipeline_type)
-        if os.path.isfile(name):
+        if os.path.isfile(name) or os.path.isfile(name + '.pipeline'):
             self.pipeline_path = os.path.split(os.path.abspath(os.path.expanduser(name)))[0]
         else:
             self.pipeline_path = None
@@ -1612,20 +1429,6 @@ class Pipeline:
             for k, v in VT_THREADS.items():
                 env.logger.trace('Waiting for {} to be completed.'.format(k))
                 v.join()
-
-
-def isBamPairedEnd(input_file):
-    # we need pysam for this but pysam does not yet work for Python 3.3.
-    if not hasPySam:
-        env.logger.error('Cannot detect if input bam file has paired reads (missing pysam). Assuming paired.')
-        return True
-    bamfile = pysam.Samfile(input_file, 'rb')
-    for read in bamfile.fetch():
-        if read.is_paired:
-            env.logger.info('{} is detected to have paired reads.'.format(input_file))
-        else:
-            env.logger.info('{} is detected to have single (non-paired) reads.'.format(input_file))
-        return read.is_paired
 
 
 def executeArguments(parser):

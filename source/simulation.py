@@ -23,6 +23,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+'''This module defines functions and actions for Variant Simulation
+Tools. 
+'''
+
 import simuOpt
 simuOpt.setOptions(alleleType='mutant', optimized=True, quiet=True, version='1.1.4')
 
@@ -41,7 +45,7 @@ import datetime
 import random
 import tempfile
 from collections import defaultdict
-from .pipeline import SkiptableAction
+from .pipeline import PipelineAction
 from .project import Project
 
 if sys.version_info.major == 2:
@@ -50,7 +54,7 @@ else:
     from ucsctools_py3 import tabixFetch
 
 
-class ExtractVCF(SkiptableAction):
+class ExtractVCF(PipelineAction):
     '''Use tabix to extract portion of a local or online VCF file '''
     def __init__(self, regions, sourceURL, output):
         if isinstance(sourceURL, (list, tuple)):
@@ -58,7 +62,7 @@ class ExtractVCF(SkiptableAction):
         else:
             self.sourceURL = [sourceURL]
         self.regions = regions
-        SkiptableAction.__init__(self, cmd='ExtractVCF {} {} {}'.format(sourceURL, regions, output),
+        PipelineAction.__init__(self, cmd='ExtractVCF {} {} {}'.format(sourceURL, regions, output),
             output=output)
 
     def _execute(self, ifiles, pipeline):
@@ -71,15 +75,17 @@ class ExtractVCF(SkiptableAction):
                 tabixFetch(URL, [region], self.output[0], False)
 
 
-class CreatePopulation(SkiptableAction):
+class CreatePopulation(PipelineAction):
     '''Create a simuPOP population from specified regions and number of individuals.
     '''
-    def __init__(self, regions, size=None, importGenotypeFrom=None, infoFields=[], output=[]):
+    def __init__(self, regions, size=None, importGenotypeFrom=None, 
+        infoFields=[], output=[], **kwargs):
         self.regions = regions
         self.size = size
         self.infoFields = infoFields
         self.sourceFile = importGenotypeFrom
-        SkiptableAction.__init__(self, cmd='PopFromRegions {} {}\n'.format(regions, output),
+        self.extra_args = kwargs
+        PipelineAction.__init__(self, cmd='PopFromRegions {} {}\n'.format(regions, output),
             output=output)
 
     def _execute(self, ifiles, pipeline):
@@ -109,7 +115,7 @@ class CreatePopulation(SkiptableAction):
             chroms.sort()
             pop = sim.Population(size=self.size, loci=[len(lociPos[x]) for x in chroms],
                 chromNames=chroms, lociPos=sum([lociPos[x] for x in chroms], []),
-                infoFields=self.infoFields)
+                infoFields=self.infoFields, **self.extra_args)
                 #chromTypes=[sim.CHROMOSOME_X if x=='X' else (sim.CHROMOSOME_Y if x=='Y' else sim.AUTOSOME) for x in chroms])
         # save regions for later use.
         pop.dvars().regions = self.regions
@@ -376,14 +382,14 @@ def FineScaleRecombinator(regions=None, scale=1, defaultRate=1e-8, output=None):
     return sim.Recombinator(rates=rec_rates, loci=sum([[(ch,pos) for pos in lociPos[ch]] for ch in chroms], []))
 
 
-class OutputPopulationStatistics(SkiptableAction):
+class OutputPopulationStatistics(PipelineAction):
     def __init__(self, mut_count=None):
         output = []
         self.mut_count = mut_count
         if self.mut_count:
             output.append(self.mut_count[0])
         self.output = output
-        SkiptableAction.__init__(self, cmd='PopStat output={}\n'
+        PipelineAction.__init__(self, cmd='PopStat output={}\n'
             .format(output), output=output)
 
     def _execute(self, ifiles, pipeline):
@@ -798,7 +804,7 @@ class ProteinPenetrance(sim.PyPenetrance, MutantInfo):
         return 1 - fitness
 
 
-class EvolvePopulation(SkiptableAction):
+class EvolvePopulation(PipelineAction):
     def __init__(self,
         selector = None, demoModel=None, 
         mutator = None, 
@@ -819,7 +825,7 @@ class EvolvePopulation(SkiptableAction):
         self.preOps = preOps if isinstance(preOps, (list, tuple)) else [preOps]
         self.postOps = postOps if isinstance(postOps, (list, tuple)) else [postOps]
         self.finalOps = finalOps if isinstance(finalOps, (list, tuple)) else [finalOps]
-        SkiptableAction.__init__(self, cmd='EvolvePop output={}\n'
+        PipelineAction.__init__(self, cmd='EvolvePop output={}\n'
             .format(output), output=output)
 
     def _execute(self, ifiles, pipeline):
@@ -896,7 +902,7 @@ class EvolvePopulation(SkiptableAction):
         return self.output
 
 
-class DrawCaseControlSample(SkiptableAction):
+class DrawCaseControlSample(PipelineAction):
     '''Draw case control samples from simulated population. If there are subpopulations and 
     cases and controls have the same demension, cases and controls are drawn from each
     subpopulation. If more than one output files are provided, multiple samples are
@@ -916,7 +922,7 @@ class DrawCaseControlSample(SkiptableAction):
             raise ValueError('Please specify cases and controls with the same dimensions.')
         self.penetrance = penetrance
         #
-        SkiptableAction.__init__(self, cmd='DrawCaseCtrlSample {}\n'.format(output),
+        PipelineAction.__init__(self, cmd='DrawCaseCtrlSample {}\n'.format(output),
             output=output)
     
     def _execute(self, ifiles, pipeline):
@@ -998,10 +1004,10 @@ class DrawCaseControlSample(SkiptableAction):
                 return True
         return False
 
-class DrawRandomSample(SkiptableAction):
+class DrawRandomSample(PipelineAction):
     def __init__(self, sizes, output):
         self.sizes = sizes
-        SkiptableAction.__init__(self, cmd='DrawRandomSampler {}\n'.format(output),
+        PipelineAction.__init__(self, cmd='DrawRandomSampler {}\n'.format(output),
             output=output)
     
     def _execute(self, ifiles, pipeline):
@@ -1031,7 +1037,7 @@ class DrawRandomSample(SkiptableAction):
         del pop
 
 
-class DrawQuanTraitSample(SkiptableAction):
+class DrawQuanTraitSample(PipelineAction):
     '''This operator cannot yet sample from different
     subpopulations.
     '''
@@ -1047,7 +1053,7 @@ class DrawQuanTraitSample(SkiptableAction):
             self.conditions = conditions
         #
         self.qtrait = qtrait
-        SkiptableAction.__init__(self, cmd='DrawQuanTraitSample {}\n'.format(output),
+        PipelineAction.__init__(self, cmd='DrawQuanTraitSample {}\n'.format(output),
             output=output)
     
     def _execute(self, ifiles, pipeline):
@@ -1091,7 +1097,7 @@ class DrawQuanTraitSample(SkiptableAction):
 
 
 
-class ExportPopulation(SkiptableAction):
+class ExportPopulation(PipelineAction):
     '''
     '''
     def __init__(self, output, sample_names=[], var_info=[]):
@@ -1103,7 +1109,7 @@ class ExportPopulation(SkiptableAction):
         for vi in var_info:
             if vi != 'MT':
                 env.logger.warning('Unrecognized variant info field. Only MT (mutant type) is supported now.')
-        SkiptableAction.__init__(self, cmd='ExportPopulation {} {}\n'.format(sample_names, output),
+        PipelineAction.__init__(self, cmd='ExportPopulation {} {}\n'.format(sample_names, output),
             output=output)
 
     def _execute(self, ifiles, pipeline):
