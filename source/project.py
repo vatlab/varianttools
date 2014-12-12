@@ -4446,11 +4446,15 @@ def show(args):
                     print('\n'.join(textwrap.wrap(doc.strip(),
                         initial_indent=' '*8,
                         subsequent_indent=' '*8, width=textWidth)))
-                print('Available pipeline actions:')
+                print('Pipeline actions:')
+                actions = []
                 for name, obj in inspect.getmembers(pipeline):
                     if inspect.isclass(obj) and issubclass(obj, pipeline.PipelineAction):
                         pipeline_members.append(name)
-                        print('        {}'.format(name))
+                        actions.append(name)
+                #
+                for action in sorted(actions):
+                    print('        {}'.format(action))
                 #
                 from variant_tools import simulation
                 print('\nModule:\n        simulation')
@@ -4460,18 +4464,23 @@ def show(args):
                     print('\n'.join(textwrap.wrap(doc.strip(),
                         initial_indent=' '*8,
                         subsequent_indent=' '*8, width=textWidth)))
-                print('Available pipeline actions:')
+                print('Pipeline actions:')
+                actions = []
                 for name, obj in inspect.getmembers(simulation):
                     if name in pipeline_members:
                         continue
                     if inspect.isclass(obj) and issubclass(obj, simulation.PipelineAction):
-                        print('        {}'.format(name))
+                        actions.append(name)
+                #
+                for action in sorted(actions):
+                    print('        {}'.format(action))
                 # look in resource files
                 res = ResourceManager()
                 res.getLocalManifest()
                 modules = [x for x in res.manifest.keys() if \
                     (x.startswith('pipeline/') or x.startswith('simulation/')) and x.endswith('.py')]
                 for mod in modules:
+                    actions = []
                     mod_file = downloadFile(mod)
                     p,f = os.path.split(os.path.expanduser(mod_file))
                     print('\nModule:\n        {}'.format(f[:-3]))
@@ -4483,12 +4492,17 @@ def show(args):
                         print('\n'.join(textwrap.wrap(doc.strip(),
                             initial_indent=' '*8,
                             subsequent_indent=' '*8, width=textWidth)))
-                    print('Available pipeline actions:')
                     for name, obj in inspect.getmembers(local_dict):
                         if name in pipeline_members:
                             continue
                         if inspect.isclass(obj) and issubclass(obj, (simulation.PipelineAction, pipeline.PipelineAction)):
-                            print('        {}'.format(name))
+                            actions.append(name)
+                    if not actions:
+                        print('No pipeline action is defined.')
+                    else:
+                        print('Pipeline actions:')
+                        for action in sorted(actions):
+                            print('        {}'.format(action))
             elif args.type == 'action':
                 if not args.items:
                     raise ValueError('Please specify a pipeline to display')

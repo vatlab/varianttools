@@ -342,7 +342,7 @@ class PipelineAction:
     same input, output and command.
 
     NOTE: User-defined actions should either override this function (__call__)
-        or define function _execute(self, ifiles, pipeline) to be called by the
+        or define function execute(self, ifiles, pipeline) to be called by the
         base __call__ function, which implements the execution signature mechanism.
     '''
     def __init__(self, cmd='', output=[]):
@@ -377,8 +377,15 @@ class PipelineAction:
             self.proc_lck = '{}.lck'.format(self.output[0])
             self.proc_info = '{}.exe_info'.format(self.output[0])
 
-    def _execute(self, ifiles, pipeline=None):
-        raise RuntimeError('Please define your own _execute function in an derived class of PipelineAction.')
+    def execute(self, ifiles, pipeline=None):
+        '''Function called by __call__ for actual action performed on ifiles. A user-defined
+        action should re-define __call__ or redefine this function and return ``True`` if the
+        action is completed successfully. 
+        '''
+        raise RuntimeError('Please define your own execute function in an derived class of PipelineAction.')
+
+    # for backward compatibility
+    _execute = execute
 
     def _write_info(self):
         if not self.output:
@@ -418,7 +425,8 @@ class PipelineAction:
 
     def __call__(self, ifiles, pipeline=None):
         '''Execute action with input files ``ifiles`` with runtime information
-        stored in ``pipeline``. This function is called by the pipeline.
+        stored in ``pipeline``. This function is called by the pipeline and calls
+        user-defined ``execute`` function.
 
         Parameters:
 
@@ -467,7 +475,7 @@ class PipelineAction:
                         calculateMD5(f, partial=True)))
         # now, run the job, write info if it is successfully finished.
         # Otherwise the job might be forked and it will record the signature by itself.
-        if self._execute(ifiles, pipeline):
+        if self.execute(ifiles, pipeline):
             self._write_info()#
         #
         if self.output:
@@ -639,6 +647,11 @@ class CheckCommands(PipelineAction):
     '''Check the existence of specified commands and raise an error if one of
     the commands does not exist.'''
     def __init__(self, commands):
+        '''
+        Parameters:
+            commands (string or list of strings):
+                Name of one of more commands to be checked. No option is allowed.
+        '''
         PipelineAction.__init__(self)
         if type(commands) == type(''):
             self.commands= [commands]
@@ -646,6 +659,18 @@ class CheckCommands(PipelineAction):
             self.commands= commands
 
     def __call__(self, ifiles, pipeline=None):
+        '''Check the existence of commands.
+
+        Parameters:
+            ifiles:   unused
+            pipeline: unused
+
+        Returns:
+            Pass input to output. Does not change pipeline.
+
+        Raises:
+            A RuntimeError will be raised if a command is not found.
+        '''
         for cmd in self.commands:
             if which(cmd) is None:
                 raise RuntimeError('Command {} does not exist. Please install it and try again.'
@@ -656,35 +681,73 @@ class CheckCommands(PipelineAction):
 
 
 class CheckOutput(PipelineAction):
-    '''Check out of of an command, and check if it matches a particular
-    pattern. The pipeline will exit if fail is set to True (default).'''
-    def __init__(self, commands, pattern, failIfMismatch=True):
-        self.commands = commands
-        if isinstance(pattern, str):
-            self.pattern = [pattern]
+    '''Check out of of an command, and check if it matches one or more
+    patterns. The pipeline will be terminated if failIfMismatch is set to True
+    (default).
+    
+    Examples:
+        action=CheckOutput('tophat2 --version', ['v2.0.13', 'v2.0.14'])
+
+        # if strict_version is a command line parameter
+        action=CheckOutput('samtools', '0.1.19', %(strict_version)s)
+    '''
+    def __init__(self, command, patterns, failIfMismatch=True):
+        '''
+        Parameters:
+            command (string):
+                A command (with or without options)
+
+            patterns (string or list of strings):
+                One or more patterns (usually a piece of version string)
+                that will be compared to the output of ``command``
+
+            failIfMismatch (boolean):
+                If set to ``True`` (default), the action will terminate the
+                pipeline if the output of command does not match any of the
+                patterns. Otherwise a warning message will be printed when 
+                the output of command does not match any of the patterns.
+        '''
+        self.command = command
+        if isinstance(patterns, str):
+            self.patterns = [patterns]
         else:
-            self.pattern = pattern
+            self.patterns = patterns
         self.fail = failIfMismatch
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
+        '''Run specified command and compare the output with specified
+        patterns. Generate an error or warning if the output does not match
+        any of the patterns.
+
+        Parameters:
+            ifiles:   unused
+            pipeline: unused
+
+        Results:
+            Pass input to putput. Does not change pipeline.
+
+        Raises:
+            Raise a RuntimeError if the output of command does not match
+            any of the patterns, if ``failIfMismatch`` is set to ``True``.
+        '''
         try:
             # do not use subprocess.check_output because I need to get
             # output even when the command returns non-zero return code
-            p = subprocess.Popen(self.commands, stdout=subprocess.PIPE,
+            p = subprocess.Popen(self.command, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, shell=True)
             odata, edata = p.communicate()
             output = odata.decode() + edata.decode()
             env.logger.trace('Output of command "{}" is "{}"'
-                .format(self.commands, output))
+                .format(self.command, output))
         except Exception as e:
             raise RuntimeError('Failed to execute command "{}": {}'
                 .format(self.cmd, e))
         #
-        if all([re.search(x, output, re.MULTILINE) is None for x in self.pattern]):
+        if all([re.search(x, output, re.MULTILINE) is None for x in self.patterns]):
             msg = ('Output of command "{}" ("{}") does not ' + 
-                    'match specified regular expression {}.').format(self.cmd,
-                        ' '.join(output[:40].split()), ' or '.join(self.pattern))
+                    'match specified regular expression {}.').format(self.command,
+                        ' '.join(output[:40].split()), ' or '.join(self.patterns))
             if self.fail:
                 raise RuntimeError(msg)
             else:
@@ -693,44 +756,99 @@ class CheckOutput(PipelineAction):
 
 class CheckFiles(PipelineAction):
     '''Check the existence of specified files and raise an
-    error if one of the files does not exist.'''
-    def __init__(self, files, msg=''):
+    error if one of the files does not exist.
+    
+    Example:
+        # assume gatk_path is a command line argument
+        action=CheckFile('%(gatk_path)s/GenomeAnalysisTK.jar',
+            'Please point --gatk_path to a directory with GenomeAnalysisTK.jar')
+    '''
+    def __init__(self, files, message=''):
+        '''
+        Parameters:
+            files (string or list of strings):
+                One or more files to check.
+
+            message (string):
+                A message when one of the files cannot be found.
+        '''
         if type(files) == str:
             self.files = [files]
         else:
             self.files = files
-        self.msg = msg
+        self.message = message
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
+        '''Check the existence of specified files and raise an error if
+        one of the files cannot be found.
+
+        Parameters:
+            ifiles:   unused
+            pipeline: unused
+
+        Results:
+            Pass input to putput. Does not change pipeline.
+
+        Raises:
+            Raise a RuntimeError if any of the files is not found.
+        '''
         for f in self.files:
-            if os.path.isfile(f):
+            if os.path.isfile(os.path.expanduser(f)):
                 env.logger.info('{} is located.'.format(f))
             else:
-                raise RuntimeError('Cannot locate {}. {}'.format(f, self.msg))
+                raise RuntimeError('Cannot locate {}: {}'.format(f, self.message))
         return ifiles
+
 
 class CheckDirs(PipelineAction):
     '''Check the existence of specified directories and raise an
-    error if one of the directories does not exist.'''
-    def __init__(self, dirs, msg=''):
+    error if one of the directories does not exist.
+    
+    Example:
+        action=CheckDirs('${CMD_OUTPUT}',
+            'Value of parameter --output need to be an existing directory')
+    '''
+    def __init__(self, dirs, message=''):
+        '''
+        Parameters:
+            files (string or list of strings):
+                One or more directories to check.
+
+            message (string):
+                A message when one of the directories cannot be found.
+        '''
+
         if type(dirs) == str:
             self.dirs = [dirs]
         else:
             self.dirs = dirs
-        self.msg = msg
+        self.message = message
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
+        '''Check the existence of specified directories and raise an error if
+        one of the files cannot be found.
+
+        Parameters:
+            ifiles:   unused
+            pipeline: unused
+
+        Results:
+            Pass input to putput. Does not change pipeline.
+
+        Raises:
+            Raise a RuntimeError if any of the directories is not found.
+        '''
+
         for d in self.dirs:
             if os.path.isdir(d):
                 env.logger.info('Directory {} is located.'.format(d))
             else:
-                raise RuntimeError('Cannot locate directory {}. {}'.format(d, self.msg))
+                raise RuntimeError('Cannot locate directory {}. {}'.format(d, self.message))
         return ifiles
 
 
-       
 class TerminateIf(PipelineAction):
     '''Terminate a pipeline if a condition is not met.
     
@@ -858,20 +976,48 @@ class OutputText(PipelineAction):
         return ifiles
 
 
-class FieldsFromTextFile:
+class FieldsFromTextFile(PipelineAction):
     '''Read a text file, guess its delimeter, field name (from header)
     and create field descriptions. If a vcf file is encountered, all
-    fields will be exported'''
-    
-    def __init__(self, output):
-        self.field_output = output
+    fields will be exported.
 
-    def __call__(self, ifiles, pipeline=None):
+    Examples:
+        action=FieldsFromTextFile('format.txt')
+
+    '''
+    def __init__(self, output):
+        '''
+        Parameters:
+            output:
+                Output file that records the format of the input files.
+        '''
+        PipelineAction.__init__(self, 'FieldsFromTextFile', output)
+
+    def execute(self, ifiles, pipeline=None):
+        '''
+        Output format of the first input file to specified output.
+
+        Parameters:
+            ifiles (string or list of strings):
+                Input files. The first file will be processed by this action.
+
+            pipeline: unused.
+        
+
+        Results:
+            Pipeline output changed to user-specified output.
+
+        Raises:
+            Raise a RuntimeError if this action failed to guess format (fields)
+            from the input file.
+        '''
+        if len(ifiles) > 1:
+            env.logger.warning('Only the format of the first input file would be outputted.')
         try:
             if ifiles[0].endswith('.vcf') or ifiles[0].endswith('.vcf.gz'):
-                showTrack(ifiles[0], self.field_output)
+                showTrack(ifiles[0], self.output[0])
             else:
-                with open(self.field_output, 'w') as fo:
+                with open(self.output[0], 'w') as fo:
                     csv_dialect = csv.Sniffer().sniff(open(ifiles[0], 'rU').read(8192))
                     fo.write('delimiter="{}"\n\n'.format(csv_dialect.delimiter.replace('\t', r'\t')))
                     values = []
@@ -892,7 +1038,7 @@ class FieldsFromTextFile:
         except Exception as e:
             raise RuntimeError('Failed to guess fields from {}: {}'.format(ifiles[0], e))
         #
-        return self.field_output
+        return True
        
 class RewindExecution(Exception):
     pass
@@ -900,34 +1046,90 @@ class RewindExecution(Exception):
 class NullAction(PipelineAction):
     '''A pipeline action that does nothing. This is usually used when the goal
     of the step is to change input, output, or assign variables to pipelines.
+    The action will be assumed if an empty action line is given.
+
+    Example:
+        action=
+        action=NullAction()
     '''
     def __init__(self):
         '''A null action that does nothing.'''
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
-        '''Pass input files directory as output of step'''
+        '''
+        Parameters:
+            ifiles: unused
+            pipeline: unused
+        
+        Results:
+            Pass input files to output. Does not change pipeline.
+        '''
         return ifiles
         
 class RunCommand(PipelineAction):
-    '''This action execute specified commands. If the pipeline is running
+    """This action execute specified commands. If the pipeline is running
     in parallel mode and a submitter is specified, it will use the submitter
-    command to submit the jobs as a separate job. '''
+    command to execute the commands in a separate job. 
+    
+    Examples:
+        # simple commands without checking output
+        action=RunCommand(cmd='vtools init myproj -f')
+        
+        action=RunCommand(cmd=[
+            '[ -d ${DIR1} ] || mkdir -p ${DIR1}',
+            '[ -d ${DIR2} ] || mkdir -p ${DIR2}'
+            ])
+        
+        # multiple commands, change working directory
+        # check output
+        action=RunCommand([
+        	'update_blastdb.pl human_genomic --decompress || true',
+        	'update_blastdb.pl nt --decompress || true',
+        	],
+            working_dir='${NCBI_RESOURCE_DIR}/blast/db',
+        	output=['${NCBI_RESOURCE_DIR}/blast/db/human_genomic.nal',
+		        '${NCBI_RESOURCE_DIR}/blast/db/nt.nal']
+            )
+        
+        # run command in background, with pipes
+        action=RunCommand('''samtools view -h ${INPUT}
+           | awk '$6 ~/N/' | awk '{ if ($9 ~ /^-/) {print $1"\t-"} else print $1"\t+" }'
+           | sort -T ${TEMP_DIR} -u | wc -l > ${ALIGNMENT_OUT}/junction.count''',
+           output='${ALIGNMENT_OUT}/junction.count',
+           submitter='sh {} &')
+
+    """
     def __init__(self, cmd='', output=[], working_dir=None, submitter=None, max_jobs=None):
         '''This action accepts one (a string) or more command (a list of strings)
-        and executes them in a shell environment. It will switch to
-        ``working_dir`` if a working directory is specified. The ``output``
-        option should contain one or more expected outcome of the commands.
-        The commands will be ignored if the command, input and output files
-        match recorded information (in .exe_info) files. If a submitter is
-        specified, a shell script will be written with its filename appended to
-        or substitute ``{}`` in ``submitter``. For example, submitter='sh {} &'
-        will run the job as a background job, and submitter='qsub -q long < {}'
-        will submit the shell file to the long queue of a cluster system. 
-        Parameter ``max_jobs`` is deprecated and is kept for compatibility reasons.
+        and executes them in a shell environment, possibly as a separate job. 
+        
+        Parameters:
+            cmd (string or list of strings):
+                One or more commands to execute. The commands will be executed in
+                shell mode so pipes are allowed.
 
-        Args:
-            max_jobs:  deprecated
+            output (string or list of strings):
+                Expected output files of the action. If specified, the execution
+                signature will be created to record the input, output and command
+                of the action, and ignore the action if the signature matches of 
+                a previous run.
+
+            working_dir (None or string):
+                Working directory of the command. Variant Tools will change to
+                this directory before executing the commands if a valid directory
+                is passed.
+
+            submitter (None or string):
+                If a submitter is specified and the pipeline is executed in multi-job
+                mode (e.g. --jobs 2), a shell script will be written with the commands
+                to be executed. The name of the shell script will be appended to
+                the ``submitter`` string or substitute ``{}`` in ``submitter``. For
+                example, submitter='sh {} &' will run the job as a background job,
+                and submitter='qsub -q long < {}' will submit the shell script to the
+                long queue of a cluster system. 
+
+            max_jobs: (deprecated)
         '''
         self.submitter = submitter
         self.working_dir = working_dir
@@ -1085,9 +1287,23 @@ class RunCommand(PipelineAction):
             self.THREADS[self.output[0]] = t
 
 
-    # override PipelineAction.__call__ because possible fork of execution
-    #
-    def _execute(self, ifiles, pipeline=None):
+    def execute(self, ifiles, pipeline=None):
+        '''Execute commands by either running it within the pipeline or 
+        submit it as a separate process/job.
+
+        Parameters:
+            ifiles (string or list of strings):
+                Input files.
+
+            pipeline: unused
+
+        Results:
+            Pass input files to output if no valid ``output`` was specified.
+            Otherwise return ``output``.
+
+        Raises:
+            Raises an error if an command fails to execute.
+        '''
         # substitute cmd by input_files and output_files
         if pipeline.jobs > 1 and self.submitter is not None and not self.output:
             env.logger.warning('Fail to execute in parallel because no output is specified.')
@@ -1102,12 +1318,24 @@ class RunCommand(PipelineAction):
             self._run_command()
             return True
 
-class DecompressFiles:
-    '''This action gets a list of fastq files from input file, decompressing
-    input files (.tar.gz, .zip, etc) if necessary. Non-fastq files are ignored
-    with a warning message. '''
+class DecompressFiles(PipelineAction):
+    '''This action gets a list of input files from input file, decompressing
+    input files (.tar.gz, .zip, etc) if necessary. The decompressed files
+    are returned as output. One particular feature of this action is that
+    it records content of large tar or tar.gz files to a manifest file and
+    ignores the step if the manifest file exists.
+
+    Examples:
+        action=DecompressFiles()
+    '''
     def __init__(self, dest_dir=None):
+        '''
+        Parameters:
+            dest_dir (None or string):
+                Destination directory, default to current directory.
+        '''
         self.dest_dir = dest_dir if dest_dir else '.'
+        PipelineAction.__init__(self)
 
     def _decompress(self, filename):
         '''If the file ends in .tar.gz, .tar.bz2, .bz2, .gz, .tgz, .tbz2, decompress
@@ -1217,6 +1445,16 @@ class DecompressFiles:
         return [filename]
         
     def __call__(self, ifiles, pipeline=None):
+        '''
+        Parameters:
+            ifiles (string or list of strings):
+                Input files
+
+            pipeline: unused
+
+        Results:
+            Decompressed files.
+        '''
         # decompress input files and return a list of output files
         filenames = []
         for filename in ifiles:
@@ -1233,11 +1471,24 @@ class RemoveIntermediateFiles(PipelineAction):
     file system. '''
     def __init__(self, files):
         '''Replace ``files`` with their signatures. This pipeline passes its 
-        input to output and does not change the flow of pipeline.'''
+        input to output and does not change the flow of pipeline.
+        
+        Parameters:
+            files (string or list of strings)
+                One or more files to be removed.
+        '''
         self.files_to_remove = files
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
+        '''
+        Parameters:
+            ifiles: unused
+            pipeline: unused
+
+        Results:
+            Pass input to output. Does not change pipeline.
+        '''
         env.logger.trace('Remove intermediate files {}'.format(self.files_to_remove))
         for f in shlex.split(self.files_to_remove) if isinstance(self.files_to_remove, str) else self.files_to_remove:
             if not os.path.isfile(f):
@@ -1256,11 +1507,17 @@ class RemoveIntermediateFiles(PipelineAction):
         return ifiles
 
 
-class LinkToDir:
+class LinkToDir(PipelineAction):
     '''Create hard links of input files to a specified directory. This is 
     usually used to link input files to a common cache directory so that 
     all operations can be performed on that directory.'''
     def __init__(self, dest_dir):
+        '''
+        Parameters:
+            dest_dir (string):
+                A directory to which input files will be linked to.
+                The directory will be created if it does not exist.
+        '''
         self.dest = dest_dir
         if not os.path.isdir(self.dest):
             env.logger.info('Creating directory {}'.format(self.dest))
@@ -1270,8 +1527,19 @@ class LinkToDir:
                 raise RuntimeError('Failed to create directory {}: {}'.format(self.dest, e))
             if not os.path.isdir(self.dest):
                 raise RuntimeError('Failed to create directory {}: {}'.format(self.dest, e))
+        PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
+        '''
+        Parameters:
+            ifiles (string or list of strings):
+                Input files to be linked to specified ``dest_dir``
+
+            pipeline: unused
+
+        Results:
+            Return ``ifiles`` under the ``dest_dir``.
+        '''
         ofiles = []
         for filename in ifiles:
             path, basename = os.path.split(filename)
@@ -1315,10 +1583,27 @@ class DownloadResource(PipelineAction):
     resource directory of the project (default to ~/.variant_tools,
     see runtime option local_resource for details). The default pipeline 
     resource directory is $local_resource/pipeline_resource/NAME where NAME
-    is the name of the pipeline.'''
+    is the name of the pipeline.
+    
+    Examples:
+        action=DownloadResource(resource='ftp://igenome:G3nom3s4u@ussd-ftp.illumina.com/Homo_sapiens/UCSC/hg19/Homo_sapiens_UCSC_hg19.tar.gz',
+             dest_dir="${LOCAL_RESOURCE}/iGenomes")
+
+        action=DownloadResource(resource='ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_omni2.5.hg19.sites.vcf.gz
+            ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_omni2.5.hg19.sites.vcf.gz.md5',
+            dest_dir='${LOCAL_RESOURCE/GATK')
+    
+    NOTE:
+        1. If FILE.md5 file is downloaded, it will be used to validate FILE.
+        2. The resources will be automatically decompressed. You would get both 
+            FILE and FILE.gz if you downloaded FILE.gz
+    '''
     def __init__(self, resource, dest_dir):
-        '''Download resources from specified URLs in ``resource``. Multiple URLs
-        can be specified 
+        '''Download resources from specified URLs in ``resource``. 
+
+        Parameters:
+            dest_dir:
+                Directory where the downloaded resources will be placed.
         '''
         self.resource = [x for x in resource.split() if x]
         if not dest_dir or type(dest_dir) != str:
@@ -1338,6 +1623,8 @@ class DownloadResource(PipelineAction):
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
+        '''Download specified resources.
+        '''
         saved_dir = os.getcwd()
         os.chdir(self.pipeline_resource)
         ofiles, md5files = self._downloadFiles(ifiles)
@@ -1607,6 +1894,8 @@ class Pipeline:
                                 .format(ifile))
                             self.THREADS[ifile].join()
                     #
+                    if not action.strip():
+                        action = 'NullAction()'
                     action = eval(action, globals(), self.GLOBALS)
                     if isinstance(action, (tuple, list)):
                         action = SequentialActions(action)
