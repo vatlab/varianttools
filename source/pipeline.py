@@ -24,6 +24,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+'''
+This module implement Variant Pipeline Tools and VPT-provided
+pipeline actions.
+'''
 import os
 import sys
 import subprocess
@@ -73,120 +77,6 @@ try:
 except ImportError as e:
     hasSimuPOP = False
 
-# a global namespace to store all user imported modules
-VT_GLOBAL = {}
-VT_THREADS = {}
-
-
-class PipelineAction:
-    '''Base class for all pipeline actions. If one or more output files
-    are specified, the pipeline will record the runtime signature of
-    this action in a file ``$OUTPUT[0].exe_info``, which consists of the
-    MD5 signature of input and output files, command used, and additional
-    information such as start and end time of execution, standard and error
-    outputs. This action will be skipped if the action is re-run with the
-    same input, output and command.
-    '''
-    def __init__(self, cmd='', output=[]):
-        # multiple command is not allowed.
-        if isinstance(cmd, str):
-            self.cmd = [' '.join(cmd.split('\n'))]
-        else:
-            self.cmd = [' '.join(x.split('\n')) for x in cmd]
-        #
-        if isinstance(output, str):
-            self.output = [output]
-        else:
-            self.output = output
-        #
-        if self.output:
-            self.proc_out = '{}.out_{}'.format(self.output[0], os.getpid())
-            self.proc_err = '{}.err_{}'.format(self.output[0], os.getpid())
-            self.proc_lck = '{}.lck'.format(self.output[0])
-            self.proc_info = '{}.exe_info'.format(self.output[0])
-
-    def _execute(self, ifiles, pipeline=None):
-        raise RuntimeError('Please define your own _execute function in an derived class of PipelineAction.')
-
-    def _write_info(self):
-        if not self.output:
-            return
-        if not os.path.isfile(self.proc_out) \
-            or not os.path.isfile(self.proc_err):
-            env.logger.warning('Could not locate process-specific output file (id {}), '
-                'which might have been removed by another process that produce '
-                'the same output file {}'.format(os.getpid(), self.output[0]))
-            # try to rerun this step
-            raise RewindExecution()
-        with open(self.proc_info, 'a') as exe_info:
-            exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
-            for f in self.output:
-                if not os.path.isfile(f):
-                    raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
-                # for performance considerations, use partial MD5
-                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
-                    calculateMD5(f, partial=True)))
-            # write standard output to exe_info
-            exe_info.write('\n\nSTDOUT\n\n')
-            with open(self.proc_out) as stdout:
-                for line in stdout:
-                    exe_info.write(line)
-            # write standard error to exe_info
-            exe_info.write('\n\nSTDERR\n\n')
-            with open(self.proc_err) as stderr:
-                for line in stderr:
-                    exe_info.write(line)
-        # if command succeed, remove all out_ and err_ files, 
-        for filename in glob.glob(self.output[0] + '.out_*') + \
-            glob.glob(self.output[0] + '.err_*') + glob.glob(self.output[0] + '.done_*'):
-            try:
-                os.remove(filename)
-            except Exception as e:
-                env.logger.warning('Fail to remove {}: {}'.format(filename, e))
-
-    def __call__(self, ifiles, pipeline=None):
-        if self.output:
-            if os.path.isfile(self.proc_info):
-                with open(self.proc_info) as exe_info:
-                    cmd = exe_info.readline().strip()
-                if cmd == '; '.join(self.cmd).strip() and existAndNewerThan(self.output, ifiles,
-                    md5file=self.proc_info):
-                    env.logger.info('Reuse existing {}'.format(', '.join(self.output)))
-                    return self.output
-            # create directory if output directory does not exist
-            for d in [os.path.split(os.path.abspath(x))[0] for x in self.output]:
-                if not os.path.isdir(d):
-                    try:
-                        os.makedirs(d)
-                    except Exception as e:
-                        raise RuntimeError('Failed to create directory {} for output file: {}'.format(d, e))
-        # We cannot ignore this step, but do we have all the input files?
-        # If not, we will have to rewind the execution
-        for ifile in ifiles:
-            if not os.path.isfile(ifile):
-                env.logger.warning('Rewind execution because input file {} does not exist.'.format(ifile))
-                raise RewindExecution(ifile)
-        #
-        if self.output:
-            with open(self.proc_info, 'w') as exe_info:
-                exe_info.write('{}\n'.format('; '.join(self.cmd)))
-                exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
-                for f in ifiles:
-                    # for performance considerations, use partial MD5
-                    exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
-                        calculateMD5(f, partial=True)))
-        # now, run the job, write info if it is successfully finished.
-        # Otherwise the job might be forked and it will record the signature by itself.
-        if self._execute(ifiles, pipeline):
-            self._write_info()#
-        #
-        if self.output:
-            return self.output
-        else:
-            return ifiles
-
-# for backward compatibility
-SkiptableAction=PipelineAction
 
 class SkipIf:
     '''An input emitter that skips the step (does not pass any input to the
@@ -194,10 +84,18 @@ class SkipIf:
     as output by default. This emitter is equivalent to 
     ``EmitInput(select=not cond, pass_unselected)`` '''
     def __init__(self, cond=None, pass_unselected=True):
-        '''Does not emit input and skip the step if cond is ``True``. In practice
-        ``cond`` is usually a lambda function that checks the existence of a file
-        or value of a pipeline variable. The unselected input files are by default
-        passed to the next step (``pass_unselected`` is ``True``). '''
+        '''Does not emit input and skip the step if cond is ``True``. 
+        
+        Parameters:
+            cond (boolean): 
+                A boolean value True or False. In practice ``cond`` is usually
+                a lambda function that checks the existence of a file or value
+                of a pipeline variable.
+
+            pass_unselected (boolean):
+                Pass input files to output if ``cond`` is not met.
+
+        '''
         self.cond = cond
         self.pass_unselected = pass_unselected
 
@@ -434,67 +332,273 @@ class EmitInput:
             return self._pairByFileName(selected, unselected)
 
 
-class OutputText:
-    '''Write its input to standard output, or a file if a filename is specified.
-    The text can be a list of strings. A new line is added automatically to
-    each line of the text.
+class PipelineAction:
+    '''Base class for all pipeline actions. If one or more output files
+    are specified, the pipeline will record the runtime signature of
+    this action in a file ``$OUTPUT[0].exe_info``, which consists of the
+    MD5 signature of input and output files, command used, and additional
+    information such as start and end time of execution, standard and error
+    outputs. This action will be skipped if the action is re-run with the
+    same input, output and command.
+
+    NOTE: User-defined actions should either override this function (__call__)
+        or define function _execute(self, ifiles, pipeline) to be called by the
+        base __call__ function, which implements the execution signature mechanism.
     '''
-    def __init__(self, text='', filename=None, mode='a'):
-        if not isinstance(text, str):
-            self.text = ''.join([str(x) + '\n' for x in text])
+    def __init__(self, cmd='', output=[]):
+        '''
+        Parameters:
+            cmd (string or list of strings):
+                one or more commands to be executed.
+
+            output (string or list of strings):
+                Output files. If at least one output file is specified,
+                the runtime signature of this action will be saved to
+                $output[0].exe_info.
+        '''
+        # multiple command is not allowed.
+        if not cmd:
+            self.cmd = []
+        elif isinstance(cmd, str):
+            self.cmd = [' '.join(cmd.split('\n'))]
         else:
-            self.text = text + '\n'
-        self.filename = filename
-        self.mode = mode
-
-    def __call__(self, ifiles, pipeline=None):
-        if self.filename is not None:
-            with open(self.filename, self.mode) as output:
-                output.write(self.text)
+            self.cmd = [' '.join(x.split('\n')) for x in cmd]
+        #
+        if not output:
+            self.output = []
+        elif isinstance(output, str):
+            self.output = [output]
         else:
-            sys.stdout.write(self.text)        
-        return ifiles
+            self.output = output
+        #
+        if self.output:
+            self.proc_out = '{}.out_{}'.format(self.output[0], os.getpid())
+            self.proc_err = '{}.err_{}'.format(self.output[0], os.getpid())
+            self.proc_lck = '{}.lck'.format(self.output[0])
+            self.proc_info = '{}.exe_info'.format(self.output[0])
 
-class TerminateIf:
-    '''Terminate a pipeline if a condition is not met'''
-    def __init__(self, cond, message):
-        self.cond = cond
-        self.message = message
+    def _execute(self, ifiles, pipeline=None):
+        raise RuntimeError('Please define your own _execute function in an derived class of PipelineAction.')
+
+    def _write_info(self):
+        if not self.output:
+            return
+        if not os.path.isfile(self.proc_out) \
+            or not os.path.isfile(self.proc_err):
+            env.logger.warning('Could not locate process-specific output file (id {}), '
+                'which might have been removed by another process that produce '
+                'the same output file {}'.format(os.getpid(), self.output[0]))
+            # try to rerun this step
+            raise RewindExecution()
+        with open(self.proc_info, 'a') as exe_info:
+            exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
+            for f in self.output:
+                if not os.path.isfile(f):
+                    raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
+                # for performance considerations, use partial MD5
+                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                    calculateMD5(f, partial=True)))
+            # write standard output to exe_info
+            exe_info.write('\n\nSTDOUT\n\n')
+            with open(self.proc_out) as stdout:
+                for line in stdout:
+                    exe_info.write(line)
+            # write standard error to exe_info
+            exe_info.write('\n\nSTDERR\n\n')
+            with open(self.proc_err) as stderr:
+                for line in stderr:
+                    exe_info.write(line)
+        # if command succeed, remove all out_ and err_ files, 
+        for filename in glob.glob(self.output[0] + '.out_*') + \
+            glob.glob(self.output[0] + '.err_*') + glob.glob(self.output[0] + '.done_*'):
+            try:
+                os.remove(filename)
+            except Exception as e:
+                env.logger.warning('Fail to remove {}: {}'.format(filename, e))
 
     def __call__(self, ifiles, pipeline=None):
-        if self.cond:
-            raise RuntimeError(self.message)
-        return ifiles
+        '''Execute action with input files ``ifiles`` with runtime information
+        stored in ``pipeline``. This function is called by the pipeline.
 
-class WarnIf:
-    '''Send a warning message if a condition is not met'''
-    def __init__(self, cond, message):
-        self.cond = cond
-        self.message = message
+        Parameters:
+
+            ifiles (string or list of strings):
+                input file names
+
+            pipeline (an pipeline object):
+                An Pipeline object for which the action is executed. The action
+                can set or retrieve runtime information from a dictionary 
+                ``pipeline.VARS``.
+
+        Result:
+            An action returns output files (parameter ``output`` of the action)
+            if any output is given. Otherwise input files (``ifiles``) are passed
+            through and returned.
+        '''
+        if self.output:
+            if os.path.isfile(self.proc_info):
+                with open(self.proc_info) as exe_info:
+                    cmd = exe_info.readline().strip()
+                if cmd == '; '.join(self.cmd).strip() and existAndNewerThan(self.output, ifiles,
+                    md5file=self.proc_info):
+                    env.logger.info('Reuse existing {}'.format(', '.join(self.output)))
+                    return self.output
+            # create directory if output directory does not exist
+            for d in [os.path.split(os.path.abspath(x))[0] for x in self.output]:
+                if not os.path.isdir(d):
+                    try:
+                        os.makedirs(d)
+                    except Exception as e:
+                        raise RuntimeError('Failed to create directory {} for output file: {}'.format(d, e))
+        # We cannot ignore this step, but do we have all the input files?
+        # If not, we will have to rewind the execution
+        for ifile in ifiles:
+            if not os.path.isfile(ifile):
+                env.logger.warning('Rewind execution because input file {} does not exist.'.format(ifile))
+                raise RewindExecution(ifile)
+        #
+        if self.output:
+            with open(self.proc_info, 'w') as exe_info:
+                exe_info.write('{}\n'.format('; '.join(self.cmd)))
+                exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
+                for f in ifiles:
+                    # for performance considerations, use partial MD5
+                    exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                        calculateMD5(f, partial=True)))
+        # now, run the job, write info if it is successfully finished.
+        # Otherwise the job might be forked and it will record the signature by itself.
+        if self._execute(ifiles, pipeline):
+            self._write_info()#
+        #
+        if self.output:
+            return self.output
+        else:
+            return ifiles
+
+# for backward compatibility
+SkiptableAction=PipelineAction
+
+class SequentialActions(PipelineAction):
+    '''Define an action that calls a list of actions, specified by Action1,
+    Action2 etc. This allows the specification of multiple small tasks in
+    a single pipeline step.
+
+    NOTE: this action is automatically applied if a list or tuple of actions
+    are specified in the SPEC file (e.g. action=Action1(), Action2()).
+
+    Examples:
+        action=CheckCommands('bowtie'), CheckOutput('bowtie --version', '1.1.1')
+
+    '''
+    def __init__(self, actions):
+        '''
+        Parameters:
+            actions (a tuple or list of actions):
+                A list of actions that will be applied to 
+        '''
+        self.actions = []
+        for a in actions:
+            if hasattr(a, '__call__'):
+                self.actions.append(a.__call__)
+            else:
+                self.actions.append(a)
 
     def __call__(self, ifiles, pipeline=None):
-        if self.cond:
-            env.logger.warning(self.message)
+        '''
+        Pass ifiles to the first action, take its output and pass it to
+        the second action, and so on. Return the output from the last
+        action as the result of this ``SequentialAction``.
+        '''
+        for a in self.actions:
+            # the input of the next action is the output of the
+            # previous action.
+            ifiles = a(ifiles)
+        # return the output of the last action
         return ifiles
 
-class ImportModules:
+
+class CheckVariantToolsVersion(PipelineAction):
+    '''Check the version of variant tools and determine if it is
+    recent enough to execute the pipeline.
+
+    Examples:
+        action=CheckVariantToolsVersion('2.5.0')
+
+    '''
+    def __init__(self, version=''):
+        '''
+        Parameters:
+            version (string):
+                Oldest version of variant tools that can be used
+                to execute this pipeline
+        '''
+        self.min_version = version
+        PipelineAction.__init__(self)
+
+    def __call__(self, ifiles, pipeline=None):
+        '''
+        Parameters:
+            ifiles: unused
+            pipeline: unused
+
+        Result:
+            Pass ifiles to output. Does not change pipeline.
+
+        Raises:
+            Fail if the version of variant tools used to execute the
+            pipeline is older than the specified version.
+        '''
+        vtools_version = [int(x) for x in re.sub('\D', ' ', pipeline.VARS['vtools_version']).split()]
+        # e.g. minimal 2.2.0, vtools 2.1.1
+        if [int(x) for x in re.sub('\D', ' ', self.min_version).split()] > vtools_version:
+            raise RuntimeError('Version {} is required to execute this pipeline. '
+                'Please upgrade your installation of variant tools (version {})'
+                .format(self.min_version, pipeline.VARS['vtools_version']))
+        return ifiles
+
+
+class ImportModules(PipelineAction):
     '''Import functions and action from a Python module. This action passed input
-    files to output and does not change the pipeline.'''
+    files to output and does not change the pipeline.
+    
+    Examples:
+        action=ImportModules('DNASeq_tools.py')
+        action=ImportModules(['DNASeq_tools.py', 'simuPOP.demography'])
+    '''
     def __init__(self, modules=[]):
-        '''Import one or more modules to be used by the existing pipeline. A module
-        can be either the name of a system module or a .py file. In the latter case,
-        Variant Tools will try to load the file directory (a full path can be given),
-        look for the module in the path of the pipeline (if a local pipeline is used),
-        or download from the Variant Tools Repository under directory pipeline.'''
+        '''Import one or more modules to be used by the existing pipeline. 
+        
+        Parameters:
+            module (string or list of strings):
+                One or more module, which can be either the name of a system module
+                or a .py file. In the latter case, Variant Tools will try to locate
+                the file directly (a full path can be given), look for the module in
+                the path of the pipeline (if a local pipeline is used), or download
+                from the Variant Tools Repository under directory pipeline.
+        '''
         if isinstance(modules, str):
             self.modules = [modules]
         else:
             self.modules = modules
-        # threads to monitor the spawned jobs
-        self.monitors = Queue.Queue()
+        # threads to _monitor the spawned jobs
+        self._monitors = Queue.Queue()
 
     def __call__(self, ifiles, pipeline=None):
-        global VT_GLOBAL
+        '''Import symbols from specified modules.
+    
+        Parameters:
+            ifiles:  unused
+
+            pipeline:
+                Import symbols to pipeline.GLOBALS
+
+        Result:
+            Pass ifiles to output. Does not change pipeline.
+
+        Raises:
+            Raise a RuntimeError if one or more modules can not
+            be imported.
+        '''
         for module in self.modules:
             # this is a path to a .py file
             if module.endswith('.py'):
@@ -515,7 +619,7 @@ class ImportModules:
                     sys.path.append(p)
                     local_dict = __import__(f[:-3] if f.endswith('.py') else f, globals(), locals(), module.split('.', 1)[-1:])
                     env.logger.info('{} symbols are imported form module {}'.format(len(local_dict.__dict__), module))
-                    VT_GLOBAL.update(local_dict.__dict__)
+                    pipeline.GLOBALS.update(local_dict.__dict__)
                 except Exception as e:
                     raise RuntimeError('Failed to import module {}: {}'.format(module, e))
             # now a system module
@@ -525,7 +629,7 @@ class ImportModules:
                     sys.path.append(os.getcwd())
                     local_dict = __import__(module, globals(), locals(), module.split('.', 1)[-1:])
                     env.logger.info('{} symbols are imported form module {}'.format(len(local_dict.__dict__), module))
-                    VT_GLOBAL.update(local_dict.__dict__)
+                    pipeline.GLOBALS.update(local_dict.__dict__)
                 except ImportError as e:
                     raise RuntimeError('Failed to import module {}: {}'.format(module, e))
         return ifiles
@@ -625,20 +729,135 @@ class CheckDirs(PipelineAction):
                 raise RuntimeError('Cannot locate directory {}. {}'.format(d, self.msg))
         return ifiles
 
-class CheckVariantToolsVersion(PipelineAction):
-    def __init__(self, version=''):
-        self.min_version = version
+
+       
+class TerminateIf(PipelineAction):
+    '''Terminate a pipeline if a condition is not met.
+    
+    Examples:
+        action=TerminateIf(not '${CMD_OUTPUT}', 'No --output is specified.')
+    '''
+    def __init__(self, cond, message):
+        '''
+        Parameters:
+            cond (boolean):
+                True or False. In practice, ``cond`` is usually
+                a lambda function that checks the existence of a file or value
+                of a pipeline variable.
+
+            message (string):
+                A message to be outputted when the condition is met.
+        '''
+        self.cond = cond
+        self.message = message
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
-        vtools_version = [int(x) for x in re.sub('\D', ' ', pipeline.VARS['vtools_version']).split()]
-        # e.g. minimal 2.2.0, vtools 2.1.1
-        if [int(x) for x in re.sub('\D', ' ', self.min_version).split()] > vtools_version:
-            raise RuntimeError('Version {} is required to execute this pipeline. '
-                'Please upgrade your installation of variant tools (version {})'
-                .format(self.min_version, pipeline.VARS['vtools_version']))
+        '''
+        Terminate the pipeline if specified condition is met.
+
+        Parameters:
+            ifiles: unused
+            pipeline: unused
+
+        Results:
+            Pass input to output. Does not change pipeline.
+
+        Raises:
+            A RuntimeError will be raised to terminate the pipeline if
+            the condition is met.
+        '''
+        if self.cond:
+            raise RuntimeError(self.message)
         return ifiles
-       
+
+
+class WarnIf(PipelineAction):
+    '''Send a warning message if a condition is not met.
+
+    Examples:
+        action=WarnIf('%(LGD)' == 'NA', 'Default value of parameter --LGD is used.')
+    '''
+    def __init__(self, cond, message):
+        '''
+        Example:
+
+        Parameters:
+            cond (boolean):
+                True or False. In practice, ``cond`` is usually
+                a lambda function that checks the existence of a file or value
+                of a pipeline variable.
+
+            message (string):
+                A message to be outputted when the condition is met.
+        '''
+        self.cond = cond
+        self.message = message
+        PipelineAction.__init__(self)
+
+    def __call__(self, ifiles, pipeline=None):
+        '''
+        Produce a warning message if specified condition is met.
+
+        Parameters:
+            ifiles: unused
+            pipeline: unused
+
+        Results:
+            Pass input to output. Does not change pipeline.
+        '''
+        if self.cond:
+            env.logger.warning(self.message)
+        return ifiles
+
+class OutputText(PipelineAction):
+    '''Write specified text to standard output, or a file if a filename is
+    specified. The text can be a list of strings. A new line is added 
+    automatically to each line of the text.
+    '''
+    def __init__(self, text='', output=None, mode='a'):
+        '''
+        Parameters:
+            text (string or list of strings):
+                Text to be written to output.
+
+            output (a file name or None):
+                Output files. The text will be written to standard output
+                if no output is specified.
+
+            mode (string):
+                Mode to open file. 'a' for append and 'w' for overwrite.
+
+        '''
+        if not isinstance(text, str):
+            self.text = ''.join([str(x) + '\n' for x in text])
+        else:
+            self.text = text + '\n'
+        self.filename = filename
+        self.mode = mode
+        PipelineAction.__init__(self, 'OutputText', filename if filename is not None else '')
+
+    def __call__(self, ifiles, pipeline=None):
+        '''
+        Write specified text to specified output.
+
+        Parameters:
+            ifiles: unused
+            pipeline: unused
+
+        Result:
+            This action pass input files to output and does not
+            change the flow of pipeline.
+        '''
+
+        if self.filename is not None:
+            with open(self.filename, self.mode) as output:
+                output.write(self.text)
+        else:
+            sys.stdout.write(self.text)        
+        return ifiles
+
+
 class FieldsFromTextFile:
     '''Read a text file, guess its delimeter, field name (from header)
     and create field descriptions. If a vcf file is encountered, all
@@ -706,6 +925,9 @@ class RunCommand(PipelineAction):
         will run the job as a background job, and submitter='qsub -q long < {}'
         will submit the shell file to the long queue of a cluster system. 
         Parameter ``max_jobs`` is deprecated and is kept for compatibility reasons.
+
+        Args:
+            max_jobs:  deprecated
         '''
         self.submitter = submitter
         self.working_dir = working_dir
@@ -733,14 +955,14 @@ class RunCommand(PipelineAction):
             cmd = ['echo "None command executed."']
         PipelineAction.__init__(self, cmd=cmd, output=output)
 
-    def elapsed_time(self):
+    def _elapsed_time(self):
         '''Return the elapsed time in human readable format since start time'''
         second_elapsed = int(time.time() - self.start_time)
         days_elapsed = second_elapsed // 86400
         return ('{} days '.format(days_elapsed) if days_elapsed else '') + \
             time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
       
-    def run_command(self):
+    def _run_command(self):
         '''Call a list of external command cmd, raise an error if any of them
         fails. '''
         if self.proc_lck:
@@ -758,7 +980,7 @@ class RunCommand(PipelineAction):
                     except:
                         pass
                 raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
-                    .format(cur_cmd, -ret, self.elapsed_time()))
+                    .format(cur_cmd, -ret, self._elapsed_time()))
             elif ret > 0:
                 if self.output:
                     with open(self.proc_err) as err:
@@ -769,10 +991,9 @@ class RunCommand(PipelineAction):
                     except:
                         pass
                 raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
-                    .format(cur_cmd, self.elapsed_time(), ret))
+                    .format(cur_cmd, self._elapsed_time(), ret))
 
-    def monitor(self):
-        global VT_THREADS
+    def _monitor(self, pipeline):
         while True:
             if os.path.isfile(self.proc_done):
                 break
@@ -788,19 +1009,19 @@ class RunCommand(PipelineAction):
         #
         if ret < 0:
             raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
-                .format('; '.join(self.cmd), -ret, self.elapsed_time()))
+                .format('; '.join(self.cmd), -ret, self._elapsed_time()))
         elif ret > 0:
             if self.output:
                 with open(self.proc_err) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
             raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
-                .format('; '.join(self.cmd), self.elapsed_time(), ret))
+                .format('; '.join(self.cmd), self._elapsed_time(), ret))
         # remove the .done file
-        if not self.output[0] in VT_THREADS:
+        if not self.output[0] in pipeline.THREADS:
             raise RuntimeError('Output is not waited by any threads')
         else:
-            VT_THREADS.pop(self.output[0])
+            pipeline.THREADS.pop(self.output[0])
         # the thread will end here
         env.logger.trace('Thread for output {} ends.'.format(self.output[0]))
         for filename in glob.glob(self.output[0] + '.done_*'):
@@ -810,7 +1031,7 @@ class RunCommand(PipelineAction):
                 env.logger.warning('Fail to remove {}: {}'
                     .format(filename, e))
 
-    def submit_command(self):
+    def _submit_command(self):
         '''Submit a job and wait for its completion.'''
         self.proc_cmd = self.output[0] + '.sh'
         self.proc_done = self.output[0] + '.done_{}'.format(os.getpid())
@@ -851,18 +1072,17 @@ class RunCommand(PipelineAction):
             except:
                 pass
         # 
-        global VT_THREADS
         if ret < 0:
             raise RuntimeError("Failed to submit job {} due to signal {} (submitter='{}')" .format(self.proc_cmd, -ret, self.submitter))
         elif ret > 0:
             raise RuntimeError("Failed to submit job {} using submiter '{}'".format(proc_cmd, self.submitter))
         else:
-            t = threading.Thread(target=self.monitor)
+            t = threading.Thread(target=self._monitor)
             t.daemon = True
             t.start()
-            if self.output[0] in VT_THREADS:
+            if self.output[0] in self.THREADS:
                 raise RuntimeError('Two spawned jobs have the same self.output[0] file {}'.format(self.output[0]))
-            VT_THREADS[self.output[0]] = t
+            self.THREADS[self.output[0]] = t
 
 
     # override PipelineAction.__call__ because possible fork of execution
@@ -876,10 +1096,10 @@ class RunCommand(PipelineAction):
         # 2. if a submit command is specified
         # 3. if --jobs with a value greater than 1 is used.
         if self.output and pipeline.jobs > 1 and self.submitter is not None:
-            self.submit_command()
+            self._submit_command()
             return False
         else:
-            self.run_command()
+            self._run_command()
             return True
 
 class DecompressFiles:
@@ -1005,7 +1225,7 @@ class DecompressFiles:
         return filenames
 
 
-class RemoveIntermediateFiles:
+class RemoveIntermediateFiles(PipelineAction):
     '''This action removes specified files (not the step input files) and replaces
     them with their signature (file size, md5 signature etc). A pipeline can bypass
     completed steps with these files as input or output by checking the signatures.
@@ -1015,6 +1235,7 @@ class RemoveIntermediateFiles:
         '''Replace ``files`` with their signatures. This pipeline passes its 
         input to output and does not change the flow of pipeline.'''
         self.files_to_remove = files
+        PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
         env.logger.trace('Remove intermediate files {}'.format(self.files_to_remove))
@@ -1276,8 +1497,6 @@ class Pipeline:
         self.jobs = jobs
 
     def execute(self, pname, input_files=[], output_files=[], **kwargs):
-        global VT_GLOBAL
-        global VT_THREADS
         if pname is None:
             if len(self.pipeline.pipelines) == 1:
                 pname = self.pipeline.pipelines.keys()[0]
@@ -1319,6 +1538,9 @@ class Pipeline:
         for key, val in self.pipeline.pipeline_vars.items():
             self.VARS[key.lower()] = substituteVars(val, self.VARS)
         #
+        self.GLOBALS = {}
+        self.THREADS = {}
+        #
         ifiles = input_files
         step_index = 0
         rewind_count = 0
@@ -1356,7 +1578,7 @@ class Pipeline:
                     if 'input' in self.VARS:
                         self.VARS.pop('input')
                     # ${CMD_INPUT} etc can be used.
-                    emitter = eval(substituteVars(command.input_emitter, self.VARS), globals(), VT_GLOBAL)
+                    emitter = eval(substituteVars(command.input_emitter, self.VARS), globals(), self.GLOBALS)
                 except Exception as e:
                     raise RuntimeError('Failed to group input files: {}'
                         .format(e))
@@ -1379,13 +1601,15 @@ class Pipeline:
                     # might be worked on by another job
                     for ifile in ig:
                         # is ifile in any of the output files?
-                        if ifile in VT_THREADS:
+                        if ifile in self.THREADS:
                             # wait for the thread to complete
                             env.logger.info('Waiting for the input file {} to be available.'
                                 .format(ifile))
-                            VT_THREADS[ifile].join()
+                            self.THREADS[ifile].join()
                     #
-                    action = eval(action, globals(), VT_GLOBAL)
+                    action = eval(action, globals(), self.GLOBALS)
+                    if isinstance(action, (tuple, list)):
+                        action = SequentialActions(action)
                     if not issubclass(action.__class__, PipelineAction):
                         env.logger.warning('Pipeline action {} is not a subclass of PipelineAction'.format(action.__class__))
                     # pass the Pipeline object itself to action
@@ -1401,7 +1625,7 @@ class Pipeline:
                 env.logger.debug('OUTPUT of step {}_{}: {}'
                     .format(pname, command.index, step_output))
                 for f in step_output:
-                    if not (os.path.isfile(f) or os.path.isfile(f + '.file_info') or f in VT_THREADS):
+                    if not (os.path.isfile(f) or os.path.isfile(f + '.file_info') or f in self.THREADS):
                         raise RuntimeError('Output file {} does not exist after '
                             'completion of step {}_{}'
                             .format(f, pname, command.index))
@@ -1460,8 +1684,8 @@ class Pipeline:
                     .format(pname, command.index, e))
         #
         # at the end of pipeline wait for all threads to complete
-        if VT_THREADS:
-            for k, v in VT_THREADS.items():
+        if self.THREADS:
+            for k, v in self.THREADS.items():
                 env.logger.trace('Waiting for {} to be completed.'.format(k))
                 v.join()
 

@@ -4439,17 +4439,33 @@ def show(args):
                 pipeline_members = []
                 # first look into variant_tools.pipeline
                 from variant_tools import pipeline
+                print('Module:\n        pipeline')
+                doc = pipeline.__doc__
+                if doc is not None and doc.strip():
+                    print('Description:')
+                    print('\n'.join(textwrap.wrap(doc.strip(),
+                        initial_indent=' '*8,
+                        subsequent_indent=' '*8, width=textWidth)))
+                print('Available pipeline actions:')
                 for name, obj in inspect.getmembers(pipeline):
                     if inspect.isclass(obj) and issubclass(obj, pipeline.PipelineAction):
                         pipeline_members.append(name)
-                        print('pipeline.{}'.format(name))
+                        print('        {}'.format(name))
                 #
                 from variant_tools import simulation
+                print('\nModule:\n        simulation')
+                doc = simulation.__doc__
+                if doc is not None and doc.strip():
+                    print('Description:')
+                    print('\n'.join(textwrap.wrap(doc.strip(),
+                        initial_indent=' '*8,
+                        subsequent_indent=' '*8, width=textWidth)))
+                print('Available pipeline actions:')
                 for name, obj in inspect.getmembers(simulation):
                     if name in pipeline_members:
                         continue
                     if inspect.isclass(obj) and issubclass(obj, simulation.PipelineAction):
-                        print('simulation.{}'.format(name))
+                        print('        {}'.format(name))
                 # look in resource files
                 res = ResourceManager()
                 res.getLocalManifest()
@@ -4458,13 +4474,21 @@ def show(args):
                 for mod in modules:
                     mod_file = downloadFile(mod)
                     p,f = os.path.split(os.path.expanduser(mod_file))
+                    print('\nModule:\n        {}'.format(f[:-3]))
                     sys.path.append(p)
                     local_dict = __import__(f[:-3], globals(), locals())
+                    doc = local_dict.__doc__
+                    if doc is not None and doc.strip():
+                        print('Description:')
+                        print('\n'.join(textwrap.wrap(doc.strip(),
+                            initial_indent=' '*8,
+                            subsequent_indent=' '*8, width=textWidth)))
+                    print('Available pipeline actions:')
                     for name, obj in inspect.getmembers(local_dict):
                         if name in pipeline_members:
                             continue
                         if inspect.isclass(obj) and issubclass(obj, (simulation.PipelineAction, pipeline.PipelineAction)):
-                            print('{}.{}'.format(f[:-3], name))
+                            print('        {}'.format(name))
             elif args.type == 'action':
                 if not args.items:
                     raise ValueError('Please specify a pipeline to display')

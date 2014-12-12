@@ -1,6 +1,7 @@
 
+import os
 from variant_tools.pipeline import PipelineAction
-from variant_tools.utils import env
+from variant_tools.utils import env, openFile
         
 class CountMappedReads(PipelineAction):
     '''This action reads the input files in sam format and count the total
