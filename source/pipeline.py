@@ -47,7 +47,7 @@ import platform
 import logging
 import random
 from multiprocessing import Process
-from collections import namedtuple
+from collections import namedtuple, MutableMapping
 
 from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
     existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName, \
@@ -92,6 +92,12 @@ class PipelineAction:
             self.output = [output]
         else:
             self.output = output
+        #
+        if self.output:
+            self.proc_out = '{}.out_{}'.format(self.output[0], os.getpid())
+            self.proc_err = '{}.err_{}'.format(self.output[0], os.getpid())
+            self.proc_lck = '{}.lck'.format(self.output[0])
+            self.proc_info = '{}.exe_info'.format(self.output[0])
 
     def _execute(self, ifiles, pipeline=None):
         raise RuntimeError('Please define your own _execute function in an derived class of PipelineAction.')
@@ -134,12 +140,11 @@ class PipelineAction:
 
     def __call__(self, ifiles, pipeline=None):
         if self.output:
-            exe_info_file = '{}.exe_info'.format(self.output[0])
-            if os.path.isfile(exe_info_file):
-                with open(exe_info_file) as exe_info:
+            if os.path.isfile(self.proc_info):
+                with open(self.proc_info) as exe_info:
                     cmd = exe_info.readline().strip()
                 if cmd == '; '.join(self.cmd).strip() and existAndNewerThan(self.output, ifiles,
-                    md5file=exe_info_file):
+                    md5file=self.proc_info):
                     env.logger.info('Reuse existing {}'.format(', '.join(self.output)))
                     return self.output
             # create directory if output directory does not exist
@@ -157,7 +162,7 @@ class PipelineAction:
                 raise RewindExecution(ifile)
         #
         if self.output:
-            with open(exe_info_file, 'w') as exe_info:
+            with open(self.proc_info, 'w') as exe_info:
                 exe_info.write('{}\n'.format('; '.join(self.cmd)))
                 exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
                 for f in ifiles:
@@ -175,17 +180,38 @@ class PipelineAction:
             return ifiles
 
 
+class SkipIf:
+    '''An input emitter that skips the step (does not pass any input to the
+    action) if certain condition is met. The input will be passed directly
+    as output by default. This emitter is equivalent to 
+    ``EmitInput(select=not cond, pass_unselected)`` '''
+    def __init__(self, cond=None, pass_unselected=True):
+        '''Does not emit input and skip the step if cond is ``True``. In practice
+        ``cond`` is usually a lambda function that checks the existence of a file
+        or value of a pipeline variable. The selected input files are by default
+        passed to the next step (``pass_unselected`` is ``True``). '''
+        self.cond = cond
+        self.pass_unselected = pass_unselected
+
+    def __call__(self, ifiles, pipeline=None):
+        if self.cond:
+            return [[]], ifiles
+        else:
+            return [ifiles], []
+
 class EmitInput:
-    '''Select input files of certain types, group them, and send input files
-    to action. Selection criteria can be True (all input file types, default),
-    'False' (select no input file), 'fastq' (check content of files), or one or
-    more file extensions (e.g. ['.sam', '.bam']).  Eligible files are by default
-    sent altogether (group_by='all') to action (${INPUT} equals ${INPUT#} where
-    # is the index of step, but can also be sent individually (group_by='single',
-    ${INPUT} equals to a list of a single file) or in pairs 
-    (group_by='paired', e.g. filename_1.txt and filename_2.txt). Unselected
-    files are by default passed directly as output of a step.'''
+    '''An input emitter that has been replaced by smaller, more
+    dedicated emitter classes.'''
     def __init__(self, group_by='all', select=True, pass_unselected=True):
+        '''Select input files of certain types, group them, and send input files
+        to action. Selection criteria can be True (all input file types, default),
+        'False' (select no input file), 'fastq' (check content of files), or one or
+        more file extensions (e.g. ['.sam', '.bam']).  Eligible files are by default
+        sent altogether (group_by='all') to action (${INPUT} equals ${INPUT#} where
+        # is the index of step, but can also be sent individually (group_by='single',
+        ${INPUT} equals to a list of a single file) or in pairs 
+        (group_by='paired', e.g. filename_1.txt and filename_2.txt). Unselected
+        files are by default passed directly as output of a step.'''
         self.group_by = group_by
         if type(select) == str:
             if select not in ['fastq', 'bam', 'sam'] and not str(select).startswith('.'):
@@ -398,17 +424,6 @@ class EmitInput:
                     'their content. Please add option select="fastq" if you need to '
                     'pair input fastq files')
             return self._pairByFileName(selected, unselected)
-
-
-        
-try:
-    # some functors are subclasses of PipelineAction and has to be
-    # imported after the definition of that class.
-    from simulation import *
-except ImportError as e:
-    # The simulation functors will not be available if simulation module cannot
-    # be loaded.
-    env.logger.warning('Failed to import module simulation: {}'.format(e))
 
 class SequentialActions:
     '''Define an action that calls a list of actions, specified by Action1,
@@ -1052,15 +1067,22 @@ class DecompressFiles:
 
 
 class RemoveIntermediateFiles:
+    '''This action removes specified files (not the step input files) and replaces
+    them with their signature (file size, md5 signature etc). A pipeline can bypass
+    completed steps with these files as input or output by checking the signatures.
+    In contrast, the steps would have to be re-run if the files are removed from the
+    file system. '''
     def __init__(self, files):
-        self.files = files
+        '''Replace ``files`` with their signatures. This pipeline passes its 
+        input to output and does not change the flow of pipeline.'''
+        self.files_to_remove = files
 
     def __call__(self, ifiles, pipeline=None):
-        env.logger.trace('Remove intermediate files {}'.format(self.files))
-        for f in shlex.split(self.files) if isinstance(self.files, str) else self.files:
+        env.logger.trace('Remove intermediate files {}'.format(self.files_to_remove))
+        for f in shlex.split(self.files_to_remove) if isinstance(self.files_to_remove, str) else self.files_to_remove:
             if not os.path.isfile(f):
                 if os.path.isfile(f + '.file_info'):
-                    env.logger.info('Reusing existing {}.file_info.'.format(f))
+                    env.logger.info('Keeping existing {}.file_info.'.format(f))
                 else:
                     raise RuntimeError('Failed to create {}.file_info: Missing input file.'
                         .format(f))
@@ -1070,8 +1092,7 @@ class RemoveIntermediateFiles:
                 try:
                     os.remove(f)
                 except e:
-                    env.logger.warning('Failed to remove intermediate file {}'
-                        .format(f))
+                    env.logger.warning('Failed to remove intermediate file {}'.format(f))
         return ifiles
 
 
@@ -1136,6 +1157,9 @@ class DownloadResource:
     resource directory is $local_resource/pipeline_resource/NAME where NAME
     is the name of the pipeline.'''
     def __init__(self, resource, dest_dir):
+        '''Download resources from specified URLs in ``resource``. Multiple URLs
+        can be specified 
+        '''
         self.resource = [x for x in resource.split() if x]
         if not dest_dir or type(dest_dir) != str:
             raise ValueError('Invalid resource directory {}'.format(dest_dir))
@@ -1229,7 +1253,79 @@ class DownloadResource:
         return ifiles, md5_files
  
 
+class _CaseInsensitiveDict(MutableMapping):
+    """A case-insensitive ``dict``-like object.
+    Implements all methods and operations of
+    ``collections.MutableMapping`` as well as dict's ``copy``. Also
+    provides ``lower_items``.
+    All keys are expected to be strings. The structure remembers the
+    case of the last key to be set, and ``iter(instance)``,
+    ``keys()``, ``items()``, ``iterkeys()``, and ``iteritems()``
+    will contain case-sensitive keys. However, querying and contains
+    testing is case insensitive:
+        cid = _CaseInsensitiveDict()
+        cid['Accept'] = 'application/json'
+        cid['aCCEPT'] == 'application/json'  # True
+        list(cid) == ['Accept']  # True
+    For example, ``headers['content-encoding']`` will return the
+    value of a ``'Content-Encoding'`` response header, regardless
+    of how the header name was originally stored.
+    If the constructor, ``.update``, or equality comparison
+    operations are given keys that have equal ``.lower()``s, the
+    behavior is undefined.
+    """
+    def __init__(self, data=None, **kwargs):
+        self._store = dict()
+        if data is None:
+            data = {}
+        self.update(data, **kwargs)
+
+    def __setitem__(self, key, value):
+        # Use the uppercased key for lookups, but store the actual
+        # key alongside the value.
+        self._store[key.upper()] = (key, value)
+
+    def __getitem__(self, key):
+        return self._store[key.upper()][1]
+
+    def __delitem__(self, key):
+        del self._store[key.upper()]
+
+    def __iter__(self):
+        return (casedkey for casedkey, mappedvalue in self._store.values())
+
+    def __len__(self):
+        return len(self._store)
+
+    def upper_items(self):
+        """Like iteritems(), but with all uppercase keys."""
+        return (
+            (upperkey, keyval[1])
+            for (upperkey, keyval)
+            in self._store.items()
+        )
+
+    def __eq__(self, other):
+        if isinstance(other, collections.Mapping):
+            other = _CaseInsensitiveDict(other)
+        else:
+            return NotImplemented
+        # Compare insensitively
+        return dict(self.upper_items()) == dict(other.upper_items())
+
+    # Copy is required
+    def copy(self):
+         return _CaseInsensitiveDict(self._store.values())
+
+    def __repr__(self):
+        return '%s(%r)' % (self.__class__.__name__, dict(self.items()))
+
 class Pipeline:
+    '''The Variant Tools pipeline class. Its instance will be passed to each action
+    to provide runtime information. An action should not change any attribute of
+    the pipeline, except for setting additional variables through its ``VARS``
+    dictionary. Note that VARS is a case-insensitive dictionary but it is generally
+    recommended to use CAPTICAL names for pipeline variables. '''
     def __init__(self, name, extra_args=[], pipeline_type='pipeline', verbosity=None, jobs=1):
         self.pipeline = PipelineDescription(name, extra_args, pipeline_type)
         if os.path.isfile(name) or os.path.isfile(name + '.pipeline'):
@@ -1266,17 +1362,16 @@ class Pipeline:
         #
         # the project will be opened when needed
         with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY'], verbosity=self.verbosity) as proj:
-            self.VARS = {
-                'cmd_input': input_files,
-                'cmd_output': output_files,
-                'temp_dir': env.temp_dir,
-                'cache_dir': env.cache_dir,
-                'local_resource': env.local_resource,
-                'ref_genome_build': proj.build,
-                'pipeline_name': pname,
-                'model_name': pname,
-                'vtools_version': proj.version,
-            }
+            self.VARS = _CaseInsensitiveDict(
+                cmd_input=input_files,
+                cmd_output=output_files,
+                temp_dir=env.temp_dir,
+                cache_dir=env.cache_dir,
+                local_resource=env.local_resource,
+                ref_genome_build=proj.build,
+                pipeline_name=pname,
+                model_name=pname,
+                vtools_version=proj.version)
         self.VARS.update(**kwargs)
         # we need to put self.pipeline.pipeline_vars in self.VARS because
         # they might refer to each other
@@ -1591,6 +1686,15 @@ def simulate_replicate(args, rep):
         sys.exit(1)
 
 def simulate(args):
+    try:
+        # some functors are subclasses of PipelineAction and has to be
+        # imported after the definition of that class.
+        from simulation import *
+    except ImportError as e:
+        # The simulation functors will not be available if simulation module cannot
+        # be loaded.
+        raise RuntimeError('Please install simuPOP before running any simulation using Variant Simulation Tools.')
+    #
     try:
         ret = 0
         if args.replicates <= 0:

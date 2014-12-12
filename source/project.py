@@ -40,6 +40,9 @@ import time
 import re
 import tarfile
 import urllib
+import inspect
+import pydoc
+
 if sys.version_info.major == 2:
     from ucsctools_py2 import showTrack
     from cgatools_py2 import fasta2crr
@@ -3914,7 +3917,8 @@ def showArguments(parser):
         'samples', 'phenotypes', 'genotypes', 'fields', 'annotations',
         'annotation', 'track', 'formats', 'format', 'tests', 'test', 
         'runtime_options', 'runtime_option', 'snapshot', 'snapshots', 
-        'pipeline', 'pipelines', 'simulations', 'simulation'],
+        'pipeline', 'pipelines', 'simulations', 'simulation', 'actions',
+        'action'],
         nargs='?', default='project',
         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
@@ -3937,9 +3941,14 @@ def showArguments(parser):
             and snapshots of the current project saved by command 
             'vtools admin --save_snapshots', 'pipeline PIPELINE'
             for details of a particular align and variant calling pipeline, 
-            'pipelines' for a list of available pipelines. 'simulation MODEL' for
+            'pipelines' for a list of available pipelines, 'simulation MODEL' for
             details of a simulation model, 'simulations' for a list of simulation 
-            models. The default parameter of this command is 'project'.''')
+            models, 'actions' for a list of pipeline actions provided by variant
+            pipeline tools, variant simulation tools, and modules defined for 
+            variant tools pipelines (.py files under the pipeline and simulation
+            directories), and 'action' for details of an action. Only classes derived
+            from class PipelineAction will be displayed. The default parameter of
+            this command is 'project'.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be, for example, name of table for
             type 'table', conditions to select samples for type 'samples', 
@@ -4426,6 +4435,80 @@ def show(args):
                     raise IndexError('Unrecognized pipeline {}: {}'
                         .format(args.items[0], e))
                 pipeline.describe()
+            elif args.type == 'actions':
+                pipeline_members = []
+                # first look into variant_tools.pipeline
+                from variant_tools import pipeline
+                for name, obj in inspect.getmembers(pipeline):
+                    if inspect.isclass(obj) and issubclass(obj, pipeline.PipelineAction):
+                        pipeline_members.append(name)
+                        print('pipeline.{}'.format(name))
+                #
+                from variant_tools import simulation
+                for name, obj in inspect.getmembers(simulation):
+                    if name in pipeline_members:
+                        continue
+                    if inspect.isclass(obj) and issubclass(obj, simulation.PipelineAction):
+                        print('simulation.{}'.format(name))
+                # look in resource files
+                res = ResourceManager()
+                res.getLocalManifest()
+                modules = [x for x in res.manifest.keys() if \
+                    (x.startswith('pipeline/') or x.startswith('simulation/')) and x.endswith('.py')]
+                for mod in modules:
+                    mod_file = downloadFile(mod)
+                    p,f = os.path.split(os.path.expanduser(mod_file))
+                    sys.path.append(p)
+                    local_dict = __import__(f[:-3], globals(), locals())
+                    for name, obj in inspect.getmembers(local_dict):
+                        if name in pipeline_members:
+                            continue
+                        if inspect.isclass(obj) and issubclass(obj, (simulation.PipelineAction, pipeline.PipelineAction)):
+                            print('{}.{}'.format(f[:-3], name))
+            elif args.type == 'action':
+                if not args.items:
+                    raise ValueError('Please specify a pipeline to display')
+                elif len(args.items) > 1:
+                    raise ValueError('Please specify only one pipeline to display')
+                found = 0
+                if '.' in args.items[0]:
+                    mod_name, action_name = args.items[0].split('.', 1)
+                else:
+                    action_name = args.items[0]
+                    mod_name = None
+                # first look into variant_tools.pipeline
+                from variant_tools import pipeline
+                if mod_name is None or mod_name == 'pipeline':
+                    for name, obj in inspect.getmembers(pipeline):
+                        if inspect.isclass(obj) and issubclass(obj, pipeline.PipelineAction) and name == action_name:
+                            pydoc.help(getattr(pipeline, name))
+                            found += 1
+                #
+                # first look into variant_tools.simulation
+                from variant_tools import simulation
+                if mod_name is None or mod_name == 'simulation':
+                    for name, obj in inspect.getmembers(simulation):
+                        if inspect.isclass(obj) and issubclass(obj, simulation.PipelineAction) and name == action_name:
+                            pydoc.help(getattr(simulation, name))
+                            found += 1
+                # look in resource files
+                res = ResourceManager()
+                res.getLocalManifest()
+                modules = [x for x in res.manifest.keys() if \
+                    (x.startswith('pipeline/') or x.startswith('simulation/')) and x.endswith('.py')]
+                for mod in modules:
+                    if mod_name is not None and mod_name != os.path.basename(mod).split('.')[0]:
+                        continue
+                    mod_file = downloadFile(mod)
+                    p,f = os.path.split(os.path.expanduser(mod_file))
+                    sys.path.append(p)
+                    local_dict = __import__(f[:-3], globals(), locals())
+                    for name, obj in inspect.getmembers(local_dict):
+                        if inspect.isclass(obj) and issubclass(obj, (simulation.PipelineAction, pipeline.PipelineAction)) and name == action_name:
+                            pydoc.help(getattr(local_dict, name))
+                            found += 1
+                if not found:
+                    env.logger.warning('No pipeline action named {} is found'.format(args.items[0]))
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
