@@ -113,4 +113,54 @@ class GuessReadGroup(PipelineAction):
             rg_output.write(rg)
         return self.output
 
+ 
+class CheckFastqVersion(PipelineAction):
+    def __init__(self, output):
+        PipelineAction.__init__(self, 'CheckFastqVersion', output)
+
+    def __call__(self, fastq_file, pipeline=None):
+        '''Detect the version of input fastq file. This can be very inaccurate'''
+        if not os.path.isfile(fastq_file[0]) and os.path.isfile(fastq_file[0] + '.file_info'):
+            if os.path.isfile(self.output[0]):
+                return self.output
+            else:
+                raise RuntimeError('A valid fastq file is needed to check version of fastq: .file_info detected')
+        with open(self.output[0], 'w') as aln_param:
+            #
+            # This function assumes each read take 4 lines, and the last line contains
+            # quality code. It collects about 1000 quality code and check their range,
+            # and use it to determine if it is Illumina 1.3+
+            #
+            qual_scores = ''
+            with openFile(fastq_file[0]) as fastq:
+                while len(qual_scores) < 1000:
+                    try:
+                        line = fastq.readline().decode('utf-8')
+                    except Exception as e:
+                        raise RuntimeError('Failed to read fastq file {}: {}'
+                            .format(fastq_file, e))
+                    if not line.startswith('@'):
+                        raise ValueError('Wrong FASTA file {}'.format(fastq_file))
+                    line = fastq.readline().decode('utf-8')
+                    line = fastq.readline().decode('utf-8')
+                    if not line.startswith('+'):
+                        env.logger.warning(
+                            'Suspiciout FASTA file {}: third line does not start with "+".'
+                            .foramt(fastq_file))
+                        return 
+                    line = fastq.readline().decode('utf-8')
+                    qual_scores += line.strip()
+            #
+            min_qual = min([ord(x) for x in qual_scores])
+            max_qual = max([ord(x) for x in qual_scores])
+            env.logger.debug('FASTA file with quality score ranging {} to {}'
+                .format(min_qual, max_qual))
+            # Sanger qual score has range Phred+33, so 33, 73 with typical score range 0 - 40
+            # Illumina qual scores has range Phred+64, which is 64 - 104 with typical score range 0 - 40
+            if min_qual >= 64 or max_qual > 90:
+                # option -I is needed for bwa if the input is Illumina 1.3+ read format (quliaty equals ASCII-64).
+                aln_param.write('-I')
+        return self.output
+
+
 

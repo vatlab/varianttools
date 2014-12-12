@@ -67,6 +67,12 @@ try:
 except (ImportError, ValueError) as e:
     hasPySam = False
 
+try:
+    from simulation import *
+    hasSimuPOP = True
+except ImportError as e:
+    hasSimuPOP = False
+
 # a global namespace to store all user imported modules
 VT_GLOBAL = {}
 VT_THREADS = {}
@@ -75,11 +81,11 @@ VT_THREADS = {}
 class PipelineAction:
     '''Base class for all pipeline actions. If one or more output files
     are specified, the pipeline will record the runtime signature of
-    this action is a file ``$OUTPUT[0].exe_info``, which consists of the
+    this action in a file ``$OUTPUT[0].exe_info``, which consists of the
     MD5 signature of input and output files, command used, and additional
-    information such as start and end time, standard and error outputs.
-    This action will be skipped if the action is re-run with the same
-    input, output and command.
+    information such as start and end time of execution, standard and error
+    outputs. This action will be skipped if the action is re-run with the
+    same input, output and command.
     '''
     def __init__(self, cmd='', output=[]):
         # multiple command is not allowed.
@@ -179,6 +185,8 @@ class PipelineAction:
         else:
             return ifiles
 
+# for backward compatibility
+SkiptableAction=PipelineAction
 
 class SkipIf:
     '''An input emitter that skips the step (does not pass any input to the
@@ -188,7 +196,7 @@ class SkipIf:
     def __init__(self, cond=None, pass_unselected=True):
         '''Does not emit input and skip the step if cond is ``True``. In practice
         ``cond`` is usually a lambda function that checks the existence of a file
-        or value of a pipeline variable. The selected input files are by default
+        or value of a pipeline variable. The unselected input files are by default
         passed to the next step (``pass_unselected`` is ``True``). '''
         self.cond = cond
         self.pass_unselected = pass_unselected
@@ -200,8 +208,8 @@ class SkipIf:
             return [ifiles], []
 
 class EmitInput:
-    '''An input emitter that has been replaced by smaller, more
-    dedicated emitter classes.'''
+    '''An input emitter that emits input files individually, in pairs, or 
+    altogether.'''
     def __init__(self, group_by='all', select=True, pass_unselected=True):
         '''Select input files of certain types, group them, and send input files
         to action. Selection criteria can be True (all input file types, default),
@@ -425,27 +433,6 @@ class EmitInput:
                     'pair input fastq files')
             return self._pairByFileName(selected, unselected)
 
-class SequentialActions:
-    '''Define an action that calls a list of actions, specified by Action1,
-    Action2 etc. The input of the first Action is ${INPUT} (for the first
-    action), or the output of the previous action. The output of the last
-    action becomes the output of the action sequence, or $OUTPUT if the last
-    action does not return any output.'''
-    def __init__(self, actions):
-        self.actions = []
-        for a in actions:
-            if hasattr(a, '__call__'):
-                self.actions.append(a.__call__)
-            else:
-                self.actions.append(a)
-
-    def __call__(self, ifiles, pipeline=None):
-        for a in self.actions:
-            # the input of the next action is the output of the
-            # previous action.
-            ifiles = a(ifiles)
-        # return the output of the last action
-        return ifiles
 
 class OutputText:
     '''Write its input to standard output, or a file if a filename is specified.
@@ -544,17 +531,18 @@ class ImportModules:
         return ifiles
 
 
-class CheckCommands:
+class CheckCommands(PipelineAction):
     '''Check the existence of specified commands and raise an error if one of
     the commands does not exist.'''
-    def __init__(self, cmds):
-        if type(cmds) == type(''):
-            self.cmd = [cmds]
+    def __init__(self, commands):
+        PipelineAction.__init__(self)
+        if type(commands) == type(''):
+            self.commands= [commands]
         else:
-            self.cmd = cmds
+            self.commands= commands
 
     def __call__(self, ifiles, pipeline=None):
-        for cmd in self.cmd:
+        for cmd in self.commands:
             if which(cmd) is None:
                 raise RuntimeError('Command {} does not exist. Please install it and try again.'
                     .format(cmd))
@@ -563,27 +551,28 @@ class CheckCommands:
         return ifiles
 
 
-class CheckOutput:
+class CheckOutput(PipelineAction):
     '''Check out of of an command, and check if it matches a particular
     pattern. The pipeline will exit if fail is set to True (default).'''
-    def __init__(self, cmd, pattern, failIfMismatch=True):
-        self.cmd = cmd
+    def __init__(self, commands, pattern, failIfMismatch=True):
+        self.commands = commands
         if isinstance(pattern, str):
             self.pattern = [pattern]
         else:
             self.pattern = pattern
         self.fail = failIfMismatch
+        PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
         try:
             # do not use subprocess.check_output because I need to get
             # output even when the command returns non-zero return code
-            p = subprocess.Popen(self.cmd, stdout=subprocess.PIPE,
+            p = subprocess.Popen(self.commands, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, shell=True)
             odata, edata = p.communicate()
             output = odata.decode() + edata.decode()
             env.logger.trace('Output of command "{}" is "{}"'
-                .format(self.cmd, output))
+                .format(self.commands, output))
         except Exception as e:
             raise RuntimeError('Failed to execute command "{}": {}'
                 .format(self.cmd, e))
@@ -598,7 +587,7 @@ class CheckOutput:
                 env.logger.warning(msg)
         return ifiles
 
-class CheckFiles:
+class CheckFiles(PipelineAction):
     '''Check the existence of specified files and raise an
     error if one of the files does not exist.'''
     def __init__(self, files, msg=''):
@@ -607,6 +596,7 @@ class CheckFiles:
         else:
             self.files = files
         self.msg = msg
+        PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
         for f in self.files:
@@ -616,7 +606,7 @@ class CheckFiles:
                 raise RuntimeError('Cannot locate {}. {}'.format(f, self.msg))
         return ifiles
 
-class CheckDirs:
+class CheckDirs(PipelineAction):
     '''Check the existence of specified directories and raise an
     error if one of the directories does not exist.'''
     def __init__(self, dirs, msg=''):
@@ -625,6 +615,7 @@ class CheckDirs:
         else:
             self.dirs = dirs
         self.msg = msg
+        PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
         for d in self.dirs:
@@ -634,9 +625,10 @@ class CheckDirs:
                 raise RuntimeError('Cannot locate directory {}. {}'.format(d, self.msg))
         return ifiles
 
-class CheckVariantToolsVersion:
+class CheckVariantToolsVersion(PipelineAction):
     def __init__(self, version=''):
         self.min_version = version
+        PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
         vtools_version = [int(x) for x in re.sub('\D', ' ', pipeline.VARS['vtools_version']).split()]
@@ -646,56 +638,7 @@ class CheckVariantToolsVersion:
                 'Please upgrade your installation of variant tools (version {})'
                 .format(self.min_version, pipeline.VARS['vtools_version']))
         return ifiles
-        
-class CheckFastqVersion:
-    def __init__(self, output):
-        self.output = output
-
-    def __call__(self, fastq_file, pipeline=None):
-        '''Detect the version of input fastq file. This can be very inaccurate'''
-        if not os.path.isfile(fastq_file[0]) and os.path.isfile(fastq_file[0] + '.file_info'):
-            if os.path.isfile(self.output):
-                return self.output
-            else:
-                raise RuntimeError('A valid fastq file is needed to check version of fastq: .file_info detected')
-        with open(self.output, 'w') as aln_param:
-            #
-            # This function assumes each read take 4 lines, and the last line contains
-            # quality code. It collects about 1000 quality code and check their range,
-            # and use it to determine if it is Illumina 1.3+
-            #
-            qual_scores = ''
-            with openFile(fastq_file[0]) as fastq:
-                while len(qual_scores) < 1000:
-                    try:
-                        line = fastq.readline().decode('utf-8')
-                    except Exception as e:
-                        raise RuntimeError('Failed to read fastq file {}: {}'
-                            .format(fastq_file, e))
-                    if not line.startswith('@'):
-                        raise ValueError('Wrong FASTA file {}'.format(fastq_file))
-                    line = fastq.readline().decode('utf-8')
-                    line = fastq.readline().decode('utf-8')
-                    if not line.startswith('+'):
-                        env.logger.warning(
-                            'Suspiciout FASTA file {}: third line does not start with "+".'
-                            .foramt(fastq_file))
-                        return 
-                    line = fastq.readline().decode('utf-8')
-                    qual_scores += line.strip()
-            #
-            min_qual = min([ord(x) for x in qual_scores])
-            max_qual = max([ord(x) for x in qual_scores])
-            env.logger.debug('FASTA file with quality score ranging {} to {}'
-                .format(min_qual, max_qual))
-            # Sanger qual score has range Phred+33, so 33, 73 with typical score range 0 - 40
-            # Illumina qual scores has range Phred+64, which is 64 - 104 with typical score range 0 - 40
-            if min_qual >= 64 or max_qual > 90:
-                # option -I is needed for bwa if the input is Illumina 1.3+ read format (quliaty equals ASCII-64).
-                aln_param.write('-I')
-        return self.output
-
-
+       
 class FieldsFromTextFile:
     '''Read a text file, guess its delimeter, field name (from header)
     and create field descriptions. If a vcf file is encountered, all
@@ -735,21 +678,17 @@ class FieldsFromTextFile:
 class RewindExecution(Exception):
     pass
 
-class NullAction:
-    def __init__(self, output=[], action=''):
-        '''A null action that is used to change input, output, or
-        execute lambda function of substituted variable.'''
-        if type(output) == str:
-            self.output = [output]
-        else:
-            self.output = output
+class NullAction(PipelineAction):
+    '''A pipeline action that does nothing. This is usually used when the goal
+    of the step is to change input, output, or assign variables to pipelines.
+    '''
+    def __init__(self):
+        '''A null action that does nothing.'''
+        PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
-        if self.output:
-            return self.output
-        else:
-            # if no output is specified, pass ifiles through
-            return ifiles
+        '''Pass input files directory as output of step'''
+        return ifiles
         
 class RunCommand(PipelineAction):
     '''This action execute specified commands. If the pipeline is running
@@ -1148,7 +1087,7 @@ class LinkToDir:
         return ofiles
 
 
-class DownloadResource:
+class DownloadResource(PipelineAction):
     '''Download resources to specified destination directory. dest_dir can
     be a full path name or a directory relative to 
     $local_resource/pipeline_resource where $local_resource is the local
@@ -1175,6 +1114,7 @@ class DownloadResource:
         except:
             raise RuntimeError('Failed to create pipeline resource directory '
                 .format(self.pipeline_resource))
+        PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
         saved_dir = os.getcwd()
@@ -1446,8 +1386,8 @@ class Pipeline:
                             VT_THREADS[ifile].join()
                     #
                     action = eval(action, globals(), VT_GLOBAL)
-                    if type(action) == tuple:
-                        action = SequentialActions(action)
+                    if not issubclass(action.__class__, PipelineAction):
+                        env.logger.warning('Pipeline action {} is not a subclass of PipelineAction'.format(action.__class__))
                     # pass the Pipeline object itself to action
                     # this allows the action to have access to pipeline variables
                     # and other options
@@ -1686,13 +1626,7 @@ def simulate_replicate(args, rep):
         sys.exit(1)
 
 def simulate(args):
-    try:
-        # some functors are subclasses of PipelineAction and has to be
-        # imported after the definition of that class.
-        from simulation import *
-    except ImportError as e:
-        # The simulation functors will not be available if simulation module cannot
-        # be loaded.
+    if not hasSimuPOP:
         raise RuntimeError('Please install simuPOP before running any simulation using Variant Simulation Tools.')
     #
     try:
