@@ -47,6 +47,7 @@ import random
 import shutil
 import hashlib
 import ConfigParser
+from HTMLParser import HTMLParser
 import tarfile
 import binascii
 from collections import namedtuple
@@ -3996,3 +3997,49 @@ def getProteinSequence(structure, mutants=[]):
                 pseq[-(1+i//3)] = pseq[-(1+i//3)].lower()
     return ''.join(pseq)
 
+
+class _DeHTMLParser(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.__text = []
+
+    def handle_data(self, data):
+        text = data.strip()
+        if len(text) > 0:
+            text = re.sub('[ \t\r\n]+', ' ', text)
+            self.__text.append(text + ' ')
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'p':
+            self.__text.append('\n\n\n\n')
+        elif tag == 'br':
+            self.__text.append('\n\n\n\n')
+        elif tag == 'ul':
+            self.__text.append('')
+        elif tag == 'li':
+            self.__text.append('\n\n  * ')
+            
+    def handle_endtag(self, tag, attrs):
+        if tag == 'ul':
+            self.__text.append('\n')
+        if tag == 'li':
+            self.__text.append('\n\n')
+
+
+    def handle_startendtag(self, tag, attrs):
+        if tag == 'br':
+            self.__text.append('\n\n')
+
+    def text(self):
+        return ''.join(self.__text).strip()
+
+
+def dehtml(text):
+    try:
+        parser = _DeHTMLParser()
+        parser.feed(text)
+        parser.close()
+        return parser.text()
+    except Exception as e:
+        env.logger.warning('Failed to dehtml text: {}'.format(e))
+        return text

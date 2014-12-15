@@ -62,7 +62,7 @@ from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName, \
     PrettyPrinter, determineSexOfSamples, getVariantsOnChromosomeX, \
     getVariantsOnChromosomeY, getTermWidth, matchName, ProgressFileObj, \
-    substituteVars, calculateMD5
+    substituteVars, calculateMD5, dehtml
 
 # define a field type
 Field = namedtuple('Field', ['name', 'index', 'adj', 'fmt', 'type', 'comment'])
@@ -832,18 +832,22 @@ class PipelineDescription:
     def describe(self):
         textWidth = max(60, getTermWidth())
         if self.description is not None:
-            print('\n'.join(textwrap.wrap(self.description, width=textWidth)))
+            # separate \n\n 
+            for paragraph in dehtml(self.description).split('\n\n'):
+                print('\n'.join(textwrap.wrap(paragraph, width=textWidth)))
         #
         text = 'Available {}: {}'.format(
             'simulation models' if self.pipeline_type == 'simulation' else 'pipelines',
             ', '.join(sorted(self.pipelines.keys())))
         print('\n' + '\n'.join(textwrap.wrap(text, width=textWidth, subsequent_indent=' '*8)))
         for pname, pipeline in sorted(self.pipelines.items()):
+            paragraphs = dehtml(self.pipeline_descriptions[pname.lower()]).split('\n\n')
             print('\n' + '\n'.join(textwrap.wrap('{} "{}":  {}'
                 .format(
                 'Model' if self.pipeline_type == 'simulation' else 'Pipeline',
-                pname, self.pipeline_descriptions[pname.lower()]),
-                width=textWidth)))
+                pname, paragraphs[0]), width=textWidth)))
+            for paragraph in paragraphs[1:]:
+                print('\n'.join(textwrap.wrap(paragraph, width=textWidth)))
             for idx, step in enumerate(pipeline):
                 # hide a step if there is no comment
                 if step.comment:
