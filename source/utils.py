@@ -4013,18 +4013,17 @@ class _DeHTMLParser(HTMLParser):
         if tag == 'p':
             self.__text.append('\n\n\n\n')
         elif tag == 'br':
-            self.__text.append('\n\n\n\n')
+            self.__text.append('\n\n')
         elif tag == 'ul':
             self.__text.append('')
         elif tag == 'li':
             self.__text.append('\n\n  * ')
             
-    def handle_endtag(self, tag, attrs):
+    def handle_endtag(self, tag):
         if tag == 'ul':
-            self.__text.append('\n')
+            self.__text.append('\n\n')
         if tag == 'li':
             self.__text.append('\n\n')
-
 
     def handle_startendtag(self, tag, attrs):
         if tag == 'br':

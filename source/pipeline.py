@@ -338,18 +338,21 @@ class PipelineAction:
     this action in a file ``$OUTPUT[0].exe_info``, which consists of the
     MD5 signature of input and output files, command used, and additional
     information such as start and end time of execution, standard and error
-    outputs. This action will be skipped if the action is re-run with the
+    outputs. An action will be skipped if the action is re-run with the
     same input, output and command.
 
-    NOTE: User-defined actions should either override this function (__call__)
-        or define function execute(self, ifiles, pipeline) to be called by the
-        base __call__ function, which implements the execution signature mechanism.
+    NOTE: The ``__call__`` function or a pipeline action implements the 
+    runtime signature feature and calls function ``execute`` for actual work.
+    User-defined actions should either override the ``__call__`` function
+    (without the runtime signature feature) or function 
+    ``execute(self, ifiles, pipeline)`` (with runtime signature feature). 
     '''
     def __init__(self, cmd='', output=[]):
         '''
         Parameters:
             cmd (string or list of strings):
-                one or more commands to be executed.
+                one or more commands to be executed. It should capture
+                the name and all options used by the command.
 
             output (string or list of strings):
                 Output files. If at least one output file is specified,
@@ -378,25 +381,15 @@ class PipelineAction:
             self.proc_info = '{}.exe_info'.format(self.output[0])
 
     def execute(self, ifiles, pipeline=None):
-        '''Function called by __call__ for actual action performed on ifiles. A user-defined
-        action should re-define __call__ or redefine this function and return ``True`` if the
-        action is completed successfully. 
-        '''
+        '''Function called by ``__call__`` for actual action performed on ifiles. A user-defined
+        action should re-define __call__ or this function. This funciton should return ``True`` if
+        the action is completed successfully, ``False`` for pending (signature will be written later,
+        and raise an exception for errors. '''
         raise RuntimeError('Please define your own execute function in an derived class of PipelineAction.')
-
-    # for backward compatibility
-    _execute = execute
 
     def _write_info(self):
         if not self.output:
             return
-        if not os.path.isfile(self.proc_out) \
-            or not os.path.isfile(self.proc_err):
-            env.logger.warning('Could not locate process-specific output file (id {}), '
-                'which might have been removed by another process that produce '
-                'the same output file {}'.format(os.getpid(), self.output[0]))
-            # try to rerun this step
-            raise RewindExecution()
         with open(self.proc_info, 'a') as exe_info:
             exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
             for f in self.output:
@@ -407,14 +400,16 @@ class PipelineAction:
                     calculateMD5(f, partial=True)))
             # write standard output to exe_info
             exe_info.write('\n\nSTDOUT\n\n')
-            with open(self.proc_out) as stdout:
-                for line in stdout:
-                    exe_info.write(line)
+            if os.path.isfile(self.proc_out):
+                with open(self.proc_out) as stdout:
+                    for line in stdout:
+                        exe_info.write(line)
             # write standard error to exe_info
             exe_info.write('\n\nSTDERR\n\n')
-            with open(self.proc_err) as stderr:
-                for line in stderr:
-                    exe_info.write(line)
+            if os.path.isfile(self.proc_err):
+                with open(self.proc_err) as stderr:
+                    for line in stderr:
+                        exe_info.write(line)
         # if command succeed, remove all out_ and err_ files, 
         for filename in glob.glob(self.output[0] + '.out_*') + \
             glob.glob(self.output[0] + '.err_*') + glob.glob(self.output[0] + '.done_*'):
@@ -475,7 +470,14 @@ class PipelineAction:
                         calculateMD5(f, partial=True)))
         # now, run the job, write info if it is successfully finished.
         # Otherwise the job might be forked and it will record the signature by itself.
-        if self.execute(ifiles, pipeline):
+        if hasattr(self, '_execute'):
+            # for backward compatibility
+            ret = self._execute(ifiles, pipeline)
+        else:
+            ret = self.execute(ifiles, pipeline)
+        if ret not in [True, False]:
+            env.logger.warning('User defined execute function of a PipelineAction should return True or False')
+        if ret:
             self._write_info()#
         #
         if self.output:
@@ -1195,7 +1197,7 @@ class RunCommand(PipelineAction):
                 raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
                     .format(cur_cmd, self._elapsed_time(), ret))
 
-    def _monitor(self, pipeline):
+    def _monitor(self):
         while True:
             if os.path.isfile(self.proc_done):
                 break
@@ -1220,10 +1222,10 @@ class RunCommand(PipelineAction):
             raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
                 .format('; '.join(self.cmd), self._elapsed_time(), ret))
         # remove the .done file
-        if not self.output[0] in pipeline.THREADS:
+        if not self.output[0] in self.pipeline.THREADS:
             raise RuntimeError('Output is not waited by any threads')
         else:
-            pipeline.THREADS.pop(self.output[0])
+            self.pipeline.THREADS.pop(self.output[0])
         # the thread will end here
         env.logger.trace('Thread for output {} ends.'.format(self.output[0]))
         for filename in glob.glob(self.output[0] + '.done_*'):
@@ -1282,9 +1284,9 @@ class RunCommand(PipelineAction):
             t = threading.Thread(target=self._monitor)
             t.daemon = True
             t.start()
-            if self.output[0] in self.THREADS:
+            if self.output[0] in self.pipeline.THREADS:
                 raise RuntimeError('Two spawned jobs have the same self.output[0] file {}'.format(self.output[0]))
-            self.THREADS[self.output[0]] = t
+            self.pipeline.THREADS[self.output[0]] = t
 
 
     def execute(self, ifiles, pipeline=None):
@@ -1307,6 +1309,8 @@ class RunCommand(PipelineAction):
         # substitute cmd by input_files and output_files
         if pipeline.jobs > 1 and self.submitter is not None and not self.output:
             env.logger.warning('Fail to execute in parallel because no output is specified.')
+        #
+        self.pipeline = pipeline
         # Submit the job on a cluster system
         # 1. if there is output, otherwise we cannot track the status of the job
         # 2. if a submit command is specified
@@ -1920,7 +1924,7 @@ class Pipeline:
                             .format(f, pname, command.index))
                 for key, val in command.pipeline_vars:
                     self.VARS[key.lower()] = substituteVars(val, self.VARS)
-                    env.logger.trace('Pipeline variable {} is set to {}'
+                    env.logger.debug('Pipeline variable {} is set to {}'
                         .format(key, self.VARS[key.lower()]))
                 #
                 ifiles = step_output

@@ -4681,11 +4681,6 @@ def admin(args):
             proc_err = '{}.err_{}'.format(output[0], pid)
             proc_info = '{}.exe_info'.format(output[0])
             #
-            if not os.path.isfile(proc_out) \
-                or not os.path.isfile(proc_err):
-                env.logger.warning('Could not locate process-specific output file (id {}), '
-                    'which might have been removed by another process that produce '
-                    'the same output file {}'.format(os.getpid(), output[0]))
             with open(proc_info, 'a') as exe_info:
                 exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
                 for f in output:
@@ -4696,14 +4691,16 @@ def admin(args):
                         calculateMD5(f, partial=True)))
                 # write standard output to exe_info
                 exe_info.write('\n\nSTDOUT\n\n')
-                with open(proc_out) as stdout:
-                    for line in stdout:
-                        exe_info.write(line)
+                if os.path.isfile(proc_out):
+                    with open(proc_out) as stdout:
+                        for line in stdout:
+                            exe_info.write(line)
                 # write standard error to exe_info
                 exe_info.write('\n\nSTDERR\n\n')
-                with open(proc_err) as stderr:
-                    for line in stderr:
-                        exe_info.write(line)
+                if os.path.isfile(proc_err):
+                    with open(proc_err) as stderr:
+                        for line in stderr:
+                            exe_info.write(line)
             sys.exit(0)
         elif args.fasta2crr is not None:
             #
