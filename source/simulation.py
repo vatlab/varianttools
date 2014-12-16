@@ -54,179 +54,6 @@ else:
     from ucsctools_py3 import tabixFetch
 
 
-class ExtractVCF(PipelineAction):
-    '''Use tabix to extract portion of a local or online VCF file '''
-    def __init__(self, regions, sourceURL, output):
-        if isinstance(sourceURL, (list, tuple)):
-            self.sourceURL = sourceURL
-        else:
-            self.sourceURL = [sourceURL]
-        self.regions = regions
-        PipelineAction.__init__(self, cmd='ExtractVCF {} {} {}'.format(sourceURL, regions, output),
-            output=output)
-
-    def _execute(self, ifiles, pipeline):
-        tabixFetch(self.sourceURL[0], [], self.output[0], True)
-        for r in expandRegions(self.regions):
-            region = '{}:{}-{}'.format(r[0], r[1], r[2])
-            env.logger.info('Retriving genotype for region chr{}{}'.format(region,
-                ' ({})'.format(r[3] if r[3] else '')))
-            for URL in self.sourceURL:
-                tabixFetch(URL, [region], self.output[0], False)
-
-
-class CreatePopulation(PipelineAction):
-    '''Create a simuPOP population from specified regions and number of individuals.
-    '''
-    def __init__(self, regions, size=None, importGenotypeFrom=None, 
-        infoFields=[], output=[], **kwargs):
-        self.regions = regions
-        self.size = size
-        self.infoFields = infoFields
-        self.sourceFile = importGenotypeFrom
-        self.extra_args = kwargs
-        PipelineAction.__init__(self, cmd='PopFromRegions {} {}\n'.format(regions, output),
-            output=output)
-
-    def _execute(self, ifiles, pipeline):
-        # translate regions to simuPOP ...
-        lociPos = {}
-        regions = expandRegions(self.regions)
-        for r in regions:
-            if r[0] in lociPos:
-                lociPos[r[0]].extend(range(r[1], r[2] + 1))
-            else:
-                lociPos[r[0]] = range(r[1], r[2] + 1)
-        #
-        if self.sourceFile is not None:
-            if self.sourceFile.lower().endswith('.vcf') or self.sourceFile.lower().endswith('.vcf.gz'):
-                pop = self._importFromVcf(lociPos)
-            elif self.sourceFile.lower().endswith('.ms'):
-                pop = self._importFromMS(lociPos)
-            else:
-                raise ValueError('CreatePopulaton can only import genotypes from files in '
-                    'vcf (with extension .vcf and .vcf.gz) or ms (with extension .ms) formats')
-            if self.size is not None and pop.popSize() != self.size:
-                env.logger.warning('Population imported from {} has {} individuals where a '
-                    'population of size {} is requested'.format(self.sourceFile,
-                    pop.popSize(), self.size))
-        else:
-            chroms = lociPos.keys()
-            chroms.sort()
-            pop = sim.Population(size=self.size, loci=[len(lociPos[x]) for x in chroms],
-                chromNames=chroms, lociPos=sum([lociPos[x] for x in chroms], []),
-                infoFields=self.infoFields, **self.extra_args)
-                #chromTypes=[sim.CHROMOSOME_X if x=='X' else (sim.CHROMOSOME_Y if x=='Y' else sim.AUTOSOME) for x in chroms])
-        # save regions for later use.
-        pop.dvars().regions = self.regions
-        env.logger.info('Saving created population to {}'.format(self.output[0]))
-        pop.save(self.output[0])
-
-    def _importFromVcf(self, lociPos):
-        chroms = lociPos.keys()
-        chroms.sort()
-        #
-        allele_map = {'0': 0, '1': 1, '2': 1, '.': 0}
-        mutantCount = 0
-        # create a dictionary of lociPos->index on each chromosome
-        lociIndex = {}
-        for chIdx,ch in enumerate(chroms):
-            lociIndex[chIdx] = {pos:idx for idx,pos in enumerate(lociPos[ch])}
-        #
-        pop = None
-        with open(self.sourceFile, 'r') as vcf:
-            for line in vcf:
-                if line.startswith('#'):
-                    continue
-                fields = line.split('\t')
-                if pop is None:
-                    if len(fields) <= 10:
-                        raise ValueError('Input vcf file does not contain any genotype information')
-                    pop = sim.Population(size=len(fields)-10, loci=[len(lociPos[x]) for x in chroms],
-                        chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []),
-                        infoFields=self.infoFields)
-                #
-                chr = pop.chromNames().index(fields[0])
-                pos = lociIndex[chr][int(fields[1])]
-                for ind, geno in enumerate(fields[10:]):
-                    if geno[0] not in ('0', '.'):
-                        pop.individual(ind).setAllele(1, pos, 0, chr)
-                        mutantCount += 1
-                    if geno[2] not in ('0', '.'):
-                        pop.individual(ind).setAllele(1, pos, 1, chr)
-                        mutantCount += 1
-        return pop
-
-    def _importFromMS(self, lociPos):
-        #
-        with open(self.sourceFile, 'r') as ms:
-            cmd = ms.readline()
-            seeds = ms.readline()
-            ms.readline()
-            # current we do not handle multiple populations etc
-            chroms = lociPos.keys()
-            chroms.sort()
-            #
-            all_indexes = []
-            all_geno = []
-            indexes = []
-            geno = []
-            for line in ms:
-                if line.strip() in ['' or '//']:
-                    continue
-                elif line.startswith('segsites:'):
-                    segsites = int(line[len('segsites:'):])
-                    # new block?
-                    if indexes:
-                       all_indexes.append(indexes)
-                       all_geno.append(geno)
-                       indexes = []
-                       geno = []
-                elif line.startswith('positions:'):
-                    positions = [float(x) for x in line[len('positions:'):].split()]
-                    if len(positions) != segsites:
-                        raise ValueError('Number of segsites do not match number of positions')
-                    #
-                    # check number of loci
-                    nLoci = len(lociPos[chroms[len(all_indexes)]])
-                    if nLoci < segsites:
-                        raise ValueError('Specified region cannot accomendate {} segregating sites'.format(segsites))
-                    # the last index is not allowed
-                    indexes = [int(nLoci*x) for x in positions if x != 1.0]
-                    if len(set(indexes)) != len(indexes):
-                        env.logger.warning('{} loci at identical location needs to be re-located'.format(len(indexes)-len(set(indexes))))
-                        existing_indexes = set(indexes)
-                        acceptable_indexes = list(set(range(nLoci)) - existing_indexes)
-                        random.shuffle(acceptable_indexes)
-                        indexes = list(existing_indexes | set(acceptable_indexes[:segsites - len(existing_indexes)]))
-                        indexes.sort()
-                    # read?
-                    # population size?
-                else:
-                    geno.append(line.strip())
-            # add everything to all_index etc
-            all_indexes.append(indexes)
-            del indexes
-            all_geno.append(geno)
-            del geno
-            #
-            pop = sim.Population(size=[len(x)/2 for x in all_geno], loci=[len(lociPos[x]) for x in chroms],
-                chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []),
-                infoFields=self.infoFields)
-            # add genotype
-            prog = ProgressBar('Importing from {}'.format(self.sourceFile), pop.popSize() * len(chroms))
-            processed = 0
-            for ch in range(len(chroms)):
-                index = all_indexes[ch]
-                for ind,geno in enumerate(all_geno[ch]):
-                    for idx,g in enumerate(geno):
-                        if g != '0':
-                            pop.individual(ind/2).setAllele(int(g), index[idx], ind % 2, ch)
-                    processed += 1
-                    prog.update(processed)
-            prog.done()
-            return pop
-
 def FineScaleRecombinator(regions=None, scale=1, defaultRate=1e-8, output=None):
     '''For specified regions of the chromosome, find genetic locations of
     all loci using a genetic map downloaded from HapMap. If no genetic
@@ -392,7 +219,7 @@ class OutputPopulationStatistics(PipelineAction):
         PipelineAction.__init__(self, cmd='PopStat output={}\n'
             .format(output), output=output)
 
-    def _execute(self, ifiles, pipeline):
+    def execute(self, ifiles, pipeline):
         #
         env.logger.info('Loading population from {}'.format(ifiles[0]))
         self.pop = sim.loadPopulation(ifiles[0])
@@ -405,7 +232,7 @@ class OutputPopulationStatistics(PipelineAction):
         #        for sp in result[ld_stat].keys():
         #            ld_out.write('{}\t{}\t{}\n'.format(ld_stat, sp, 
         #                '\t'.join(['{:.4f}'.format(x) for x in result[ld_stat][sp]])))
-
+        return True
 
     def count_mutants(self):
         #
@@ -804,17 +631,283 @@ class ProteinPenetrance(sim.PyPenetrance, MutantInfo):
         return 1 - fitness
 
 
+
+class ExtractVCF(PipelineAction):
+    '''Extract variants and genotypes in specified regions of a local or online VCF
+    file and save to a local VCF file.'''
+    def __init__(self, regions, sourceURL, output):
+        '''
+        Parameters:
+            regions (string):
+                One or more chromosome regions in the format of chr:start-end 
+                (e.g. chr21:33,031,597-33,041,570), Field:Value from a region-based
+                annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947),
+                or set options of several regions (&, |, -, and ^ for intersection,
+                union, difference, and symmetric difference).
+
+            sourceURL (string or list of strings):
+                URL or filename of the VCF file from which variants and genotypes
+                will be extracted. A list of URLs can be specified to extract
+                genotypes from multiple source files.
+
+            output (string):
+                Output vcf file.
+        '''
+        if isinstance(sourceURL, (list, tuple)):
+            self.sourceURL = sourceURL
+        else:
+            self.sourceURL = [sourceURL]
+        self.regions = regions
+        PipelineAction.__init__(self, cmd='ExtractVCF {} {}'.format(sourceURL, regions),
+            output=output)
+
+    def execute(self, ifiles, pipeline):
+        '''
+        Parameters:
+            ifiles: unused
+            pipeline: unused
+
+        Results:
+            Return the resulting vcf file as output.
+        '''
+        tabixFetch(self.sourceURL[0], [], self.output[0], True)
+        for r in expandRegions(self.regions):
+            region = '{}:{}-{}'.format(r[0], r[1], r[2])
+            env.logger.info('Retriving genotype for region chr{}{}'.format(region,
+                ' ({})'.format(r[3] if r[3] else '')))
+            for URL in self.sourceURL:
+                tabixFetch(URL, [region], self.output[0], False)
+        return True
+
+
+class CreatePopulation(PipelineAction):
+    '''Create a simuPOP population from specified regions and
+    number of individuals. 
+    '''
+    def __init__(self, regions, size=None, importGenotypeFrom=None, 
+        infoFields=[], build=None, output=[], **kwargs):
+        '''
+        Parameters:
+            regions: (string):
+                One or more chromosome regions in the format of chr:start-end 
+                (e.g. chr21:33,031,597-33,041,570), Field:Value from a region-based
+                annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947),
+                or set options of several regions (&, |, -, and ^ for intersection,
+                union, difference, and symmetric difference).
+            
+            size (None, integer, list of integers):
+                Size of the population. This parameter can be ignored (``None``) if
+                parameter ``importGenotypeFrom`` is specified to import genotypes from
+                external files.
+            
+            importGenotypeFrom (None or string):
+                A file from which genotypes are imported. Currently a file with extension
+                ``.vcf`` or ``.vcf.gz`` (VCF format) or ``.ms`` (MS format) is supported.
+                Because the ms format does not have explicit location of loci, the loci are
+                spread over the specified regions according to their relative locations.
+
+            infoFields (string or list of strings):
+                information fields of the population, if needed by particular operators
+                during evolution.
+
+            build (string):
+                build of the reference genome. Default to hg19.
+
+            output (string):
+                Name of the created population in simuPOP's binary format.
+
+            kwargs (arbitrary keyword parameters):
+                Additional parameters that will be passed to the constructor of 
+                population (e.g. ``ploidy=1`` for haploid population). Please refer
+                to the ``Population()`` function of simuPOP for details.
+        '''
+        self.regions = regions
+        self.size = size
+        self.infoFields = infoFields
+        self.sourceFile = importGenotypeFrom
+        self.extra_args = kwargs
+        # this parameter is currently not used. Need to get it working later
+        self.build = build
+        PipelineAction.__init__(self, cmd='CreatePopulation {} {}\n'.format(regions, size),
+            output=output)
+
+    def execute(self, ifiles, pipeline):
+        # translate regions to simuPOP ...
+        lociPos = {}
+        regions = expandRegions(self.regions)
+        for r in regions:
+            if r[0] in lociPos:
+                lociPos[r[0]].extend(range(r[1], r[2] + 1))
+            else:
+                lociPos[r[0]] = range(r[1], r[2] + 1)
+        #
+        if self.sourceFile is not None:
+            if self.sourceFile.lower().endswith('.vcf') or self.sourceFile.lower().endswith('.vcf.gz'):
+                pop = self._importFromVcf(lociPos)
+            elif self.sourceFile.lower().endswith('.ms'):
+                pop = self._importFromMS(lociPos)
+            else:
+                raise ValueError('CreatePopulaton can only import genotypes from files in '
+                    'vcf (with extension .vcf and .vcf.gz) or ms (with extension .ms) formats')
+            if self.size is not None and pop.popSize() != self.size:
+                env.logger.warning('Population imported from {} has {} individuals where a '
+                    'population of size {} is requested'.format(self.sourceFile,
+                    pop.popSize(), self.size))
+        else:
+            chroms = lociPos.keys()
+            chroms.sort()
+            pop = sim.Population(size=self.size, loci=[len(lociPos[x]) for x in chroms],
+                chromNames=chroms, lociPos=sum([lociPos[x] for x in chroms], []),
+                infoFields=self.infoFields, **self.extra_args)
+                #chromTypes=[sim.CHROMOSOME_X if x=='X' else (sim.CHROMOSOME_Y if x=='Y' else sim.AUTOSOME) for x in chroms])
+        # save regions for later use.
+        pop.dvars().regions = self.regions
+        env.logger.info('Saving created population to {}'.format(self.output[0]))
+        pop.save(self.output[0])
+        return True
+
+    def _importFromVcf(self, lociPos):
+        chroms = lociPos.keys()
+        chroms.sort()
+        #
+        allele_map = {'0': 0, '1': 1, '2': 1, '.': 0}
+        mutantCount = 0
+        # create a dictionary of lociPos->index on each chromosome
+        lociIndex = {}
+        for chIdx,ch in enumerate(chroms):
+            lociIndex[chIdx] = {pos:idx for idx,pos in enumerate(lociPos[ch])}
+        #
+        pop = None
+        with open(self.sourceFile, 'r') as vcf:
+            for line in vcf:
+                if line.startswith('#'):
+                    continue
+                fields = line.split('\t')
+                if pop is None:
+                    if len(fields) <= 10:
+                        raise ValueError('Input vcf file does not contain any genotype information')
+                    pop = sim.Population(size=len(fields)-10, loci=[len(lociPos[x]) for x in chroms],
+                        chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []),
+                        infoFields=self.infoFields)
+                #
+                chr = pop.chromNames().index(fields[0])
+                pos = lociIndex[chr][int(fields[1])]
+                for ind, geno in enumerate(fields[10:]):
+                    if geno[0] not in ('0', '.'):
+                        pop.individual(ind).setAllele(1, pos, 0, chr)
+                        mutantCount += 1
+                    if geno[2] not in ('0', '.'):
+                        pop.individual(ind).setAllele(1, pos, 1, chr)
+                        mutantCount += 1
+        return pop
+
+    def _importFromMS(self, lociPos):
+        #
+        with open(self.sourceFile, 'r') as ms:
+            cmd = ms.readline()
+            seeds = ms.readline()
+            ms.readline()
+            # current we do not handle multiple populations etc
+            chroms = lociPos.keys()
+            chroms.sort()
+            #
+            all_indexes = []
+            all_geno = []
+            indexes = []
+            geno = []
+            for line in ms:
+                if line.strip() in ['' or '//']:
+                    continue
+                elif line.startswith('segsites:'):
+                    segsites = int(line[len('segsites:'):])
+                    # new block?
+                    if indexes:
+                       all_indexes.append(indexes)
+                       all_geno.append(geno)
+                       indexes = []
+                       geno = []
+                elif line.startswith('positions:'):
+                    positions = [float(x) for x in line[len('positions:'):].split()]
+                    if len(positions) != segsites:
+                        raise ValueError('Number of segsites do not match number of positions')
+                    #
+                    # check number of loci
+                    nLoci = len(lociPos[chroms[len(all_indexes)]])
+                    if nLoci < segsites:
+                        raise ValueError('Specified region cannot accomendate {} segregating sites'.format(segsites))
+                    # the last index is not allowed
+                    indexes = [int(nLoci*x) for x in positions if x != 1.0]
+                    if len(set(indexes)) != len(indexes):
+                        env.logger.warning('{} loci at identical location needs to be re-located'.format(len(indexes)-len(set(indexes))))
+                        existing_indexes = set(indexes)
+                        acceptable_indexes = list(set(range(nLoci)) - existing_indexes)
+                        random.shuffle(acceptable_indexes)
+                        indexes = list(existing_indexes | set(acceptable_indexes[:segsites - len(existing_indexes)]))
+                        indexes.sort()
+                    # read?
+                    # population size?
+                else:
+                    geno.append(line.strip())
+            # add everything to all_index etc
+            all_indexes.append(indexes)
+            del indexes
+            all_geno.append(geno)
+            del geno
+            #
+            pop = sim.Population(size=[len(x)/2 for x in all_geno], loci=[len(lociPos[x]) for x in chroms],
+                chromNames = chroms, lociPos=sum([lociPos[x] for x in chroms], []),
+                infoFields=self.infoFields)
+            # add genotype
+            prog = ProgressBar('Importing from {}'.format(self.sourceFile), pop.popSize() * len(chroms))
+            processed = 0
+            for ch in range(len(chroms)):
+                index = all_indexes[ch]
+                for ind,geno in enumerate(all_geno[ch]):
+                    for idx,g in enumerate(geno):
+                        if g != '0':
+                            pop.individual(ind/2).setAllele(int(g), index[idx], ind % 2, ch)
+                    processed += 1
+                    prog.update(processed)
+            prog.done()
+            return pop
+
+
 class EvolvePopulation(PipelineAction):
+    '''Evolve a population, subject to passed operators.'''
     def __init__(self,
-        selector = None, demoModel=None, 
+        selector = None, 
         mutator = None, 
         transmitter = None,
-        taggers=[],
         initOps=[],
         preOps=[],
+        taggers=[],
         postOps=[],
         finalOps=[],
+        demoModel=None, 
         output=[]):
+        '''
+        Parameters:
+            selector (None, one or a list of simuPOP operators): 
+                Operator for natural selection that will be applied before mating
+                at each generation. Default to no natural selection.
+
+            mutator (None, or one or a list of simuPOP operators):
+                Mutation operator that will be applied before mating at each
+                generation. Default to no mutation.
+
+            transmitter (None, or one or a list of simuPOP operators):
+                Genotype transmision operators. Default to ``MedelianGenoTransmitter``.
+
+            initOps, preOps, taggers, postOps, finalOps (one or a list of simuPOP operators):
+                Additional operaors that will be applied during initiation, before, during
+                and after mating, and after the complection of evolutionary process.
+
+            demoModel (A demographic model):
+                A demographic model as defined in the simuPOP.demography module.
+
+            output (string):
+                Evolved population in simuPOP binary format.
+        '''
         self.mutator = [] if mutator is None else (mutator if isinstance(mutator, (list, tuple)) else [mutator])
         self.selector = [] if selector is None else (selector if isinstance(selector, (list, tuple)) else [selector])
         self.demoModel = demoModel
@@ -828,7 +921,17 @@ class EvolvePopulation(PipelineAction):
         PipelineAction.__init__(self, cmd='EvolvePop output={}\n'
             .format(output), output=output)
 
-    def _execute(self, ifiles, pipeline):
+    def execute(self, ifiles, pipeline):
+        '''
+        Parameters:
+            ifiles (list of strings):
+                A population file in simuPOP's binary format.
+
+            pipeline: unused.
+
+        Results:
+            Evolved population 
+        '''
         pop = sim.loadPopulation(ifiles[0])
         pop.addInfoFields(['fitness', 'migrate_to'])
         startTime = time.clock()
@@ -899,7 +1002,7 @@ class EvolvePopulation(PipelineAction):
         #
         env.logger.info('Population simulation takes %.2f seconds' % (time.clock() - startTime))
         pop.save(self.output[0])
-        return self.output
+        return True
 
 
 class DrawCaseControlSample(PipelineAction):
@@ -909,6 +1012,21 @@ class DrawCaseControlSample(PipelineAction):
     draw from the population.
     '''
     def __init__(self, cases, controls, penetrance, output):
+        '''
+        Parameters:
+            cases (integer):
+                Number of affected individuals to sample
+
+            controls (integer):
+                Number of unaffected individuals to sample
+
+            penetrance (a simuPOP operator):
+                A penetrance operator that determines the affection status
+                of individuals.
+
+            output:
+                Sample population saved in simuPOP binary format.
+        '''
         if isinstance(cases, int):
             self.cases = [cases]
         else:
@@ -925,7 +1043,7 @@ class DrawCaseControlSample(PipelineAction):
         PipelineAction.__init__(self, cmd='DrawCaseCtrlSample {}\n'.format(output),
             output=output)
     
-    def _execute(self, ifiles, pipeline):
+    def execute(self, ifiles, pipeline):
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
         for idx, output in enumerate(self.output):
@@ -941,6 +1059,7 @@ class DrawCaseControlSample(PipelineAction):
             else:
                 # else use a copy of the loaded population
                 self._drawSample(pop.clone(), output)
+        return True
 
     def _drawSample(self, pop, output):
         #
@@ -1005,12 +1124,22 @@ class DrawCaseControlSample(PipelineAction):
         return False
 
 class DrawRandomSample(PipelineAction):
+    '''Draw random sample from an input population and save
+    samples (population) in simuPOP's binary format. '''
     def __init__(self, sizes, output):
+        '''
+        Parameters:
+            sizes (integer):
+                Number of individuals to sample
+
+            output:
+                Sample population saved in simuPOP binary format.
+        '''
         self.sizes = sizes
         PipelineAction.__init__(self, cmd='DrawRandomSampler {}\n'.format(output),
             output=output)
     
-    def _execute(self, ifiles, pipeline):
+    def execute(self, ifiles, pipeline):
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
         for idx, output in enumerate(self.output):
@@ -1020,6 +1149,7 @@ class DrawRandomSample(PipelineAction):
             else:
                 # else use a copy of the loaded population
                 self._drawSample(pop.clone(), output)
+        return True
 
     def _drawSample(self, pop, output):
         pop.evolve(
@@ -1038,10 +1168,26 @@ class DrawRandomSample(PipelineAction):
 
 
 class DrawQuanTraitSample(PipelineAction):
-    '''This operator cannot yet sample from different
-    subpopulations.
+    '''Draw samples according to individual trait values.
     '''
     def __init__(self, sizes, conditions, qtrait, output):
+        '''
+        Parameters:
+            sizes (integer):
+                Number of individuals to sample.
+
+            conditions (string):
+                Conditions for selecting sample, which is a Python 
+                expression that involves name of the quantitative
+                trait.
+
+            qtrait (a simuPOP operator)
+                A simuPOP quantitative trait operator to assign
+                quantitative traits to individuals.
+
+            output (string):
+                Samples (population) saved in simuPOP binary format.
+        '''
         if isinstance(sizes, int):
             self.sizes = [sizes]
         else:
@@ -1056,7 +1202,7 @@ class DrawQuanTraitSample(PipelineAction):
         PipelineAction.__init__(self, cmd='DrawQuanTraitSample {}\n'.format(output),
             output=output)
     
-    def _execute(self, ifiles, pipeline):
+    def execute(self, ifiles, pipeline):
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
         for idx, output in enumerate(self.output):
@@ -1066,6 +1212,7 @@ class DrawQuanTraitSample(PipelineAction):
             else:
                 # else use a copy of the loaded population
                 self._drawSample(pop.clone(), output)
+        return True
 
     def _drawSample(self, pop, output):
         if pop.numSubPop() > 1:
@@ -1098,11 +1245,22 @@ class DrawQuanTraitSample(PipelineAction):
 
 
 class ExportPopulation(PipelineAction):
-    '''
+    '''Export simulated populatons in vcf, and fasta format.
     '''
     def __init__(self, output, sample_names=[], var_info=[]):
-        '''var_info: output variant info if any of the variable is specified
-            MT
+        '''
+        Parameters:
+            output (string):
+                Name of the output file. The variants and genotypes will be saved in ``VCF``
+                format is the filename ends with ``.vcf``. Otherwise the sequences will be
+                saved in fasta format.
+
+            sample_names (list of strings):
+                Name of samples. Default to S_i for i=1, 2, ...
+
+
+            var_info (string or list of strings):
+                Variant information fields that will be outputted if exporting in vcf format.
         '''
         self.sample_names = sample_names
         self.var_info = var_info
@@ -1112,7 +1270,14 @@ class ExportPopulation(PipelineAction):
         PipelineAction.__init__(self, cmd='ExportPopulation {} {}\n'.format(sample_names, output),
             output=output)
 
-    def _execute(self, ifiles, pipeline):
+    def execute(self, ifiles, pipeline):
+        '''
+        Parameters:
+            ifiles (string):
+                Population in simuPOP's binary format.
+
+            pipeline: unused
+        '''
         if self.output[0].endswith('.vcf'):
             self._exportVCF(ifiles, pipeline)
         else:
@@ -1140,6 +1305,7 @@ class ExportPopulation(PipelineAction):
                 phe.write('\n')
                 prog.update(i+1)
             prog.done()
+        return True
 
 
     def _exportFasta(self, ifiles, pipeline):

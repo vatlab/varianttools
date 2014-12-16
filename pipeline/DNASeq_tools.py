@@ -13,7 +13,7 @@ class CountMappedReads(PipelineAction):
         self.cutoff = cutoff
         PipelineAction.__init__(self, cmd='CountMappedReads', output=output)
 
-    def _execute(self, sam_file, pipeline=None):
+    def execute(self, sam_file, pipeline=None):
         #
         # count total reads and unmapped reads
         #
@@ -37,8 +37,6 @@ class CountMappedReads(PipelineAction):
                     0 if total_count == 0 else (100.*mapped_count/total_count)))
         return self.output
 
-
-    
 class GuessReadGroup(PipelineAction):
     def __init__(self, bamfile, rgfile):
         self.output_bam = bamfile
