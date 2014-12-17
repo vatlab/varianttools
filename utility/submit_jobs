@@ -46,7 +46,7 @@ class Mailer:
         self.smtp_port = smtp_port
         self.smtp_ssl = smtp_ssl
 
-    def sendmail(header):
+    def sendmail(self, header):
         '''Send an email to report status.'''
         if not self.notify_email:
             return
@@ -89,7 +89,7 @@ class Jobs:
         pattern
             Patterns to select jobs according to their names
         qsub_cmd and qstat_cmd
-            Commands to submit jobs and check job status
+           Commands to submit jobs and check job status
         mailer:
             Options to send emails for major events
         '''
@@ -268,7 +268,7 @@ notification_email (optional): an email address to which major events such as
     #
     # add variables defined in configuration file to args
     qsub_cmd = cvars['qsub_cmd'] if 'qsub_cmd' in cvars else 'qsub < $name.pbs'
-    qstat_cmd = cvars['qstat_cmd'] if 'qstat_cmd' in cvars else r'''qstat -f | grep 'Job_Name\|job_state' | cut -d= -f2 | awk '{printf $0 ";"; getline; print $0}' | grep -v '; C' '''
+    qstat_cmd = cvars['qstat_cmd'] if 'qstat_cmd' in cvars else r'''qstat -f | grep 'Job_Name\|job_state' | cut -d= -f2 | awk '{printf $0 ";"; getline; print $0}' '''
     mailer = Mailer(
         cvars['notification_email'] if 'notification_email' in cvars else '',
         cvars['smtp_host'] if 'smtp_host' in cvars else 'localhost',

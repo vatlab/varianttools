@@ -1125,11 +1125,14 @@ class RunCommand(PipelineAction):
             submitter (None or string):
                 If a submitter is specified and the pipeline is executed in multi-job
                 mode (e.g. --jobs 2), a shell script will be written with the commands
-                to be executed. The name of the shell script will be appended to
-                the ``submitter`` string or substitute ``{}`` in ``submitter``. For
+                to be executed. The submitter command will be executed with ``{}`` in
+                parameter ``submitter`` replaced by the name of shell script. For
                 example, submitter='sh {} &' will run the job as a background job,
                 and submitter='qsub -q long < {}' will submit the shell script to the
-                long queue of a cluster system. 
+                long queue of a cluster system. Because the pipeline will be terminated
+                if the submitter command fails, `qsub new_job ... && false` can be used
+                to replace the running process by start a new job and terminate the
+                existing process intentionally.
 
             max_jobs: (deprecated)
         '''
@@ -1237,7 +1240,8 @@ class RunCommand(PipelineAction):
 
     def _submit_command(self):
         '''Submit a job and wait for its completion.'''
-        self.proc_cmd = self.output[0] + '.sh'
+        # use full path because the command might be submitted to a remote machine
+        self.proc_cmd = os.path.abspath(self.output[0] + '.sh')
         self.proc_done = self.output[0] + '.done_{}'.format(os.getpid())
         #
         if os.path.isfile(self.proc_done):
@@ -1249,11 +1253,17 @@ class RunCommand(PipelineAction):
         with open(self.proc_cmd, 'w') as sh_file:
             sh_file.write('#PBS -o {}\n'.format(self.proc_out))
             sh_file.write('#PBS -e {}\n'.format(self.proc_err))
+            sh_file.write('#PBS -N {}\n'.format(os.path.basename(self.output[0])))
             #sh_file.write('#PBS -N {}.{}_{}\n'.format(self.proc_err))
             sh_file.write('#PBS -V\n')
+            # we try to reproduce the environment as much as possible becaus ehte
+            # script might be executed in a different environment
+            for k, v in os.environ.items():
+                sh_file.write('{}={}\n'.format(k, v))
             #
+            sh_file.write('\ncd {}\n'.format(os.path.abspath(os.getcwd())))
             if self.working_dir is not None:
-                sh_file.write('[ -d {0} ] || mkdir -p {0}\ncd {0}\n'.format(self.working_dir))
+                sh_file.write('[ -d {0} ] || mkdir -p {0}\ncd {0}\n'.format(os.path.abspath(self.working_dir)))
             sh_file.write('\n'.join(self.cmd))
             #
             sh_file.write('\n\nCMD_RET=$?\nif [ $CMD_RET == 0 ]; then vtools admin --record_exe_info {} {}; fi\n'
@@ -1264,9 +1274,9 @@ class RunCommand(PipelineAction):
         # try to submit command
         if '{}' in self.submitter:
             submit_cmd = self.submitter.replace('{}', self.proc_cmd)
-        else:
-            submit_cmd = self.submitter + ' ' + self.proc_cmd
         #
+        env.logger.info('Running job {} with command "{}" from directory {}'.format(
+            self.proc_cmd, submit_cmd, os.getcwd()))
         ret = subprocess.call(submit_cmd, shell=True,
             stdout=open(self.proc_out, 'w'), stderr=open(self.proc_err, 'w'),
             cwd=self.working_dir)
@@ -1896,7 +1906,8 @@ class Pipeline:
                             # wait for the thread to complete
                             env.logger.info('Waiting for the input file {} to be available.'
                                 .format(ifile))
-                            self.THREADS[ifile].join()
+                            while self.THREADS[ifile].isAlive():
+                                self.THREADS[ifile].join(5)
                     #
                     if not action.strip():
                         action = 'NullAction()'
@@ -1980,7 +1991,8 @@ class Pipeline:
         if self.THREADS:
             for k, v in self.THREADS.items():
                 env.logger.trace('Waiting for {} to be completed.'.format(k))
-                v.join()
+                while v.isAlive():
+                    v.join(5)
 
 
 def executeArguments(parser):
