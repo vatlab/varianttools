@@ -1242,7 +1242,7 @@ class RunCommand(PipelineAction):
         '''Submit a job and wait for its completion.'''
         # use full path because the command might be submitted to a remote machine
         self.proc_cmd = os.path.abspath(self.output[0] + '.sh')
-        self.proc_done = self.output[0] + '.done_{}'.format(os.getpid())
+        self.proc_done = os.path.abspath(self.output[0]) + '.done_{}'.format(os.getpid())
         #
         if os.path.isfile(self.proc_done):
             os.remove(self.proc_done)
@@ -1251,15 +1251,17 @@ class RunCommand(PipelineAction):
         #
         # create a batch file for execution
         with open(self.proc_cmd, 'w') as sh_file:
-            sh_file.write('#PBS -o {}\n'.format(self.proc_out))
-            sh_file.write('#PBS -e {}\n'.format(self.proc_err))
+            sh_file.write('#PBS -o {}\n'.format(os.path.abspath(self.proc_out)))
+            sh_file.write('#PBS -e {}\n'.format(os.path.abspath(self.proc_err)))
             sh_file.write('#PBS -N {}\n'.format(os.path.basename(self.output[0])))
             #sh_file.write('#PBS -N {}.{}_{}\n'.format(self.proc_err))
             sh_file.write('#PBS -V\n')
             # we try to reproduce the environment as much as possible becaus ehte
             # script might be executed in a different environment
             for k, v in os.environ.items():
-                sh_file.write('{}={}\n'.format(k, v))
+                if any([k.startswith('x') for x in ('SSH', 'PBS', '_')]):
+                    continue
+                sh_file.write('export {}={}\n'.format(k, v))
             #
             sh_file.write('\ncd {}\n'.format(os.path.abspath(os.getcwd())))
             if self.working_dir is not None:
@@ -1274,6 +1276,8 @@ class RunCommand(PipelineAction):
         # try to submit command
         if '{}' in self.submitter:
             submit_cmd = self.submitter.replace('{}', self.proc_cmd)
+        else:
+            submit_cmd = self.submitter
         #
         env.logger.info('Running job {} with command "{}" from directory {}'.format(
             self.proc_cmd, submit_cmd, os.getcwd()))
@@ -1289,7 +1293,12 @@ class RunCommand(PipelineAction):
         if ret < 0:
             raise RuntimeError("Failed to submit job {} due to signal {} (submitter='{}')" .format(self.proc_cmd, -ret, self.submitter))
         elif ret > 0:
-            raise RuntimeError("Failed to submit job {} using submiter '{}'".format(proc_cmd, self.submitter))
+            if os.path.isfile(self.proc_err):
+                 with open(self.proc_err) as err:
+                     msg = err.read()
+            else:
+                msg = ''
+            raise RuntimeError("Failed to submit job {} using submiter '{}': {}".format(self.proc_cmd, self.submitter, msg))
         else:
             t = threading.Thread(target=self._monitor)
             t.daemon = True
