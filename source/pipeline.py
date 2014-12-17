@@ -1227,8 +1227,11 @@ class RunCommand(PipelineAction):
         # remove the .done file
         if not self.output[0] in self.pipeline.THREADS:
             raise RuntimeError('Output is not waited by any threads')
-        else:
-            self.pipeline.THREADS.pop(self.output[0])
+        # DO NOT POP FROM ANOTHER THREAD, this will cause race condition
+        # (unless we use thread safe dictionry). In this case, we only need
+        # to monitor the status of threads from the master threads.
+        #    self.pipeline.THREADS.pop(self.output[0])
+        #
         # the thread will end here
         env.logger.trace('Thread for output {} ends.'.format(self.output[0]))
         for filename in glob.glob(self.output[0] + '.done_*'):
@@ -1917,6 +1920,8 @@ class Pipeline:
                                 .format(ifile))
                             while self.THREADS[ifile].isAlive():
                                 self.THREADS[ifile].join(5)
+                            # thread closed, remove from self.THREADS
+                            self.THREADS.pop(ifile)
                     #
                     if not action.strip():
                         action = 'NullAction()'
@@ -2002,6 +2007,8 @@ class Pipeline:
                 env.logger.trace('Waiting for {} to be completed.'.format(k))
                 while v.isAlive():
                     v.join(5)
+                # thread closed, remove from self.THREADS
+                self.THREADS.pop(ifile)
 
 
 def executeArguments(parser):
