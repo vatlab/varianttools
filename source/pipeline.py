@@ -380,7 +380,7 @@ class PipelineAction:
             self.proc_lck = '{}.lck'.format(self.output[0])
             self.proc_info = '{}.exe_info'.format(self.output[0])
 
-    def execute(self, ifiles, pipeline=None):
+    def _execute(self, ifiles, pipeline=None):
         '''Function called by ``__call__`` for actual action performed on ifiles. A user-defined
         action should re-define __call__ or this function. This funciton should return ``True`` if
         the action is completed successfully, ``False`` for pending (signature will be written later,
@@ -470,11 +470,7 @@ class PipelineAction:
                         calculateMD5(f, partial=True)))
         # now, run the job, write info if it is successfully finished.
         # Otherwise the job might be forked and it will record the signature by itself.
-        if hasattr(self, '_execute'):
-            # for backward compatibility
-            ret = self._execute(ifiles, pipeline)
-        else:
-            ret = self.execute(ifiles, pipeline)
+        ret = self._execute(ifiles, pipeline)
         if ret not in [True, False]:
             env.logger.warning('User defined execute function of a PipelineAction should return True or False')
         if ret:
@@ -495,6 +491,7 @@ class SequentialActions(PipelineAction):
 
     NOTE: this action is automatically applied if a list or tuple of actions
     are specified in the SPEC file (e.g. action=Action1(), Action2()).
+
 
     Examples:
         action=CheckCommands('bowtie'), CheckOutput('bowtie --version', '1.1.1')
@@ -531,6 +528,14 @@ class CheckVariantToolsVersion(PipelineAction):
     '''Check the version of variant tools and determine if it is
     recent enough to execute the pipeline.
 
+    File Flow: Input passthrough. 
+
+        INPUT ====> INPUT
+
+    Raises:
+        Fail if the version of variant tools used to execute the
+        pipeline is older than the specified version.
+
     Examples:
         action=CheckVariantToolsVersion('2.5.0')
 
@@ -546,18 +551,6 @@ class CheckVariantToolsVersion(PipelineAction):
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
-        '''
-        Parameters:
-            ifiles: unused
-            pipeline: unused
-
-        Result:
-            Pass ifiles to output. Does not change pipeline.
-
-        Raises:
-            Fail if the version of variant tools used to execute the
-            pipeline is older than the specified version.
-        '''
         vtools_version = [int(x) for x in re.sub('\D', ' ', pipeline.VARS['vtools_version']).split()]
         # e.g. minimal 2.2.0, vtools 2.1.1
         if [int(x) for x in re.sub('\D', ' ', self.min_version).split()] > vtools_version:
@@ -571,6 +564,16 @@ class ImportModules(PipelineAction):
     '''Import functions and action from a Python module. This action passed input
     files to output and does not change the pipeline.
     
+    File Flow: Input passthrough, but import symbols to pipeline.
+
+                     Pipeline
+                        ^
+            INPUT =============》INPUT
+
+    Raises:
+        Raise a RuntimeError if one or more modules can not
+        be imported.
+
     Examples:
         action=ImportModules('DNASeq_tools.py')
         action=ImportModules(['DNASeq_tools.py', 'simuPOP.demography'])
@@ -585,6 +588,8 @@ class ImportModules(PipelineAction):
                 the file directly (a full path can be given), look for the module in
                 the path of the pipeline (if a local pipeline is used), or download
                 from the Variant Tools Repository under directory pipeline.
+
+
         '''
         if isinstance(modules, str):
             self.modules = [modules]
@@ -594,30 +599,15 @@ class ImportModules(PipelineAction):
         self._monitors = Queue.Queue()
 
     def __call__(self, ifiles, pipeline=None):
-        '''Import symbols from specified modules.
-    
-        Parameters:
-            ifiles:  unused
-
-            pipeline:
-                Import symbols to pipeline.GLOBALS
-
-        Result:
-            Pass ifiles to output. Does not change pipeline.
-
-        Raises:
-            Raise a RuntimeError if one or more modules can not
-            be imported.
-        '''
         for module in self.modules:
             # this is a path to a .py file
             if module.endswith('.py'):
                 if os.path.isfile(module):
                     pyfile = module
                 # if the .py file locates in the same directory as the pipeline file
-                elif pipeline is not None and pipeline.pipeline_path is not None \
-                    and os.path.isfile(os.path.join(pipeline.pipeline_path, module)):
-                    pyfile = os.path.join(pipeline.pipeline_path, module)
+                elif pipeline is not None \
+                    and os.path.isfile(os.path.join(os.path.split(pipeline.spec_file)[0], module)):
+                    pyfile = os.path.join(os.path.split(pipeline.spec_file)[0], module)
                 else:
                     # try to download it from online
                     try:
@@ -647,7 +637,19 @@ class ImportModules(PipelineAction):
 
 class CheckCommands(PipelineAction):
     '''Check the existence of specified commands and raise an error if one of
-    the commands does not exist.'''
+    the commands does not exist.
+    
+    File Flow: Input passthrough. 
+
+        INPUT ====> INPUT 
+
+    Raises:
+        A RuntimeError will be raised if a command is not found.
+
+    Examples:
+        action=CheckCommands('java')
+        action=CheckCommands(['java', 'tophat2'])
+    '''
     def __init__(self, commands):
         '''
         Parameters:
@@ -661,18 +663,6 @@ class CheckCommands(PipelineAction):
             self.commands= commands
 
     def __call__(self, ifiles, pipeline=None):
-        '''Check the existence of commands.
-
-        Parameters:
-            ifiles:   unused
-            pipeline: unused
-
-        Returns:
-            Pass input to output. Does not change pipeline.
-
-        Raises:
-            A RuntimeError will be raised if a command is not found.
-        '''
         for cmd in self.commands:
             if which(cmd) is None:
                 raise RuntimeError('Command {} does not exist. Please install it and try again.'
@@ -683,10 +673,18 @@ class CheckCommands(PipelineAction):
 
 
 class CheckOutput(PipelineAction):
-    '''Check out of of an command, and check if it matches one or more
+    '''Run a command and check if its output matches at least one of specified
     patterns. The pipeline will be terminated if failIfMismatch is set to True
-    (default).
+    (default). Otherwise a warning message will be printed.
     
+    File Flow: Input passthrough. 
+
+        INPUT ====> INPUT
+
+    Raises:
+        Raise a RuntimeError if the output of command does not match
+        any of the patterns, if ``failIfMismatch`` is set to ``True``.
+
     Examples:
         action=CheckOutput('tophat2 --version', ['v2.0.13', 'v2.0.14'])
 
@@ -718,21 +716,6 @@ class CheckOutput(PipelineAction):
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
-        '''Run specified command and compare the output with specified
-        patterns. Generate an error or warning if the output does not match
-        any of the patterns.
-
-        Parameters:
-            ifiles:   unused
-            pipeline: unused
-
-        Results:
-            Pass input to putput. Does not change pipeline.
-
-        Raises:
-            Raise a RuntimeError if the output of command does not match
-            any of the patterns, if ``failIfMismatch`` is set to ``True``.
-        '''
         try:
             # do not use subprocess.check_output because I need to get
             # output even when the command returns non-zero return code
@@ -760,6 +743,13 @@ class CheckFiles(PipelineAction):
     '''Check the existence of specified files and raise an
     error if one of the files does not exist.
     
+    File Flow: Input passthrough. 
+
+        INPUT ====> INPUT
+
+    Raises:
+        Raise a RuntimeError if any of the files is not found.
+
     Example:
         # assume gatk_path is a command line argument
         action=CheckFile('%(gatk_path)s/GenomeAnalysisTK.jar',
@@ -782,19 +772,6 @@ class CheckFiles(PipelineAction):
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
-        '''Check the existence of specified files and raise an error if
-        one of the files cannot be found.
-
-        Parameters:
-            ifiles:   unused
-            pipeline: unused
-
-        Results:
-            Pass input to putput. Does not change pipeline.
-
-        Raises:
-            Raise a RuntimeError if any of the files is not found.
-        '''
         for f in self.files:
             if os.path.isfile(os.path.expanduser(f)):
                 env.logger.info('{} is located.'.format(f))
@@ -807,6 +784,13 @@ class CheckDirs(PipelineAction):
     '''Check the existence of specified directories and raise an
     error if one of the directories does not exist.
     
+    File Flow: Input passthrough. 
+
+        INPUT ====> INPUT
+
+    Raises:
+        Raise a RuntimeError if any of the directories is not found.
+
     Example:
         action=CheckDirs('${CMD_OUTPUT}',
             'Value of parameter --output need to be an existing directory')
@@ -829,20 +813,6 @@ class CheckDirs(PipelineAction):
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
-        '''Check the existence of specified directories and raise an error if
-        one of the files cannot be found.
-
-        Parameters:
-            ifiles:   unused
-            pipeline: unused
-
-        Results:
-            Pass input to putput. Does not change pipeline.
-
-        Raises:
-            Raise a RuntimeError if any of the directories is not found.
-        '''
-
         for d in self.dirs:
             if os.path.isdir(d):
                 env.logger.info('Directory {} is located.'.format(d))
@@ -854,6 +824,14 @@ class CheckDirs(PipelineAction):
 class TerminateIf(PipelineAction):
     '''Terminate a pipeline if a condition is not met.
     
+    File Flow: Input passthrough. 
+
+        INPUT ====> INPUT
+
+    Raises:
+        A RuntimeError will be raised to terminate the pipeline if
+        the condition is met.
+
     Examples:
         action=TerminateIf(not '${CMD_OUTPUT}', 'No --output is specified.')
     '''
@@ -873,20 +851,6 @@ class TerminateIf(PipelineAction):
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
-        '''
-        Terminate the pipeline if specified condition is met.
-
-        Parameters:
-            ifiles: unused
-            pipeline: unused
-
-        Results:
-            Pass input to output. Does not change pipeline.
-
-        Raises:
-            A RuntimeError will be raised to terminate the pipeline if
-            the condition is met.
-        '''
         if self.cond:
             raise RuntimeError(self.message)
         return ifiles
@@ -895,13 +859,15 @@ class TerminateIf(PipelineAction):
 class WarnIf(PipelineAction):
     '''Send a warning message if a condition is not met.
 
+    File Flow: Input passthrough. 
+
+        INPUT ====> INPUT
+
     Examples:
         action=WarnIf('%(LGD)' == 'NA', 'Default value of parameter --LGD is used.')
     '''
     def __init__(self, cond, message):
         '''
-        Example:
-
         Parameters:
             cond (boolean):
                 True or False. In practice, ``cond`` is usually
@@ -916,24 +882,23 @@ class WarnIf(PipelineAction):
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
-        '''
-        Produce a warning message if specified condition is met.
-
-        Parameters:
-            ifiles: unused
-            pipeline: unused
-
-        Results:
-            Pass input to output. Does not change pipeline.
-        '''
         if self.cond:
             env.logger.warning(self.message)
         return ifiles
+
 
 class OutputText(PipelineAction):
     '''Write specified text to standard output, or a file if a filename is
     specified. The text can be a list of strings. A new line is added 
     automatically to each line of the text.
+
+    File Flow: Input passthrough. 
+
+        INPUT ====> INPUT
+
+    Examples:
+        action=OutputText('Hey, the biggest part is done.')
+    
     '''
     def __init__(self, text='', output=None, mode='a'):
         '''
@@ -958,18 +923,6 @@ class OutputText(PipelineAction):
         PipelineAction.__init__(self, 'OutputText', filename if filename is not None else '')
 
     def __call__(self, ifiles, pipeline=None):
-        '''
-        Write specified text to specified output.
-
-        Parameters:
-            ifiles: unused
-            pipeline: unused
-
-        Result:
-            This action pass input files to output and does not
-            change the flow of pipeline.
-        '''
-
         if self.filename is not None:
             with open(self.filename, self.mode) as output:
                 output.write(self.text)
@@ -983,6 +936,14 @@ class FieldsFromTextFile(PipelineAction):
     and create field descriptions. If a vcf file is encountered, all
     fields will be exported.
 
+    File Flow: extract format of input and output format.
+
+        INPUT ==> Get Format ==> OUTPUT
+
+    Raises:
+        Raise a RuntimeError if this action failed to guess format (fields)
+        from the input file.
+
     Examples:
         action=FieldsFromTextFile('format.txt')
 
@@ -995,24 +956,7 @@ class FieldsFromTextFile(PipelineAction):
         '''
         PipelineAction.__init__(self, 'FieldsFromTextFile', output)
 
-    def execute(self, ifiles, pipeline=None):
-        '''
-        Output format of the first input file to specified output.
-
-        Parameters:
-            ifiles (string or list of strings):
-                Input files. The first file will be processed by this action.
-
-            pipeline: unused.
-        
-
-        Results:
-            Pipeline output changed to user-specified output.
-
-        Raises:
-            Raise a RuntimeError if this action failed to guess format (fields)
-            from the input file.
-        '''
+    def _execute(self, ifiles, pipeline=None):
         if len(ifiles) > 1:
             env.logger.warning('Only the format of the first input file would be outputted.')
         try:
@@ -1050,6 +994,10 @@ class NullAction(PipelineAction):
     of the step is to change input, output, or assign variables to pipelines.
     The action will be assumed if an empty action line is given.
 
+    File Flow: Input passthrough. 
+
+        INPUT ====> INPUT
+
     Example:
         action=
         action=NullAction()
@@ -1059,14 +1007,6 @@ class NullAction(PipelineAction):
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
-        '''
-        Parameters:
-            ifiles: unused
-            pipeline: unused
-        
-        Results:
-            Pass input files to output. Does not change pipeline.
-        '''
         return ifiles
         
 class RunCommand(PipelineAction):
@@ -1074,6 +1014,16 @@ class RunCommand(PipelineAction):
     in parallel mode and a submitter is specified, it will use the submitter
     command to execute the commands in a separate job. 
     
+    File Flow:
+
+        Input passthrough if no output file is specified.
+            INPUT ====> INPUT
+        Generate output if one or more output files are specified.
+            INPUT ==> CMD ==> OUTPUT
+        
+    Raises:
+        Raises an error if an command fails to execute.
+
     Examples:
         # simple commands without checking output
         action=RunCommand(cmd='vtools init myproj -f')
@@ -1311,23 +1261,7 @@ class RunCommand(PipelineAction):
             self.pipeline.THREADS[self.output[0]] = t
 
 
-    def execute(self, ifiles, pipeline=None):
-        '''Execute commands by either running it within the pipeline or 
-        submit it as a separate process/job.
-
-        Parameters:
-            ifiles (string or list of strings):
-                Input files.
-
-            pipeline: unused
-
-        Results:
-            Pass input files to output if no valid ``output`` was specified.
-            Otherwise return ``output``.
-
-        Raises:
-            Raises an error if an command fails to execute.
-        '''
+    def _execute(self, ifiles, pipeline=None):
         # substitute cmd by input_files and output_files
         if pipeline.jobs > 1 and self.submitter is not None and not self.output:
             env.logger.warning('Fail to execute in parallel because no output is specified.')
@@ -1350,6 +1284,10 @@ class DecompressFiles(PipelineAction):
     are returned as output. One particular feature of this action is that
     it records content of large tar or tar.gz files to a manifest file and
     ignores the step if the manifest file exists.
+
+    File Flow: Decompress input files
+
+        INPUT ==> Decompress ==> OUTPUT
 
     Examples:
         action=DecompressFiles()
@@ -1471,16 +1409,6 @@ class DecompressFiles(PipelineAction):
         return [filename]
         
     def __call__(self, ifiles, pipeline=None):
-        '''
-        Parameters:
-            ifiles (string or list of strings):
-                Input files
-
-            pipeline: unused
-
-        Results:
-            Decompressed files.
-        '''
         # decompress input files and return a list of output files
         filenames = []
         for filename in ifiles:
@@ -1494,29 +1422,42 @@ class RemoveIntermediateFiles(PipelineAction):
     them with their signature (file size, md5 signature etc). A pipeline can bypass
     completed steps with these files as input or output by checking the signatures.
     In contrast, the steps would have to be re-run if the files are removed from the
-    file system. '''
+    file system. 
+    
+    File Flow: Input passthrough. Specified files are replaced by their signature.
+
+        INPUT ====> INPUT
+
+    Examples:
+        action=RemoveIntermediateFiles('${OUTPUT200}')
+        action=RemoveIntermediateFiles('${OUTPUT200} ${OUTPUT330}')
+        action=RemoveIntermediateFiles(['${OUTPUT200}', '${OUTPUT330}'])
+    '''
     def __init__(self, files):
         '''Replace ``files`` with their signatures. This pipeline passes its 
         input to output and does not change the flow of pipeline.
-        
+ 
         Parameters:
             files (string or list of strings)
-                One or more files to be removed.
+                One or more files to be removed. Multiple files can be specified
+                in the same string if they are separated by spaces.
+
         '''
-        self.files_to_remove = files
+        if isinstance(files, str):
+            self.files_to_remove = [files]
+        else:
+            self.files_to_remove = files
         PipelineAction.__init__(self)
 
-    def __call__(self, ifiles, pipeline=None):
-        '''
-        Parameters:
-            ifiles: unused
-            pipeline: unused
+    def _getFiles(self):
+        for name in self.files_to_remove:
+            files = shlex.split(name)
+            for f in files:
+                yield f
 
-        Results:
-            Pass input to output. Does not change pipeline.
-        '''
-        env.logger.trace('Remove intermediate files {}'.format(self.files_to_remove))
-        for f in shlex.split(self.files_to_remove) if isinstance(self.files_to_remove, str) else self.files_to_remove:
+    def __call__(self, ifiles, pipeline=None):
+        env.logger.trace('Remove intermediate files {}'.format(' '.join(self.files_to_remove)))
+        for f in self._getFiles():
             if not os.path.isfile(f):
                 if os.path.isfile(f + '.file_info'):
                     env.logger.info('Keeping existing {}.file_info.'.format(f))
@@ -1536,7 +1477,16 @@ class RemoveIntermediateFiles(PipelineAction):
 class LinkToDir(PipelineAction):
     '''Create hard links of input files to a specified directory. This is 
     usually used to link input files to a common cache directory so that 
-    all operations can be performed on that directory.'''
+    all operations can be performed on that directory.
+
+    File Flow: Link input files to specified destination directory.
+
+        INPUT == LINK ==> DEST_DIR/INPUT
+
+    Examples:
+        action=LinkToDir('cache')
+
+    '''
     def __init__(self, dest_dir):
         '''
         Parameters:
@@ -1556,16 +1506,6 @@ class LinkToDir(PipelineAction):
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
-        '''
-        Parameters:
-            ifiles (string or list of strings):
-                Input files to be linked to specified ``dest_dir``
-
-            pipeline: unused
-
-        Results:
-            Return ``ifiles`` under the ``dest_dir``.
-        '''
         ofiles = []
         for filename in ifiles:
             path, basename = os.path.split(filename)
@@ -1611,6 +1551,10 @@ class DownloadResource(PipelineAction):
     resource directory is $local_resource/pipeline_resource/NAME where NAME
     is the name of the pipeline.
     
+    File Flow: Input passthrough. 
+
+        INPUT ====> INPUT
+
     Examples:
         action=DownloadResource(resource='ftp://igenome:G3nom3s4u@ussd-ftp.illumina.com/Homo_sapiens/UCSC/hg19/Homo_sapiens_UCSC_hg19.tar.gz',
              dest_dir="${LOCAL_RESOURCE}/iGenomes")
@@ -1649,8 +1593,6 @@ class DownloadResource(PipelineAction):
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
-        '''Download specified resources.
-        '''
         saved_dir = os.getcwd()
         os.chdir(self.pipeline_resource)
         ofiles, md5files = self._downloadFiles(ifiles)
@@ -1729,24 +1671,7 @@ class DownloadResource(PipelineAction):
 
 class _CaseInsensitiveDict(MutableMapping):
     """A case-insensitive ``dict``-like object.
-    Implements all methods and operations of
-    ``collections.MutableMapping`` as well as dict's ``copy``. Also
-    provides ``lower_items``.
-    All keys are expected to be strings. The structure remembers the
-    case of the last key to be set, and ``iter(instance)``,
-    ``keys()``, ``items()``, ``iterkeys()``, and ``iteritems()``
-    will contain case-sensitive keys. However, querying and contains
-    testing is case insensitive:
-        cid = _CaseInsensitiveDict()
-        cid['Accept'] = 'application/json'
-        cid['aCCEPT'] == 'application/json'  # True
-        list(cid) == ['Accept']  # True
-    For example, ``headers['content-encoding']`` will return the
-    value of a ``'Content-Encoding'`` response header, regardless
-    of how the header name was originally stored.
-    If the constructor, ``.update``, or equality comparison
-    operations are given keys that have equal ``.lower()``s, the
-    behavior is undefined.
+    That limits the type of items to string or list of strings.
     """
     def __init__(self, data=None, **kwargs):
         self._store = dict()
@@ -1757,6 +1682,13 @@ class _CaseInsensitiveDict(MutableMapping):
     def __setitem__(self, key, value):
         # Use the uppercased key for lookups, but store the actual
         # key alongside the value.
+        if key.upper in self._store and value == self._store[key.upper()][1]:
+            env.logger.warning('Changing value of pipeline variable ({} from {} to {}) is strongly discouraged.'
+                .format(key, self._store[key.upper()][1], value))
+        if not isinstance(value, (str, list, tuple)):
+            raise ValueError('Only string or list of strings are allowed for pipeline variables: {}'.format(value))
+        if isinstance(value, (list, tuple)) and not all([isinstance(x, str) for x in value]):
+            raise ValueError('Only string or list of strings are allowed for pipeline variables: {}'.format(value))
         self._store[key.upper()] = (key, value)
 
     def __getitem__(self, key):
@@ -1794,6 +1726,7 @@ class _CaseInsensitiveDict(MutableMapping):
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, dict(self.items()))
 
+
 class Pipeline:
     '''The Variant Tools pipeline class. Its instance will be passed to each action
     to provide runtime information. An action should not change any attribute of
@@ -1802,14 +1735,11 @@ class Pipeline:
     recommended to use CAPTICAL names for pipeline variables. '''
     def __init__(self, name, extra_args=[], pipeline_type='pipeline', verbosity=None, jobs=1):
         self.pipeline = PipelineDescription(name, extra_args, pipeline_type)
-        if os.path.isfile(name) or os.path.isfile(name + '.pipeline'):
-            self.pipeline_path = os.path.split(os.path.abspath(os.path.expanduser(name)))[0]
-        else:
-            self.pipeline_path = None
+        self.spec_file = self.pipeline.spec_file
         self.verbosity = verbosity
         self.jobs = jobs
 
-    def execute(self, pname, input_files=[], output_files=[], **kwargs):
+    def _execute(self, pname, input_files=[], output_files=[], **kwargs):
         if pname is None:
             if len(self.pipeline.pipelines) == 1:
                 pname = self.pipeline.pipelines.keys()[0]
@@ -1842,6 +1772,7 @@ class Pipeline:
                 local_resource=env.local_resource,
                 ref_genome_build=proj.build,
                 pipeline_name=pname,
+                spec_file=self.spec_file,
                 model_name=pname,
                 vtools_version=proj.version)
         self.VARS.update(**kwargs)

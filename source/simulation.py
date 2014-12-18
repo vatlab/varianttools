@@ -219,7 +219,7 @@ class OutputPopulationStatistics(PipelineAction):
         PipelineAction.__init__(self, cmd='PopStat output={}\n'
             .format(output), output=output)
 
-    def execute(self, ifiles, pipeline):
+    def _execute(self, ifiles, pipeline):
         #
         env.logger.info('Loading population from {}'.format(ifiles[0]))
         self.pop = sim.loadPopulation(ifiles[0])
@@ -661,7 +661,7 @@ class ExtractVCF(PipelineAction):
         PipelineAction.__init__(self, cmd='ExtractVCF {} {}'.format(sourceURL, regions),
             output=output)
 
-    def execute(self, ifiles, pipeline):
+    def _execute(self, ifiles, pipeline):
         '''
         Parameters:
             ifiles: unused
@@ -731,7 +731,7 @@ class CreatePopulation(PipelineAction):
         PipelineAction.__init__(self, cmd='CreatePopulation {} {}\n'.format(regions, size),
             output=output)
 
-    def execute(self, ifiles, pipeline):
+    def _execute(self, ifiles, pipeline):
         # translate regions to simuPOP ...
         lociPos = {}
         regions = expandRegions(self.regions)
@@ -921,7 +921,7 @@ class EvolvePopulation(PipelineAction):
         PipelineAction.__init__(self, cmd='EvolvePop output={}\n'
             .format(output), output=output)
 
-    def execute(self, ifiles, pipeline):
+    def _execute(self, ifiles, pipeline):
         '''
         Parameters:
             ifiles (list of strings):
@@ -1043,7 +1043,7 @@ class DrawCaseControlSample(PipelineAction):
         PipelineAction.__init__(self, cmd='DrawCaseCtrlSample {}\n'.format(output),
             output=output)
     
-    def execute(self, ifiles, pipeline):
+    def _execute(self, ifiles, pipeline):
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
         for idx, output in enumerate(self.output):
@@ -1139,7 +1139,7 @@ class DrawRandomSample(PipelineAction):
         PipelineAction.__init__(self, cmd='DrawRandomSampler {}\n'.format(output),
             output=output)
     
-    def execute(self, ifiles, pipeline):
+    def _execute(self, ifiles, pipeline):
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
         for idx, output in enumerate(self.output):
@@ -1202,7 +1202,7 @@ class DrawQuanTraitSample(PipelineAction):
         PipelineAction.__init__(self, cmd='DrawQuanTraitSample {}\n'.format(output),
             output=output)
     
-    def execute(self, ifiles, pipeline):
+    def _execute(self, ifiles, pipeline):
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
         for idx, output in enumerate(self.output):
@@ -1270,7 +1270,7 @@ class ExportPopulation(PipelineAction):
         PipelineAction.__init__(self, cmd='ExportPopulation {} {}\n'.format(sample_names, output),
             output=output)
 
-    def execute(self, ifiles, pipeline):
+    def _execute(self, ifiles, pipeline):
         '''
         Parameters:
             ifiles (string):
