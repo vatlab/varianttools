@@ -1686,9 +1686,9 @@ class _CaseInsensitiveDict(MutableMapping):
             env.logger.warning('Changing value of pipeline variable ({} from {} to {}) is strongly discouraged.'
                 .format(key, self._store[key.upper()][1], value))
         if not isinstance(value, (str, list, tuple)):
-            raise ValueError('Only string or list of strings are allowed for pipeline variables: {}'.format(value))
+            raise ValueError('Only string or list of strings are allowed for pipeline variables: {} for key {}'.format(value, key))
         if isinstance(value, (list, tuple)) and not all([isinstance(x, str) for x in value]):
-            raise ValueError('Only string or list of strings are allowed for pipeline variables: {}'.format(value))
+            raise ValueError('Only string or list of strings are allowed for pipeline variables: {} for key {}'.format(value, key))
         self._store[key.upper()] = (key, value)
 
     def __getitem__(self, key):
@@ -1739,7 +1739,7 @@ class Pipeline:
         self.verbosity = verbosity
         self.jobs = jobs
 
-    def _execute(self, pname, input_files=[], output_files=[], **kwargs):
+    def execute(self, pname, input_files=[], output_files=[], **kwargs):
         if pname is None:
             if len(self.pipeline.pipelines) == 1:
                 pname = self.pipeline.pipelines.keys()[0]
@@ -1770,7 +1770,7 @@ class Pipeline:
                 temp_dir=env.temp_dir,
                 cache_dir=env.cache_dir,
                 local_resource=env.local_resource,
-                ref_genome_build=proj.build,
+                ref_genome_build=proj.build if proj.build is not None else '',
                 pipeline_name=pname,
                 spec_file=self.spec_file,
                 model_name=pname,

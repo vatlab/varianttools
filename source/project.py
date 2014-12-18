@@ -727,6 +727,7 @@ class PipelineDescription:
         return args
 
     def parsePipeline(self, filename, defaults):
+        self.spec_file = filename
         if sys.version_info.major == 2:
             parser = SafeConfigParser()
         else:
