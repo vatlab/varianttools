@@ -22,7 +22,7 @@ call_description=Call and validate variants (SNPs and Indels) from one or more
   calling will be performed.
 
 # resource_directory is set to ~/.variant_tools/pipeline_resource/gatk28_hg19
-RESOURCE_DIR=${LOCAL_RESOURCE}/pipeline_resource/gatk28_hg19
+RESOURCE_DIR=${LOCAL_RESOURCE}/pipeline_resource/GATK/2.8/hg19
 
 # directory to save all intermediate files
 AUXILIARY_DIR=${CACHE_DIR}/%(name)s
@@ -138,17 +138,17 @@ comment=Check the version of variant tools (version 2.1.1 and above is required
 action=ImportModules('DNASeq_tools.py')
 comment=Import module DNASeq_tools with some utility functions and actions
 
-[align_5]
+[*_5]
 # resources are downloaded from ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/*
 # the .gz files will be automatically decompressed
-action=DownloadResource(resource='ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_omni2.5.hg19.vcf.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_omni2.5.hg19.vcf.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_omni2.5.hg19.vcf.idx.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_omni2.5.hg19.vcf.idx.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.vcf.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.vcf.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.vcf.idx.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.vcf.idx.gz.md5
+action=DownloadResource(resource='ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_omni2.5.hg19.sites.vcf.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_omni2.5.hg19.sites.vcf.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_omni2.5.hg19.sites.vcf.idx.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_omni2.5.hg19.sites.vcf.idx.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.sites.vcf.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.sites.vcf.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.sites.vcf.idx.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.sites.vcf.idx.gz.md5
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/dbsnp_138.hg19.excluding_sites_after_129.vcf.gz
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/dbsnp_138.hg19.excluding_sites_after_129.vcf.gz.md5
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/dbsnp_138.hg19.excluding_sites_after_129.vcf.idx.gz
@@ -157,14 +157,14 @@ action=DownloadResource(resource='ftp://gsapubftp-anonymous@ftp.broadinstitute.o
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/dbsnp_138.hg19.vcf.gz.md5
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/dbsnp_138.hg19.vcf.idx.gz
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/dbsnp_138.hg19.vcf.idx.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/hapmap_3.3.hg19.vcf.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/hapmap_3.3.hg19.vcf.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/hapmap_3.3.hg19.vcf.idx.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/hapmap_3.3.hg19.vcf.idx.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.idx.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.idx.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/hapmap_3.3.hg19.sites.vcf.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/hapmap_3.3.hg19.sites.vcf.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/hapmap_3.3.hg19.sites.vcf.idx.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/hapmap_3.3.hg19.sites.vcf.idx.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf.gz.md5
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf.idx.gz
+    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf.idx.gz.md5
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.sites.vcf.gz
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.sites.vcf.gz.md5
     ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/NA12878.HiSeq.WGS.bwa.cleaned.raw.subset.hg19.sites.vcf.idx.gz
@@ -290,10 +290,9 @@ comment=Running bwa sampe for paired end reads, using read group tag saved
     in a .RG file
 
 [align_302]
-action=CountMappedReads(output="${INPUT: INPUT[0] + '.counts'}", cutoff=0.8)
+action=CountMappedReads(output="${INPUT: INPUT[0] + '.counts'}")
 input_emitter=EmitInput('single')
-comment=Check the proportion of aligned reads and exit if there are less than
-    80% of aligned reads.
+comment=Check the proportion of aligned reads
 
 [align_303]
 action=RemoveIntermediateFiles('${OUTPUT100}')
@@ -367,10 +366,10 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         --mismatchFraction 0.0
         -o ${INPUT: INPUT[0][:-4] + '.IndelRealignerTarget.intervals'}
         -known ${RESOURCE_DIR}/dbsnp_138.hg19.vcf
-        -known ${RESOURCE_DIR}/hapmap_3.3.hg19.vcf
-        -known ${RESOURCE_DIR}/1000G_omni2.5.hg19.vcf
-        -known ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.vcf
-        -known ${RESOURCE_DIR}/1000G_phase1.indels.hg19.vcf",
+        -known ${RESOURCE_DIR}/hapmap_3.3.hg19.sites.vcf
+        -known ${RESOURCE_DIR}/1000G_omni2.5.hg19.sites.vcf
+        -known ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf
+        -known ${RESOURCE_DIR}/1000G_phase1.indels.hg19.sites.vcf",
     output="${INPUT: INPUT[0][:-4] + '.IndelRealignerTarget.intervals'}")
 comment=Realign indels create indel realigner target
 
@@ -387,11 +386,11 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         --consensusDeterminationModel USE_READS
         -compress 0 
         -o ${INPUT: INPUT[0][:-4] + '.clean.bam'}
-        -known ${RESOURCE_DIR}/dbsnp_138.hg19.vcf
-        -known ${RESOURCE_DIR}/hapmap_3.3.hg19.vcf
-        -known ${RESOURCE_DIR}/1000G_omni2.5.hg19.vcf
-        -known ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.vcf
-        -known ${RESOURCE_DIR}/1000G_phase1.indels.hg19.vcf",
+        -known ${RESOURCE_DIR}/dbsnp_138.hg19.sites.vcf
+        -known ${RESOURCE_DIR}/hapmap_3.3.hg19.sites.vcf
+        -known ${RESOURCE_DIR}/1000G_omni2.5.hg19.sites.vcf
+        -known ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf
+        -known ${RESOURCE_DIR}/1000G_phase1.indels.hg19.sites.vcf",
     output="${INPUT: INPUT[0][:-4] + '.clean.bam'}")
 comment=Apply indel realigner target to bam file
 
@@ -452,42 +451,6 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
 input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT) > 1})
 comment=Generated bam file with reduced reads if more than one output file
 	is specified
-
-
-# resources are downloaded from ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/*
-# the .gz files will be automatically decompressed
-[call_5]
-action=DownloadResource(resource='ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_omni2.5.hg19.vcf.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_omni2.5.hg19.vcf.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_omni2.5.hg19.vcf.idx.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_omni2.5.hg19.vcf.idx.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.vcf.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.vcf.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.vcf.idx.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/1000G_phase1.indels.hg19.vcf.idx.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/dbsnp_138.hg19.excluding_sites_after_129.vcf.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/dbsnp_138.hg19.excluding_sites_after_129.vcf.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/dbsnp_138.hg19.excluding_sites_after_129.vcf.idx.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/dbsnp_138.hg19.excluding_sites_after_129.vcf.idx.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/dbsnp_138.hg19.vcf.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/dbsnp_138.hg19.vcf.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/dbsnp_138.hg19.vcf.idx.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/dbsnp_138.hg19.vcf.idx.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/hapmap_3.3.hg19.vcf.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/hapmap_3.3.hg19.vcf.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/hapmap_3.3.hg19.vcf.idx.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/hapmap_3.3.hg19.vcf.idx.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.idx.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/Mills_and_1000G_gold_standard.indels.hg19.vcf.idx.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/ucsc.hg19.dict.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/ucsc.hg19.dict.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/ucsc.hg19.fasta.fai.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/ucsc.hg19.fasta.fai.gz.md5
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/ucsc.hg19.fasta.gz
-    ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/hg19/ucsc.hg19.fasta.gz.md5',
-    dest_dir="${RESOURCE_DIR}")
 
 
 [call_10]

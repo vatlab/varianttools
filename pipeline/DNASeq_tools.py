@@ -1,22 +1,41 @@
 
 import os
+import re
 from variant_tools.pipeline import PipelineAction
 from variant_tools.utils import env, openFile
         
 class CountMappedReads(PipelineAction):
     '''This action reads the input files in sam format and count the total
-    number of reads and number of mapped reads. It raises a RuntimeError
-    if the proportion of unmapped reads lower than the specified cutoff value
-    (default to 0.8). This action writes a count file to specified output
-    files and read from this file directly if the file already exists.'''
-    def __init__(self, output, cutoff=0.2):
-        self.cutoff = cutoff
+    number of reads and number of mapped reads. This action writes a count file
+    to specified output files and read from this file directly if the file
+    already exists. This action sets variables ``MAPPED_READS`` and ``TOTAL_READS`.
+    
+    File Flow:
+               count mapped reads
+        INPUT =====================> OUTPUT
+    
+    '''
+    def __init__(self, output):
+        '''
+        Parameters:
+            output (string):
+                Mapped reads file
+
+        '''
         PipelineAction.__init__(self, cmd='CountMappedReads', output=output)
 
-    def execute(self, sam_file, pipeline=None):
+    def _execute(self, sam_file, pipeline=None):
         #
         # count total reads and unmapped reads
         #
+        if os.path.isfile(self.output[0]):
+            with open(self.output[0]) as stat:
+                n = stat.readline()
+                pipeline.VARS['MAPPED_READS'] = n.strip()
+                n = stat.readline()
+                pipeline.VARS['TOTAL_READS'] = n.strip()
+            if pipeline.VARS['MAPPED_READS'].isdigit() and pipeline.VARS['TOTAL_READS'].isdigit():
+                return
         unmapped_count = 0
         total_count = 0
         with open(sam_file[0]) as sam:
@@ -27,17 +46,17 @@ class CountMappedReads(PipelineAction):
         mapped_count = total_count - unmapped_count
         with open(self.output[0], 'w') as target:
             target.write('{}\n{}\n'.format(mapped_count, total_count))
-        if total_count == 0 or mapped_count * 1.0 / total_count < self.cutoff:
-            raise RuntimeError('{}: {} out of {} reads ({:.2f}%) are mapped.'
-                .format(sam_file[0], mapped_count, total_count,
-                    0 if total_count == 0 else (100.*mapped_count/total_count)))
-        else:
-            env.logger.info('{}: {} out of {} reads ({:.2f}%) are mapped.'
-                .format(sam_file[0], mapped_count, total_count,
-                    0 if total_count == 0 else (100.*mapped_count/total_count)))
+            pipeline.VARS['MAPPED_READS'] = str(mapped_count)
+            pipeline.VARS['TOTAL_READS'] = str(total_count)
+        env.logger.info('{}: {} out of {} reads ({:.2f}%) are mapped.'
+            .format(sam_file[0], mapped_count, total_count,
+                0 if total_count == 0 else (100.*mapped_count/total_count)))
         return self.output
 
 class GuessReadGroup(PipelineAction):
+    '''Guess read group information from file name. This function
+    is deprecated and should not be used.
+    '''
     def __init__(self, bamfile, rgfile):
         self.output_bam = bamfile
         PipelineAction.__init__(self, cmd='GuessReadGroup', output=rgfile)
@@ -114,6 +133,19 @@ class GuessReadGroup(PipelineAction):
 
  
 class CheckFastqVersion(PipelineAction):
+    '''
+    Check the version of fastq file in order to set proper option for ``bwa aln`` runs.
+
+    File flow: Write option to output file, and set variable ``ALN_PARAM``.
+
+        INPUT ====> OUTPUT
+
+    Example:
+        action=CheckFastqVersion(output='aln_param.txt')
+
+    Note:
+        Output result to a file to avoid re-checking the fastq files repeatedly.
+    '''
     def __init__(self, output):
         PipelineAction.__init__(self, 'CheckFastqVersion', output)
 
@@ -159,6 +191,9 @@ class CheckFastqVersion(PipelineAction):
             if min_qual >= 64 or max_qual > 90:
                 # option -I is needed for bwa if the input is Illumina 1.3+ read format (quliaty equals ASCII-64).
                 aln_param.write('-I')
+                pipeline.VARS['ALN_PARAM'] = '-I'
+            else:
+                pipeline.VARS['ALN_PARAM'] = ''
         return self.output
 
 
