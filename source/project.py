@@ -4441,6 +4441,9 @@ def show(args):
                         .format(args.items[0], e))
                 pipeline.describe()
             elif args.type == 'actions':
+                if args.items:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show actions"'
+                        .format(', '.join(args.items)))
                 pipeline_members = []
                 # first look into variant_tools.pipeline
                 from variant_tools import pipeline

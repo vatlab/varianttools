@@ -1,5 +1,5 @@
 # 
-# Site configuration files for site-wise installation of variant tools.
+# Site configuration file for site-wise installation of variant tools.
 # 
 
 # ; separated pragmas for sqlite database that can be used to optimize the
