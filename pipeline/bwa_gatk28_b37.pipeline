@@ -22,7 +22,7 @@ call_description=Call and validate variants (SNPs and Indels) from one or more
   calling will be performed.
 
 # resource_directory is set to ~/.variant_tools/pipeline_resource/gatk23_b37
-RESOURCE_DIR=${LOCAL_RESOURCE}/pipeline_resource/gatk28_b37
+RESOURCE_DIR=${LOCAL_RESOURCE}/pipeline_resource/GATK/2.8/b37
 
 # directory to save all intermediate files
 AUXILIARY_DIR=${CACHE_DIR}/%(name)s

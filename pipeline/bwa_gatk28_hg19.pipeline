@@ -386,7 +386,7 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         --consensusDeterminationModel USE_READS
         -compress 0 
         -o ${INPUT: INPUT[0][:-4] + '.clean.bam'}
-        -known ${RESOURCE_DIR}/dbsnp_138.hg19.sites.vcf
+        -known ${RESOURCE_DIR}/dbsnp_138.hg19.vcf
         -known ${RESOURCE_DIR}/hapmap_3.3.hg19.sites.vcf
         -known ${RESOURCE_DIR}/1000G_omni2.5.hg19.sites.vcf
         -known ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf
@@ -412,10 +412,10 @@ action=RunCommand(cmd="%(java)s %(opt_java)s
         -cov ContextCovariate
         -o ${INPUT: INPUT[0][:-4] + '.grp'}
         -knownSites ${RESOURCE_DIR}/dbsnp_138.hg19.vcf
-        -knownSites ${RESOURCE_DIR}/hapmap_3.3.hg19.vcf
-        -knownSites ${RESOURCE_DIR}/1000G_omni2.5.hg19.vcf
-        -knownSites ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.vcf
-        -knownSites ${RESOURCE_DIR}/1000G_phase1.indels.hg19.vcf",
+        -knownSites ${RESOURCE_DIR}/hapmap_3.3.hg19.sites.vcf
+        -knownSites ${RESOURCE_DIR}/1000G_omni2.5.hg19.sites.vcf
+        -knownSites ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf
+        -knownSites ${RESOURCE_DIR}/1000G_phase1.indels.hg19.sites.vcf",
     output="${INPUT: INPUT[0][:-4] + '.grp'}")
 comment=Create base recalibrator target
 
