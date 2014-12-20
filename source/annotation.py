@@ -39,7 +39,7 @@ from .project import AnnoDB, Project, Field, AnnoDBWriter
 from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressGzFile, \
     compressFile, SQL_KEYWORDS, extractField, env, isAnnoDB, \
-    calculateMD5
+    calculateMD5, ResourceManager
 from .importer import LineProcessor, TextReader
 from .preprocessor import *
   
@@ -506,9 +506,34 @@ def use(args):
             if annoDB is None:
                 res = urlparse.urlsplit(args.source)
                 if not res.scheme:
-                    args.source = 'annoDB/{}.ann'.format(args.source)
+                    # if this is a versioned annotation string, use the version
+                    res = ResourceManager()
+                    res.getLocalManifest()
+                    res.selectFiles(resource_type='annotation')
+                    avail_annoDBs = res.manifest.keys()
+                    if '-' in args.source:
+                        if 'annoDB/' + args.source in avail_annoDBs:
+                            args.source = 'annoDB/{}.ann'.format(args.source)
+                        else:
+                            raise ValueError('Annotation database {} not found.'.format(args.source))
+                    else:
+                        # now, no version information is given, try to find the matching one.
+                        all_versions = [x for x in avail_annoDBs if x.split('/')[1].split('-')[0] == args.source and x.endswith('.ann')]
+                        if not all_versions:
+                            raise ValueError('Annotation database [] not found.'.format(args.source))
+                        # find the matching reference genome
+                        ref_filtered = [x for x in all_versions if res.manifest[x][2] == '*' \
+                            or (proj.build is not None and proj.build in res.manifest[x][2]) \
+                            or (proj.alt_build is not None and proj.alt_build in res.manifest[x][2])]
+                        #
+                        if not ref_filtered:
+                            raise ValueError('No database with matching reference genome is found: {}, available {}'
+                                .format(args.source, ', '.join(all_versions)))
+                        # now, we use the latest version
+                        args.source = sorted(ref_filtered)[-1]
+                        env.logger.trace('Choosing version {} from annotation databases {}'.format(
+                            args.source, ', '.join(ref_filtered)))
                 # download?
-                #
                 env.logger.info('Downloading annotation database {}'.format(args.source))
                 try:
                     annoDB = downloadFile(args.source, None if args.source.endswith('.ann') else '.', quiet=args.source.endswith('.ann'))

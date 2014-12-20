@@ -1833,7 +1833,7 @@ class ResourceManager:
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('format/')}
         elif resource_type == 'snapshot':
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('snapshot/')}
-        elif resource_type == 'annotation':
+        elif resource_type in ['annotation', 'annoDB']:
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('annoDB/')}
         elif resource_type == 'pipeline':
             self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('pipeline/') and not x.endswith('.py')}
