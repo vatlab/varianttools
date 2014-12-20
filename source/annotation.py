@@ -523,6 +523,7 @@ def use(args):
                             raise ValueError('Annotation database [] not found.'.format(args.source))
                         # find the matching reference genome
                         ref_filtered = [x for x in all_versions if res.manifest[x][2] == '*' \
+                            or proj.build is None \
                             or (proj.build is not None and proj.build in res.manifest[x][2]) \
                             or (proj.alt_build is not None and proj.alt_build in res.manifest[x][2])]
                         #
