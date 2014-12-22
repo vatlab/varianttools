@@ -4154,7 +4154,10 @@ def show(args):
                 nAll = 0
                 displayed = 0
                 for idx, (annoDB, prop) in enumerate(sorted(res.manifest.iteritems())):
-                    if not annoDB.endswith('.ann'):
+                    # we do not display non-versioned db because they are 
+                    # identical to one of the versioned ones, and variant tools
+                    # does not need them since version 2.6.0
+                    if not annoDB.endswith('.ann') or '-' not in annoDB:
                         continue
                     if args.items:
                         match = False
