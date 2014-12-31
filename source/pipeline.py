@@ -345,7 +345,9 @@ class PipelineAction:
     runtime signature feature and calls function ``execute`` for actual work.
     User-defined actions should either override the ``__call__`` function
     (without the runtime signature feature) or function 
-    ``execute(self, ifiles, pipeline)`` (with runtime signature feature). 
+    ``_execute(self, ifiles, pipeline)`` (with runtime signature feature).
+    User can also define function ``_bypass(self, ifiles, pipeline)`` if the
+    step is bypassed due to identical execution signatures.
     '''
     def __init__(self, cmd='', output=[]):
         '''
@@ -379,6 +381,12 @@ class PipelineAction:
             self.proc_err = '{}.err_{}'.format(self.output[0], os.getpid())
             self.proc_lck = '{}.lck'.format(self.output[0])
             self.proc_info = '{}.exe_info'.format(self.output[0])
+
+    def _bypass(self, ifiles, pipeline=None):
+        '''Function called by ``__call__`` if the step is bypassed due to identical
+        execution signature. This function can be used, for example, to set pipeline
+        variable even when the step is not executed.'''
+        return True
 
     def _execute(self, ifiles, pipeline=None):
         '''Function called by ``__call__`` for actual action performed on ifiles. A user-defined
@@ -445,7 +453,11 @@ class PipelineAction:
                 if cmd == '; '.join(self.cmd).strip() and existAndNewerThan(self.output, ifiles,
                     md5file=self.proc_info):
                     env.logger.info('Reuse existing {}'.format(', '.join(self.output)))
-                    return self.output
+                    self._bypass(ifiles, pipeline)
+                    if self.output:
+                        return self.output
+                    else:
+                        return ifiles
             # create directory if output directory does not exist
             for d in [os.path.split(os.path.abspath(x))[0] for x in self.output]:
                 if not os.path.isdir(d):
