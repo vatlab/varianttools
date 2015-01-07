@@ -326,6 +326,15 @@ class OutputPopulationStatistics(PipelineAction):
 
 
 class RefGenomeMutator(sim.PyOperator):
+    '''This operator uses allele 0 as the reference allele at different loci and
+    applies different @@ActgMutator@@ according to the actual nuclotides on the
+    reference genome. For example, if the reference genome is
+    @@ACCCCTTAGG@@, it is represented by haplotype @@0000000000@@, and
+    @@1000000000@@ and @@0200000000@@ represents @@CCCCCTTAGG@@ and
+    @@ATCCCTTAGG@@ respectively (A->C->G->T). If you apply a Kimura's
+    2-parameter (K80) model to the reference genome, it will act differently
+    at different location of the genome.
+    '''
     def __init__(self, regions, model, rate):
         # 
         base = {'A': [], 'C': [], 'G': [], 'T': [], 'N': []}
