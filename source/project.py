@@ -4149,7 +4149,7 @@ def show(args):
                 annoDB.describe(args.verbosity == '2')
             elif args.type == 'annotations':
                 res = ResourceManager()
-                res.getLocalManifest()
+                res.getRemoteManifest()
                 res.selectFiles(resource_type='annotation')
                 nAll = 0
                 displayed = 0
@@ -4192,7 +4192,7 @@ def show(args):
                     raise ValueError('Invalid parameter "{}" for command "vtools show formats"'
                         .format(', '.join(args.items)))
                 res = ResourceManager()
-                res.getLocalManifest()
+                res.getRemoteManifest()
                 res.selectFiles(resource_type='format')
                 nAll = len(res.manifest)
                 for idx, (fmt, prop) in enumerate(res.manifest.iteritems()):
@@ -4290,7 +4290,7 @@ def show(args):
                 if args.items:
                     raise ValueError('Invalid parameter "{}" for command "vtools show simulations"'.format(', '.join(args.items)))
                 res = ResourceManager()
-                res.getLocalManifest()
+                res.getRemoteManifest()
                 res.selectFiles(resource_type='simulation')
                 nAll = len(res.manifest)
                 for idx, (simulation, prop) in enumerate(sorted(res.manifest.iteritems())):
@@ -4394,7 +4394,7 @@ def show(args):
                 #
                 nLocal = len(snapshots)
                 res = ResourceManager()
-                res.getLocalManifest()
+                res.getRemoteManifest()
                 res.selectFiles(resource_type='snapshot')
                 if len(res.manifest) > 0:
                     if snapshots:
@@ -4418,7 +4418,7 @@ def show(args):
                     raise ValueError('Invalid parameter "{}" for command "vtools show pipelines"'
                         .format(', '.join(args.items)))
                 res = ResourceManager()
-                res.getLocalManifest()
+                res.getRemoteManifest()
                 res.selectFiles(resource_type='pipeline')
                 nAll = len(res.manifest)
                 for idx, (pipeline, prop) in enumerate(sorted(res.manifest.iteritems())):
@@ -4487,7 +4487,7 @@ def show(args):
                     print('        {}'.format(action))
                 # look in resource files
                 res = ResourceManager()
-                res.getLocalManifest()
+                res.getRemoteManifest()
                 modules = [x for x in res.manifest.keys() if \
                     (x.startswith('pipeline/') or x.startswith('simulation/')) and x.endswith('.py')]
                 for mod in modules:
