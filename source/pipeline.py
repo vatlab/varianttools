@@ -477,6 +477,8 @@ class PipelineAction:
                 exe_info.write('{}\n'.format('; '.join(self.cmd)))
                 exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
                 for f in ifiles:
+                    if pipeline is not None and f == pipeline.VARS['null_input']:
+                        continue
                     # for performance considerations, use partial MD5
                     exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
                         calculateMD5(f, partial=True)))
@@ -1775,6 +1777,11 @@ class Pipeline:
             env.logger.addHandler(ch)
         #
         # the project will be opened when needed
+        null_input = os.path.join(env.local_resource, 'null_input')
+        if not os.path.isfile(null_input):
+            # create a null input file
+            with open(null_input, 'w') as ni:
+                pass
         with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY'], verbosity=self.verbosity) as proj:
             self.VARS = _CaseInsensitiveDict(
                 cmd_input=input_files,
@@ -1786,6 +1793,7 @@ class Pipeline:
                 pipeline_name=pname,
                 spec_file=self.spec_file,
                 model_name=pname,
+                null_input=null_input,
                 vtools_version=proj.version)
         self.VARS.update(**kwargs)
         # we need to put self.pipeline.pipeline_vars in self.VARS because
