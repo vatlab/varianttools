@@ -257,6 +257,8 @@ class RuntimeEnvironments(object):
         self._lock_files = []
         #
         self._term_width = None
+        #
+        self._null_input = None
     #
     def lock(self, filename, content=''):
         with open(filename, 'w') as lockfile:
@@ -601,6 +603,16 @@ class RuntimeEnvironments(object):
     #
     logger = property(lambda self: self._logger, _set_logger)
 
+    def _get_null_input(self):
+        if self._null_input is not None:
+            return self._null_input
+        self._null_input = os.path.join(os.path.expanduser(self._local_resource), 'null_input')
+        if not os.path.isfile(self._null_input):
+            with open(self._null_input, 'w') as ni:
+                pass
+        return self._null_input
+    #
+    null_input = property(lambda self: self._get_null_input(), None)
 
 # the singleton object of RuntimeEnvironments
 env = RuntimeEnvironments()
@@ -2382,8 +2394,9 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
     # if there is no input or output file, ofiles cannot be newer than ifiles.
     if not ofiles or ifiles == ofiles:
         return False
-    _ifiles = [ifiles] if type(ifiles) != list else ifiles
-    _ofiles = [ofiles] if type(ofiles) != list else ofiles
+    _ifiles = [ifiles] if not isinstance(ifiles, list) else ifiles
+    _ifiles = [x for x in _ifiles if x != env.null_input]
+    _ofiles = [ofiles] if not isinstance(ofiles, list) else ofiles
     # file exist?
     for ifile in _ifiles:
         if not (os.path.isfile(ifile) or os.path.isfile(ifile + '.file_info')):
@@ -2440,7 +2453,7 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
                     env.logger.warning(e)
                     return False
                 md5matched.append(f)
-        if len(nFiles) != 2 or nFiles[0] == 0 or nFiles[1] == 0:
+        if len(nFiles) != 2 or nFiles[1] == 0:
             env.logger.warning('Corrupted exe_info file {}'.format(md5file))
             return False    
     #
