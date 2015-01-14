@@ -141,8 +141,7 @@ try:
         from vt_sqlite3_py2 import OperationalError
     else:
         import pickle
-        from io import Stp
-        ingIO
+        from io import StringIO
         import urllib.parse as urlparse
         import vt_sqlite3_py3 as sqlite3
         from cgatools_py3 import CrrFile, Location, Range
