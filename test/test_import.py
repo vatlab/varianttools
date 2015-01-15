@@ -418,9 +418,8 @@ class TestImport(ProcessTestCase):
         self.assertFail('vtools import vcf/SAMP1.vcf --build hg18 --sample_name samp_vcf1 samp_vcf2 samp_vcf3')
         #you can assign sample names as blow
         with open('output/vcf_multiple_sample_name.txt') as inputfile:
-              input = [x.split(',') for x in inputfile.readlines()]
-        input=input[1:]
-        self.assertSucc("vtools import vcf/500SAMP.vcf --build hg19 --sample_name {}".format(input))
+              input = [x.strip() for x in inputfile.readlines()]
+        self.assertSucc("vtools import vcf/500SAMP.vcf --build hg19 --sample_name {}".format(' '.join(input[1:])))
 
     def testCsvImport1(self):
         self.assertSucc('vtools import txt/test.csv --format ../format/csv.fmt --build hg18 --sample_name samp_csv')
