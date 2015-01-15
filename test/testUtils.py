@@ -70,6 +70,11 @@ class ProcessTestCase(unittest.TestCase):
         'Clear any existing project'
         #runCmd('vtools remove project')
 
+    def fileContent(self, file):
+        with open(file) as ifile:
+            cont = ifile.read()
+        return cont
+
 # compare if the command output is what we want
     def assertOutput(self, cmd, output=None, numOfLines=0, file=None, skip=None):
         cmd = shlex.split(cmd)
@@ -108,7 +113,7 @@ class ProcessTestCase(unittest.TestCase):
                     self.assertEqual(
                          '\n'.join(subprocess.check_output(cmd, stderr=fnull,
                          env=test_env).decode().split('\n')[:numOfLines]),
-                         '\n'.join(open(file).read().split('\n')[:numOfLines]))
+                         '\n'.join(self.fileContent(file).split('\n')[:numOfLines]))
             elif numOfLines < 0:            
                 if file is None:            
                     self.assertEqual(
@@ -119,7 +124,7 @@ class ProcessTestCase(unittest.TestCase):
                     self.assertEqual(
                          '\n'.join(subprocess.check_output(cmd, stderr=fnull,
                          env=test_env).decode().split('\n')[numOfLines:]),
-                         '\n'.join(open(file).read().split('\n')[numOfLines:]))
+                         '\n'.join(self.fileContent(file).split('\n')[numOfLines:]))
     def assertSucc(self, cmd):
         cmd = shlex.split(cmd)
         # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.

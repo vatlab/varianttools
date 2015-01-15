@@ -2261,8 +2261,8 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
         os.makedirs(dest_dir)
     # 
     # if the file is in the repository, try to find a mirror
-    servers = [fileSig[4][2*i] for i in range(len(fileSig[4])/2)]
-    weights = [fileSig[4][2*i+1] for i in range(len(fileSig[4])/2)]
+    servers = [fileSig[4][2*i] for i in range(len(fileSig[4])//2)]
+    weights = [fileSig[4][2*i+1] for i in range(len(fileSig[4])//2)]
     #
     # if there is a local server, use it regardless of weight
     for server in servers:
