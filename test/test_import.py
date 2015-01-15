@@ -149,9 +149,10 @@ class TestImport(ProcessTestCase):
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'max_gt\n')
         # test for re-naming the sample
         self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --force --sample_name casavasnp')
-        self.assertEqual(numOfSample(), 1)
+        # both samples exist
+        self.assertEqual(numOfSample(), 2)
         self.assertEqual(numOfVariant(), 21)
-        self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'casavasnp\n')
+        self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'max_gt\ncasavasnp\n')
         runCmd('vtools init test -f')
         # test for using user specified genotype information. Have to init a test because of efficiency problem using --force
         self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --geno max_gt --geno_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')

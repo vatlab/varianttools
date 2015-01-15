@@ -68,11 +68,13 @@ def FineScaleRecombinator(regions=None, scale=1, defaultRate=1e-8, output=None):
         return sim.MendelianGenoTransmitter()
     #
     lociPos = {}
-    if type(regions) in [tuple, list]:
+    if isinstance(regions, str):
+        regions = expandRegions(regions)
+    if isinstance(regions, (tuple, list)):
         if not regions:
             return sim.MendelianGenoTransmitter()
         if len(regions[0]) > 2:
-            for reg in expandRegions(regions):
+            for reg in regions:
                 if reg[0] in lociPos:
                     lociPos[reg[0]].extend(range(reg[1], reg[2]+1))
                 else:
@@ -612,7 +614,7 @@ class ProteinPenetrance(sim.PyPenetrance, MutantInfo):
         self.s_stoploss = s_stoploss
         self.s_stopgain = s_stopgain
         #
-        MutantInfo.__init__(regions)
+        MutantInfo.__init__(self, regions)
         if not self.codon_info:
             env.logger.warning('Specified region does not contain any gene. A neutral model will be used.')
             sim.PyPenetrance.__init__(self, func=self._neutral, loci=[])

@@ -84,19 +84,19 @@ class TestExport(ProcessTestCase):
         #self.assertSucc('vtools export variant --format vcf --geno_info test')
         #self.assertSucc('vtools export variant --format vcf --var_info test')
         #self.assertSucc('vtools export variant --format vcf --var_info')
-        self.assertSucc('vtools export variant --format vcf --var_info dbSNP.valid')
-        self.assertSucc('vtools export variant --format vcf --geno_info dbSNP.class')
+        self.assertSucc('vtools export variant --format vcf --var_info dbSNP.INT_flag')
+        self.assertSucc('vtools export variant --format vcf --geno_info dbSNP.VC')
         
         #for those suboptions, you have to assign the fields
         self.assertSucc('vtools export variant --format vcf --id dbSNP.name')
-        self.assertSucc('vtools export variant --format vcf --pos dbSNP.start')
-        self.assertSucc('vtools export variant --format vcf --ref dbSNP.refUCSC')
+        self.assertSucc('vtools export variant --format vcf --pos dbSNP.pos')
+        self.assertSucc('vtools export variant --format vcf --ref dbSNP.ref')
         self.assertSucc('vtools export variant --format vcf --alt dbSNP.alt')
         
         self.assertSucc('vtools export variant --format vcf --qual dbSNP.VP')
-        self.assertSucc('vtools export variant --format vcf --filter dbSNP.valid')
-        self.assertSucc('vtools export variant --format vcf --info dbSNP.locType')
-        self.assertSucc('vtools export variant --format vcf --geno dbSNP.molType')
+        self.assertSucc('vtools export variant --format vcf --filter dbSNP.INT_FLAG')
+        self.assertSucc('vtools export variant --format vcf --info dbSNP.VC')
+        self.assertSucc('vtools export variant --format vcf --geno dbSNP.VP')
 
         #"THE FOLLOWING FOUR TESTS SHOULD BE FAIL, NEED TO MODIFY THE CODE"
         # without name, the cmd can be passed, but no output for the field 
@@ -160,14 +160,14 @@ class TestExport(ProcessTestCase):
         self.assertSucc('vtools export variant --format vcf --pos pos  --ref ref --alt alt')
 
         #those tests are passed. Please check the fields you want to assign to each suboption, otherwise the output will be messy.
-        self.assertSucc('vtools export variant --format vcf --pos dbSNP.start --ref ref')
-        self.assertSucc('vtools export variant --format vcf --pos dbSNP.start --ref dbSNP.refUCSC --alt dbSNP.alt ')
-        self.assertSucc('vtools export variant -o my.vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.VP')
-        self.assertSucc('vtools export variant --format vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.VP --samples 1 --format_string GT:DP')
+        self.assertSucc('vtools export variant --format vcf --pos dbSNP.pos --ref ref')
+        self.assertSucc('vtools export variant --format vcf --pos dbSNP.pos --ref dbSNP.ref --alt dbSNP.alt ')
+        self.assertSucc('vtools export variant -o my.vcf --id dbSNP.name --filter dbSNP.VC --info dbSNP.VP')
+        self.assertSucc('vtools export variant --format vcf --id dbSNP.name --filter dbSNP.VC --info dbSNP.VP --samples 1 --format_string GT:DP')
 
         #output in alternative reference genome
         runCmd('vtools liftover hg18')
-        self.assertSucc('vtools export variant --format vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.VP --samples 1 --format_string GT:DP')
+        self.assertSucc('vtools export variant --format vcf --id dbSNP.name --filter dbSNP.VC --info dbSNP.VP --samples 1 --format_string GT:DP')
 
     def testHeader(self):
         'Test option header of vtools export'

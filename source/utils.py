@@ -3163,18 +3163,17 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                 env.logger.info('Filename "{}" matches {} files: {}'
                     .format(filename, len(filenames), ', '.join(filenames)))
             # if the string has option 'matched', we need reference genome information
-            if 'bam' in query or 'BAM' in query:
-                if build in ['hg18', 'build36']:
-                    crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build36.crr')
-                elif build in ['hg19', 'build37']:
-                    crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
-                elif os.path.isfile(os.path.join(env.local_resource, 'reference', '{}.crr'.format(build))):
-                    crrFile = os.path.join(env.local_resource, 'reference', '{}.crr'.format(build))
-                else:
-                    try:
-                        crrFile = downloadFile('reference/{}.crr'.format(build))
-                    except Exception as e:
-                        raise ValueError('Cannot find reference genome for build {}: {}'.format(build, e))
+            if build in ['hg18', 'build36']:
+                crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build36.crr')
+            elif build in ['hg19', 'build37']:
+                crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
+            elif os.path.isfile(os.path.join(env.local_resource, 'reference', '{}.crr'.format(build))):
+                crrFile = os.path.join(env.local_resource, 'reference', '{}.crr'.format(build))
+            else:
+                try:
+                    crrFile = downloadFile('reference/{}.crr'.format(build))
+                except Exception as e:
+                    raise ValueError('Cannot find reference genome for build {}: {}'.format(build, e))
             if alt_build:
                 return ', '.join(["track(variant.alt_chr, variant.alt_pos, variant.ref, variant.alt, '{}', '{}' {})".format(crrFile, x, param) for x in filenames])
             else:

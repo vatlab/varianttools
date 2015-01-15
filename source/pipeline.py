@@ -71,12 +71,6 @@ try:
 except (ImportError, ValueError) as e:
     hasPySam = False
 
-try:
-    from simulation import *
-    hasSimuPOP = True
-except ImportError as e:
-    hasSimuPOP = False
-
 
 class SkipIf:
     '''An input emitter that skips the step (does not pass any input to the
@@ -497,6 +491,12 @@ class PipelineAction:
 
 # for backward compatibility
 SkiptableAction=PipelineAction
+
+try:
+    from simulation import *
+    hasSimuPOP = True
+except ImportError as e:
+    hasSimuPOP = False
 
 class SequentialActions(PipelineAction):
     '''Define an action that calls a list of actions, specified by Action1,
@@ -1790,7 +1790,7 @@ class Pipeline:
                 model_name=pname,
                 null_input=env.null_input,
                 vtools_version=proj.version)
-        self.VARS.update(**kwargs)
+        self.VARS.update({k:str(v) for k,v in kwargs.items()})
         # we need to put self.pipeline.pipeline_vars in self.VARS because
         # they might refer to each other
         self.VARS.update(self.pipeline.pipeline_vars)

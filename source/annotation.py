@@ -510,9 +510,11 @@ def use(args):
                     res = ResourceManager()
                     res.getLocalManifest()
                     res.selectFiles(resource_type='annotation')
-                    avail_annoDBs = res.manifest.keys()
+                    avail_annoDBs = [x for x in res.manifest.keys() if x.endswith('.ann')]
                     if '-' in args.source:
                         if 'annoDB/' + args.source in avail_annoDBs:
+                            args.source = 'annoDB/{}'.format(args.source)
+                        elif 'annoDB/' + args.source + '.ann' in avail_annoDBs:
                             args.source = 'annoDB/{}.ann'.format(args.source)
                         else:
                             raise ValueError('Annotation database {} not found.'.format(args.source))
