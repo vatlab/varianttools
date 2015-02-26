@@ -627,7 +627,10 @@ class ImportModules(PipelineAction):
                     try:
                         pyfile = downloadFile('simulation/{}'.format(module))
                     except Exception as e:
-                        raise ValueError('Failed to download required python module {}'.format(module))
+                        try:
+                            pyfile = downloadFile('pipeline/{}'.format(module))
+                        except Exception as e:
+                            raise ValueError('Failed to download required python module {}: {}'.format(module, e))
                 try:
                     p,f = os.path.split(os.path.abspath(os.path.expanduser(pyfile)))
                     sys.path.append(p)

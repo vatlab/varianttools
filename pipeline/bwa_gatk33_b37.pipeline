@@ -295,7 +295,7 @@ comment=Running bwa sampe for paired end reads, using read group tag saved
     in a .RG file
 
 [align_302]
-action=CountMappedReads(output="${INPUT: INPUT[0] + '.counts'}", cutoff=0.8)
+action=CountMappedReads(output="${INPUT: INPUT[0] + '.counts'}")
 input_emitter=EmitInput('single')
 comment=Check the proportion of aligned reads and exit if there are less than
     80% of aligned reads.
