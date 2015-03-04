@@ -1516,7 +1516,10 @@ class Project:
         # an annotation database might be re-used with a different linked_field
         self.saveProperty('{}_linked_by'.format(db.linked_name), str(db.linked_by))
         self.saveProperty('{}_anno_type'.format(db.linked_name), str(db.anno_type))
-        self.saveProperty('{}_linked_fields'.format(db.linked_name), str(db.build))
+        if db.build:
+            self.saveProperty('{}_linked_fields'.format(db.linked_name), str(db.build))
+        else:
+            self.saveProperty('{}_linked_fields'.format(db.linked_name), str(db.alt_build))
         # 
         # if a field database, connect and check 
         if db.linked_by:
