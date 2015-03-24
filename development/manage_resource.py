@@ -61,6 +61,7 @@ def uploadFile(local_file, remote_file, repo):
     env.logger.info(cmd)
     if not dryrun:
         os.system(cmd)
+        remoteDo('chmod o+r {}/{}/{}'.format(repoDir, repo, remote_file))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''Manage variant tools resources''')
