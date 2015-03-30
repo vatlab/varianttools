@@ -113,6 +113,12 @@ class TestSelect(ProcessTestCase):
         self.assertOutput("vtools execute 'select count(*) from sample where sample_name like \"NA0%\"'", '9\n')
         self.assertSucc('vtools select CEU -s "BMI<18.5" -t Underweight')
 
+    def testSelectSampleWithWildtypeGenotype(self):
+        runCmd('vtools import vcf/with_wildtype.vcf --sample_name WT')
+        # original 989 variants but some of them have only wildtype genotype
+        self.assertOutput('''vtools select variant --samples "sample_name='WT'" -c''', "934\n")
+
+
     def testSelectLargeSample(self):
         runCmd('vtools import vcf/500SAMP.vcf')
         self.assertSucc('vtools select variant --samples "sample_name like \'SAM%\'" -c')

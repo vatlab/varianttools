@@ -295,6 +295,13 @@ def select(args, reverse=False):
                 # we save genotype in a separate database to keep the main project size tolerable.
                 proj.db.attach(proj.name + '_genotype')
                 IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.samples]))
+                #
+                # check if genotype table has field GT and select only variants with non-wildtype genotype
+                # if genotype information is available.
+                #
+                hasGT = {id: 'GT' in [x[0] for x in proj.db.fieldsOfTable('{}_genotype.genotype_{}'.format(proj.name, id))] for id in IDs}
+                noWT_clause = {id : 'WHERE {0}_genotype.genotype_{1}.GT != 0'.format(proj.name, id) if hasGT[id] else '' for id in IDs}
+                #
                 if len(IDs) == 0:
                     env.logger.warning('No sample is selected by condition: {}'.format(' AND '.join(['({})'.format(x) for x in args.samples])))
                     # nothing will be selected
@@ -310,7 +317,8 @@ def select(args, reverse=False):
                     env.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
                     where_clause += ' AND ({}.variant_id IN ({}))'.format(
                         encodeTableName(args.from_table), 
-                        '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{}'.format(proj.name, id) for id in IDs])) 
+                        '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{} {}'
+                            .format(proj.name, id, noWT_clause[id]) for id in IDs])) 
                 else:
                     # we have to create a temporary table and select variants sample by sample
                     # this could be done in parallel if there are a large number of samples, but that needs a lot more
@@ -333,7 +341,8 @@ def select(args, reverse=False):
                         if len(block_IDs) == 0:
                             continue
                         query = 'INSERT INTO {} {};'.format(merged_table,
-                            '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{}'.format(proj.name, id) for id in block_IDs]))
+                            '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{} {}'
+                                .format(proj.name, id, noWT_clause[id]) for id in block_IDs]))
                         #env.logger.debug(query)
                         cur.execute(query)
                         count += len(block_IDs)
@@ -422,7 +431,8 @@ def excludeArguments(parser):
     parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
         help='''Limiting variants from samples that match conditions that
             use columns shown in command 'vtools show sample' (e.g. 'aff=1',
-            'filename like "MG%%"').''')
+            'filename like "MG%%"'). Variants with homozygous wildtype genotype
+            are not selected if the sample contains genotype information.''')
     parser.add_argument('-t', '--to_table', nargs='*', metavar=('TABLE', 'DESC'),
         help='''Destination variant table.''')
     grp = parser.add_mutually_exclusive_group()
