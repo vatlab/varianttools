@@ -84,13 +84,20 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
     select_clause, select_fields = consolidateFieldName(proj, table, ','.join(output_fields),
         args.build and args.build == proj.alt_build)
     #
+    # GROUP BY clause
+    group_clause = ''
+    if args.group_by:
+        group_fields, group_field_names = consolidateFieldName(proj, table, ','.join(args.group_by))
+        group_clause = ' GROUP BY {}'.format(group_fields)
+    else:
+        group_field_names = []
     # if there is no annotation database involved, the query can be simpler
-    noAnnoDBInvolved = all([proj.isVariantTable(x.rsplit('.', 1)[0]) for x in select_fields])
+    noAnnoDBInvolved = all([proj.isVariantTable(x.rsplit('.', 1)[0]) for x in (select_fields + group_field_names)])
     #
     # FROM clause
     from_clause = 'FROM {} '.format(table)
     where_conditions = []
-    fields_info = sum([proj.linkFieldToTable(x, table) for x in select_fields], [])
+    fields_info = sum([proj.linkFieldToTable(x, table) for x in select_fields + group_field_names], [])
     #
     processed = set()
     # the normal annotation databases that are 'LEFT OUTER JOIN'
@@ -103,11 +110,7 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
         # FIXME: if the query has a simple where clause, we should use that directly.
         where_conditions.append('{}.variant_id {} IN ({})'.format(table, 'NOT' if reverse else '', query))
     where_clause = 'WHERE {}'.format(' AND '.join(['({})'.format(x) for x in where_conditions])) if where_conditions else ''
-    # GROUP BY clause
-    group_clause = ''
-    if args.group_by:
-        group_fields, group_field_names = consolidateFieldName(proj, table, ','.join(args.group_by))
-        group_clause = ' GROUP BY {}'.format(group_fields)
+    # ORDER BY clause
     order_clause = ''
     if args.order_by:
         order_fields, order_field_names = consolidateFieldName(proj, table, ','.join(args.order_by))
