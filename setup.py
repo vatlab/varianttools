@@ -694,11 +694,21 @@ setup(name = "variant_tools",
     author_email = 'bpeng@mdanderson.org',
     maintainer = 'Bo Peng',
     maintainer_email = 'varianttools-devel@lists.sourceforge.net',
-    # py_modules = VTOOLS_FILES + [
-    #     SQLITE_PY_FILE.format(PYVERSION)[:-3],
-    #     WRAPPER_PY_FILE.format(PYVERSION)[:-3],          # assotests_pyX.py file without extension
-    #     CGATOOLS_WRAPPER_PY_FILE.format(PYVERSION)[:-3]  # cgatools_pyX.py
-    # ],
+    license = 'GPL3',
+    classifiers = [
+            'Development Status :: 5 - Production/Stable',
+            'Environment :: Console',
+            'Intended Audience :: Education',
+            'Intended Audience :: Science/Research',
+            'License :: OSI Approved :: GNU General Public License (GPL)',
+            'Natural Language :: English',
+            'Operating System :: Linux',
+            'Operating System :: MacOSX',
+            'Programming Language :: C++',
+            'Programming Language :: Python',
+            'Programming Language :: Python :: 3',
+            'Topic :: Scientific/Engineering :: Bio-Informatics',
+        ],
     packages = ['variant_tools'],
     scripts = [
         'vtools',
