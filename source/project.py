@@ -790,6 +790,14 @@ class PipelineDescription:
                         self.pipelines[pname].append(command)
                 except Exception as e:
                     raise ValueError('Invalid section {}: {}'.format(section, e))
+        # for pipelines with all * sections, look for a description or use default name
+        not_wildname = [y for y in self.pipelines.keys() if '*' not in y and '?' not in y]
+        # if all names are * ...
+        if not not_wildname:
+            if self.pipeline_descriptions:
+                self.pipelines.update({x:[] for x in self.pipeline_descriptions})
+            else:
+                self.pipelines.update({'default':[]})
         # process wild cast pipelines
         for wildname in [x for x in self.pipelines.keys() if '*' in x or '?' in x]:
             for pname in [y for y in self.pipelines.keys() if '*' not in y and '?' not in y]:

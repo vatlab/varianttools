@@ -87,7 +87,7 @@ class TestRemove(ProcessTestCase):
         out = outputOfCmd('vtools show tables')
         # take only the first two columns (table and #variants)
         str1 = '\n'.join(['\t'.join(x.split()[:2]) for x in out.split('\n')])
-        self.assertEqual(str1, '''table\t#variants\nCEU\t288\nunaffected\t577\nvariant\t1,036\n''')
+        self.assertEqual(str1, '''table\t#variants\nCEU\t288\nunaffected\t552\nvariant\t1,036\n''')
         self.assertSucc('vtools remove variants CEU')
         out = outputOfCmd('vtools show tables')
         str2 = '\n'.join(['\t'.join(x.split()[:2]) for x in out.split('\n')])

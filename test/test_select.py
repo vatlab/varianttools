@@ -86,7 +86,7 @@ class TestSelect(ProcessTestCase):
         #
         self.assertSucc('vtools select variant --samples "aff=\'1\' and BMI<20" -t ns3')
         namelist = output2list('vtools execute "select sample_id from sample where aff=1 and BMI<20"')
-        variantlist = [output2list('vtools execute "select variant_id from genotype_{}"'.format(x)) for x in namelist]
+        variantlist = [output2list('vtools execute "select variant_id from genotype_{} where GT <> 0"'.format(x)) for x in namelist]
         variantlist = [x for y in variantlist for x in y]
         lv = str(len(set(variantlist)))        
         self.assertOutput("vtools select ns3 -c", '{}\n'.format(lv))
@@ -96,7 +96,7 @@ class TestSelect(ProcessTestCase):
         #
         self.assertSucc('vtools select variant --samples "aff=\'1\' or BMI<20" -t ns2')
         namelist = output2list('vtools execute "select sample_id from sample where aff=1 or BMI<20"')
-        variantlist = [output2list('vtools execute "select variant_id from genotype_{}"'.format(x)) for x in namelist]
+        variantlist = [output2list('vtools execute "select variant_id from genotype_{} where GT <> 0"'.format(x)) for x in namelist]
         variantlist = [x for y in variantlist for x in y]
         lv = str(len(set(variantlist)))
         self.assertOutput("vtools select ns2 -c", '{}\n'.format(lv))
@@ -106,7 +106,7 @@ class TestSelect(ProcessTestCase):
         #
         self.assertSucc('vtools select variant --samples "sample_name like \'NA0%\'" -t NA0')
         namelist = output2list('vtools execute "select sample_id from sample where sample_name like \'NA0%\'"')
-        variantlist = [output2list('vtools execute "select variant_id from genotype_{}"'.format(x)) for x in namelist]
+        variantlist = [output2list('vtools execute "select variant_id from genotype_{} where gt <> 0"'.format(x)) for x in namelist]
         variantlist = [x for y in variantlist for x in y]
         lv = str(len(set(variantlist)))
         self.assertOutput("vtools select NA0 -c", '{}\n'.format(lv))
