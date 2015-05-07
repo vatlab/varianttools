@@ -2318,8 +2318,8 @@ class Project:
                 try:
                     print('Downloading snapshot {}.tar.gz from online repository'.format(name))
                     snapshot_file = downloadFile('snapshot/' + name + '.tar.gz', quiet=False)
-                except:
-                    raise ValueError('Failed to download snapshot {}.'.format(name))
+                except Exception as e:
+                    raise ValueError('Failed to download snapshot {}: {}'.format(name, e))
             else:
                 raise ValueError('Snapshot {} does not exist locally.'.format(name))
         #

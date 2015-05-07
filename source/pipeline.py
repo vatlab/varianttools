@@ -53,7 +53,7 @@ import random
 from multiprocessing import Process
 from collections import namedtuple, MutableMapping
 
-from .utils import env, ProgressBar, downloadURL, calculateMD5, delayedAction, \
+from .utils import env, ProgressBar, downloadFile, downloadURL, calculateMD5, delayedAction, \
     existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName, \
     FileInfo, convertDoubleQuote, openFile, encodeTableName, expandRegions, \
     substituteVars, which
