@@ -3630,7 +3630,7 @@ class VariableSubstitutor:
         else:
             return str(var)
 
-    def _substitute(self, text, PipelineVars):
+    def _substitute(self, text, PipelineVars, PipelineGlobals):
         # if text has new line, replace it with space
         text =  ' '.join(text.split())
         # now, find ${}
@@ -3648,6 +3648,8 @@ class VariableSubstitutor:
                         continue
                     KEY = KEY.split(':', 1)[0].strip()
                     try:
+                        # allow the use of user defined functions in expressions
+                        globals().update(PipelineGlobals)
                         if not KEY:
                             # if there is no KEY, this is a lamba function without parameter
                             pieces[idx] = self.var_expr(FUNC())
@@ -3688,16 +3690,16 @@ class VariableSubstitutor:
         # now, join the pieces together, but remove all newlines
         return ' '.join(''.join(pieces).split())
 
-    def substituteWith(self, PipelineVars):
+    def substituteWith(self, PipelineVars, PipelineGlobals):
         while True:
-            new_text = self._substitute(self.text, PipelineVars)
+            new_text = self._substitute(self.text, PipelineVars, PipelineGlobals)
             if new_text == self.text:
                 return new_text
             else:
                 self.text = new_text
     
-def substituteVars(text, PipelineVars):
-    return VariableSubstitutor(text).substituteWith(PipelineVars)
+def substituteVars(text, PipelineVars, PipelineGlobals):
+    return VariableSubstitutor(text).substituteWith(PipelineVars, PipelineGlobals)
 
 def determineSexOfSamples(proj, sample_IDs=None):
     '''Determine the sex of samples by checking phenotype sex or gender.

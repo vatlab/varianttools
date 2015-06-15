@@ -1794,14 +1794,16 @@ class Pipeline:
                 null_input=env.null_input,
                 vtools_version=proj.version)
         self.VARS.update({k:str(v) for k,v in kwargs.items()})
+        #
+        self.GLOBALS = {}
+        self.THREADS = {}
         # we need to put self.pipeline.pipeline_vars in self.VARS because
         # they might refer to each other
         self.VARS.update(self.pipeline.pipeline_vars)
         for key, val in self.pipeline.pipeline_vars.items():
-            self.VARS[key.lower()] = substituteVars(val, self.VARS)
-        #
-        self.GLOBALS = {}
-        self.THREADS = {}
+            self.VARS[key.lower()] = substituteVars(val, self.VARS, self.GLOBALS)
+        for key, val in self.VARS.items():
+            env.logger.trace('{} is set to {}'.format(key, val))
         #
         ifiles = input_files
         step_index = 0
@@ -1821,7 +1823,7 @@ class Pipeline:
             elif not command.input.strip():
                 step_input = []
             else:
-                step_input = shlex.split(substituteVars(command.input, self.VARS))
+                step_input = shlex.split(substituteVars(command.input, self.VARS, self.GLOBALS))
             #
             # if there is no input file?
             if not step_input:
@@ -1840,7 +1842,7 @@ class Pipeline:
                     if 'input' in self.VARS:
                         self.VARS.pop('input')
                     # ${CMD_INPUT} etc can be used.
-                    emitter = eval(substituteVars(command.input_emitter, self.VARS), globals(), self.GLOBALS)
+                    emitter = eval(substituteVars(command.input_emitter, self.VARS, self.GLOBALS), globals(), self.GLOBALS)
                 except Exception as e:
                     raise RuntimeError('Failed to group input files: {}'
                         .format(e))
@@ -1853,7 +1855,7 @@ class Pipeline:
                     if not ig:
                         continue
                     self.VARS['input'] = ig
-                    action = substituteVars(command.action, self.VARS)
+                    action = substituteVars(command.action, self.VARS, self.GLOBALS)
                     env.logger.trace('Emitted input of step {}_{}: {}'
                         .format(pname, command.index, ig))
                     env.logger.trace('Action of step {}_{}: {}'
@@ -1899,7 +1901,7 @@ class Pipeline:
                             'completion of step {}_{}'
                             .format(f, pname, command.index))
                 for key, val in command.pipeline_vars:
-                    self.VARS[key.lower()] = substituteVars(val, self.VARS)
+                    self.VARS[key.lower()] = substituteVars(val, self.VARS, self.GLOBALS)
                     env.logger.debug('Pipeline variable {} is set to {}'
                         .format(key, self.VARS[key.lower()]))
                 #
