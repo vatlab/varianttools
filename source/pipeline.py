@@ -1792,7 +1792,8 @@ class Pipeline:
                 spec_file=self.spec_file,
                 model_name=pname,
                 null_input=env.null_input,
-                vtools_version=proj.version)
+                vtools_version=proj.version,
+                pipeline_format=self.pipeline.pipeline_format)
         self.VARS.update({k:str(v) for k,v in kwargs.items()})
         #
         self.GLOBALS = {}

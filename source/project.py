@@ -673,6 +673,7 @@ class PipelineDescription:
     def __init__(self, name, extra_args=[], pipeline_type='pipeline'):
         '''Pipeline configuration file'''
         self.description = None
+        self.pipeline_format = None
         self.pipeline_vars = {}
         self.pipelines = {}
         self.pipeline_descriptions = {}
@@ -702,6 +703,10 @@ class PipelineDescription:
             self.parsePipeline(pipeline, defaults=args)
 
     def parseArgs(self, filename, fmt_args):
+        with open(filename) as pp:
+            firstline = pp.readline()
+            if firstline.startswith('##fileformat='):
+                self.pipeline_format = firstline[len('##fileformat='):]
         if sys.version_info.major == 2:
             fmt_parser = SafeConfigParser()
         else:

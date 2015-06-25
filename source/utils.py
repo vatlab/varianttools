@@ -3631,8 +3631,11 @@ class VariableSubstitutor:
             return str(var)
 
     def _substitute(self, text, PipelineVars, PipelineGlobals):
-        # if text has new line, replace it with space
-        #text =  ' '.join(text.split())
+        if PipelineVars['pipeline_format'] is None:
+            # for the first version of pipeline specification file, newlines are
+            # replaced with ' '. The newer version (1.0+) keeps newline to faciliate the
+            # inclusion of multi-line scripts etc.
+            text =  ' '.join(text.split())
         # now, find ${}
         pieces = re.split('(\${(?:[^{}]|{[^}]*})*})', text)
         for idx, piece in enumerate(pieces):
@@ -3687,8 +3690,12 @@ class VariableSubstitutor:
                         env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
                             .format(piece, KEY))
                         continue
-        # now, join the pieces together, but remove all newlines
-        return ' '.join(pieces) # ''.join(pieces).split())
+        #
+        if PipelineVars['pipeline_format'] is None:
+            # now, join the pieces together, but remove all newlines
+            return ' '.join(''.join(pieces).split())
+        else:
+            return ''.join(pieces)
 
     def substituteWith(self, PipelineVars, PipelineGlobals):
         while True:
