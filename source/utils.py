@@ -3632,7 +3632,7 @@ class VariableSubstitutor:
 
     def _substitute(self, text, PipelineVars, PipelineGlobals):
         # if text has new line, replace it with space
-        text =  ' '.join(text.split())
+        #text =  ' '.join(text.split())
         # now, find ${}
         pieces = re.split('(\${(?:[^{}]|{[^}]*})*})', text)
         for idx, piece in enumerate(pieces):
@@ -3688,7 +3688,7 @@ class VariableSubstitutor:
                             .format(piece, KEY))
                         continue
         # now, join the pieces together, but remove all newlines
-        return ' '.join(''.join(pieces).split())
+        return ' '.join(pieces) # ''.join(pieces).split())
 
     def substituteWith(self, PipelineVars, PipelineGlobals):
         while True:
