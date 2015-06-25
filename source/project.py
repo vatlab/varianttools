@@ -706,7 +706,10 @@ class PipelineDescription:
         with open(filename) as pp:
             firstline = pp.readline()
             if firstline.startswith('##fileformat='):
-                self.pipeline_format = firstline[len('##fileformat='):]
+                m = re.match('##fileformat=PIPELINE([\d.]+)', firstline)
+                if m is None:
+                    raise ValueError('Pipeline format string should have format ##fileformat=PIPELINEx.xx: {} detected'.format(firstline))
+                self.pipeline_format = m.group(1)
         if sys.version_info.major == 2:
             fmt_parser = SafeConfigParser()
         else:

@@ -3631,7 +3631,7 @@ class VariableSubstitutor:
             return str(var)
 
     def _substitute(self, text, PipelineVars, PipelineGlobals):
-        if PipelineVars['pipeline_format'] is None:
+        if float(PipelineVars['pipeline_format']) <= 1.0 is None:
             # for the first version of pipeline specification file, newlines are
             # replaced with ' '. The newer version (1.0+) keeps newline to faciliate the
             # inclusion of multi-line scripts etc.
@@ -3691,7 +3691,7 @@ class VariableSubstitutor:
                             .format(piece, KEY))
                         continue
         #
-        if PipelineVars['pipeline_format'] is None:
+        if float(PipelineVars['pipeline_format']) <= 1.0:
             # now, join the pieces together, but remove all newlines
             return ' '.join(''.join(pieces).split())
         else:

@@ -1793,7 +1793,7 @@ class Pipeline:
                 model_name=pname,
                 null_input=env.null_input,
                 vtools_version=proj.version,
-                pipeline_format=self.pipeline.pipeline_format)
+                pipeline_format='1.0' if self.pipeline.pipeline_format is None else self.pipeline.pipeline_format)
         self.VARS.update({k:str(v) for k,v in kwargs.items()})
         #
         self.GLOBALS = {}
