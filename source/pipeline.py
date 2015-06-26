@@ -36,10 +36,12 @@ import Queue
 import threading
 #
 import glob
+import hashlib
 import shlex
 import argparse
 import logging
 import shutil
+import tempfile
 import tarfile
 import gzip
 import bz2
@@ -1294,6 +1296,334 @@ class RunCommand(PipelineAction):
         else:
             self._run_command()
             return True
+
+class ExecuteScript(PipelineAction):
+    """This action execute specified in-line script with specified command (bash, python, perl
+    etc). If the pipeline is running in parallel mode and a submitter is specified, it will use
+    the submitter command to execute the commands in a separate job. This action is the base
+    action for ExecuteRScript, ExecutePerlScript and ExecutePythonScript and is usually not
+    used directly.
+    
+    
+    File Flow:
+
+        Input passthrough if no output file is specified.
+            INPUT ====> INPUT
+        Generate output if one or more output files are specified.
+            INPUT ==> CMD ==> OUTPUT
+        
+    Raises:
+        Raises an error if an command fails to execute.
+
+    """
+    def __init__(self, script='', interpreter='', output=[], working_dir=None, submitter=None,
+        suffix=None):
+        '''This action accepts one or a list of strings, write them to a temporary file
+        and executes them by a interpreter, possibly as a separate job. 
+        
+        Parameters:
+            script (string or list of strings):
+                One or more strings to execute. List of strings will be concatenated by new
+                lines. The complete script will be written to a temporary file to be executed
+                by an interpreter.
+
+            interpreter (string):
+                An interpreter that will be used to execute the script. It is usually just a command
+                but more complex command line is allowed with '{}' replaced by the path to the
+                temporary script.
+
+            output (string or list of strings):
+                Expected output files of the action. If specified, the execution
+                signature will be created to record the input, output and command
+                of the action, and ignore the action if the signature matches of 
+                a previous run.
+
+            working_dir (None or string):
+                Working directory of the command. Variant Tools will change to
+                this directory before executing the commands if a valid directory
+                is passed.
+
+            submitter (None or string):
+                If a submitter is specified and the pipeline is executed in multi-job
+                mode (e.g. --jobs 2), the script will be submitted by the submitter.
+                The submitter command will be executed with ``{}`` in
+                parameter ``submitter`` replaced by the name of shell script. For
+                example, submitter='sh {} &' will run the job as a background job,
+                and submitter='qsub -q long < {}' will submit the shell script to the
+                long queue of a cluster system. Because the pipeline will be terminated
+                if the submitter command fails, `qsub new_job ... && false` can be used
+                to replace the running process by start a new job and terminate the
+                existing process intentionally.
+
+            suffix (None or string):
+                An optional suffix (file extension) to the temporary script.
+        '''
+        self.interpreter = interpreter
+        self.submitter = submitter
+        self.working_dir = working_dir
+        if type(output) == str:
+            self.output = [os.path.expanduser(output)]
+        else:
+            self.output = [os.path.expanduser(x) for x in output]
+        #
+        for filename in self.output:
+            if filename.lower().rsplit('.', 1)[-1] in ['exe_info', 'lck']:
+                raise RuntimeError('Output file with extension .exe_info and .lck are reserved.')
+        #
+        if not self.output:
+            self.proc_out = None
+            self.proc_err = None
+            self.proc_lck = None
+            self.proc_info = None
+        else:
+            self.proc_out = '{}.out_{}'.format(self.output[0], os.getpid())
+            self.proc_err = '{}.err_{}'.format(self.output[0], os.getpid())
+            self.proc_lck = '{}.lck'.format(self.output[0])
+            self.proc_info = '{}.exe_info'.format(self.output[0])
+        self.start_time = time.time()
+        if not script:
+            raise ValueError('No valid script is specified.')
+        if isinstance(script, str):
+            self.script = script
+        else:
+            self.script = '\n'.join(script)
+        env.logger.info('Executing\n{}'.format(self.script))
+        #
+        m = hashlib.md5()
+        m.update(self.script)
+        #
+        self.script_file = tempfile.NamedTemporaryFile(mode='w+t', suffix=suffix, delete=False).name
+        with open(self.script_file, 'w') as script_file:
+            script_file.write(self.script)
+        #
+        PipelineAction.__init__(self, cmd='{} {}'.format(interpreter, m), output=output)
+
+    def __del__(self):
+        try:
+            os.remove(self.script_file)
+        except Exception as e:
+            env.logger.debug('Failed to remove temporary script file {}: {}'.format(self.script_file, e))
+
+    def _elapsed_time(self):
+        '''Return the elapsed time in human readable format since start time'''
+        second_elapsed = int(time.time() - self.start_time)
+        days_elapsed = second_elapsed // 86400
+        return ('{} days '.format(days_elapsed) if days_elapsed else '') + \
+            time.strftime('%H:%M:%S', time.gmtime(second_elapsed % 86400))
+      
+    def _run_command(self):
+        '''Call a list of external command cmd, raise an error if any of them
+        fails. '''
+        if self.proc_lck:
+            env.lock(self.proc_lck, str(os.getpid()))
+        if '{}' in self.interpreter:
+            cmd = self.interpreter.replace('{}', self.script_file)
+        else:
+            cmd = self.interpreter + ' ' + self.script_file
+        env.logger.info('Running [[{}]]'.format(cmd))
+        ret = subprocess.call(cmd, shell=True, 
+            stdout=None if self.proc_out is None else open(self.proc_out, 'w'),
+            stderr=None if self.proc_err is None else open(self.proc_err, 'w'),
+            cwd=self.working_dir)
+        if ret < 0:
+            if self.output:
+                try:
+                    env.unlock(self.proc_lck, str(os.getpid()))
+                except:
+                    pass
+            raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
+                .format(cmd, -ret, self._elapsed_time()))
+        elif ret > 0:
+            if self.output:
+                with open(self.proc_err) as err:
+                    for line in err.read().split('\n')[-50:]:
+                        env.logger.error(line)
+                try:
+                    env.unlock(self.proc_lck, str(os.getpid()))
+                except:
+                    pass
+            raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
+                .format(cmd, self._elapsed_time(), ret))
+
+    def _monitor(self):
+        while True:
+            if os.path.isfile(self.proc_done):
+                break
+            else:
+                time.sleep(10)
+        try:
+            env.unlock(self.proc_lck, str(os.getpid()))
+        except:
+            env.logger.warning('Failed to remove lock for file {}'.format(self.output[0]))
+            pass
+        with open(self.proc_done) as done:
+            ret = int(done.read().strip())
+        #
+        if ret < 0:
+            raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
+                .format('; '.join(self.cmd), -ret, self._elapsed_time()))
+        elif ret > 0:
+            if self.output:
+                with open(self.proc_err) as err:
+                    for line in err.read().split('\n')[-50:]:
+                        env.logger.error(line)
+            raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
+                .format('; '.join(self.cmd), self._elapsed_time(), ret))
+        # remove the .done file
+        if not self.output[0] in self.pipeline.THREADS:
+            raise RuntimeError('Output is not waited by any threads')
+        # DO NOT POP FROM ANOTHER THREAD, this will cause race condition
+        # (unless we use thread safe dictionry). In this case, we only need
+        # to monitor the status of threads from the master threads.
+        #    self.pipeline.THREADS.pop(self.output[0])
+        #
+        # the thread will end here
+        env.logger.trace('Thread for output {} ends.'.format(self.output[0]))
+        for filename in glob.glob(self.output[0] + '.done_*'):
+            try:
+                os.remove(filename)
+            except Exception as e:
+                env.logger.warning('Fail to remove {}: {}'
+                    .format(filename, e))
+
+    def _submit_command(self):
+        '''Submit a job and wait for its completion.'''
+        # use full path because the command might be submitted to a remote machine
+        self.proc_cmd = os.path.abspath(self.output[0] + '.sh')
+        self.proc_done = os.path.abspath(self.output[0]) + '.done_{}'.format(os.getpid())
+        #
+        if os.path.isfile(self.proc_done):
+            os.remove(self.proc_done)
+        if self.proc_lck:
+            env.lock(self.proc_lck, str(os.getpid()))
+        #
+        # create a batch file for execution
+        with open(self.proc_cmd, 'w') as sh_file:
+            sh_file.write('#PBS -o {}\n'.format(os.path.abspath(self.proc_out)))
+            sh_file.write('#PBS -e {}\n'.format(os.path.abspath(self.proc_err)))
+            sh_file.write('#PBS -N {}\n'.format(os.path.basename(self.output[0])))
+            #sh_file.write('#PBS -N {}.{}_{}\n'.format(self.proc_err))
+            sh_file.write('#PBS -V\n')
+            # we try to reproduce the environment as much as possible becaus ehte
+            # script might be executed in a different environment
+            for k, v in os.environ.items():
+                if any([k.startswith('x') for x in ('SSH', 'PBS', '_')]):
+                    continue
+                sh_file.write('export {}={}\n'.format(k, v))
+            #
+            sh_file.write('\ncd {}\n'.format(os.path.abspath(os.getcwd())))
+            if self.working_dir is not None:
+                sh_file.write('[ -d {0} ] || mkdir -p {0}\ncd {0}\n'.format(os.path.abspath(self.working_dir)))
+
+            # interpreter
+            if '{}' in self.interpreter:
+                sh_file.write(self.interpreter.replace('{}', self.script_file) + '\n')
+            else:
+                sh_file.write(self.interpreter + ' ' + self.script_file + '\n')
+            #
+            sh_file.write('\n\nCMD_RET=$?\nif [ $CMD_RET == 0 ]; then vtools admin --record_exe_info {} {}; fi\n'
+                .format(os.getpid(), ' '.join(self.output)))
+            # a signal to show the successful completion of the job
+            sh_file.write('\necho $CMD_RET > {}\n'.format(self.proc_done))
+        #
+        # try to submit command
+        if '{}' in self.submitter:
+            submit_cmd = self.submitter.replace('{}', self.proc_cmd)
+        else:
+            submit_cmd = self.submitter
+        #
+        env.logger.info('Running job {} with command "{}" from directory {}'.format(
+            self.proc_cmd, submit_cmd, os.getcwd()))
+        ret = subprocess.call(submit_cmd, shell=True,
+            stdout=open(self.proc_out, 'w'), stderr=open(self.proc_err, 'w'),
+            cwd=self.working_dir)
+        if ret != 0:
+            try:
+                env.unlock(self.proc_out, str(os.getpid()))
+            except:
+                pass
+        # 
+        if ret < 0:
+            raise RuntimeError("Failed to submit job {} due to signal {} (submitter='{}')" .format(self.proc_cmd, -ret, self.submitter))
+        elif ret > 0:
+            if os.path.isfile(self.proc_err):
+                 with open(self.proc_err) as err:
+                     msg = err.read()
+            else:
+                msg = ''
+            raise RuntimeError("Failed to submit job {} using submiter '{}': {}".format(self.proc_cmd, self.submitter, msg))
+        else:
+            t = threading.Thread(target=self._monitor)
+            t.daemon = True
+            t.start()
+            if self.output[0] in self.pipeline.THREADS:
+                raise RuntimeError('Two spawned jobs have the same self.output[0] file {}'.format(self.output[0]))
+            self.pipeline.THREADS[self.output[0]] = t
+
+
+    def _execute(self, ifiles, pipeline=None):
+        # substitute cmd by input_files and output_files
+        if pipeline.jobs > 1 and self.submitter is not None and not self.output:
+            env.logger.warning('Fail to execute in parallel because no output is specified.')
+        #
+        self.pipeline = pipeline
+        # Submit the job on a cluster system
+        # 1. if there is output, otherwise we cannot track the status of the job
+        # 2. if a submit command is specified
+        # 3. if --jobs with a value greater than 1 is used.
+        if self.output and pipeline.jobs > 1 and self.submitter is not None:
+            self._submit_command()
+            return False
+        else:
+            self._run_command()
+            return True
+
+
+class ExecuteRScript(ExecuteScript):
+    '''Execute in-line R script using Rscript as interpreter. Please
+    check action ExecuteScript for more details.
+    '''
+    def __init__(self, script='', output=[], working_dir=None, submitter=None):
+        ExecuteScript.__init__(self, script=script, interpreter='Rscript',
+            output=output, working_dir=working_dir, submitter=submitter,
+            suffix='.R')
+
+class ExecuteShellScript(ExecuteScript):
+    '''Execute in-line shell script using bash as interpreter. Please
+    check action ExecuteScript for more details.
+    '''
+    def __init__(self, script='', output=[], working_dir=None, submitter=None):
+        ExecuteScript.__init__(self, script=script, interpreter='bash',
+            output=output, working_dir=working_dir, submitter=submitter,
+            suffix='.sh')
+
+class ExecutePythonScript(ExecuteScript):
+    '''Execute in-line python script using python as interpreter. Please
+    check action ExecuteScript for more details.
+    '''
+    def __init__(self, script='', output=[], working_dir=None, submitter=None):
+        ExecuteScript.__init__(self, script=script, interpreter='python',
+            output=output, working_dir=working_dir, submitter=submitter,
+            suffix='.py')
+
+class ExecutePython3Script(ExecuteScript):
+    '''Execute in-line python script using python3 as interpreter. Please
+    check action ExecuteScript for more details.
+    '''
+    def __init__(self, script='', output=[], working_dir=None, submitter=None):
+        ExecuteScript.__init__(self, script=script, interpreter='python3',
+            output=output, working_dir=working_dir, submitter=submitter,
+            suffix='.py')
+
+class ExecutePerlScript(ExecuteScript):
+    '''Execute in-line perl script using perl as interpreter. Please
+    check action ExecuteScript for more details.
+    '''
+    def __init__(self, script='', output=[], working_dir=None, submitter=None):
+        ExecuteScript.__init__(self, script=script, interpreter='perl',
+            output=output, working_dir=working_dir, submitter=submitter,
+            suffix='.perl')
+
 
 class DecompressFiles(PipelineAction):
     '''This action gets a list of input files from input file, decompressing
