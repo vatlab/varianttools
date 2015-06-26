@@ -34,6 +34,7 @@ import subprocess
 # for parallel execution of steps
 import Queue
 import threading
+import pipes
 #
 import glob
 import hashlib
@@ -1316,7 +1317,7 @@ class ExecuteScript(PipelineAction):
         Raises an error if an command fails to execute.
 
     """
-    def __init__(self, script='', interpreter='', output=[], working_dir=None, submitter=None,
+    def __init__(self, script='', interpreter='', args='', output=[], working_dir=None, submitter=None,
         suffix=None):
         '''This action accepts one or a list of strings, write them to a temporary file
         and executes them by a interpreter, possibly as a separate job. 
@@ -1331,6 +1332,10 @@ class ExecuteScript(PipelineAction):
                 An interpreter that will be used to execute the script. It is usually just a command
                 but more complex command line is allowed with '{}' replaced by the path to the
                 temporary script.
+
+            args (string or list of strings):
+                Command line arguments which can be a single string or a list of strings.
+                Filenames will be properly quoted if needed.
 
             output (string or list of strings):
                 Expected output files of the action. If specified, the execution
@@ -1387,6 +1392,8 @@ class ExecuteScript(PipelineAction):
             self.script = script
         else:
             self.script = '\n'.join(script)
+        #
+        self.args = args
         env.logger.info('Executing\n{}'.format(self.script))
         #
         m = hashlib.md5()
@@ -1417,9 +1424,10 @@ class ExecuteScript(PipelineAction):
         if self.proc_lck:
             env.lock(self.proc_lck, str(os.getpid()))
         if '{}' in self.interpreter:
-            cmd = self.interpreter.replace('{}', self.script_file)
+            cmd = self.interpreter.replace('{}', pipes.quote(self.script_file))
         else:
-            cmd = self.interpreter + ' ' + self.script_file
+            cmd = self.interpreter + ' ' + pipes.quote(self.script_file) + \
+                (self.args if isinstance(self.args, str) else ' '.join(pipes.quote(x) for x in self.args))
         env.logger.info('Running [[{}]]'.format(cmd))
         ret = subprocess.call(cmd, shell=True, 
             stdout=None if self.proc_out is None else open(self.proc_out, 'w'),
@@ -1517,9 +1525,11 @@ class ExecuteScript(PipelineAction):
 
             # interpreter
             if '{}' in self.interpreter:
-                sh_file.write(self.interpreter.replace('{}', self.script_file) + '\n')
+                sh_file.write(self.interpreter.replace('{}', pipes.quote(self.script_file)) +
+                    (self.args if isinstance(self.args, str) else ' '.join(pipes.quote(x) for x in self.args)) + '\n')
             else:
-                sh_file.write(self.interpreter + ' ' + self.script_file + '\n')
+                sh_file.write(self.interpreter + ' ' + pipes.quote(self.script_file) + \
+                    (self.args if isinstance(self.args, str) else ' '.join(pipes.quote(x) for x in self.args)) + '\n')
             #
             sh_file.write('\n\nCMD_RET=$?\nif [ $CMD_RET == 0 ]; then vtools admin --record_exe_info {} {}; fi\n'
                 .format(os.getpid(), ' '.join(self.output)))
@@ -1583,8 +1593,8 @@ class ExecuteRScript(ExecuteScript):
     '''Execute in-line R script using Rscript as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', output=[], working_dir=None, submitter=None):
-        ExecuteScript.__init__(self, script=script, interpreter='Rscript',
+    def __init__(self, script='', args='', output=[], working_dir=None, submitter=None):
+        ExecuteScript.__init__(self, script=script, interpreter='Rscript', args=args,
             output=output, working_dir=working_dir, submitter=submitter,
             suffix='.R')
 
@@ -1592,17 +1602,26 @@ class ExecuteShellScript(ExecuteScript):
     '''Execute in-line shell script using bash as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', output=[], working_dir=None, submitter=None):
-        ExecuteScript.__init__(self, script=script, interpreter='bash',
+    def __init__(self, script='', args='', output=[], working_dir=None, submitter=None):
+        ExecuteScript.__init__(self, script=script, interpreter='bash', args=args,
             output=output, working_dir=working_dir, submitter=submitter,
             suffix='.sh')
+
+class ExecuteCShellScript(ExecuteScript):
+    '''Execute in-line shell script using bash as interpreter. Please
+    check action ExecuteScript for more details.
+    '''
+    def __init__(self, script='', args='', output=[], working_dir=None, submitter=None):
+        ExecuteScript.__init__(self, script=script, interpreter='tcsh', args=args,
+            output=output, working_dir=working_dir, submitter=submitter,
+            suffix='.csh')
 
 class ExecutePythonScript(ExecuteScript):
     '''Execute in-line python script using python as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', output=[], working_dir=None, submitter=None):
-        ExecuteScript.__init__(self, script=script, interpreter='python',
+    def __init__(self, script='', args='', output=[], working_dir=None, submitter=None):
+        ExecuteScript.__init__(self, script=script, interpreter='python', args=args,
             output=output, working_dir=working_dir, submitter=submitter,
             suffix='.py')
 
@@ -1610,8 +1629,8 @@ class ExecutePython3Script(ExecuteScript):
     '''Execute in-line python script using python3 as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', output=[], working_dir=None, submitter=None):
-        ExecuteScript.__init__(self, script=script, interpreter='python3',
+    def __init__(self, script='', args='', output=[], working_dir=None, submitter=None):
+        ExecuteScript.__init__(self, script=script, interpreter='python3', args=args,
             output=output, working_dir=working_dir, submitter=submitter,
             suffix='.py')
 
@@ -1619,11 +1638,20 @@ class ExecutePerlScript(ExecuteScript):
     '''Execute in-line perl script using perl as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', output=[], working_dir=None, submitter=None):
-        ExecuteScript.__init__(self, script=script, interpreter='perl',
+    def __init__(self, script='', args='',  output=[], working_dir=None, submitter=None):
+        ExecuteScript.__init__(self, script=script, interpreter='perl', args=args,
             output=output, working_dir=working_dir, submitter=submitter,
             suffix='.perl')
 
+
+class ExecuteRubyScript(ExecuteScript):
+    '''Execute in-line perl script using perl as interpreter. Please
+    check action ExecuteScript for more details.
+    '''
+    def __init__(self, script='', args='',  output=[], working_dir=None, submitter=None):
+        ExecuteScript.__init__(self, script=script, interpreter='ruby', args=args,
+            output=output, working_dir=working_dir, submitter=submitter,
+            suffix='.rb')
 
 class DecompressFiles(PipelineAction):
     '''This action gets a list of input files from input file, decompressing
