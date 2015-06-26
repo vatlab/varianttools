@@ -595,7 +595,7 @@ class ImportModules(PipelineAction):
         action=ImportModules('DNASeq_tools.py')
         action=ImportModules(['DNASeq_tools.py', 'simuPOP.demography'])
     '''
-    def __init__(self, modules=[]):
+    def __init__(self, modules=[], script=''):
         '''Import one or more modules to be used by the existing pipeline. 
         
         Parameters:
@@ -606,14 +606,22 @@ class ImportModules(PipelineAction):
                 the path of the pipeline (if a local pipeline is used), or download
                 from the Variant Tools Repository under directory pipeline.
 
-
+            script (string or list of strings):
+                One or more in-line script that defines Python functions or customized
+                actions that will be used in this pipeline. This allows users to define
+                actions and utility functions that do not need to be shared with other
+                pipelines but might be used repeatedly in this pipeline. Otherwise a
+                ExecuteFunction action can be used.
         '''
         if isinstance(modules, str):
             self.modules = [modules]
         else:
             self.modules = modules
-        # threads to _monitor the spawned jobs
-        self._monitors = Queue.Queue()
+        #
+        if isinstance(script, str):
+            self.script = script
+        else:
+            self.script = '\n'.join(script)
 
     def __call__(self, ifiles, pipeline=None):
         for module in self.modules:
@@ -652,6 +660,16 @@ class ImportModules(PipelineAction):
                     pipeline.GLOBALS.update(local_dict.__dict__)
                 except ImportError as e:
                     raise RuntimeError('Failed to import module {}: {}'.format(module, e))
+        # script
+        if self.script:
+            try:
+                local_dict = {}
+                exec(self.script, globals(), local_dict)
+                env.logger.info('{} symbols are imported form inline script'.format(len(local_dict)))
+                pipeline.GLOBALS.update(local_dict)
+            except Exception as e:
+                raise RuntimeError('Failed to execute script "{}": {}'.format(self.script, e))
+
         return ifiles
 
 
@@ -1297,6 +1315,79 @@ class RunCommand(PipelineAction):
         else:
             self._run_command()
             return True
+
+class ExecuteFunction(PipelineAction):
+    '''This action execute an script that defines a function, which will be called with 
+    parameter ifile and pipeline to to perform pipeline action. This action provides a
+    way to implement pipeline actions on the fly. Note that functions defined in this
+    action are NOT visible by the pipeline or other actions. Please use the script
+    parameter of action ImportModule if you need to define pipeline-specific functions.
+   
+    File Flow:
+
+        Input passthrough if no output file is specified.
+            INPUT ====> INPUT
+        Generate output if one or more output files are specified.
+            INPUT ==> CMD ==> OUTPUT
+        
+    Raises:
+        Raises an error if an command fails to execute.
+
+    '''
+    def __init__(self, script='', func='execute', output=[], **kwargs):
+        '''This action accepts one or a list of strings and execute it as a Python script.
+        It then look for a function (default to execute) and execute it with parameters
+        ifiles (input files), ofiles (output files), and pipeline.
+
+        Parameters:
+            script (string or list of strings):
+                One or more strings to execute. List of strings will be concatenated by new
+                lines. The complete script will be executed as a Python script. This
+                script should define a function called "execute" that accepts parameters
+                ifiles, ofiles, and pipeline.
+
+            function (string, default to "execute"):
+                Name of the function that will be called.
+
+            output (string):
+                Output files.
+
+            kwargs (additional parameters):
+                Any additional kwargs will be passed to the function executed.
+        '''
+        if not script:
+            raise ValueError('No valid script is specified.')
+        if isinstance(script, str):
+            self.script = script
+        else:
+            self.script = '\n'.join(script)
+        #
+        m = hashlib.md5()
+        m.update(self.script)
+        #
+        self.func = func
+        self.kwargs = kwargs
+        #
+        PipelineAction.__init__(self, cmd='python -e {} {}'.format(m, kwargs), output=output)
+
+    def _execute(self, ifiles, pipeline=None):
+        try:
+            local_dict = {}
+            exec(self.script, globals(), local_dict)
+        except Exception as e:
+            raise RuntimeError('Failed to execute script "{}": {}'.format(self.script, e))
+        #
+        if not self.func in local_dict:
+            raise RuntimeError("Passed script does not define function {}".format(self.func))
+        #
+        try:
+            # allow the use of symbols imported for the pipeline
+            globals().update(pipeline.GLOBALS)
+            return local_dict[self.func](ifiles, self.output, pipeline, **self.kwargs)
+        except Exception as e:
+            raise RuntimeError('Failed to execute function {} with input files {} and output files {}: {}'
+                .format(self.func, ', '.join(ifiles), ', '.join(self.output), e))
+
 
 class ExecuteScript(PipelineAction):
     """This action execute specified in-line script with specified command (bash, python, perl
