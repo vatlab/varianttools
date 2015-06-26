@@ -47,10 +47,12 @@ if sys.version_info.major == 2:
     from ucsctools_py2 import showTrack
     from cgatools_py2 import fasta2crr
     from ConfigParser import SafeConfigParser
+    from StringIO import StringIO
 else:
     from ucsctools_py3 import showTrack
     from cgatools_py3 import fasta2crr
     from configparser import ConfigParser
+    from io import StringIO
 
 from multiprocessing import Process
 from subprocess import Popen, PIPE
@@ -678,6 +680,10 @@ class PipelineDescription:
         self.pipelines = {}
         self.pipeline_descriptions = {}
         self.pipeline_type = pipeline_type
+        # a strange piece of text and replaces newlines in triple
+        # quoted text so that the text can be read as a single string.
+        # Newlines in the processed values will be translated back.
+        self.PH = chr(5) + chr(6) + chr(7)
         #
         if os.path.isfile(name + '.pipeline'):
             self.name = os.path.split(name)[-1]
@@ -702,6 +708,24 @@ class PipelineDescription:
             args = self.parseArgs(pipeline, extra_args)
             self.parsePipeline(pipeline, defaults=args)
 
+    def _translateConfigText(self, filename):
+        # We would like to keep everything between triple quotes literal. There is no easy way 
+        # to achive that so we have to convert the text and then convert back after
+        # the data is read.
+        if not hasattr(self, 'config_text'):
+            with open(filename, 'r') as inputfile:
+                self.config_text = inputfile.read()
+                #
+                for quote in ('"""', "'''"):
+                    pieces = re.split(quote, self.config_text)
+                    for i in range(1, len(pieces), 2):
+                        if pieces[i-1].endswith('\n'):
+                            pieces[i-1] = pieces[i-1] + ' '
+                        # replace string with an unlikely character
+                        pieces[i] = pieces[i].replace('\n', self.PH)
+                    self.config_text = quote.join(pieces)
+        return self.config_text
+        
     def parseArgs(self, filename, fmt_args):
         with open(filename) as pp:
             firstline = pp.readline()
@@ -714,7 +738,7 @@ class PipelineDescription:
             fmt_parser = SafeConfigParser()
         else:
             fmt_parser = ConfigParser(strict=False)
-        fmt_parser.read(filename)
+        fmt_parser.readfp(StringIO(self._translateConfigText(filename)))
         parameters = fmt_parser.items('DEFAULT')
         parser = argparse.ArgumentParser(prog='vtools CMD --pipeline {}'
             .format(os.path.split(filename)[-1]),
@@ -744,7 +768,7 @@ class PipelineDescription:
         # but there is no simple way to make it python2 compatible.
         #with open(filename, 'r', encoding='UTF-8') as inputfile:
         #    parser.readfp(inputfile)
-        parser.read(filename)
+        parser.readfp(StringIO(self._translateConfigText(filename)))
         # sections?
         sections = parser.sections()
         if 'pipeline description' not in sections:
@@ -790,11 +814,11 @@ class PipelineDescription:
                             step_vars.append([item, parser.get(section, item, vars=defaults)])
                     for pname,pidx in zip(pnames, pidxs):
                         command = PipelineCommand(index=pidx,
-                            input=parser.get(section, 'input', vars=defaults) if 'input' in items else None,
-                            input_emitter=parser.get(section, 'input_emitter', vars=defaults) if 'input_emitter' in items else '',
-                            action=parser.get(section, 'action', vars=defaults) if 'action' in items else '',
+                            input=parser.get(section, 'input', vars=defaults).replace(self.PH, '\n') if 'input' in items else None,
+                            input_emitter=parser.get(section, 'input_emitter', vars=defaults).replace(self.PH, '\n') if 'input_emitter' in items else '',
+                            action=parser.get(section, 'action', vars=defaults).replace(self.PH, '\n') if 'action' in items else '',
                             pipeline_vars=step_vars,
-                            comment=parser.get(section, 'comment', raw=True) if 'comment' in items else '')
+                            comment=parser.get(section, 'comment', raw=True).replace(self.PH, '\n') if 'comment' in items else '')
                         self.pipelines[pname].append(command)
                 except Exception as e:
                     raise ValueError('Invalid section {}: {}'.format(section, e))
