@@ -2242,7 +2242,9 @@ class Pipeline:
                 model_name=pname,
                 null_input=env.null_input,
                 vtools_version=proj.version,
-                pipeline_format='1.0' if self.pipeline.pipeline_format is None else self.pipeline.pipeline_format)
+                pipeline_format=self.pipeline.pipeline_format)
+        # these are command line options
+        self.VARS.update(self.pipeline.commandline_opts)
         self.VARS.update({k:str(v) for k,v in kwargs.items()})
         #
         self.GLOBALS = {}

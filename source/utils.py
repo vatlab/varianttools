@@ -3644,7 +3644,7 @@ class VariableSubstitutor:
                 if ':' in KEY:
                     # a lambda function?
                     try:
-                        FUNC = eval('lambda {}'.format(piece[2:-1]))
+                        FUNC = eval('lambda {}'.format(piece[2:-1].replace('\n', ' ')))
                     except Exception as e:
                         env.logger.warning('Failed to interpret {} as a pipeline variable: {}'
                             .format(piece, e))

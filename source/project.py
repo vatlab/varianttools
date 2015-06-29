@@ -46,12 +46,12 @@ import pydoc
 if sys.version_info.major == 2:
     from ucsctools_py2 import showTrack
     from cgatools_py2 import fasta2crr
-    from ConfigParser import SafeConfigParser
+    from ConfigParser import SafeConfigParser, RawConfigParser
     from StringIO import StringIO
 else:
     from ucsctools_py3 import showTrack
     from cgatools_py3 import fasta2crr
-    from configparser import ConfigParser
+    from configparser import ConfigParser, RawConfigParser
     from io import StringIO
 
 from multiprocessing import Process
@@ -671,15 +671,37 @@ class fileFMT:
 
 
 
+class MyConfigParser(RawConfigParser):
+    def __init__(self, *args, **kwargs):
+        RawConfigParser.__init__(self, *args, **kwargs)
+
+    def optionxform(self, x):
+        return str(x)
+
+    def items(self, section, raw=False, vars={}):
+        res = RawConfigParser.items(self, section)
+        return res
+
+    def get(self, section, item, raw=False, vars={}):
+        res = RawConfigParser.get(self, section, item)
+        if re.search(r'%\(\w+\)s', res):
+            env.logger.warning('The use of %(VAR)s variable is deprecated. Please use ${{}} instead: {} ..'
+                .format(' '.join(res.split())[:40]))
+            new_res = re.sub(r'%\((\w+)\)s', r'${\1}', res)  
+            env.logger.debug('Replacing "{}" with "{}"'.format(res, new_res))
+            return new_res
+        return res
+
 class PipelineDescription:
     def __init__(self, name, extra_args=[], pipeline_type='pipeline'):
         '''Pipeline configuration file'''
         self.description = None
-        self.pipeline_format = None
+        self.pipeline_format = '1.0'
         self.pipeline_vars = {}
         self.pipelines = {}
         self.pipeline_descriptions = {}
         self.pipeline_type = pipeline_type
+        self.commandline_opts = {}
         # a strange piece of text and replaces newlines in triple
         # quoted text so that the text can be read as a single string.
         # Newlines in the processed values will be translated back.
@@ -687,12 +709,12 @@ class PipelineDescription:
         #
         if os.path.isfile(name + '.pipeline'):
             self.name = os.path.split(name)[-1]
-            args = self.parseArgs(name + '.pipeline', extra_args)
-            self.parsePipeline(name + '.pipeline', defaults=args) 
+            self.commandline_opts = self.parseArgs(name + '.pipeline', extra_args)
+            self.parsePipeline(name + '.pipeline', defaults=self.commandline_opts) 
         elif name.endswith('.pipeline') and os.path.isfile(name):
             self.name = os.path.split(name)[-1][:-9]
-            args = self.parseArgs(name, extra_args)
-            self.parsePipeline(name, defaults=args) 
+            self.commandline_opts = self.parseArgs(name, extra_args)
+            self.parsePipeline(name, defaults=self.commandline_opts) 
         else:
             # not found, try online
             if name.endswith('.pipeline'):
@@ -705,8 +727,8 @@ class PipelineDescription:
                 raise ValueError('Failed to download pipeline specification '
                     'file {}.pipeline: {}'.format(name, e))
             self.name = name
-            args = self.parseArgs(pipeline, extra_args)
-            self.parsePipeline(pipeline, defaults=args)
+            self.commandline_opts = self.parseArgs(pipeline, extra_args)
+            self.parsePipeline(pipeline, defaults=self.commandline_opts)
 
     def _translateConfigText(self, filename):
         # We would like to keep everything between triple quotes literal. There is no easy way 
@@ -732,14 +754,22 @@ class PipelineDescription:
                 if not line.startswith('#'):
                     break
                 if line.startswith('##fileformat='):
-                    m = re.match('##fileformat=PIPELINE([\d.]+)', line)
+                    m = re.match('##fileformat=\D*([\d.]+)', line)
                     if m is None:
-                        raise ValueError('Pipeline format string should have format ##fileformat=PIPELINEx.xx: {} detected'.format(firstline))
+                        raise ValueError('Pipeline format string should have format ##fileformat=PIPELINEx.xx: {} detected'
+                            .format(line))
                     self.pipeline_format = m.group(1)
-        if sys.version_info.major == 2:
-            fmt_parser = SafeConfigParser()
+        #
+        env.logger.debug('Pipeline version {}'.format(self.pipeline_format))
+        # We used format interpolation in older version 
+        if float(self.pipeline_format) <= 1.0:
+            if sys.version_info.major == 2:
+                fmt_parser = SafeConfigParser()
+            else:
+                fmt_parser = ConfigParser(strict=False)
         else:
-            fmt_parser = ConfigParser(strict=False)
+            # and now we only use pipeline variables.
+            fmt_parser = MyConfigParser()
         fmt_parser.readfp(StringIO(self._translateConfigText(filename)))
         parameters = fmt_parser.items('DEFAULT')
         parser = argparse.ArgumentParser(prog='vtools CMD --pipeline {}'
@@ -762,10 +792,14 @@ class PipelineDescription:
 
     def parsePipeline(self, filename, defaults):
         self.spec_file = filename
-        if sys.version_info.major == 2:
-            parser = SafeConfigParser()
+        if float(self.pipeline_format) <= 1.0:
+            if sys.version_info.major == 2:
+                parser = SafeConfigParser()
+            else:
+                parser = ConfigParser(strict=False)
         else:
-            parser = ConfigParser(strict=False)
+            # and now we only use pipeline variables.
+            parser = MyConfigParser()
         # this allows python3 to read .pipeline file with non-ascii characters,
         # but there is no simple way to make it python2 compatible.
         #with open(filename, 'r', encoding='UTF-8') as inputfile:
