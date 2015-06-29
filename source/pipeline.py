@@ -423,6 +423,29 @@ class PipelineAction:
             except Exception as e:
                 env.logger.warning('Fail to remove {}: {}'.format(filename, e))
 
+    def _useVars(self, text, pipeline_vars={}):
+        # reduce extra newline, space etc
+        text = ' '.join(text.split())
+        #
+        # if there are pipeline vars, try to use pipeline vars to replace the 
+        # text 
+        if pipeline_vars:
+            files_and_dirs = []
+            for key, item in pipeline_vars.items():
+                if isinstance(item, str) and (os.path.isfile(item) or os.path.isdir(item)):
+                    files_and_dirs.append([key, item])
+            # sort by length
+            files_and_dirs = sorted(files_and_dirs, key=lambda x: -len(x[1]))
+            #
+            # try to subsitute
+            pieces = text.split()
+            for key, item in files_and_dirs:
+                for idx,p in enumerate(pieces):
+                    if p.startswith(item):
+                        pieces[idx] = '${{{}}}{}'.format(key, pieces[idx][len(item):])
+            text = ' '.join(pieces)
+        return text                   
+            
     def __call__(self, ifiles, pipeline=None):
         '''Execute action with input files ``ifiles`` with runtime information
         stored in ``pipeline``. This function is called by the pipeline and calls
@@ -447,8 +470,8 @@ class PipelineAction:
             if os.path.isfile(self.proc_info):
                 with open(self.proc_info) as exe_info:
                     cmd = exe_info.readline().strip()
-                if cmd == '; '.join(self.cmd).strip() and existAndNewerThan(self.output, ifiles,
-                    md5file=self.proc_info):
+                if cmd == self._useVars('; '.join(self.cmd), pipeline.VARS) and existAndNewerThan(self.output, ifiles,
+                    md5file=self.proc_info, pipeline=pipeline):
                     env.logger.info('Reuse existing {}'.format(', '.join(self.output)))
                     self._bypass(ifiles, pipeline)
                     if self.output:
@@ -471,13 +494,13 @@ class PipelineAction:
         #
         if self.output:
             with open(self.proc_info, 'w') as exe_info:
-                exe_info.write('{}\n'.format('; '.join(self.cmd)))
+                exe_info.write('{}\n'.format(self._useVars('; '.join(self.cmd), pipeline.VARS)))
                 exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
                 for f in ifiles:
                     if pipeline is not None and f == pipeline.VARS['null_input']:
                         continue
                     # for performance considerations, use partial MD5
-                    exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                    exe_info.write('{}\t{}\t{}\n'.format(self._useVars(f, pipeline.VARS), os.path.getsize(f),
                         calculateMD5(f, partial=True)))
         # now, run the job, write info if it is successfully finished.
         # Otherwise the job might be forked and it will record the signature by itself.
@@ -1163,7 +1186,8 @@ class RunCommand(PipelineAction):
         if self.proc_lck:
             env.lock(self.proc_lck, str(os.getpid()))
         for cur_cmd in self.cmd:
-            env.logger.info('Running [[{}]]'.format(cur_cmd))
+            env.logger.info('Running [[{}]]{}'.format(cur_cmd,
+                ' under {}'.format(self.working_dir) if self.working_dir else ''))
             ret = subprocess.call(cur_cmd, shell=True, 
                 stdout=None if self.proc_out is None else open(self.proc_out, 'w'),
                 stderr=None if self.proc_err is None else open(self.proc_err, 'w'),
@@ -2231,6 +2255,8 @@ class Pipeline:
         # the project will be opened when needed
         with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY'], verbosity=self.verbosity) as proj:
             self.VARS = _CaseInsensitiveDict(
+                HOME=os.environ['HOME'],
+                CWD=os.getcwd(),
                 cmd_input=input_files,
                 cmd_output=output_files,
                 temp_dir=env.temp_dir,
@@ -2253,7 +2279,7 @@ class Pipeline:
         # they might refer to each other
         self.VARS.update(self.pipeline.pipeline_vars)
         for key, val in self.pipeline.pipeline_vars.items():
-            self.VARS[key.lower()] = substituteVars(val, self.VARS, self.GLOBALS)
+            self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS)
         for key, val in self.VARS.items():
             env.logger.trace('{} is set to {}'.format(key, val))
         #

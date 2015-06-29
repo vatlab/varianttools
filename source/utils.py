@@ -2384,7 +2384,7 @@ class FileInfo:
                 self.load()
         return self._first_line
 
-def existAndNewerThan(ofiles, ifiles, md5file=None):
+def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
     '''Check if ofiles is newer than ifiles. The oldest timestamp
     of ofiles and newest timestam of ifiles will be used if 
     ofiles or ifiles is a list. If a md5file is specified,
@@ -2396,6 +2396,7 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
     _ifiles = [ifiles] if not isinstance(ifiles, list) else ifiles
     _ifiles = [x for x in _ifiles if x != env.null_input]
     _ofiles = [ofiles] if not isinstance(ofiles, list) else ofiles
+    #
     # file exist?
     for ifile in _ifiles:
         if not (os.path.isfile(ifile) or os.path.isfile(ifile + '.file_info')):
@@ -2425,11 +2426,12 @@ def existAndNewerThan(ofiles, ifiles, md5file=None):
                 if not line.strip():
                     break
                 try:
-                    f, s, m = line.split('\t')
+                    f_raw, s, m = line.split('\t')
+                    f = substituteVars(f, pipeline.VARS, pipeline.GLOBALS)
                     nFiles[-1] += 1
                     s = int(s)
                 except Exception as e:
-                    env.logger.error('Wrong md5 line {} in {}'.format(line, md5file))
+                    env.logger.error('Wrong md5 line {} in {}: e'.format(line, md5file, e))
                     continue
                 # we do not check if f is one of _ifiles or _ofiles because presentation
                 # of files might differ
@@ -3698,12 +3700,15 @@ class VariableSubstitutor:
             return ''.join(pieces)
 
     def substituteWith(self, PipelineVars, PipelineGlobals):
-        while True:
+        count = 1
+        while count < 10:
             new_text = self._substitute(self.text, PipelineVars, PipelineGlobals)
             if new_text == self.text:
                 return new_text
             else:
                 self.text = new_text
+            count += 1
+        raise ValueError('Failed to evaluate pipeline varialbe {}. Perhpas the variable is nested.'.format(self.text))
     
 def substituteVars(text, PipelineVars, PipelineGlobals):
     return VariableSubstitutor(text).substituteWith(PipelineVars, PipelineGlobals)
