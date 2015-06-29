@@ -785,9 +785,6 @@ class PipelineDescription:
             parser.add_argument('--{}'.format(par[0]), help=self.parameters[-1][2],
                 nargs='*', default=par[1])
         args = vars(parser.parse_args(fmt_args))
-        for key in args:
-            if type(args[key]) == list:
-                args[key] = ','.join(args[key])
         return args
 
     def parsePipeline(self, filename, defaults):
