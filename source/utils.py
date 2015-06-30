@@ -3630,6 +3630,7 @@ class VariableSubstitutor:
         elif type(var) == list:
             return ' '.join([self.var_expr(x) for x in var])
         else:
+            env.logger.warning('Return value of pipeline variable is not string or list of strings: {}'.format(var))
             return str(var)
 
     def _substitute(self, text, PipelineVars, PipelineGlobals):
@@ -3646,7 +3647,7 @@ class VariableSubstitutor:
                 if ':' in KEY:
                     # a lambda function?
                     try:
-                        FUNC = eval('lambda {}'.format(piece[2:-1].replace('\n', ' ')))
+                        FUNC = eval('lambda {}'.format(piece[2:-1].replace('\\\n', '').replace('\n', ' ')))
                     except Exception as e:
                         env.logger.warning('Failed to interpret {} as a pipeline variable: {}'
                             .format(piece, e))

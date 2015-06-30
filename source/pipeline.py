@@ -635,7 +635,7 @@ class ImportModules(PipelineAction):
                 actions that will be used in this pipeline. This allows users to define
                 actions and utility functions that do not need to be shared with other
                 pipelines but might be used repeatedly in this pipeline. Otherwise a
-                ExecuteFunction action can be used.
+                ExecutePipelineFunction action can be used.
         '''
         if isinstance(modules, str):
             self.modules = [modules]
@@ -1392,6 +1392,9 @@ class ExecutePythonAction(PipelineAction):
         #
         self.func = func
         self.kwargs = kwargs
+        #
+        if func.__doc__:
+            self.__doc__ == func.__doc__
         #
         PipelineAction.__init__(self, cmd='python -e {} {}'.format(m, kwargs), output=output)
 
@@ -2258,18 +2261,18 @@ class Pipeline:
             self.VARS = _CaseInsensitiveDict(
                 HOME=os.environ['HOME'],
                 CWD=os.getcwd(),
-                cmd_input=input_files,
-                cmd_output=output_files,
-                temp_dir=env.temp_dir,
-                cache_dir=env.cache_dir,
-                local_resource=env.local_resource,
-                ref_genome_build=proj.build if proj.build is not None else '',
-                pipeline_name=pname,
-                spec_file=self.spec_file,
-                model_name=pname,
-                null_input=env.null_input,
-                vtools_version=proj.version,
-                pipeline_format=self.pipeline.pipeline_format)
+                CMD_INPUT=input_files,
+                CMD_OUTPUT=output_files,
+                TEMP_DIR=env.temp_dir,
+                CACHE_DIR=env.cache_dir,
+                LOCAL_RESOURCE=env.local_resource,
+                REF_GENOME_BUILD=proj.build if proj.build is not None else '',
+                PIPELINE_NAME=pname,
+                SPEC_FILE=self.spec_file,
+                MODEL_NAME=pname,
+                NULL_INPUT=env.null_input,
+                VTOOLS_VERSION=proj.version,
+                PIPELINE_FORMAT=self.pipeline.pipeline_format)
         # these are command line options
         self.VARS.update(self.pipeline.commandline_opts)
         self.VARS.update({k:str(v) for k,v in kwargs.items()})
