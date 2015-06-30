@@ -392,7 +392,7 @@ class PipelineAction:
         and raise an exception for errors. '''
         raise RuntimeError('Please define your own execute function in an derived class of PipelineAction.')
 
-    def _write_info(self):
+    def _write_info(self, pipeline=None):
         if not self.output:
             return
         with open(self.proc_info, 'a') as exe_info:
@@ -401,7 +401,7 @@ class PipelineAction:
                 if not os.path.isfile(f):
                     raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
                 # for performance considerations, use partial MD5
-                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
+                exe_info.write('{}\t{}\t{}\n'.format(self._useVars(f, pipeline.VARS), os.path.getsize(f),
                     calculateMD5(f, partial=True)))
             # write standard output to exe_info
             exe_info.write('\n\nSTDOUT\n\n')
@@ -441,7 +441,7 @@ class PipelineAction:
             pieces = text.split()
             for key, item in files_and_dirs:
                 for idx,p in enumerate(pieces):
-                    if p.startswith(item):
+                    if p.startswith(item) and (len(p) == len(item) or not (p[len(item)].isalpha() or p[len(item)].isdigit())):
                         pieces[idx] = '${{{}}}{}'.format(key, pieces[idx][len(item):])
             text = ' '.join(pieces)
         return text                   
@@ -470,7 +470,8 @@ class PipelineAction:
             if os.path.isfile(self.proc_info):
                 with open(self.proc_info) as exe_info:
                     cmd = exe_info.readline().strip()
-                if cmd == self._useVars('; '.join(self.cmd), pipeline.VARS) and existAndNewerThan(self.output, ifiles,
+                if self._useVars(cmd, pipeline.VARS) == self._useVars('; '.join(self.cmd), pipeline.VARS) \
+                    and existAndNewerThan(self.output, ifiles,
                     md5file=self.proc_info, pipeline=pipeline):
                     env.logger.info('Reuse existing {}'.format(', '.join(self.output)))
                     self._bypass(ifiles, pipeline)
@@ -508,7 +509,7 @@ class PipelineAction:
         if ret not in [True, False]:
             env.logger.warning('User defined execute function of a PipelineAction should return True or False')
         if ret:
-            self._write_info()#
+            self._write_info(pipeline)#
         #
         if self.output:
             return self.output
@@ -1340,7 +1341,7 @@ class RunCommand(PipelineAction):
             self._run_command()
             return True
 
-class ExecuteFunction(PipelineAction):
+class ExecutePythonAction(PipelineAction):
     '''This action execute an script that defines a function, which will be called with 
     parameter ifile and pipeline to to perform pipeline action. This action provides a
     way to implement pipeline actions on the fly. Note that functions defined in this
@@ -1601,7 +1602,7 @@ class ExecuteScript(PipelineAction):
         #    self.pipeline.THREADS.pop(self.output[0])
         #
         # the thread will end here
-        env.logger.trace('Thread for output {} ends.'.format(self.output[0]))
+        env.logger.info('{} has been successfully generated.'.format(self.output[0]))
         for filename in glob.glob(self.output[0] + '.done_*'):
             try:
                 os.remove(filename)

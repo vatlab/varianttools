@@ -2427,11 +2427,11 @@ def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
                     break
                 try:
                     f_raw, s, m = line.split('\t')
-                    f = substituteVars(f, pipeline.VARS, pipeline.GLOBALS)
+                    f = substituteVars(f_raw, pipeline.VARS, pipeline.GLOBALS)
                     nFiles[-1] += 1
                     s = int(s)
                 except Exception as e:
-                    env.logger.error('Wrong md5 line {} in {}: e'.format(line, md5file, e))
+                    env.logger.error('Wrong md5 line {} in {}: {}'.format(line, md5file, e))
                     continue
                 # we do not check if f is one of _ifiles or _ofiles because presentation
                 # of files might differ
