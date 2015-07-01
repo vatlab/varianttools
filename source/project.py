@@ -705,7 +705,8 @@ class PipelineDescription:
         # a strange piece of text and replaces newlines in triple
         # quoted text so that the text can be read as a single string.
         # Newlines in the processed values will be translated back.
-        self.PH = chr(5) + chr(6) + chr(7)
+        self.newline_PH = chr(5) + chr(6) + chr(7)
+        self.semicolon_PH = chr(16) + chr(17)
         #
         if os.path.isfile(name + '.pipeline'):
             self.name = os.path.split(name)[-1]
@@ -736,7 +737,7 @@ class PipelineDescription:
         # the data is read.
         if not hasattr(self, 'config_text'):
             with open(filename, 'r') as inputfile:
-                self.config_text = inputfile.read()
+                self.config_text = inputfile.read().replace(';', self.semicolon_PH)
             #
             for quote in ('"""', "'''"):
                 pieces = re.split(quote, self.config_text)
@@ -744,7 +745,7 @@ class PipelineDescription:
                     if pieces[i-1].endswith('\n'):
                         pieces[i-1] = pieces[i-1] + ' '
                     # replace string with an unlikely character
-                    pieces[i] = pieces[i].replace('\n', self.PH)
+                    pieces[i] = pieces[i].replace('\n', self.newline_newline_PH)
                 self.config_text = quote.join(pieces)
             # handling comments
             #
@@ -962,11 +963,11 @@ class PipelineDescription:
                             step_vars.append([item, parser.get(section, item, vars=defaults)])
                     for pname,pidx in zip(pnames, pidxs):
                         command = PipelineCommand(index=pidx,
-                            input=parser.get(section, 'input', vars=defaults).replace(self.PH, '\n') if 'input' in items else None,
-                            input_emitter=parser.get(section, 'input_emitter', vars=defaults).replace(self.PH, '\n') if 'input_emitter' in items else '',
-                            action=parser.get(section, 'action', vars=defaults).replace(self.PH, '\n') if 'action' in items else '',
+                            input=parser.get(section, 'input', vars=defaults).replace(self.newline_PH, '\n').replace(self.semicolon_PH, ';') if 'input' in items else None,
+                            input_emitter=parser.get(section, 'input_emitter', vars=defaults).replace(self.newline_PH, '\n').replace(self.semicolon_PH, ';') if 'input_emitter' in items else '',
+                            action=parser.get(section, 'action', vars=defaults).replace(self.newline_PH, '\n').replace(self.semicolon_PH, ';') if 'action' in items else '',
                             pipeline_vars=step_vars,
-                            comment=parser.get(section, 'comment', raw=True).replace(self.PH, '\n') if 'comment' in items else '')
+                            comment=parser.get(section, 'comment', raw=True).replace(self.newline_PH, '\n').replace(self.semicolon_PH, ';') if 'comment' in items else '')
                         self.pipelines[pname].append(command)
                 except Exception as e:
                     raise ValueError('Invalid section {}: {}'.format(section, e))
