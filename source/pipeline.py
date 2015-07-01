@@ -560,7 +560,7 @@ class SequentialActions(PipelineAction):
         for a in self.actions:
             # the input of the next action is the output of the
             # previous action.
-            ifiles = a(ifiles)
+            ifiles = a(ifiles, pipeline)
         # return the output of the last action
         return ifiles
 
@@ -2322,6 +2322,8 @@ class Pipeline:
             # if this is an empty string
             elif not command.input.strip():
                 step_input = []
+            elif command.input == 'None':
+                step_input = [self.VARS['null_input']]
             else:
                 step_input = shlex.split(substituteVars(command.input, self.VARS, self.GLOBALS))
             #
@@ -2378,7 +2380,7 @@ class Pipeline:
                     #
                     if not action.strip():
                         action = 'NullAction()'
-                    action = eval(action, globals(), self.GLOBALS)
+                    action = eval('(' + action + ')', globals(), self.GLOBALS)
                     if isinstance(action, (tuple, list)):
                         action = SequentialActions(action)
                     if not issubclass(action.__class__, PipelineAction):
@@ -2401,9 +2403,9 @@ class Pipeline:
                             'completion of step {}_{}'
                             .format(f, pname, command.index))
                 for key, val in command.pipeline_vars:
-                    self.VARS[key.lower()] = substituteVars(val, self.VARS, self.GLOBALS)
+                    self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS)
                     env.logger.debug('Pipeline variable {} is set to {}'
-                        .format(key, self.VARS[key.lower()]))
+                        .format(key, self.VARS[key]))
                 #
                 ifiles = step_output
                 # this step is successful, go to next

@@ -745,7 +745,7 @@ class PipelineDescription:
                     if pieces[i-1].endswith('\n'):
                         pieces[i-1] = pieces[i-1] + ' '
                     # replace string with an unlikely character
-                    pieces[i] = pieces[i].replace('\n', self.newline_newline_PH)
+                    pieces[i] = pieces[i].replace('\n', self.newline_PH)
                 self.config_text = quote.join(pieces)
             # handling comments
             #
