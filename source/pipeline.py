@@ -2317,13 +2317,13 @@ class Pipeline:
                 .format(self.pipeline.name, pname, command.index, 
                     ' '.join(command.comment.split())))
             # substitute ${} variables
-            if command.input is None:
+            if 'no_input' in command.options:
+                step_input = [self.VARS['null_input']]
+            elif command.input is None:
                 step_input = ifiles
             # if this is an empty string
             elif not command.input.strip():
                 step_input = []
-            elif command.input == 'None':
-                step_input = [self.VARS['null_input']]
             else:
                 step_input = shlex.split(substituteVars(command.input, self.VARS, self.GLOBALS))
             #
@@ -2332,6 +2332,10 @@ class Pipeline:
                 env.logger.debug('Step ignored because of no input file for step {}_{}.'.format(pname, command.index))
             #
             self.VARS['input{}'.format(command.index)] = step_input
+            for opt in command.options:
+                matched = re.match('^input_alias\s*=\s*([\w\d_]+)$', opt)
+                if matched:
+                    self.VARS[matched.group(1)] = step_input
             env.logger.debug('INPUT of step {}_{}: {}'
                     .format(pname, command.index, step_input))
             # 
@@ -2395,6 +2399,10 @@ class Pipeline:
                         step_output.extend(ofiles)
                 # wait for all pending jobs to finish
                 self.VARS['output{}'.format(command.index)] = step_output
+                for opt in command.options:
+                    matched = re.match('^output_alias\s*=\s*([\w\d_]+)$', opt)
+                    if matched:
+                        self.VARS[matched.group(1)] = step_output
                 env.logger.debug('OUTPUT of step {}_{}: {}'
                     .format(pname, command.index, step_output))
                 for f in step_output:

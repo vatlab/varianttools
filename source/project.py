@@ -72,7 +72,7 @@ Column = namedtuple('Column', ['index', 'field', 'adj', 'comment'])
 #
 # see http://varianttools.sourceforge.net/Calling/New for details
 #
-PipelineCommand = namedtuple('PipelineCommand', ['index', 'input',
+PipelineCommand = namedtuple('PipelineCommand', ['index', 'options', 'input',
     'input_emitter', 'action', 'pipeline_vars', 'comment'])
 #
 # How field will be use in a query. For example, for field sift, it is
@@ -833,7 +833,6 @@ class PipelineDescription:
                     has_pipeline_description_section = True
                 #
                 if in_comment and comment_count == 2:
-                    env.logger.error(line)
                     second_comment.append('    ' + line.lstrip('#'))
                 #
                 if re.match('^\[\s*DEFAULT\s*\]\s*$', line):
@@ -940,11 +939,24 @@ class PipelineDescription:
                 # section header can contain multiple steps
                 # [A_1,B_1,*_3]
                 try:
-                    pnames = [x.strip().rsplit('_', 1)[0] for x in section.split(',')]
-                    pidxs = [x.strip().rsplit('_', 1)[1] for x in section.split(',')]
+                    section_headers = [x.strip() for x in section.split(':', 1)[0].split(',')]
+                    for header in section_headers:
+                        if not re.match('^[\w\d_]+_[\d]+$', header):
+                            raise ValueError('Invalid section header "{}"'.format(section))
+                    #
+                    pnames = [x.strip().rsplit('_', 1)[0] for x in section_headers]
+                    pidxs = [x.strip().rsplit('_', 1)[1] for x in section_headers]
+                    #
+                    if ':' in section:
+                        options = [x.strip() for x in section.split(':', 1)[-1].split(',')]
+                        for opt in options:
+                            if opt != 'no_input' and not re.match('^(output|input)_alias\s*=\s*([\w\d_]+)$', opt):
+                                env.logger.warning('Unrecognized section option: {}'.format(opt))
+                    else:
+                        options = []
                 except Exception as e:
-                    raise ValueError('Invalid section name {} in pipeline description file {}'
-                        .format(section, filename))
+                    raise ValueError('Invalid section name {} in pipeline description file {}: {}'
+                        .format(section, filename, e))
                 if not all([x.isdigit() for x in pidxs]):
                     raise ValueError('Index of a pipeline step should be an integer: {} provided'
                         .format(', '.join(pidxs)))
@@ -963,6 +975,7 @@ class PipelineDescription:
                             step_vars.append([item, parser.get(section, item, vars=defaults)])
                     for pname,pidx in zip(pnames, pidxs):
                         command = PipelineCommand(index=pidx,
+                            options=options,
                             input=parser.get(section, 'input', vars=defaults).replace(self.newline_PH, '\n').replace(self.semicolon_PH, ';') if 'input' in items else None,
                             input_emitter=parser.get(section, 'input_emitter', vars=defaults).replace(self.newline_PH, '\n').replace(self.semicolon_PH, ';') if 'input_emitter' in items else '',
                             action=parser.get(section, 'action', vars=defaults).replace(self.newline_PH, '\n').replace(self.semicolon_PH, ';') if 'action' in items else '',
@@ -1011,6 +1024,7 @@ class PipelineDescription:
                 if '${' in cmd.comment:
                     pipeline[idx] = PipelineCommand(
                         index=cmd.index,
+                        options=cmd.options,
                         input=cmd.input,
                         input_emitter=cmd.input_emitter,
                         action=cmd.action,
