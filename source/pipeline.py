@@ -1341,12 +1341,11 @@ class RunCommand(PipelineAction):
             self._run_command()
             return True
 
-class ExecutePythonAction(PipelineAction):
-    '''This action execute an script that defines a function, which will be called with 
-    parameter ifile and pipeline to to perform pipeline action. This action provides a
-    way to implement pipeline actions on the fly. Note that functions defined in this
-    action are NOT visible by the pipeline or other actions. Please use the script
-    parameter of action ImportModule if you need to define pipeline-specific functions.
+class ExecutePythonCode(PipelineAction):
+    '''This action execute a piece of Python code under the pipeline namespace, which
+    means all pipeline variables will be available to the code. This action provides a
+    way to implement pipeline actions on the fly. Arbitary parameters can be passed
+    and be made available.
    
     File Flow:
 
@@ -1356,26 +1355,20 @@ class ExecutePythonAction(PipelineAction):
             INPUT ==> CMD ==> OUTPUT
         
     Raises:
-        Raises an error if an command fails to execute.
+        Raises an error if the python code fails to execute.
 
     '''
-    def __init__(self, script='', func='execute', output=[], **kwargs):
-        '''This action accepts one or a list of strings and execute it as a Python script.
-        It then look for a function (default to execute) and execute it with parameters
-        ifiles (input files), ofiles (output files), and pipeline.
+    def __init__(self, script='', output=[], modules=[], **kwargs):
+        '''This action accepts one or a list of strings and execute it as a piece of Python
+        code. The input and output files are provided by the pipeline as variables 
+        INPUT and OUTPUT, with additional parameters passed by kwargs.
 
         Parameters:
             script (string or list of strings):
                 One or more strings to execute. List of strings will be concatenated by new
-                lines. The complete script will be executed as a Python script. This
-                script should define a function called "execute" that accepts parameters
-                ifiles, ofiles, and pipeline.
-
-            function (string, default to "execute"):
-                Name of the function that will be called.
-
-            output (string):
-                Output files.
+                lines. The code will be executed under the pipeline namespace, with
+                'pipeline' available to the function (usually used to set pipeline variables
+                through pipeline.VARS.
 
             kwargs (additional parameters):
                 Any additional kwargs will be passed to the function executed.
@@ -1390,31 +1383,56 @@ class ExecutePythonAction(PipelineAction):
         m = hashlib.md5()
         m.update(self.script)
         #
-        self.func = func
         self.kwargs = kwargs
-        #
-        if func.__doc__:
-            self.__doc__ == func.__doc__
+        self.modules = modules
         #
         PipelineAction.__init__(self, cmd='python -e {} {}'.format(m, kwargs), output=output)
 
     def _execute(self, ifiles, pipeline=None):
+        for module in self.modules:
+            # this is a path to a .py file
+            if module.endswith('.py'):
+                if os.path.isfile(module):
+                    pyfile = module
+                # if the .py file locates in the same directory as the pipeline file
+                elif pipeline is not None \
+                    and os.path.isfile(os.path.join(os.path.split(pipeline.spec_file)[0], module)):
+                    pyfile = os.path.join(os.path.split(pipeline.spec_file)[0], module)
+                else:
+                    # try to download it from online
+                    try:
+                        pyfile = downloadFile('simulation/{}'.format(module))
+                    except Exception as e:
+                        try:
+                            pyfile = downloadFile('pipeline/{}'.format(module))
+                        except Exception as e:
+                            raise ValueError('Failed to download required python module {}: {}'.format(module, e))
+                try:
+                    p,f = os.path.split(os.path.abspath(os.path.expanduser(pyfile)))
+                    sys.path.append(p)
+                    local_dict = __import__(f[:-3] if f.endswith('.py') else f, globals(), locals(), module.split('.', 1)[-1:])
+                    env.logger.info('{} symbols are imported form module {}'.format(len(local_dict.__dict__), module))
+                    pipeline.GLOBALS.update(local_dict.__dict__)
+                except Exception as e:
+                    raise RuntimeError('Failed to import module {}: {}'.format(module, e))
+            # now a system module
+            else:
+                try:
+                    # allow loading from current directory
+                    sys.path.append(os.getcwd())
+                    local_dict = __import__(module, globals(), locals(), module.split('.', 1)[-1:])
+                    env.logger.info('{} symbols are imported form module {}'.format(len(local_dict.__dict__), module))
+                    pipeline.GLOBALS.update(local_dict.__dict__)
+                except ImportError as e:
+                    raise RuntimeError('Failed to import module {}: {}'.format(module, e))
         try:
-            local_dict = {}
+            globals().update(pipeline.GLOBALS)
+            local_dict = self.kwargs
+            local_dict['pipeline'] = pipeline
             exec(self.script, globals(), local_dict)
         except Exception as e:
             raise RuntimeError('Failed to execute script "{}": {}'.format(self.script, e))
-        #
-        if not self.func in local_dict:
-            raise RuntimeError("Passed script does not define function {}".format(self.func))
-        #
-        try:
-            # allow the use of symbols imported for the pipeline
-            globals().update(pipeline.GLOBALS)
-            return local_dict[self.func](ifiles, self.output, pipeline, **self.kwargs)
-        except Exception as e:
-            raise RuntimeError('Failed to execute function {} with input files {} and output files {}: {}'
-                .format(self.func, ', '.join(ifiles), ', '.join(self.output), e))
+        return True
 
 
 class ExecuteScript(PipelineAction):

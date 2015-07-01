@@ -737,15 +737,130 @@ class PipelineDescription:
         if not hasattr(self, 'config_text'):
             with open(filename, 'r') as inputfile:
                 self.config_text = inputfile.read()
+            #
+            for quote in ('"""', "'''"):
+                pieces = re.split(quote, self.config_text)
+                for i in range(1, len(pieces), 2):
+                    if pieces[i-1].endswith('\n'):
+                        pieces[i-1] = pieces[i-1] + ' '
+                    # replace string with an unlikely character
+                    pieces[i] = pieces[i].replace('\n', self.PH)
+                self.config_text = quote.join(pieces)
+            # handling comments
+            #
+            # This will allow the use of 
+            #
+            # [header]
+            # # comment_text
+            #
+            # instead of
+            #
+            # [header]
+            # comment: comment_text
+            pieces = re.split('(\n\[[*\w\d,\s-]+\]\s*)', self.config_text)
+            for idx, piece in enumerate(pieces):
+                if re.match('^\s*\[[*\w\d,\s-]+\]\s*$', piece) and idx + 1 != len(pieces):
+                    comment = []
+                    non_comment = []
+                    has_comment = False
+                    for line in pieces[idx + 1].split('\n'):
+                        if line.startswith('#') and not non_comment:
+                            comment.append(line.lstrip('#'))
+                        else:
+                            if line.startswith('comment:') or line.startswith('comment='):
+                                # if there is existing ...
+                                has_comment = True
+                                break
+                            non_comment.append(line)
+                    if not has_comment and comment:
+                        pieces[idx + 1] = '\n'.join(non_comment) + '\n' + 'comment=' + ' '.join(comment) + '\n'
+            self.config_text = '\n'.join(pieces)
+            # now, the [DEFAULT] section
+            #
+            # we can convert
+            #
+            # par=default
+            #     comment 
+            #
+            # automatically to
+            #
+            # par=default
+            # par_comment=comment
+            #
+            #
+            # for the regular section
+            #
+            # if we have
+            #
+            # [section]
+            # input:
+            # somethingelse(
+            #
+            # we change it to
+            #
+            # [section]
+            # input:
+            # action: somethingelse(
+            #
+            # automatically.
+            #
+            # 
+            has_pipeline_description_section = False
+            has_pipeline_description = False
+            pieces = []
+            par = None
+            in_default = False
+            in_comment = False
+            comment_count = 0
+            second_comment = []
+            for line in self.config_text.split('\n'):
+                pieces.append(line)
                 #
-                for quote in ('"""', "'''"):
-                    pieces = re.split(quote, self.config_text)
-                    for i in range(1, len(pieces), 2):
-                        if pieces[i-1].endswith('\n'):
-                            pieces[i-1] = pieces[i-1] + ' '
-                        # replace string with an unlikely character
-                        pieces[i] = pieces[i].replace('\n', self.PH)
-                    self.config_text = quote.join(pieces)
+                if re.match('^\[\s*pipeline desciption\]\s*$', line):
+                    has_pipeline_description_section = True
+                if re.match('^description\s[:=]', line):
+                    has_pipeline_description = True
+                if line.startswith('#'):
+                    if not in_comment:
+                        in_comment = True
+                        comment_count += 1
+                else:
+                    in_comment = False
+                #
+                if not in_comment and not re.match('^\s+', line) and not has_pipeline_description_section:
+                    pieces.insert(len(pieces)-1, '[pipeline description]')
+                    has_pipeline_description_section = True
+                #
+                if in_comment and comment_count == 2:
+                    env.logger.error(line)
+                    second_comment.append('    ' + line.lstrip('#'))
+                #
+                if re.match('^\[\s*DEFAULT\s*\]\s*$', line):
+                    in_default = True
+                    continue
+                if not in_default:
+                    # not in default section, we expand action
+                    # automatically
+                    if (not line.startswith('#')) and re.match('^[\w\d_]+\s*\(', line):
+                        pieces[-1] = 'action: ' + line
+                    continue
+                elif re.match('^\[', line):
+                    in_default = False
+                    continue
+                #
+                matched = re.match('^(\w+[\w\d_]*)\s*[=:]', line)
+                if matched:
+                    par = matched.group(1)
+                elif par is not None:
+                    # if not matched, but par is True, must be the next line
+                    if line.startswith(' ') or line.startswith('\t'):
+                        pieces[-1] = '{}_comment : {}'.format(par, line.lstrip())
+                        par = None
+            self.config_text = '\n'.join(pieces)
+            if not has_pipeline_description:
+                self.config_text = self.config_text.replace('[pipeline description]', '[pipeline description]\ndescription:\n{}'.format('\n'.join(second_comment)))
+            with open('temp', 'w') as tmp:
+                tmp.write(self.config_text)
         return self.config_text
         
     def parseArgs(self, filename, fmt_args):
