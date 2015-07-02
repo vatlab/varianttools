@@ -48,7 +48,7 @@ def modifyVersion(version):
     # modify source/__init__.py to write version string
     if version is not None:
         content = []
-        rev = runCommand('svnversion').strip()
+        rev = runCommand('git rev-list --count HEAD').strip()
         with open('source/__init__.py', 'r') as init_file:
             for x in init_file.readlines():
                 if x.startswith('VTOOLS_VERSION'):
@@ -56,9 +56,8 @@ def modifyVersion(version):
                 elif x.startswith('# $Rev:'):
                     content.append("# $Rev: {} $\n".\
                                    format(rev))
-                elif x.startswith("VTOOLS_REVISION='$Rev"):
-                    content.append("VTOOLS_REVISION='$Rev: {} $'\n".\
-                                   format(rev.rstrip('M').split(':')[0]))
+                elif x.startswith("VTOOLS_REVISION="):
+                    content.append("VTOOLS_REVISION='{}'\n".format(rev))
                 else:
                     content.append(x)
         with open('source/__init__.py', 'w') as init_file:
@@ -71,7 +70,7 @@ def modifyVersion(version):
 
 def setupEnvironment(version):
     #
-    if 'svn' in version or 'rc' in version:
+    if 'beta' in version or 'rc' in version:
         print('WARNING: You are releasing a subversion version of variant tools.')
         print('To make a formal release, you will need to change version string in source/__init__.py')
     #
@@ -325,16 +324,14 @@ def createLinuxPackage(version):
     
 def tagRelease(version):
     try:
-        ret = subprocess.check_output('svn diff', shell=True)
+        ret = subprocess.check_output('git diff', shell=True)
         if ret:
             print('Commit all changes for the release of {}'.format(version))
-            subprocess.call('svn ci -m "Commit all change for the release of {}"'
+            subprocess.call('git add .; git commit -m "Commit all change for the release of {}"'
                 .format(version), shell=True)
         with open(os.devnull, 'w') as fnull:
             print('Tagging release {}...'.format(version))
-            ret = subprocess.call('svn copy svn+ssh://bpeng2000@svn.code.sf.net/p/varianttools/code/trunk '
-                'svn+ssh://bpeng2000@svn.code.sf.net/p/varianttools/code/tags/v{} '
-                ' -m "Version {} released at {}"'.format(version, version, time.asctime()),
+            ret = subprocess.call('git tag -a {} -m "Version {} released at {}"; git push --tags'.format(version, version, time.asctime()),
                 shell=True, stdout=fnull)
             if ret != 0:
                 sys.exit('Failed to tag release {}.'.format(version))
