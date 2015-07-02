@@ -941,7 +941,7 @@ class PipelineDescription:
                 try:
                     section_headers = [x.strip() for x in section.split(':', 1)[0].split(',')]
                     for header in section_headers:
-                        if not re.match('^[\w\d_]+_[\d]+$', header):
+                        if not re.match('^[\w\d*_]+_[\d]+$', header):
                             raise ValueError('Invalid section header "{}"'.format(section))
                     #
                     pnames = [x.strip().rsplit('_', 1)[0] for x in section_headers]
@@ -1005,14 +1005,14 @@ class PipelineDescription:
         # 
         # validate
         for pname in self.pipeline_descriptions:
-            if pname not in [x.lower() for x in  self.pipelines.keys()]:
+            if pname not in self.pipelines.keys():
                 env.logger.warning('Invalid item {0}_description because pipeline '
-                    '{0} is not defined in this file (available: {1}).'
+                    '"{0}" is not defined in this file (available: {1}).'
                     .format(pname, ', '.join(self.pipelines.keys())))
         for pname, pipeline in self.pipelines.items():
-            if pname.lower() not in self.pipeline_descriptions:
+            if pname not in self.pipeline_descriptions:
                 env.logger.warning('No description for {} {} is available.'.format(self.pipeline_type, pname))
-                self.pipeline_descriptions[pname.lower()] = ''
+                self.pipeline_descriptions[pname] = ''
             for idx, cmd in enumerate(pipeline):
                 if cmd is None:
                     raise ValueError('Invalid pipeline {}. Step {} is left unspecified.'
@@ -1045,7 +1045,7 @@ class PipelineDescription:
             ', '.join(sorted(self.pipelines.keys())))
         print('\n' + '\n'.join(textwrap.wrap(text, width=textWidth, subsequent_indent=' '*8)))
         for pname, pipeline in sorted(self.pipelines.items()):
-            paragraphs = dehtml(self.pipeline_descriptions[pname.lower()]).split('\n\n')
+            paragraphs = dehtml(self.pipeline_descriptions[pname]).split('\n\n')
             print('\n' + '\n'.join(textwrap.wrap('{} "{}":  {}'
                 .format(
                 'Model' if self.pipeline_type == 'simulation' else 'Pipeline',

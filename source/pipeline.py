@@ -1540,7 +1540,7 @@ class ExecuteScript(PipelineAction):
         with open(self.script_file, 'w') as script_file:
             script_file.write(self.script)
         #
-        PipelineAction.__init__(self, cmd='{} {}'.format(interpreter, m), output=output)
+        PipelineAction.__init__(self, cmd='{} {}'.format(interpreter, m.hexdigest()), output=output)
 
     def __del__(self):
         try:
@@ -1789,6 +1789,87 @@ class ExecuteRubyScript(ExecuteScript):
         ExecuteScript.__init__(self, script=script, interpreter='ruby', args=args,
             output=output, working_dir=working_dir, submitter=submitter,
             suffix='.rb')
+
+
+class CheckRLibraries(ExecuteRScript):
+    '''Check the existence of specified R libraries. If an package is not available,
+    it will try to install it using "install.package" and from bioconductor. The pipeline
+    will raise an error if one of the library is not available and cannot be installed.
+    
+    File Flow: Input passthrough. 
+
+        INPUT ====> INPUT 
+
+    Raises:
+        A RuntimeError will be raised if a R library is not installed.
+
+    Examples:
+        action=CheckRLibraries('edgeR')
+        action=CheckRLibraries(['edgeR', 'AIMS'])
+    '''
+    def __init__(self, libraries):
+        '''
+        Parameters:
+            libraries (string or list of strings):
+                Name of one of more R libraries to be checked.
+        '''
+        PipelineAction.__init__(self)
+        if type(libraries) == type(''):
+            self.libraries= [libraries]
+        else:
+            self.libraries= libraries
+        # script
+        # get temp filename
+        self.output_file = tempfile.NamedTemporaryFile(mode='w+t', suffix='.txt', delete=False).name
+        script = r'''
+        for (package in c({0})) {{
+            if (require(package, character.only=TRUE, quietly=TRUE)) {{
+                write(paste(package, "AVAILABLE"), file="{1}", append=TRUE)
+                next
+            }} else {{
+                install.packages(package, repos="http://cran.us.r-project.org", 
+                    quiet=TRUE)
+            }}
+            # if the package still does not exist
+            if (!require(package, character.only=TRUE, quietly=TRUE)) {{
+                source("http://bioconductor.org/biocLite.R")
+                biocLite(package, ask=FALSE)
+            }}
+            # if it still does not exist, write the package name to output
+            if (require(package, character.only=TRUE, quietly=TRUE)) {{
+                write(paste(package, "INSTALLED"), file="{1}", append=TRUE)
+            }} else {{
+                write(paste(package, "MISSING"), file="{1}", append=TRUE)
+            }}
+        }}
+        '''.format(', '.join(['"{}"'.format(lib) for lib in self.libraries]), 
+            self.output_file)
+        ExecuteRScript.__init__(self, script=script, output=self.output_file)
+
+    def __call__(self, ifiles, pipeline=None):
+        ExecuteRScript.__call__(self, ifiles, pipeline)
+        with open(self.output_file) as tmp:
+            count = 0
+            for line in tmp:
+                lib, status = line.split()
+                if status.strip() == "MISSING":
+                    env.logger.error('R Library {} is not available and cannot be installed.'.format(lib))
+                    count += 1
+                elif status.strip() == 'AVAILABLE':
+                    env.logger.info('R library {} is available'.format(lib))
+                elif status.strip() == 'INSTALLED':
+                    env.logger.info('R library {} has been installed'.format(lib))
+                else:
+                    raise RuntimeError('This should not happen: {}'.format(line))
+        #
+        try:
+            os.remove(self.output_file)
+        except:
+            pass
+        if count > 0:
+            raise RuntimeError("One or more R libraries are not available.")
+        return ifiles
+
 
 class DecompressFiles(PipelineAction):
     '''This action gets a list of input files from input file, decompressing
