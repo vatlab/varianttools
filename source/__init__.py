@@ -35,8 +35,7 @@ __all__ = ['utils', 'project', 'variant', 'annotation', 'assoTests', 'pipeline',
 # This should be updated when vtools is released, or there is a need to mark a
 # revision between release cycles
 VTOOLS_VERSION='2.7.0svn'
-VTOOLS_REVISION='$Rev$'
-VTOOLS_REVISION=VTOOLS_REVISION[VTOOLS_REVISION.find(" ")+1:-2]
+VTOOLS_REVISION='2950'
 #
 VTOOLS_FULL_VERSION='{} (revision {}) for Python {}.{}.{}'.format(VTOOLS_VERSION, VTOOLS_REVISION, ver.major, ver.minor, ver.micro)
 VTOOLS_COPYRIGHT = '''variant tools {} : Copyright (c) 2011 - 2014 Bo Peng'''.format(VTOOLS_VERSION)
