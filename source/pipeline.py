@@ -2398,7 +2398,7 @@ class Pipeline:
                 .format(self.pipeline.name, pname, command.index, 
                     ' '.join(command.comment.split())))
             # substitute ${} variables
-            if 'no_input' in command.options:
+            if 'no_input' in command.options or 'passthrough' in command.options:
                 step_input = [self.VARS['null_input']]
             elif command.input is None:
                 step_input = ifiles
@@ -2496,7 +2496,10 @@ class Pipeline:
                     env.logger.debug('Pipeline variable {} is set to {}'
                         .format(key, self.VARS[key]))
                 #
-                ifiles = step_output
+                # In case of passthrough, the original input files will be passed to 
+                # the next step regardless what has been produced during the step.
+                if 'passthrough' not in command.options:
+                    ifiles = step_output
                 # this step is successful, go to next
                 os.chdir(saved_dir)
                 step_index += 1

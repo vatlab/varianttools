@@ -950,7 +950,7 @@ class PipelineDescription:
                     if ':' in section:
                         options = [x.strip() for x in section.split(':', 1)[-1].split(',')]
                         for opt in options:
-                            if opt != 'no_input' and not re.match('^(output|input)_alias\s*=\s*([\w\d_]+)$', opt):
+                            if opt not in ['no_input', 'passthrough'] and not re.match('^(output|input)_alias\s*=\s*([\w\d_]+)$', opt):
                                 env.logger.warning('Unrecognized section option: {}'.format(opt))
                     else:
                         options = []
