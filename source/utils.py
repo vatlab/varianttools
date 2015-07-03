@@ -3644,6 +3644,47 @@ class VariableSubstitutor:
         for idx, piece in enumerate(pieces):
             if piece.startswith('${') and piece.endswith('}'):
                 KEY = piece[2:-1].lower()
+                # if the KEY is in the format of ${VAR}
+                if re.match('^\s*[\w\d_]+\s*$', KEY):
+                    if KEY.strip() in PipelineVars:
+                        pieces[idx] = self.var_expr(PipelineVars[KEY.strip()])
+                    else:
+                        env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
+                            .format(piece, KEY))
+                    continue
+                #
+                # if the KEY is in the format of ${VAR[0]} or ${VAR[2:]}
+                match = re.match('^([\w\d_]+)\s*\[([\s\d:-]+)\]$', KEY)
+                if match:
+                    KEY_name = match.group(1)
+                    KEY_index = match.group(2)
+                    if KEY_name in PipelineVars:
+                        try:
+                            if KEY_index.count(':') == 0:
+                                pieces[idx] = self.var_expr(PipelineVars[KEY_name][int(KEY_index)])
+                            elif KEY_index.count(':') == 1:
+                                idx1, idx2 = KEY_index.split(':')
+                                idx1 = int(idx1) if idx1.strip() else None
+                                idx2 = int(idx2) if idx2.strip() else None
+                                pieces[idx] = self.var_expr(PipelineVars[KEY_name][idx1:idx2])
+                            elif KEY_index.count(':') == 2:
+                                idx1, idx2, idx3 = KEY_index.split(':')
+                                idx1 = int(idx1) if idx1.strip() else None
+                                idx2 = int(idx2) if idx2.strip() else None
+                                idx3 = int(idx3) if idx3.strip() else None
+                                pieces[idx] = self.var_expr(PipelineVars[KEY_name][idx1:idx2:idx3])
+                            else:
+                                raise ValueError('Invalid index string {}'.format(KEY_index))
+                        except Exception as e:
+                            env.logger.warning("Failed to interpret {} as a pipeline varialbe: {}"
+                                .format(piece, e))
+                    else:
+                        env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
+                            .format(piece, KEY))
+                    continue
+                #
+                # now, the lambda function form
+                #
                 if ':' in KEY:
                     # a lambda function?
                     try:
@@ -3686,13 +3727,9 @@ class VariableSubstitutor:
                             .format(piece, e))
                         continue
                 else:
-                    # if KEY in PipelineVars, replace it
-                    if KEY in PipelineVars:
-                        pieces[idx] = self.var_expr(PipelineVars[KEY])
-                    else:
-                        env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
-                            .format(piece, KEY))
-                        continue
+                    env.logger.warning('Failed to interpret {} as a pipeline variable'
+                            .format(piece))
+                    continue
         #
         if float(PipelineVars['pipeline_format']) <= 1.0:
             # now, join the pieces together, but remove all newlines
