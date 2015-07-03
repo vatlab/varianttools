@@ -742,8 +742,12 @@ class PipelineDescription:
             for quote in ('"""', "'''"):
                 pieces = re.split(quote, self.config_text)
                 for i in range(1, len(pieces), 2):
+                    # if ''' starts from a new line (this should not happen, automatically pad it
                     if pieces[i-1].endswith('\n'):
                         pieces[i-1] = pieces[i-1] + ' '
+                    # automatically add r to ''' ''' quotes
+                    if quote == "'''" and not pieces[i-1].endswith('r'):
+                        pieces[i-1] = pieces[i-1] + 'r'
                     # replace string with an unlikely character
                     pieces[i] = pieces[i].replace('\n', self.newline_PH)
                 self.config_text = quote.join(pieces)
