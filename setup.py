@@ -562,7 +562,7 @@ if not EMBEDED_BOOST:
     import tarfile
     downloadProgress.counter = 0
     try:
-        BOOST_URL = 'http://hivelocity.dl.sourceforge.net/project/boost/boost/1.49.0/boost_1_49_0.tar.gz'
+        BOOST_URL = 'http://downloads.sourceforge.net/project/boost/boost/1.49.0/boost_1_49_0.tar.gz?r=&ts=1435893980&use_mirror=iweb'
         sys.stdout.write('Downloading boost C++ library 1.49.0 ')
         sys.stdout.flush()
         if not os.path.isfile('boost_1_49_0.tar.gz'):
@@ -587,7 +587,7 @@ if not EMBEDED_BOOST:
 #
 # Generate wrapper files (only in development mode)
 #
-if 'svn' in VTOOLS_VERSION or 'rc' in VTOOLS_VERSION:
+if 'beta' in VTOOLS_VERSION or 'rc' in VTOOLS_VERSION:
     #
     try:
        ret = subprocess.call(['swig -python -external-runtime source/swigpyrun.h'], shell=True)
