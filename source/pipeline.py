@@ -2319,6 +2319,133 @@ class _CaseInsensitiveDict(MutableMapping):
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, dict(self.items()))
 
+class NamedList:
+    '''This class implements a named list to assist users in inputting a large
+    number of items to a pipeline. Because these lists are often stored in a text 
+    or excel file and are associated with a name or some other meta information,
+    users can input all them in the format of three ':' seprated parts
+
+    1. name (optional): name of the list.
+    2. values: values can be either a space or comma separated list such as A1 A2 ... 
+       or A1,A2,A3,... or a field in a file in the format of fieldname@filename?query.
+       Fieldname should be one or more fields from the file joined with a non-alphabetical
+       character (e.g. '+'). Filename should be a file in .csv, text (tab delimited) or 
+       EXCEL file. Query is a query that can limit the items from the retrieved list.
+       A query can consist other fields in the input data file with the entire file treated
+       as a retional database.
+    3. meta (optional): meta information for the list, which can be extra comment, weight (relative
+       to other list), and others.
+
+    Examples:
+        age@phenotype.xls
+            A column called phenotype from "phenotype.xls". Age will be treated as 
+            name of the list.
+
+        deceased:dead@phenotype.xls
+            A list with name "deceased" retrieved from column "dead" of "phenotype.xls".
+
+        id1,id2,id3,id4
+            A list of IDs.
+
+        IDs@phenotype.xls?recurrance="1"
+           get a list of IDs (column IDs) from "phenotype.xls" where the recurrance column has
+           value "1"
+
+        age@phenotype.xls:1000
+            A named list with meta information 1000
+
+    The named list has attribute
+        name
+            Name of the list, default to "" unless default_name is given.
+
+        items
+            A list of items.
+
+        meta
+            Optional meta information. Default to "".
+
+    '''
+    def __init__(self, value_string, default_name=""):
+        self.name = default_name
+        self.items = []
+        self.meta = ""
+        #
+        if not isinstance(value_string, str):
+            if len(value_string) == 1:
+                value_string = value_string[0]
+            else:
+                # if multiple items are passed, treat directly
+                # as list of strings.
+                self.items = value_string
+                return
+        #
+        self._parse(value_string, default_name)
+
+    def _parse(self, value_string, default_name):
+        if not value_string:
+            return
+        # single space separated string
+        if re.match('([\w\d-]+\s+)+[\w\d-]+', value_string):
+            self.items = value_string.split()
+            return
+        #
+        # comma separated named list
+        matches = re.match('^([\w\d-]+:)*((([\w\d-]+,)+[\w\d-]+)|([^:]*)@([^:?]*)(\?([^:]*))*)(:([\d.-]+))*$', value_string)
+        if matches is None:
+            raise ValueError(('"{}" is not a valid named list / query string, which should be name (optional) + comma separated list or '
+                'colname@filename with optional query string (?), with optional meta. Three parts should be separated by :.')
+                .format(value_string))
+        name = matches.group(1)
+        comma_list = matches.group(3)
+        colname = matches.group(5)
+        filename = matches.group(6)
+        query = matches.group(8)
+        meta = matches.group(10)
+        if name is not None:
+            self.name = name.rstrip(':')
+        if meta is not None:
+            self.meta = meta
+        #
+        if comma_list is not None:
+            self.items = comma_list.split(',')
+        else:
+            if not os.path.isfile(filename):
+                raise ValueError('File does not exist: {}'.format(filename))
+            # pandas can be slow to import
+            import pandas as pd
+            if filename.endswith('.csv'):
+                data = pd.read_csv(filename)
+            else:
+                data = pd.read_excel(filename)
+            #
+            # if query?
+            if query is not None:
+                try:
+                    data = filterDataFrame(data, query)
+                except Exception as e:
+                    raise ValueError('Failed to apply query "{}" to data file {}: {}'
+                        .format(query, filename, e))
+            #
+            values = None
+            for col in re.split('([^\w\d_])', colname):
+                if re.match('[^\w\d_]', col):
+                    if values is None:
+                        raise ValueError('Leading non-ascii word is not allowed. {}'.format(colname))
+                    else:
+                        value = [x+col for x in value]
+                    continue
+                if col not in data.columns:
+                    raise ValueError('File {} does not have column {}. Available columns are {}'
+                        .format(filename, col, ', '.join(list(data.columns))))
+                if values is None:
+                    values = list(data[col].fillna(''))
+                else:
+                    values = [x+y for x,y in zip(values, data[col].fillna(''))]
+            #
+            if self.name == default_name:
+                self.name = colname
+
+
 
 class Pipeline:
     '''The Variant Tools pipeline class. Its instance will be passed to each action
