@@ -2421,7 +2421,7 @@ class NamedList:
             # if query?
             if query is not None:
                 try:
-                    data = filterDataFrame(data, query)
+                    data = data.query(query)
                 except Exception as e:
                     raise ValueError('Failed to apply query "{}" to data file {}: {}'
                         .format(query, filename, e))
@@ -2442,6 +2442,7 @@ class NamedList:
                 else:
                     values = [x+y for x,y in zip(values, data[col].fillna(''))]
             #
+            self.items = values
             if self.name == default_name:
                 self.name = colname
 
@@ -2504,6 +2505,7 @@ class Pipeline:
         self.VARS.update({k:str(v) for k,v in kwargs.items()})
         #
         self.GLOBALS = {}
+        self.GLOBALS.update(globals())
         self.THREADS = {}
         # we need to put self.pipeline.pipeline_vars in self.VARS because
         # they might refer to each other
