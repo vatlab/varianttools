@@ -3654,30 +3654,37 @@ class VariableSubstitutor:
                     continue
                 #
                 # if the KEY is in the format of ${VAR[0]} or ${VAR[2:]}
-                match = re.match('^([\w\d_]+)\s*\[([\s\d:-]+)\]$', KEY)
+                match = re.match('^([\w\d_]+)\s*((\[[\s\d:-]+\])+)$', KEY)
                 if match:
                     KEY_name = match.group(1)
                     KEY_index = match.group(2)
                     if KEY_name in PipelineVars:
-                        try:
-                            if KEY_index.count(':') == 0:
-                                pieces[idx] = self.var_expr(PipelineVars[KEY_name][int(KEY_index)])
-                            elif KEY_index.count(':') == 1:
-                                idx1, idx2 = KEY_index.split(':')
-                                idx1 = int(idx1) if idx1.strip() else None
-                                idx2 = int(idx2) if idx2.strip() else None
-                                pieces[idx] = self.var_expr(PipelineVars[KEY_name][idx1:idx2])
-                            elif KEY_index.count(':') == 2:
-                                idx1, idx2, idx3 = KEY_index.split(':')
-                                idx1 = int(idx1) if idx1.strip() else None
-                                idx2 = int(idx2) if idx2.strip() else None
-                                idx3 = int(idx3) if idx3.strip() else None
-                                pieces[idx] = self.var_expr(PipelineVars[KEY_name][idx1:idx2:idx3])
-                            else:
-                                raise ValueError('Invalid index string {}'.format(KEY_index))
-                        except Exception as e:
-                            env.logger.warning("Failed to interpret {} as a pipeline varialbe: {}"
-                                .format(piece, e))
+                        VAL = PipelineVars[KEY_name]
+                        # handle index
+                        #
+                        # split index by [][]
+                        for sub_index in re.split('\]\s*\[', KEY_index):
+                            try:
+                                sub_index = sub_index.strip().lstrip('[').rstrip(']')
+                                if sub_index.count(':') == 0:
+                                    VAL = VAL[int(sub_index)]
+                                elif sub_index.count(':') == 1:
+                                    idx1, idx2 = sub_index.split(':')
+                                    idx1 = int(idx1) if idx1.strip() else None
+                                    idx2 = int(idx2) if idx2.strip() else None
+                                    VAL = VAL[idx1:idx2]
+                                elif sub_index.count(':') == 2:
+                                    idx1, idx2, idx3 = sub_index.split(':')
+                                    idx1 = int(idx1) if idx1.strip() else None
+                                    idx2 = int(idx2) if idx2.strip() else None
+                                    idx3 = int(idx3) if idx3.strip() else None
+                                    VAL = VAL[idx1:idx2:idx3]
+                                else:
+                                    raise ValueError('Invalid index string {}'.format(KEY_index))
+                            except Exception as e:
+                                env.logger.warning("Failed to interpret {} as a pipeline varialbe: {}"
+                                    .format(piece, e))
+                        pieces[idx] = self.var_expr(VAL)
                     else:
                         env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
                             .format(piece, KEY))
