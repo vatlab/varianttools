@@ -559,7 +559,8 @@ class SequentialActions(PipelineAction):
         '''
         for a in self.actions:
             # the input of the next action is the output of the
-            # previous action.
+            # previous action. However, ${INPUT} is the same for all 
+            # options because it is substitute before ...
             ifiles = a(ifiles, pipeline)
         # return the output of the last action
         return ifiles
@@ -1224,8 +1225,12 @@ class RunCommand(PipelineAction):
         except:
             env.logger.warning('Failed to remove lock for file {}'.format(self.output[0]))
             pass
-        with open(self.proc_done) as done:
-            ret = int(done.read().strip())
+        try:
+            with open(self.proc_done) as done:
+                ret = int(done.read().strip())
+        except Exception as e:
+            raise RuntimeError('Failed to retrive return information for forked process from {}. {}'
+                .format(self.proc_done, e))
         #
         if ret < 0:
             raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
@@ -1277,7 +1282,7 @@ class RunCommand(PipelineAction):
             for k, v in os.environ.items():
                 if any([k.startswith('x') for x in ('SSH', 'PBS', '_')]):
                     continue
-                sh_file.write('export {}={}\n'.format(k, v))
+                sh_file.write('export {}="{}"\n'.format(k, v))
             #
             sh_file.write('\ncd {}\n'.format(os.path.abspath(os.getcwd())))
             if self.working_dir is not None:
