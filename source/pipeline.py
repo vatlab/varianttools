@@ -105,7 +105,7 @@ class SkipIf:
 class EmitInput:
     '''An input emitter that emits input files individually, in pairs, or 
     altogether.'''
-    def __init__(self, group_by='all', select=True, pass_unselected=True):
+    def __init__(self, group_by='all', select=True, skip=False, pass_unselected=True):
         '''Select input files of certain types, group them, and send input files
         to action. Selection criteria can be True (all input file types, default),
         'False' (select no input file), 'fastq' (check content of files), or one or
@@ -131,6 +131,7 @@ class EmitInput:
                         "'fastq', or a file extension with leading '.': '{}' provided."
                         .format(s))
             self.select = select
+        self.skip = skip
         self.pass_unselected = pass_unselected
 
     def _isFastq(self, filename):
@@ -285,6 +286,8 @@ class EmitInput:
                         'index can pair filenames perfectly.') 
 
     def __call__(self, ifiles, pipeline=None):
+        if self.skip:
+            return [], ifiles
         selected = []
         unselected = []
         for filename in ifiles:
@@ -307,6 +310,7 @@ class EmitInput:
                 selected.append(filename)
             elif self.pass_unselected:
                 unselected.append(filename)
+        #
         # for this special case, the step is skipped
         if self.group_by == 'single':
             return [[x] for x in selected], unselected
@@ -2283,7 +2287,8 @@ class _CaseInsensitiveDict(MutableMapping):
             env.logger.warning('Changing value of pipeline variable ({} from {} to {}) is strongly discouraged.'
                 .format(key, self._store[key.upper()][1], value))
         if not isinstance(value, (str, list, tuple)):
-            raise ValueError('Only string or list of strings are allowed for pipeline variables: {} for key {}'.format(value, key))
+            value = str(value)
+            env.logger.warning('Pipeline variable {} is converted to "{}"'.format(key, value))
         if isinstance(value, (list, tuple)) and not all([isinstance(x, str) for x in value]):
             raise ValueError('Only string or list of strings are allowed for pipeline variables: {} for key {}'.format(value, key))
         self._store[key.upper()] = (key, value)
@@ -2531,6 +2536,7 @@ class Pipeline:
                 .format(self.pipeline.name, pname, command.index, 
                     ' '.join(command.comment.split())))
             # substitute ${} variables
+            emitter = None
             if 'no_input' in command.options or 'passthrough' in command.options:
                 step_input = [self.VARS['null_input']]
             elif command.input is None:
@@ -2540,6 +2546,16 @@ class Pipeline:
                 step_input = []
             else:
                 step_input = shlex.split(substituteVars(command.input, self.VARS, self.GLOBALS))
+                if ':' in step_input:
+                    i, e = step_input.split(':', 1)
+                    step_input = i
+                    try:
+                        # remove ${INPUT} because it is determined by the emitter
+                        if 'input' in self.VARS:
+                            self.VARS.pop('input')
+                        emitter = eval('EmitInput({})'.format(e), globals(), self.GLOBALS)
+                    except Exception as e:
+                        raise ValueError('Failed to interpret input emit options "{}"'.format(e))
             #
             # if there is no input file?
             if not step_input:
@@ -2555,8 +2571,11 @@ class Pipeline:
             # 
             # now, group input files
             if not command.input_emitter:
-                emitter = EmitInput()
+                if emitter is None:  # if not defined in input:
+                    emitter = EmitInput()
             else:
+                if emitter is not None:
+                    raise ValueError('Cannot define input emitter in both input and input_emitter')
                 try:
                     # remove ${INPUT} because it is determined by the emitter
                     if 'input' in self.VARS:
