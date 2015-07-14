@@ -356,7 +356,8 @@ class PipelineAction:
             output (string or list of strings):
                 Output files. If at least one output file is specified,
                 the runtime signature of this action will be saved to
-                $output[0].exe_info.
+                $output[0].exe_info. The output directory will be created
+                if it does not exist.
         '''
         # multiple command is not allowed.
         if not cmd:
@@ -1350,7 +1351,8 @@ class ExecutePythonCode(PipelineAction):
     '''This action execute a piece of Python code under the pipeline namespace, which
     means all pipeline variables will be available to the code. This action provides a
     way to implement pipeline actions on the fly. Arbitary parameters can be passed
-    and be made available.
+    and be made available to the script. Pipeline variables are also available to the 
+    script as a variabe "pvars".
    
     File Flow:
 
@@ -1365,15 +1367,12 @@ class ExecutePythonCode(PipelineAction):
     '''
     def __init__(self, script='', output=[], modules=[], **kwargs):
         '''This action accepts one or a list of strings and execute it as a piece of Python
-        code. The input and output files are provided by the pipeline as variables 
-        INPUT and OUTPUT, with additional parameters passed by kwargs.
+        code. Pipeline variables are made available as a dictionary "pvars".
 
         Parameters:
             script (string or list of strings):
                 One or more strings to execute. List of strings will be concatenated by new
-                lines. The code will be executed under the pipeline namespace, with
-                'pipeline' available to the function (usually used to set pipeline variables
-                through pipeline.VARS.
+                lines.
 
             kwargs (additional parameters):
                 Any additional kwargs will be passed to the function executed.
@@ -1433,7 +1432,7 @@ class ExecutePythonCode(PipelineAction):
         try:
             globals().update(pipeline.GLOBALS)
             local_dict = self.kwargs
-            local_dict['pipeline'] = pipeline
+            local_dict['pvars'] = pipeline.VARS
             exec(self.script, globals(), local_dict)
         except Exception as e:
             raise RuntimeError('Failed to execute script "{}": {}'.format(self.script, e))
