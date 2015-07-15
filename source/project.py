@@ -945,11 +945,11 @@ class PipelineDescription:
                 try:
                     section_headers = [x.strip() for x in section.split(':', 1)[0].split(',')]
                     for header in section_headers:
-                        if not re.match('^[\w\d*_]+_[\d]+$', header):
+                        if not re.match('^([\w\d*_]+_)?[\d]+$', header):
                             raise ValueError('Invalid section header "{}"'.format(section))
                     #
-                    pnames = [x.strip().rsplit('_', 1)[0] for x in section_headers]
-                    pidxs = [x.strip().rsplit('_', 1)[1] for x in section_headers]
+                    pnames = [x.strip().rsplit('_', 1)[0] if '_' in x else 'default' for x in section_headers]
+                    pidxs = [x.strip().rsplit('_', 1)[1] if '_' in x else x for x in section_headers]
                     #
                     if ':' in section:
                         options = [x.strip() for x in section.split(':', 1)[-1].split(',')]
@@ -1015,7 +1015,8 @@ class PipelineDescription:
                     .format(pname, ', '.join(self.pipelines.keys())))
         for pname, pipeline in self.pipelines.items():
             if pname not in self.pipeline_descriptions:
-                env.logger.warning('No description for {} {} is available.'.format(self.pipeline_type, pname))
+                if pname != 'default':
+                    env.logger.warning('No description for {} {} is available.'.format(self.pipeline_type, pname))
                 self.pipeline_descriptions[pname] = ''
             for idx, cmd in enumerate(pipeline):
                 if cmd is None:
@@ -1034,7 +1035,10 @@ class PipelineDescription:
                         action=cmd.action,
                         pipeline_vars=cmd.pipeline_vars,
                         comment=substituteVars(cmd.comment, 
-                            {'pipeline_name': pname, 'pipeline_step': cmd.index})
+                            {'pipeline_name': pname, 
+                             'pipeline_step': cmd.index,
+                             'pipeline_format': self.pipeline_format},
+                            {})
                         )
      
     def describe(self):

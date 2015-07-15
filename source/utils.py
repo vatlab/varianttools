@@ -3630,7 +3630,7 @@ class VariableSubstitutor:
         elif type(var) == list:
             return ' '.join([self.var_expr(x) for x in var])
         else:
-            env.logger.warning('Return value of pipeline variable is not string or list of strings: {}'.format(var))
+            env.logger.debug('Return value of pipeline variable is not string or list of strings: {}'.format(var))
             return str(var)
 
     def _substitute(self, text, PipelineVars, PipelineGlobals):
