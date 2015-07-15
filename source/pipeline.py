@@ -503,8 +503,6 @@ class PipelineAction:
                 exe_info.write('{}\n'.format(self._useVars('; '.join(self.cmd), pipeline.VARS)))
                 exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
                 for f in ifiles:
-                    if pipeline is not None and f == pipeline.VARS['null_input']:
-                        continue
                     # for performance considerations, use partial MD5
                     exe_info.write('{}\t{}\t{}\n'.format(self._useVars(f, pipeline.VARS), os.path.getsize(f),
                         calculateMD5(f, partial=True)))
@@ -860,7 +858,7 @@ class CheckDirs(PipelineAction):
         Raise a RuntimeError if any of the directories is not found.
 
     Example:
-        action=CheckDirs('${CMD_OUTPUT}',
+        action=CheckDirs('${cmd_output}',
             'Value of parameter --output need to be an existing directory')
     '''
     def __init__(self, dirs, message=''):
@@ -901,7 +899,7 @@ class TerminateIf(PipelineAction):
         the condition is met.
 
     Examples:
-        action=TerminateIf(not '${CMD_OUTPUT}', 'No --output is specified.')
+        action=TerminateIf(not '${cmd_output}', 'No --output is specified.')
     '''
     def __init__(self, cond, message):
         '''
@@ -2469,13 +2467,15 @@ class Pipeline:
         self.verbosity = verbosity
         self.jobs = jobs
 
-    def execute(self, pname, input_files=[], output_files=[], **kwargs):
+    def execute(self, pname, **kwargs):
         if pname is None:
             if len(self.pipeline.pipelines) == 1:
                 pname = self.pipeline.pipelines.keys()[0]
+            elif 'default' in self.pipeline.pipelines:
+                pname = 'default'
             else:
                 raise ValueError('Name of pipeline should be specified because '
-                    '{}.pipeline defines more than one pipelines. '
+                    '{}.pipeline defines more than one pipelines without a default one. '
                     'Available pipelines are: {}.'.format(self.pipeline.name,
                     ', '.join(self.pipeline.pipelines.keys())))
         else:
@@ -2484,34 +2484,41 @@ class Pipeline:
                     '{}. Available pipelines are: {}'.format(pname,
                     self.pipeline.name, ', '.join(self.pipeline.pipelines.keys())))
         psteps = self.pipeline.pipelines[pname]
-        # if there is a output file, write log to .log
-        if output_files:
-            logfile = output_files[0] + '.log'
-            ch = logging.FileHandler(logfile.lstrip('>'), mode = 'a')
-            ch.setLevel(logging.DEBUG)
-            ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
-            env.logger.addHandler(ch)
         #
         # the project will be opened when needed
         with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY'], verbosity=self.verbosity) as proj:
             self.VARS = _CaseInsensitiveDict(
-                HOME=os.environ['HOME'],
-                CWD=os.getcwd(),
-                CMD_INPUT=input_files,
-                CMD_OUTPUT=output_files,
-                TEMP_DIR=env.temp_dir,
-                CACHE_DIR=env.cache_dir,
-                LOCAL_RESOURCE=env.local_resource,
-                REF_GENOME_BUILD=proj.build if proj.build is not None else '',
-                PIPELINE_NAME=pname,
-                SPEC_FILE=self.spec_file,
-                MODEL_NAME=pname,
-                NULL_INPUT=env.null_input,
-                VTOOLS_VERSION=proj.version,
-                PIPELINE_FORMAT=self.pipeline.pipeline_format)
+                home=os.environ['HOME'],
+                cwd=os.getcwd(),
+                temp_dir=env.temp_dir,
+                cache_dir=env.cache_dir,
+                local_resource=env.local_resource,
+                ref_genome_build=proj.build if proj.build is not None else '',
+                pipeline_name=pname,
+                spec_file=self.spec_file,
+                model_name=pname,
+                vtools_version=proj.version,
+                pipeline_format=self.pipeline.pipeline_format)
+        env.logger.error(self.pipeline.commandline_opts.keys())
         # these are command line options
         self.VARS.update(self.pipeline.commandline_opts)
         self.VARS.update({k:str(v) for k,v in kwargs.items()})
+        if 'cmd_input' not in self.VARS:
+            self.VARS['cmd_input'] = []
+        if 'cmd_output' not in self.VARS:
+            self.VARS['cmd_output'] = []
+        # if there is a output file, write log to .log
+        if self.VARS['cmd_output']:
+            logfile = self.VARS['cmd_output'][0] + '.log'
+            if '/' in logfile:
+                d = os.path.split(logfile)[0]
+                if not os.path.isdir(d):
+                    env.logger.info('Making directory {} for output file'.format(d))
+                    os.makedirs(d)
+            ch = logging.FileHandler(logfile.lstrip('>'), mode = 'a')
+            ch.setLevel(logging.DEBUG)
+            ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
+            env.logger.addHandler(ch)
         #
         self.GLOBALS = {}
         self.GLOBALS.update(globals())
@@ -2524,7 +2531,7 @@ class Pipeline:
         for key, val in self.VARS.items():
             env.logger.trace('{} is set to {}'.format(key, val))
         #
-        ifiles = input_files
+        ifiles = self.VARS['cmd_input']
         step_index = 0
         rewind_count = 0
         while True:
@@ -2538,7 +2545,7 @@ class Pipeline:
             # substitute ${} variables
             emitter = None
             if 'no_input' in command.options or 'passthrough' in command.options:
-                step_input = [self.VARS['null_input']]
+                step_input = []
             elif command.input is None:
                 step_input = ifiles
             # if this is an empty string
@@ -2560,9 +2567,6 @@ class Pipeline:
                 else:
                     step_input = shlex.split(substituteVars(command.input, self.VARS, self.GLOBALS))
             #
-            # if there is no input file?
-            if not step_input:
-                env.logger.debug('Step ignored because of no input file for step {}_{}.'.format(pname, command.index))
             #
             self.VARS['input{}'.format(command.index)] = step_input
             for opt in command.options:
@@ -2747,12 +2751,6 @@ def executeArguments(parser):
             command "vtools show pipeline SPECFILE" for details of available
             pipelines in SPECFILE, including pipeline-specific parameters that
             could be used to change the default behavior of the pipelines.''')
-    parser.add_argument('-i', '--input', nargs='*', metavar='INPUT', default=[],
-        help='''Input to the pipelines, usually a list of input files, that
-            will bepassed to the pipelines as variable ${CMD_INPUT}.''')
-    parser.add_argument('-o', '--output', nargs='*', metavar='OUTPUT', default=[],
-        help='''Output of the pipelines, usually a list of output files, that
-            will be passed to the pipelines as variable ${CMD_OUTPUT}.''')
     parser.add_argument('-j', '--jobs', default=1, type=int,
         help='''Execute the pipeline in parallel model if a number other than
             1 is specified. In this mode, the RunCommand action will create
@@ -2794,16 +2792,16 @@ def execute(args):
             jobs=args.jobs)
         # unspecified
         if not args.pipelines:
-            pipeline.execute(None, args.input, args.output)
+            pipeline.execute(None)
         else:
             for name in args.pipelines:
-                pipeline.execute(name, args.input, args.output)
+                pipeline.execute(name)
     # 
     try:
         env.verbosity = args.verbosity
         env.logger = None
         # definitely a pipeline
-        if args.specfile.endswith('.pipeline') or args.input or args.output or args.unknown_args:
+        if args.specfile.endswith('.pipeline') or args.unknown_args:
             executePipeline()
         # definitely a sql query
         elif args.delimiter != '\t':

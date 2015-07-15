@@ -895,15 +895,34 @@ class PipelineDescription:
             .format(os.path.split(filename)[-1]),
             description='Parameters to override parameters of existing steps.')
         self.parameters = []
+        if 'input' not in [x[0] for x in parameters]:
+            parser.add_argument('-i', '--input', help='Input of pipeline as variable ${cmd_input}', nargs='*', default=[])
+        else:
+            par_help = [x[1] for x in parameters if x[0] == 'input_comment']
+            parser.add_argument('-i', '--input', help=par_help[0] if par_help else '', nargs='*', default=[])
+        if 'output' not in [x[0] for x in parameters]:
+            parser.add_argument('-o', '--output', help='Output of pipeline as variable ${cmd_ontput}', nargs='*', default=[])
+        else:
+            par_help = [x[1] for x in parameters if x[0] == 'output_comment']
+            parser.add_argument('-o', '--output', help=par_help[0] if par_help else '', nargs='*', default=[])
         for par in parameters:
             # $NAME_comment is used for documentation only
-            if par[0].endswith('_comment'):
+            if par[0].endswith('_comment') or par[0] in ('input', 'output'):
                 continue
+            if par[0].lower() in ('home', 'cwd', 'cmd_input', 'cmd_output', 'temp_dir', 'cache_dir', 'local_resource',
+                    'ref_genome_build', 'pipeline_name', 'spec_file', 'model_name', 'vtools_version', 'pipeline_format'):
+                raise ValueError('Command option {} is reserved and cannot be specified from command line.'.format(par[0]))
             par_help = [x[1] for x in parameters if x[0] == par[0] + '_comment']
             self.parameters.append((par[0], par[1], par_help[0] if par_help else ''))
             parser.add_argument('--{}'.format(par[0]), help=self.parameters[-1][2],
                 nargs='*', default=par[1])
         args = vars(parser.parse_args(fmt_args))
+        if 'input' in args:
+            args['cmd_input'] = args['input']
+            args.pop('input')
+        if 'output' in args:
+            args['cmd_output'] = args['output']
+            args.pop('output')
         return args
 
     def parsePipeline(self, filename, defaults):
