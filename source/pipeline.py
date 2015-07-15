@@ -1394,7 +1394,7 @@ class ExecutePythonCode(PipelineAction):
         self.kwargs = kwargs
         self.modules = modules
         #
-        PipelineAction.__init__(self, cmd='python -e {} {}'.format(m, kwargs), output=output)
+        PipelineAction.__init__(self, cmd='python -e {} {}'.format(m.hexdigest(), kwargs), output=output)
 
     def _execute(self, ifiles, pipeline=None):
         for module in self.modules:
@@ -2545,17 +2545,20 @@ class Pipeline:
             elif not command.input.strip():
                 step_input = []
             else:
-                step_input = shlex.split(substituteVars(command.input, self.VARS, self.GLOBALS))
-                if ':' in step_input:
-                    i, e = step_input.split(':', 1)
-                    step_input = i
+                if ':' in command.input:
+                    input_part, emitter_part = command.input.split(':', 1)
+                    step_input = shlex.split(substituteVars(input_part, self.VARS, self.GLOBALS))
                     try:
                         # remove ${INPUT} because it is determined by the emitter
                         if 'input' in self.VARS:
                             self.VARS.pop('input')
-                        emitter = eval('EmitInput({})'.format(e), globals(), self.GLOBALS)
+                        emitter = eval('EmitInput({})'.format(
+                            substituteVars(emitter_part, self.VARS, self.GLOBALS)
+                            ), globals(), self.GLOBALS)
                     except Exception as e:
                         raise ValueError('Failed to interpret input emit options "{}"'.format(e))
+                else:
+                    step_input = shlex.split(substituteVars(command.input, self.VARS, self.GLOBALS))
             #
             # if there is no input file?
             if not step_input:
@@ -2724,6 +2727,8 @@ class Pipeline:
                     v.join(5)
                 # thread closed, remove from self.THREADS
                 self.THREADS.pop(ifile)
+        env.logger.info('Execution of pipeline {}.{} is successful with output {}'
+            .format(self.pipeline.name, pname, ', '.join(step_output)))
 
 
 def executeArguments(parser):
