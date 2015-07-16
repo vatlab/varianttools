@@ -886,10 +886,11 @@ class PipelineDescription:
                 fmt_parser = SafeConfigParser()
             else:
                 fmt_parser = ConfigParser(strict=False)
+            fmt_parser.read(filename)
         else:
             # and now we only use pipeline variables.
             fmt_parser = MyConfigParser()
-        fmt_parser.readfp(StringIO(self._translateConfigText(filename)))
+            fmt_parser.readfp(StringIO(self._translateConfigText(filename)))
         parameters = fmt_parser.items('DEFAULT')
         parser = argparse.ArgumentParser(prog='vtools CMD --pipeline {}'
             .format(os.path.split(filename)[-1]),
@@ -917,6 +918,10 @@ class PipelineDescription:
             parser.add_argument('--{}'.format(par[0]), help=self.parameters[-1][2],
                 nargs='*', default=par[1])
         args = vars(parser.parse_args(fmt_args))
+        if  float(self.pipeline_format) <= 1.0:
+            for key,value in args.items():
+                if not isinstance(value, str):
+                    args[key] = ','.join(value)
         if 'input' in args:
             args['cmd_input'] = args['input']
             args.pop('input')

@@ -2503,6 +2503,11 @@ class Pipeline:
                 vtools_version=proj.version,
                 pipeline_format=self.pipeline.pipeline_format)
         # these are command line options
+        if float(self.pipeline.pipeline_format) <= 1.0:
+            if 'cmd_input' in self.pipeline.commandline_opts:
+                self.pipeline.commandline_opts['cmd_input'] = self.pipeline.commandline_opts['cmd_input'].split(',')
+            if 'cmd_output' in self.pipeline.commandline_opts:
+                self.pipeline.commandline_opts['cmd_output'] = self.pipeline.commandline_opts['cmd_output'].split(',')
         self.VARS.update(self.pipeline.commandline_opts)
         self.VARS.update({k:str(v) for k,v in kwargs.items()})
         if 'cmd_input' not in self.VARS:
