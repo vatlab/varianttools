@@ -901,7 +901,7 @@ class TerminateIf(PipelineAction):
     Examples:
         action=TerminateIf(not '${cmd_output}', 'No --output is specified.')
     '''
-    def __init__(self, cond, message):
+    def __init__(self, cond, message=''):
         '''
         Parameters:
             cond (boolean):
@@ -2376,7 +2376,9 @@ class NamedList:
         self.name = default_name
         self.items = []
         self.meta = ""
-        #
+        # if it is None etc
+        if not value_string:
+            return
         if not isinstance(value_string, str):
             if len(value_string) == 1:
                 value_string = value_string[0]
@@ -2430,6 +2432,8 @@ class NamedList:
             #
             # if query?
             if query is not None:
+                if re.match('.*[\d\w_]+\s*=\s*[\d\w_]+.*', query):
+                    raise ValueError('Syntax "a=b" is not allowed. Please use "a==b" instead: {}'.format(query))
                 try:
                     data = data.query(query)
                 except Exception as e:
