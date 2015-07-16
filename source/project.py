@@ -410,7 +410,7 @@ class fileFMT:
         if sys.version_info.major == 2:
             fmt_parser = SafeConfigParser()
         else:
-            fmt_parser = ConfigParser(strict=False)
+            fmt_parser = ConfigParser(strict=True)
         fmt_parser.read(filename)
         parameters = fmt_parser.items('DEFAULT')
         parser = argparse.ArgumentParser(prog='vtools CMD --format {}'.format(os.path.split(filename)[-1]),
@@ -434,7 +434,7 @@ class fileFMT:
         if sys.version_info.major == 2:
             parser = SafeConfigParser()
         else:
-            parser = ConfigParser(strict=False)
+            parser = ConfigParser(strict=True)
         # this allows python3 to read .fmt file with non-ascii characters, but there is no
         # simple way to make it python2 compatible.
         #with open(filename, 'r', encoding='UTF-8') as inputfile:
@@ -973,7 +973,7 @@ class PipelineDescription:
                     if ':' in section:
                         options = [x.strip() for x in section.split(':', 1)[-1].split(',')]
                         for opt in options:
-                            if opt not in ['no_input', 'passthrough'] and not re.match('^(output|input)_alias\s*=\s*([\w\d_]+)$', opt):
+                            if opt not in ['no_input', 'passthrough', 'skip'] and not re.match('^(output|input)_alias\s*=\s*([\w\d_]+)$', opt):
                                 env.logger.warning('Unrecognized section option: {}'.format(opt))
                     else:
                         options = []

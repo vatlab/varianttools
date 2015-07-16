@@ -2540,6 +2540,14 @@ class Pipeline:
             # step_index can jump back and forth depending on the 
             # execution status of each step
             command = psteps[step_index]
+            if 'skip' in command.options:
+                step_index += 1
+                env.logger.info('Step {}.{}_{} is skipped'
+                    .format(self.pipeline.name, pname, command.index))
+                if step_index == len(psteps):
+                    break
+                step_output = []
+                continue
             self.VARS['pipeline_step'] = command.index
             env.logger.info('Executing [[{}.{}_{}]]: {}'
                 .format(self.pipeline.name, pname, command.index, 
