@@ -762,9 +762,9 @@ class PipelineDescription:
             #
             # [header]
             # comment: comment_text
-            pieces = re.split('(\n\[[*\w\d,\s-]+\]\s*)', self.config_text)
+            pieces = re.split('(\n\[.+\]\s*)', self.config_text)
             for idx, piece in enumerate(pieces):
-                if re.match('^\s*\[[*\w\d,\s-]+\]\s*$', piece) and idx + 1 != len(pieces):
+                if re.match('^\s*\[[*\w\d,\s:=-]+\]\s*$', piece) and idx + 1 != len(pieces):
                     comment = []
                     non_comment = []
                     has_comment = False

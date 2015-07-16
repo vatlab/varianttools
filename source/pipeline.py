@@ -2341,7 +2341,7 @@ class NamedList:
        A query can consist other fields in the input data file with the entire file treated
        as a retional database.
     3. meta (optional): meta information for the list, which can be extra comment, weight (relative
-       to other list), and others.
+       to other list), and others, must be in the format of comma separated name=value
 
     Examples:
         age@phenotype.xls
@@ -2358,7 +2358,7 @@ class NamedList:
            get a list of IDs (column IDs) from "phenotype.xls" where the recurrance column has
            value "1"
 
-        age@phenotype.xls:1000
+        age@phenotype.xls:weight=1000
             A named list with meta information 1000
 
     The named list has attribute
@@ -2397,21 +2397,24 @@ class NamedList:
             return
         #
         # comma separated named list
-        matches = re.match('^([\w\d-]+:)*((([\w\d-]+,)+[\w\d-]+)|([^:]*)@([^:?]*)(\?([^:]*))*)(:([\d.-]+))*$', value_string)
-        if matches is None:
+        matched = re.match('^([\w\d-]+:)*((([\w\d-]+,)+[\w\d-]+)|([^:]*)@([^:?]*)(\?([^:]*))*)(:([^:]+))*$', value_string)
+        if matched is None:
             raise ValueError(('"{}" is not a valid named list / query string, which should be name (optional) + comma separated list or '
                 'colname@filename with optional query string (?), with optional meta. Three parts should be separated by :.')
                 .format(value_string))
-        name = matches.group(1)
-        comma_list = matches.group(3)
-        colname = matches.group(5)
-        filename = matches.group(6)
-        query = matches.group(8)
-        meta = matches.group(10)
+        name = matched.group(1)
+        comma_list = matched.group(3)
+        colname = matched.group(5)
+        filename = matched.group(6)
+        query = matched.group(8)
+        meta = matched.group(10)
         if name is not None:
             self.name = name.rstrip(':')
         if meta is not None:
-            self.meta = meta
+            matched = re.match('[\d\w_]+\s*=\s*[^=,]*(,[\d\w_]+\s*=\s*[^=,]*)*$', meta)
+            if not matched:
+                raise ValueError('Meta information is not in the format of key=value: {}'.format(meta))
+            self.meta = {x.split('=')[0].strip(): x.split('=')[1].strip() for x in meta.split(',')}
         #
         if comma_list is not None:
             self.items = comma_list.split(',')
@@ -2439,7 +2442,7 @@ class NamedList:
                     if values is None:
                         raise ValueError('Leading non-ascii word is not allowed. {}'.format(colname))
                     else:
-                        value = [x+col for x in value]
+                        values = [x+col for x in values]
                     continue
                 if col not in data.columns:
                     raise ValueError('File {} does not have column {}. Available columns are {}'
@@ -2499,7 +2502,6 @@ class Pipeline:
                 model_name=pname,
                 vtools_version=proj.version,
                 pipeline_format=self.pipeline.pipeline_format)
-        env.logger.error(self.pipeline.commandline_opts.keys())
         # these are command line options
         self.VARS.update(self.pipeline.commandline_opts)
         self.VARS.update({k:str(v) for k,v in kwargs.items()})
@@ -2546,15 +2548,38 @@ class Pipeline:
             emitter = None
             if 'no_input' in command.options or 'passthrough' in command.options:
                 step_input = []
+                step_named_input = []
             elif command.input is None:
                 step_input = ifiles
+                step_named_input = [['', ifiles]]
             # if this is an empty string
             elif not command.input.strip():
                 step_input = []
+                step_named_input = []
             else:
                 if ':' in command.input:
                     input_part, emitter_part = command.input.split(':', 1)
-                    step_input = shlex.split(substituteVars(input_part, self.VARS, self.GLOBALS))
+                else:
+                    input_part = command.input
+                    emitter_part = ''
+                #
+                input_line = substituteVars(input_part, self.VARS, self.GLOBALS)
+                # look for pattern of name=filenames
+                pieces = re.split('([\w\d_]+\s*=)', input_line)
+                step_named_input = []
+                for piece in pieces:
+                    if not piece:
+                        continue
+                    if piece.endswith('='):
+                        step_named_input.append([piece[:-1].strip(), []])
+                    else:
+                        if not step_named_input:
+                            step_named_input.append(['', shlex.split(piece)])
+                        else:
+                            step_named_input[-1][1] = shlex.split(piece)
+                #
+                step_input = sum([x[1] for x in step_named_input], [])
+                if emitter_part:
                     try:
                         # remove ${INPUT} because it is determined by the emitter
                         if 'input' in self.VARS:
@@ -2564,15 +2589,20 @@ class Pipeline:
                             ), globals(), self.GLOBALS)
                     except Exception as e:
                         raise ValueError('Failed to interpret input emit options "{}"'.format(e))
-                else:
-                    step_input = shlex.split(substituteVars(command.input, self.VARS, self.GLOBALS))
             #
             #
             self.VARS['input{}'.format(command.index)] = step_input
+            for n, f in step_named_input:
+                if n:
+                    self.VARS['input{}_{}'.format(command.index, n)] = f
             for opt in command.options:
                 matched = re.match('^input_alias\s*=\s*([\w\d_]+)$', opt)
                 if matched:
                     self.VARS[matched.group(1)] = step_input
+                    for n, f in step_named_input:
+                        if n:
+                            self.VARS['{}_{}'.format(matched.group(1), n)] = f
+            #
             env.logger.debug('INPUT of step {}_{}: {}'
                     .format(pname, command.index, step_input))
             # 
@@ -2598,9 +2628,11 @@ class Pipeline:
             igroups, step_output = emitter(step_input, self)
             try:
                 for ig in igroups:
-                    if not ig:
-                        continue
                     self.VARS['input'] = ig
+                    for n,f in step_named_input:
+                        if n:
+                            self.VARS['input_{}'.format(n)] = [x for x in ig if x in f]
+                    #
                     action = substituteVars(command.action, self.VARS, self.GLOBALS)
                     env.logger.trace('Emitted input of step {}_{}: {}'
                         .format(pname, command.index, ig))
