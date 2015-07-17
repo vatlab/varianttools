@@ -190,7 +190,7 @@ class AnnoDB:
             len(self.alt_build) != 3)):
             raise ValueError('There should be three linking fields for range-based annotation databases.')
         if self.description == '':
-            env.logger.warning('No description for annotation database {}'
+            env.logger.debug('No description for annotation database {}'
                 .format(annoDB))
         if self.build is None and self.alt_build is None:
             raise ValueError('No reference genome information for annotation database {}'

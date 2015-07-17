@@ -116,6 +116,15 @@ else:
 #   mirror the variant tools repository and let the users to keep it up to date.
 #shared_resource=None
 
+# A ;-separated list of directories that stores personally-generated file formats,
+# annotation databases, pipelines and such. These directories are searched if
+# the requested file is not available in any online repository (or their local
+# copy). Files under these directories are NOT maintained by variant tools
+# (no manifest or md5 signatures are monitors). Currently only local files are
+# allowed (no URL to a remote server). By setting this option to ~/.variant_tools
+# (default) resource files under that directory will be usable even if they 
+# are not managed by variant tools
+user_stash='~/.variant_tools'
 ''')
     _user_options = {}
 #
@@ -216,7 +225,15 @@ class RuntimeEnvironments(object):
             'local_resource': ('~/.variant_tools', 'A directory to store variant tools related '
                 'resources such as reference genomes and annotation database. This option will '
                 'be ignored if a writable shared resource directory is specified by the system '
-                'admin.')
+                'admin.'),
+            'user_stash': ('~/.variant_tools', 'A ;-separated list of directories that stores personally-'
+                'generated file formats, annotation databases, pipelines and such. These '
+                'directories are searched if the requested file is not available in any '
+                'online repository (or their local copy). Files under these directories are'
+                'NOT maintained by variant tools (no manifest or md5 signatures are monitors).'
+                'Currently only local files are allowed (no URL to a remote server). By setting '
+                'this option to ~/.variant_tools, resource files under that directory '
+                'will be usable even if they are not managed by variant tools')
         }
         # a default value
         self.command_line = ''
@@ -491,6 +508,14 @@ class RuntimeEnvironments(object):
             self._search_path = val
     #
     search_path = property(lambda self: self._search_path, _set_search_path)
+    #
+    # user stash
+    def _set_user_stash(self, val):
+        if val not in ['None', None]:
+            self._user_stash = val
+    #
+    user_stash = property(lambda self: self._user_stash, _set_user_stash)
+    #
     #
     # attribute logger
     class ColoredFormatter(logging.Formatter):
@@ -2222,7 +2247,16 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
         # cannot find the file
         resource.getRemoteManifest()
         if fileToGet not in resource.manifest:
-            raise RuntimeError('Cannot download {} because it is not in the variant tools online repository.'.format(fileToGet))
+            # look in user stash if avail
+            if env.user_stash is not None:
+                for us in env.user_stash.split(';'):
+                    if not os.path.isdir(us):
+                        env.logger.warning('Stash directory ({}) does not exist. Check ~/.variant_tools/user_options.py for details.'
+                            .format(us))
+                    usf = os.path.expanduser(os.path.join(us, fileToGet))
+                    if os.path.isfile(usf):
+                        return usf
+            raise RuntimeError('Cannot download {} because it is not in the variant tools online repository or local stash directories.'.format(fileToGet))
     #
     fileSig = resource.manifest[fileToGet]
     if dest_dir is not None:
