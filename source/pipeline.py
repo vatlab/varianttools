@@ -1540,7 +1540,7 @@ class ExecuteScript(PipelineAction):
         env.logger.info('Executing\n{}'.format(self.script))
         #
         m = hashlib.md5()
-        m.update(self.script)
+        m.update(self.script.encode())
         #
         self.script_file = tempfile.NamedTemporaryFile(mode='w+t', suffix=suffix, delete=False).name
         with open(self.script_file, 'w') as script_file:
