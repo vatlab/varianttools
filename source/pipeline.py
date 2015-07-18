@@ -1552,7 +1552,7 @@ class ExecuteScript(PipelineAction):
         try:
             os.remove(self.script_file)
         except Exception as e:
-            env.logger.debug('Failed to remove temporary script file {}: {}'.format(self.script_file, e))
+            env.logger.debug('Failed to remove temporary script file: {}'.format(e))
 
     def _elapsed_time(self):
         '''Return the elapsed time in human readable format since start time'''
