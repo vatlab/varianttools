@@ -226,7 +226,7 @@ class RuntimeEnvironments(object):
                 'resources such as reference genomes and annotation database. This option will '
                 'be ignored if a writable shared resource directory is specified by the system '
                 'admin.'),
-            'user_stash': (site_options.user_stash, 'A ;-separated list of directories that stores personally-'
+            'user_stash': ('~/.variant_tools', 'A ;-separated list of directories that stores personally-'
                 'generated file formats, annotation databases, pipelines and such. These '
                 'directories are searched if the requested file is not available in any '
                 'online repository (or their local copy). Files under these directories are'
@@ -248,7 +248,6 @@ class RuntimeEnvironments(object):
             if not os.path.isdir(site_options.shared_resource):
                 os.makedirs(site_options.shared_resource)
         #
-        self._user_stash = self.persistent_options['user_stash'][0]
         self._logfile_verbosity = self.persistent_options['logfile_verbosity'][0]
         self._verbosity = self.persistent_options['verbosity'][0]
         # self._check_update = self.persistent_options['check_update'][0]
@@ -2183,7 +2182,7 @@ def downloadURL(URL, dest, quiet, message=None):
     raise RuntimeError('Failed to download {}'.format(fileToGet))
 
 
-def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False, 
+def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
     message=None):
     '''Download file from URL to filename.'''
     #
@@ -2251,14 +2250,12 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
             # look in user stash if avail
             if env.user_stash is not None:
                 for us in env.user_stash.split(';'):
-                    if not os.path.isdir(os.path.expanduser(us)):
+                    if not os.path.isdir(us):
                         env.logger.warning('Stash directory ({}) does not exist. Check ~/.variant_tools/user_options.py for details.'
                             .format(us))
-                    # we usually download file in directories such as annoDB/mydb
-                    # so we allow both structure and unstructured stash directory
-                    for usf in  [os.path.expanduser(os.path.join(us, x)) for x in (fileToGet, os.path.basename(fileToGet))]:
-                        if os.path.isfile(usf):
-                            return usf
+                    usf = os.path.expanduser(os.path.join(us, fileToGet))
+                    if os.path.isfile(usf):
+                        return usf
             raise RuntimeError('Cannot download {} because it is not in the variant tools online repository or local stash directories.'.format(fileToGet))
     #
     fileSig = resource.manifest[fileToGet]

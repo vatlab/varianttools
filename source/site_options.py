@@ -47,13 +47,3 @@ search_path='http://bioinformatics.mdanderson.org/Software/VariantTools/reposito
 #   to implement and requires less maintenance. The system admin can choose to
 #   mirror the variant tools repository and let the users to keep it up to date.
 shared_resource=None
-
-# A ;-separated list of directories that stores personally-generated file formats,
-# annotation databases, pipelines and such. These directories are searched if
-# the requested file is not available in any online repository (or their local
-# copy). Files under these directories are NOT maintained by variant tools
-# (no manifest or md5 signatures are monitors). Currently only local files are
-# allowed (no URL to a remote server). By setting this option to ~/.variant_tools
-# (default) resource files under that directory will be usable even if they 
-# are not managed by variant tools
-user_stash='~/.variant_tools'
