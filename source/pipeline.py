@@ -1387,7 +1387,7 @@ class ExecutePythonCode(PipelineAction):
             self.script = '\n'.join(script)
         #
         m = hashlib.md5()
-        m.update(self.script)
+        m.update(self.script.encode())
         #
         self.kwargs = kwargs
         self.modules = modules

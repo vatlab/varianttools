@@ -54,6 +54,58 @@ from collections import namedtuple
 from itertools import chain
 import site_options
 
+default_user_options = [
+    ('sqlite_pragma', '', '''
+; separated pragmas for sqlite database that can be used to optimize the
+performance of sqlite database operations. Please check the sqlite manual
+for more details.'''),
+    ('import_num_of_readers', 2, '''
+Number of processes to read from input files during multi-process import.
+A smaller number might provide better performance for file systems with
+slow random I/O access.'''),
+    ('associate_num_of_readers', None, '''
+Number of processes to read genotype data for association tests. The default
+value is the minimum of value of option --jobs and 8. A smaller number
+might provide better performance for file system with slow random I/O
+access.'''),
+    ('temp_dir', None, '''
+root of tempory directory to store temporary files (default to system default)
+Setting it to a different physical disk than user projects can generally
+improve the performance of variant tools. It should also be set to a directory
+with at least 500G of free diskspace if the default temporary partition
+is small.'''),
+    ('search_path', 'http://bioinformatics.mdanderson.org/Software/VariantTools/repository/;http://bioinformatics.mdanderson.org/Software/VariantTools/archive/', '''
+A ;-separated list of URL that host the variant tools repository. This option
+should only be changed if you have created a local mirror of the variant tools
+repository. Adding the URL before the default URL might provide better
+downloading performance for your users. Removing the default URL is possible
+but not recommended.'''),    
+    ('shared_resource', None, '''
+ A directory for shared resource files. It can be configured as
+ 1. NO shared resource (default). All users maintain their own resource
+   directory ($local_resource, which is usually ~/.variant_tools).
+
+ 2. A read-only directory with a mirror of the variant tools repository, with
+   .DB.gz files decompressed in the annoDB directory. This is important because
+   otherwise each user will have to decompress the files in their local resource
+   directory. The system admin can choose to remove outdated databases to reduce
+   the use of disk space. This option requires regular update of the resources.
+
+ 3. A directory that is writable by all users. The resources will be downloaded
+   to this directory by users, and shared by all users. This option is easier
+   to implement and requires less maintenance. The system admin can choose to
+   mirror the variant tools repository and let the users to keep it up to date.'''),
+    ('user_stash', '~/.variant_tools', '''
+ A ;-separated list of directories that stores personally-generated file formats,
+ annotation databases, pipelines and such. These directories are searched if
+ the requested file is not available in any online repository (or their local
+ copy). Files under these directories are NOT maintained by variant tools
+ (no manifest or md5 signatures are monitors). Currently only local files are
+ allowed (no URL to a remote server). By setting this option to ~/.variant_tools
+ (default) resource files under that directory will be usable even if they 
+ are not managed by variant tools''')]
+
+
 if os.path.isfile(os.path.expanduser('~/.variant_tools/user_options.py')):
     sys.path.insert(0, os.path.expanduser('~/.variant_tools'))
     try:
@@ -64,68 +116,14 @@ else:
     if not os.path.isdir(os.path.expanduser('~/.variant_tools')):
         os.mkdir(os.path.expanduser('~/.variant_tools'))
     with open(os.path.expanduser('~/.variant_tools/user_options.py'), 'w') as uo:
-        uo.write('''#
+        uo.write('''#!/usr/bin/env python
 # User configuration file that overrides settings from site-wise installation of variant tools.
 # This file should be placed in $HOME/.variant_tools/user_options.py. Please
 # note that this is a Python file so the strings should be quoted.
 #
-
-# ; separated pragmas for sqlite database that can be used to optimize the
-# performance of sqlite database operations. Please check the sqlite manual
-# for more details.
-#sqlite_pragma=''
-
-# Number of processes to read from input files during multi-process import.
-# A smaller number might provide better performance for file systems with
-# slow random I/O access.
-#import_num_of_readers=2
-
-# Number of processes to read genotype data for association tests. The default
-# value is the minimum of value of option --jobs and 8. A smaller number
-# might provide better performance for file system with slow random I/O
-# access.
-#associate_num_of_readers=None
-
-# root of tempory directory to store temporary files (default to system default)
-# Setting it to a different physical disk than user projects can generally
-# improve the performance of variant tools. It should also be set to a directory
-# with at least 500G of free diskspace if the default temporary partition
-# is small.
-#temp_dir=None
-
-# A ;-separated list of URL that host the variant tools repository. This option
-# should only be changed if you have created a local mirror of the variant tools
-# repository. Adding the URL before the default URL might provide better
-# downloading performance for your users. Removing the default URL is possible
-# but not recommended.
-#search_path='http://bioinformatics.mdanderson.org/Software/VariantTools/repository/;http://bioinformatics.mdanderson.org/Software/VariantTools/archive/'
-
-# A directory for shared resource files. It can be configured as
-# 1. NO shared resource (default). All users maintain their own resource
-#   directory ($local_resource, which is usually ~/.variant_tools).
-#
-# 2. A read-only directory with a mirror of the variant tools repository, with
-#   .DB.gz files decompressed in the annoDB directory. This is important because
-#   otherwise each user will have to decompress the files in their local resource
-#   directory. The system admin can choose to remove outdated databases to reduce
-#   the use of disk space. This option requires regular update of the resources.
-#
-# 3. A directory that is writable by all users. The resources will be downloaded
-#   to this directory by users, and shared by all users. This option is easier
-#   to implement and requires less maintenance. The system admin can choose to
-#   mirror the variant tools repository and let the users to keep it up to date.
-#shared_resource=None
-
-# A ;-separated list of directories that stores personally-generated file formats,
-# annotation databases, pipelines and such. These directories are searched if
-# the requested file is not available in any online repository (or their local
-# copy). Files under these directories are NOT maintained by variant tools
-# (no manifest or md5 signatures are monitors). Currently only local files are
-# allowed (no URL to a remote server). By setting this option to ~/.variant_tools
-# (default) resource files under that directory will be usable even if they 
-# are not managed by variant tools
-user_stash='~/.variant_tools'
-''')
+''' + '\n'.join(
+    ['#{}\n{}={}\n'.format(z.replace('\n', '\n# '), x, "'{}'".format(y) if isinstance(y, str) else str(y))
+        for x,y,z in default_user_options]))
     _user_options = {}
 #
 # overriding site option with local setting
@@ -226,7 +224,7 @@ class RuntimeEnvironments(object):
                 'resources such as reference genomes and annotation database. This option will '
                 'be ignored if a writable shared resource directory is specified by the system '
                 'admin.'),
-            'user_stash': ('~/.variant_tools', 'A ;-separated list of directories that stores personally-'
+            'user_stash': (site_options.user_stash, 'A ;-separated list of directories that stores personally-'
                 'generated file formats, annotation databases, pipelines and such. These '
                 'directories are searched if the requested file is not available in any '
                 'online repository (or their local copy). Files under these directories are'
@@ -248,6 +246,7 @@ class RuntimeEnvironments(object):
             if not os.path.isdir(site_options.shared_resource):
                 os.makedirs(site_options.shared_resource)
         #
+        self._user_stash = self.persistent_options['user_stash'][0]
         self._logfile_verbosity = self.persistent_options['logfile_verbosity'][0]
         self._verbosity = self.persistent_options['verbosity'][0]
         # self._check_update = self.persistent_options['check_update'][0]
@@ -2250,12 +2249,14 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
             # look in user stash if avail
             if env.user_stash is not None:
                 for us in env.user_stash.split(';'):
-                    if not os.path.isdir(us):
+                    if not os.path.isdir(os.path.expanduser(us)):
                         env.logger.warning('Stash directory ({}) does not exist. Check ~/.variant_tools/user_options.py for details.'
                             .format(us))
-                    usf = os.path.expanduser(os.path.join(us, fileToGet))
-                    if os.path.isfile(usf):
-                        return usf
+                    # we usually download file in directories such as annoDB/mydb
+                    # so we allow both structure and unstructured stash directory
+                    for usf in  [os.path.expanduser(os.path.join(us, x)) for x in (fileToGet, os.path.basename(fileToGet))]:
+                        if os.path.isfile(usf):
+                            return usf
             raise RuntimeError('Cannot download {} because it is not in the variant tools online repository or local stash directories.'.format(fileToGet))
     #
     fileSig = resource.manifest[fileToGet]
