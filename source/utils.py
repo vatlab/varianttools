@@ -112,6 +112,7 @@ if os.path.isfile(os.path.expanduser('~/.variant_tools/user_options.py')):
         _user_options = __import__('user_options',  globals(), locals()).__dict__
     except Exception as e:
         print('Failed to load user settings from ~/.variant_tools/user_options.py')
+    _user_options.update({x:y for x,y,z in default_user_options if x not in _user_options})
 else:
     if not os.path.isdir(os.path.expanduser('~/.variant_tools')):
         os.mkdir(os.path.expanduser('~/.variant_tools'))
@@ -124,11 +125,11 @@ else:
 ''' + '\n'.join(
     ['#{}\n{}={}\n'.format(z.replace('\n', '\n# '), x, "'{}'".format(y) if isinstance(y, str) else str(y))
         for x,y,z in default_user_options]))
-    _user_options = {}
+    _user_options = {x:y for x,y,z in default_user_options}
 #
 # overriding site option with local setting
 for k, v in _user_options.items():
-    if hasattr(site_options, k):
+    if not hasattr(site_options, k):
         setattr(site_options, k, v)
                
 try:

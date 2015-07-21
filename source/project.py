@@ -4975,6 +4975,60 @@ def admin(args):
                 else:
                     raise ValueError('File does not exist: {}'.format(ifile))
             sys.exit(0)
+        elif args.set_runtime_option is not None and vars(arg)['global']:
+            for option in args.set_runtime_option:
+                if '=' not in option:
+                    raise ValueError('Runtime option should be specified as opt=value')
+                opt, value = option.split('=', 1)
+                if opt not in (env.persistent_options) and opt not in env.hidden_options:
+                    raise ValueError('Only options {} are currently supported.'
+                        .format(', '.join(env.persistent_options)))
+                # save option to user-options
+                sys.path.insert(0, os.path.expanduser('~/.variant_tools'))
+                try:
+                    _user_options = __import__('user_options',  globals(), locals()).__dict__
+                except Exception as e:
+                    _user_options = {}
+                    print('Failed to load user settings from ~/.variant_tools/user_options.py')
+                _user_options[opt] = value
+                _user_options = {x[0]:x[1] if x[0] not in _user_options else _user_options[x[0]] for x in default_user_options}
+                #
+                with open(os.path.expanduser('~/.variant_tools/user_options.py'), 'w') as uo:
+                    uo.write('''#
+# User configuration file that overrides settings from site-wise installation of variant tools.
+# This file should be placed in $HOME/.variant_tools/user_options.py. Please
+# note that this is a Python file so the strings should be quoted.
+#
+''' + '\n'.join(
+['#{}\n{}={}\n'.format([c for c in default_user_options if c[0] == x][0][2].replace('\n', '\n# '),
+    x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in _user_options.items()]))
+        elif args.reset_runtime_option is not None and vars(arg)['global']:
+            if args.reset_runtime_option not in env.persistent_options:
+                raise ValueError('Option {} is not a valid runtime option. '
+                    'Use "vtools show runtime_options" to list currently '
+                    'supported runtime options.'.format(args.reset_runtime_option))
+            env.logger.info('Option {} is set to its default value'.format(args.reset_runtime_option))
+            # save option to user-options
+            sys.path.insert(0, os.path.expanduser('~/.variant_tools'))
+            try:
+                _user_options = __import__('user_options',  globals(), locals()).__dict__
+            except Exception as e:
+                _user_options = {}
+                print('Failed to load user settings from ~/.variant_tools/user_options.py')
+            if args.reset_runtime_option in _user_options:
+                _user_options.pop(args.reset_runtime_option)
+            _user_options = {x[0]:x[1] if x[0] not in _user_options else _user_options[x[0]] for x in default_user_options}
+            #
+            with open(os.path.expanduser('~/.variant_tools/user_options.py'), 'w') as uo:
+                uo.write('''#
+# User configuration file that overrides settings from site-wise installation of variant tools.
+# This file should be placed in $HOME/.variant_tools/user_options.py. Please
+# note that this is a Python file so the strings should be quoted.
+#
+''' + '\n'.join(
+['#{}\n{}={}\n'.format([c for c in default_user_options if c[0] == x][0][2].replace('\n', '\n# '),
+x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in _user_options.items()]))
+        #
         # other options requires a project
         with Project(verbosity=args.verbosity) as proj:
             if args.rename_samples:
@@ -5125,26 +5179,6 @@ def admin(args):
                             .format(value, opt, e))
                     proj.saveProperty('__option_{}'.format(opt), getattr(env, '_' + opt))
                     env.logger.info('Option {} is set to {}'.format(opt, getattr(env, '_' + opt)))
-                    # save option to user-options
-                    if vars(args)['global']:
-                        sys.path.insert(0, os.path.expanduser('~/.variant_tools'))
-                        try:
-                            _user_options = __import__('user_options',  globals(), locals()).__dict__
-                        except Exception as e:
-                            _user_options = {}
-                            print('Failed to load user settings from ~/.variant_tools/user_options.py')
-                        _user_options[opt] = value
-                        _user_options = {x[0]:x[1] if x[0] not in _user_options else _user_options[x[0]] for x in default_user_options}
-                        #
-                        with open(os.path.expanduser('~/.variant_tools/user_options.py'), 'w') as uo:
-                            uo.write('''#
-# User configuration file that overrides settings from site-wise installation of variant tools.
-# This file should be placed in $HOME/.variant_tools/user_options.py. Please
-# note that this is a Python file so the strings should be quoted.
-#
-''' + '\n'.join(
-    ['#{}\n{}={}\n'.format([c for c in default_user_options if c[0] == x][0][2].replace('\n', '\n# '),
-        x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in _user_options.items()]))
             elif args.reset_runtime_option is not None:
                 if args.reset_runtime_option not in env.persistent_options:
                     raise ValueError('Option {} is not a valid runtime option. '
@@ -5152,28 +5186,6 @@ def admin(args):
                         'supported runtime options.'.format(args.reset_runtime_option))
                 proj.removeProperty('__option_{}'.format(args.reset_runtime_option))
                 env.logger.info('Option {} is set to its default value'.format(args.reset_runtime_option))
-                # save option to user-options
-                if vars(args)['global']:
-                    sys.path.insert(0, os.path.expanduser('~/.variant_tools'))
-                    try:
-                        _user_options = __import__('user_options',  globals(), locals()).__dict__
-                    except Exception as e:
-                        _user_options = {}
-                        print('Failed to load user settings from ~/.variant_tools/user_options.py')
-                    if args.reset_runtime_option in _user_options:
-                        _user_options.pop(args.reset_runtime_option)
-                    _user_options = {x[0]:x[1] if x[0] not in _user_options else _user_options[x[0]] for x in default_user_options}
-                    #
-                    with open(os.path.expanduser('~/.variant_tools/user_options.py'), 'w') as uo:
-                        uo.write('''#
-# User configuration file that overrides settings from site-wise installation of variant tools.
-# This file should be placed in $HOME/.variant_tools/user_options.py. Please
-# note that this is a Python file so the strings should be quoted.
-#
-''' + '\n'.join(
-['#{}\n{}={}\n'.format([c for c in default_user_options if c[0] == x][0][2].replace('\n', '\n# '),
-    x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in _user_options.items()]))
-            #
             elif args.save_snapshot is not None:
                 if args.extra_files is not None:
                     cur_dir = os.path.realpath(os.getcwd())
