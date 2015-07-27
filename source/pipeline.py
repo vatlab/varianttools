@@ -1595,6 +1595,14 @@ class ExecuteScript(PipelineAction):
                     pass
             raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
                 .format(cmd, self._elapsed_time(), ret))
+        else:
+            # write standard out to terminal
+            with open(self.proc_out) as proc_out:
+                for line in proc_out:
+                    env.logger.info(line)
+            with open(self.proc_err) as proc_err:
+                for line in proc_err:
+                    env.logger.info(line)
 
     def _monitor(self):
         while True:
@@ -2456,9 +2464,9 @@ class Pipeline:
                         step_named_input.append([piece[:-1].strip(), []])
                     else:
                         if not step_named_input:
-                            step_named_input.append(['', shlex.split(piece)])
+                            step_named_input.append(['', sum([glob.glob(os.path.expanduser(x)) for x in shlex.split(piece)], [])])
                         else:
-                            step_named_input[-1][1] = shlex.split(piece)
+                            step_named_input[-1][1] = sum([glob.glob(os.path.expanduser(x)) for x in shlex.split(piece)], [])
                 #
                 step_input = sum([x[1] for x in step_named_input], [])
                 if emitter_part:
