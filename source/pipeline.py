@@ -2724,7 +2724,7 @@ def execute(args):
             try:
                 # try to execute as a SQL query
                 executeQuery()
-            except RuntimeError as e:
+            except (RuntimeError, ValueError) as e:
                 env.logger.debug('Failed to execute {} as SQL query: {}'
                     .format(' '.join(args.pipelines), e))
                 executePipeline()
