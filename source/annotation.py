@@ -390,13 +390,16 @@ class AnnoDBConfiger:
         function set self.db to a live connection.
         '''
         if not source_files and not rebuild:
-            dbFile = self.name + ('-' + self.version if self.version else '') + '.DB'
-            if os.path.isfile(dbFile):
-                try:
-                    return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields, linked_name)
-                except ValueError as e:
-                    env.logger.debug(e)
-                    env.logger.info('Existing database cannot be used.')
+            dbFilename = self.name + ('-' + self.version if self.version else '') + '.DB'
+            for dbFile in (dbFilename, os.path.join(env.local_resource, 'annoDB', dbFilename)):
+                if os.path.isfile(dbFile):
+                    if self.db_md5 and calculateMD5(dbFile, partial=True) != self.db_md5:
+                        env.logger.warning('MD5 signature mismatch: {}'.format(dbFile))
+                    try:
+                        return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields, linked_name)
+                    except ValueError as e:
+                        env.logger.debug(e)
+                        env.logger.info('Existing database cannot be used.')
             # if there is a direct URL?
             if self.direct_url is not None:
                 env.logger.info('Downloading annotation database from {}'.format(self.direct_url))
