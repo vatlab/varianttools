@@ -581,7 +581,7 @@ class RuntimeEnvironments(object):
             # This is done for levelname not in self.LEVEL_COLOR, e.g.
             # for info that uses native color. The text will not be 
             # visible if someone is using a green background
-            return re.sub(r'\[\[(.*)\]\]', '\033[32m\\1\033[0m', str(msg))
+            return re.sub(r'\[\[([^\]]*)\]\]', '\033[32m\\1\033[0m', str(msg))
 
         def format(self, record):
             record = copy.copy(record)

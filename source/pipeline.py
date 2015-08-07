@@ -1191,6 +1191,8 @@ class RunCommand(PipelineAction):
         if self.proc_lck:
             env.lock(self.proc_lck, str(os.getpid()))
         for cur_cmd in self.cmd:
+            if self.working_dir is not None and not os.path.isdir(self.working_dir):
+                os.makedirs(self.working_dir)
             env.logger.info('Running [[{}]]{}'.format(cur_cmd,
                 ' under {}'.format(self.working_dir) if self.working_dir else ''))
             ret = subprocess.call(cur_cmd, shell=True, 
@@ -1602,7 +1604,7 @@ class ExecuteScript(PipelineAction):
                     env.logger.info(line)
             with open(self.proc_err) as proc_err:
                 for line in proc_err:
-                    env.logger.info(line)
+                    env.logger.info(line.rstrip())
 
     def _monitor(self):
         while True:
@@ -2574,7 +2576,7 @@ class Pipeline:
                             .format(f, pname, command.index))
                 for key, val in command.pipeline_vars:
                     self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS)
-                    env.logger.debug('Pipeline variable {} is set to {}'
+                    env.logger.info('Pipeline variable [[{}]] is set to [[{}]]'
                         .format(key, self.VARS[key]))
                 #
                 # In case of passthrough, the original input files will be passed to 

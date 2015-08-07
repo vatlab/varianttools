@@ -749,7 +749,7 @@ class PipelineDescription:
                     if quote == "'''" and not pieces[i-1].endswith('r'):
                         pieces[i-1] = pieces[i-1] + 'r'
                     # replace string with an unlikely character
-                    pieces[i] = pieces[i].replace('\n', self.newline_PH)
+                    pieces[i] = pieces[i].replace('\\\n', '').replace('\n', self.newline_PH)
                 self.config_text = quote.join(pieces)
             # handling comments
             #
@@ -969,11 +969,11 @@ class PipelineDescription:
                 try:
                     section_headers = [x.strip() for x in section.split(':', 1)[0].split(',')]
                     for header in section_headers:
-                        if not re.match('^([\w\d*_]+_)?[\d]+$', header):
+                        if not re.match('^([\w*_][\w\d*_]*_)?[\d]+$', header) and not re.match('^[\w][\w\d]*$', header):
                             raise ValueError('Invalid section header "{}"'.format(section))
                     #
-                    pnames = [x.strip().rsplit('_', 1)[0] if '_' in x else 'default' for x in section_headers]
-                    pidxs = [x.strip().rsplit('_', 1)[1] if '_' in x else x for x in section_headers]
+                    pnames = [x.strip().rsplit('_', 1)[0] if '_' in x else ('default' if x.isgigit() else x) for x in section_headers]
+                    pidxs = [x.strip().rsplit('_', 1)[1] if '_' in x else (x if x.isdigit() else '0') for x in section_headers]
                     #
                     if ':' in section:
                         options = [x.strip() for x in section.split(':', 1)[-1].split(',')]
