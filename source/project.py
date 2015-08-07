@@ -881,16 +881,28 @@ class PipelineDescription:
         #
         env.logger.debug('Pipeline version {}'.format(self.pipeline_format))
         # We used format interpolation in older version 
-        if float(self.pipeline_format) <= 1.0:
-            if sys.version_info.major == 2:
-                fmt_parser = SafeConfigParser()
+        try:
+            if float(self.pipeline_format) <= 1.0:
+                if sys.version_info.major == 2:
+                    fmt_parser = SafeConfigParser()
+                else:
+                    fmt_parser = ConfigParser(strict=False)
+                fmt_parser.read(filename)
             else:
-                fmt_parser = ConfigParser(strict=False)
-            fmt_parser.read(filename)
-        else:
-            # and now we only use pipeline variables.
-            fmt_parser = MyConfigParser()
-            fmt_parser.readfp(StringIO(self._translateConfigText(filename)))
+                # and now we only use pipeline variables.
+                fmt_parser = MyConfigParser()
+                fmt_parser.readfp(StringIO(self._translateConfigText(filename)))
+        except Exception as e:
+            msg = repr(e).split('\n')
+            if msg[-1].strip().startswith('[line'):
+                line_no = int(msg[-1].strip()[6:].split(']')[0])
+                lines = self._translateConfigText(filename).split('\n')
+                if line_no > 2:
+                    env.logger.error('{}: {}'.format(line_no-1, lines[line_no - 2]))
+                env.logger.error('{}: {}'.format(line_no, lines[line_no-1]))
+                if line_no < len(lines):
+                    env.logger.error('{}: {}'.format(line_no + 1, lines[line_no]))
+            raise
         parameters = fmt_parser.items('DEFAULT')
         parser = argparse.ArgumentParser(prog='vtools CMD --pipeline {}'
             .format(os.path.split(filename)[-1]),
@@ -944,7 +956,11 @@ class PipelineDescription:
         # but there is no simple way to make it python2 compatible.
         #with open(filename, 'r', encoding='UTF-8') as inputfile:
         #    parser.readfp(inputfile)
-        parser.readfp(StringIO(self._translateConfigText(filename)))
+        try:
+            parser.readfp(StringIO(self._translateConfigText(filename)))
+        except:
+            env.logger.error(self._translateConfigText(filename))
+            raise
         # sections?
         sections = parser.sections()
         if 'pipeline description' not in sections:
@@ -955,7 +971,12 @@ class PipelineDescription:
             if section.lower() == 'pipeline description':
                 for item in parser.items(section, vars=defaults):
                     if item[0] == 'description':
-                        self.description = item[1]
+                        self.description = item[1].strip()
+                        if (self.description.startswith("r'''") or self.description.startswith("'''")) and self.description.endswith("'''"):
+                            self.description = self.description[(4 if self.description.startswith('r') else 3):-3].replace(self.newline_PH, '<br>')
+                        elif (self.description.startswith('r"""') or self.description.startswith('"""')) and self.description.endswith('"""'):
+                            self.description = self.description[(4 if self.description.startswith('r') else 3):-3].replace(self.newline_PH, '\n')
+
                     elif item[0].endswith('_description'):
                         self.pipeline_descriptions[item[0].strip().rsplit('_', 1)[0]] = item[1]
                     elif item[0] in defaults or item[0].endswith('_comment'):
@@ -972,7 +993,7 @@ class PipelineDescription:
                         if not re.match('^([\w*_][\w\d*_]*_)?[\d]+$', header) and not re.match('^[\w][\w\d]*$', header):
                             raise ValueError('Invalid section header "{}"'.format(section))
                     #
-                    pnames = [x.strip().rsplit('_', 1)[0] if '_' in x else ('default' if x.isgigit() else x) for x in section_headers]
+                    pnames = [x.strip().rsplit('_', 1)[0] if '_' in x else ('default' if x.isdigit() else x) for x in section_headers]
                     pidxs = [x.strip().rsplit('_', 1)[1] if '_' in x else (x if x.isdigit() else '0') for x in section_headers]
                     #
                     if ':' in section:
@@ -1039,8 +1060,8 @@ class PipelineDescription:
                     .format(pname, ', '.join(self.pipelines.keys())))
         for pname, pipeline in self.pipelines.items():
             if pname not in self.pipeline_descriptions:
-                if pname != 'default':
-                    env.logger.warning('No description for {} {} is available.'.format(self.pipeline_type, pname))
+                #if pname != 'default':
+                #    env.logger.warning('No description for {} {} is available.'.format(self.pipeline_type, pname))
                 self.pipeline_descriptions[pname] = ''
             for idx, cmd in enumerate(pipeline):
                 if cmd is None:
@@ -1100,9 +1121,9 @@ class PipelineDescription:
                     ('(default: {})'.format(item[1]) if item[1] else '')
                 print('\n'.join(textwrap.wrap(text, subsequent_indent=' '*22,
                     width=textWidth)))
-        else:
-            print('\nNo configurable parameter is defined for this {}.\n'
-                .format('model' if self.pipeline_type == 'simulation' else 'pipeline'))
+        #else:
+        #    print('\nNo configurable parameter is defined for this {}.\n'
+        #        .format('model' if self.pipeline_type == 'simulation' else 'pipeline'))
 
 
 class AnnoDBWriter:
