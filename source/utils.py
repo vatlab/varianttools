@@ -2258,7 +2258,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
                     for usf in  [os.path.expanduser(os.path.join(us, x)) for x in (fileToGet, os.path.basename(fileToGet))]:
                         if os.path.isfile(usf):
                             return usf
-            raise RuntimeError('Cannot download {} because it is not in the variant tools online repository or local stash directories.'.format(fileToGet))
+            raise RuntimeError('Failed to download {} because it is not in the variant tools online repository or local stash directories.'.format(fileToGet))
     #
     fileSig = resource.manifest[fileToGet]
     if dest_dir is not None:
@@ -3653,8 +3653,9 @@ def make_unique(lst):
     return result 
 
 class VariableSubstitutor:
-    def __init__(self, text):
+    def __init__(self, text, asString):
         self.text = text
+        self.asString = asString
 
     def var_expr(self, var):
         if type(var) == str:
@@ -3664,7 +3665,10 @@ class VariableSubstitutor:
             else:
                 return var
         elif type(var) == list:
-            return ' '.join([self.var_expr(x) for x in var])
+            if self.asString:
+                return ' '.join([self.var_expr(x) for x in var])
+            else:
+                return [self.var_expr(x) for x in var]
         else:
             env.logger.debug('Return value of pipeline variable is not string or list of strings: {}'.format(var))
             return str(var)
@@ -3774,25 +3778,44 @@ class VariableSubstitutor:
                             .format(piece))
                     continue
         #
-        if float(PipelineVars['pipeline_format']) <= 1.0:
-            # now, join the pieces together, but remove all newlines
-            return ' '.join(''.join(pieces).split())
+        if self.asString:
+            if float(PipelineVars['pipeline_format']) <= 1.0:
+                # now, join the pieces together, but remove all newlines
+                return ' '.join(''.join(pieces).split())
+            else:
+                return ''.join(pieces)
         else:
-            return ''.join(pieces)
+            pieces = [x for x in pieces if x]
+            if not pieces:
+                return ''
+            elif len(pieces) == 1:
+                return pieces[0]
+            else:
+                if all([isinstance(x, str) or len(x) <= 1 for x in pieces]):
+                    return ''.join([x if isinstance(x, str) else (x[0] if len(x) == 1 else '') for x in pieces])
+                else:
+                    raise ValueError('Variables must be string type (or list of length 1) in variable assignment if text and expressions are mixed: {} evalulated as {}'
+                        .format(text, pieces))
+
 
     def substituteWith(self, PipelineVars, PipelineGlobals):
-        count = 1
-        while count < 10:
-            new_text = self._substitute(self.text, PipelineVars, PipelineGlobals)
-            if new_text == self.text:
-                return new_text
-            else:
-                self.text = new_text
-            count += 1
-        raise ValueError('Failed to evaluate pipeline varialbe {}. Perhpas the variable is nested.'.format(self.text))
+        if self.asString:
+            count = 1
+            while count < 10:
+                new_text = self._substitute(self.text, PipelineVars, PipelineGlobals)
+                if new_text == self.text:
+                    return new_text
+                else:
+                    self.text = new_text
+                count += 1
+            raise ValueError('Failed to evaluate pipeline varialbe {}. Perhpas the variable is nested.'.format(self.text))
+        else:
+            return self._substitute(self.text, PipelineVars, PipelineGlobals)
     
-def substituteVars(text, PipelineVars, PipelineGlobals):
-    return VariableSubstitutor(text).substituteWith(PipelineVars, PipelineGlobals)
+def substituteVars(text, PipelineVars, PipelineGlobals, asString=True):
+    # if asString is to, the return value is forced to be string
+    # Otherwise, the evaluate values are returned.
+    return VariableSubstitutor(text, asString).substituteWith(PipelineVars, PipelineGlobals)
 
 def determineSexOfSamples(proj, sample_IDs=None):
     '''Determine the sex of samples by checking phenotype sex or gender.

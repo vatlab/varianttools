@@ -73,7 +73,7 @@ Column = namedtuple('Column', ['index', 'field', 'adj', 'comment'])
 # see http://varianttools.sourceforge.net/Calling/New for details
 #
 PipelineCommand = namedtuple('PipelineCommand', ['index', 'options', 'input',
-    'input_emitter', 'action', 'pipeline_vars', 'comment'])
+    'input_emitter', 'action', 'init_action_vars', 'pre_action_vars', 'post_action_vars', 'comment'])
 #
 # How field will be use in a query. For example, for field sift, it is
 # connection clause will be:
@@ -949,6 +949,7 @@ class PipelineDescription:
                 parser = SafeConfigParser()
             else:
                 parser = ConfigParser(strict=False)
+            parser.optionxform = str
         else:
             # and now we only use pipeline variables.
             parser = MyConfigParser()
@@ -1016,19 +1017,37 @@ class PipelineDescription:
                     items = [x[0] for x in parser.items(section, raw=True)]
                     if 'action' not in items:
                         raise ValueError('Missing item "action" in section {}.'.format(section))
-                    step_vars = []
+                    step_init_vars = []
+                    step_pre_vars = []
+                    step_post_vars = []
                     for item in items:
                         if item.endswith('_comment'):
                             continue
-                        if item not in ['input', 'input_emitter', 'action', 'comment'] + defaults.keys():
-                            step_vars.append([item, parser.get(section, item, vars=defaults)])
+                        before_input_action = True
+                        before_action = True
+                        if item not in ['input', 'input_emitter', 'comment'] + defaults.keys():
+                            if item == 'input':
+                                before_input_action = False
+                                continue
+                            elif item == 'action':
+                                before_action = False
+                                before_input_action = False
+                                continue
+                            if before_input_action:
+                                step_init_vars.append([item, parser.get(section, item, vars=defaults)])
+                            elif before_action:
+                                step_pre_vars.append([item, parser.get(section, item, vars=defaults)])
+                            else:
+                                step_post_vars.append([item, parser.get(section, item, vars=defaults)])
                     for pname,pidx in zip(pnames, pidxs):
                         command = PipelineCommand(index=pidx,
                             options=options,
                             input=parser.get(section, 'input', vars=defaults).replace(self.newline_PH, '\n').replace(self.semicolon_PH, ';') if 'input' in items else None,
                             input_emitter=parser.get(section, 'input_emitter', vars=defaults).replace(self.newline_PH, '\n').replace(self.semicolon_PH, ';') if 'input_emitter' in items else '',
                             action=parser.get(section, 'action', vars=defaults).replace(self.newline_PH, '\n').replace(self.semicolon_PH, ';') if 'action' in items else '',
-                            pipeline_vars=step_vars,
+                            init_action_vars=step_init_vars,
+                            pre_action_vars=step_pre_vars,
+                            post_action_vars=step_post_vars,
                             comment=parser.get(section, 'comment', raw=True).replace(self.newline_PH, '\n').replace(self.semicolon_PH, ';') if 'comment' in items else '')
                         self.pipelines[pname].append(command)
                 except Exception as e:
@@ -1078,7 +1097,9 @@ class PipelineDescription:
                         input=cmd.input,
                         input_emitter=cmd.input_emitter,
                         action=cmd.action,
-                        pipeline_vars=cmd.pipeline_vars,
+                        init_action_vars=cmd.init_action_vars,
+                        pre_action_vars=cmd.pre_action_vars,
+                        post_action_vars=cmd.post_action_vars,
                         comment=substituteVars(cmd.comment, 
                             {'pipeline_name': pname, 
                              'pipeline_step': cmd.index,

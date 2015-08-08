@@ -35,6 +35,7 @@ import subprocess
 import Queue
 import threading
 import pipes
+import pprint
 #
 import glob
 import hashlib
@@ -74,6 +75,146 @@ try:
 except (ImportError, ValueError) as e:
     hasPySam = False
 
+
+
+class NamedList:
+    '''This class implements a named list to assist users in inputting a large
+    number of items to a pipeline. Because these lists are often stored in a text 
+    or excel file and are associated with a name or some other meta information,
+    users can input all them in the format of three ':' seprated parts
+
+    1. name (optional): name of the list.
+    2. values: values can be either a space or comma separated list such as A1 A2 ... 
+       or A1,A2,A3,... or a field in a file in the format of fieldname@filename?query.
+       Fieldname should be one or more fields from the file joined with a non-alphabetical
+       character (e.g. '+'). Filename should be a file in .csv, text (tab delimited) or 
+       EXCEL file. Query is a query that can limit the items from the retrieved list.
+       A query can consist other fields in the input data file with the entire file treated
+       as a retional database.
+    3. meta (optional): meta information for the list, which can be extra comment, weight (relative
+       to other list), and others, must be in the format of comma separated name=value
+
+    Examples:
+        age@phenotype.xls
+            A column called phenotype from "phenotype.xls". Age will be treated as 
+            name of the list.
+
+        deceased:dead@phenotype.xls
+            A list with name "deceased" retrieved from column "dead" of "phenotype.xls".
+
+        id1,id2,id3,id4
+            A list of IDs.
+
+        IDs@phenotype.xls?recurrance=="1"
+           get a list of IDs (column IDs) from "phenotype.xls" where the recurrance column has
+           value "1"
+
+        age@phenotype.xls:weight==1000
+            A named list with meta information 1000
+
+    The named list has attribute
+        name
+            Name of the list, default to "" unless default_name is given.
+
+        items
+            A list of items.
+
+        meta
+            Optional meta information as a dictionary. Default to {}.
+
+    '''
+    def __init__(self, value_string, default_name=""):
+        self.name = default_name
+        self.items = []
+        self.meta = {}
+        # if it is None etc
+        if value_string is None:
+            return
+        if not isinstance(value_string, str):
+            if len(value_string) == 1:
+                value_string = value_string[0]
+            else:
+                # if multiple items are passed, treat directly
+                # as list of strings.
+                self.items = value_string
+                return
+        #
+        self._parse(value_string, default_name)
+
+    def _parse(self, value_string, default_name):
+        if not value_string:
+            return
+        # single space separated string
+        if re.match('([\w\d-]+\s+)+[\w\d-]+', value_string):
+            self.items = value_string.split()
+            return
+        #
+        # comma separated named list
+        matched = re.match('^([\w\d-]+:)*((([\w\d-]+,)+[\w\d-]+)|([^:]*)@([^:?]*)(\?([^:]*))*)(:([^:]+))*$', value_string)
+        if matched is None:
+            raise ValueError(('"{}" is not a valid named list / query string, which should be name (optional) + comma separated list or '
+                'colname@filename with optional query string (?), with optional meta. Three parts should be separated by :.')
+                .format(value_string))
+        name = matched.group(1)
+        comma_list = matched.group(3)
+        colname = matched.group(5)
+        filename = matched.group(6)
+        query = matched.group(8)
+        meta = matched.group(10)
+        if name is not None:
+            self.name = name.rstrip(':')
+        if meta is not None:
+            matched = re.match('[\d\w_]+\s*=\s*[^=,]*(,[\d\w_]+\s*=\s*[^=,]*)*$', meta)
+            if not matched:
+                raise ValueError('Meta information is not in the format of key=value: {}'.format(meta))
+            self.meta = {x.split('=')[0].strip(): x.split('=')[1].strip() for x in meta.split(',')}
+        #
+        if comma_list is not None:
+            self.items = comma_list.split(',')
+        else:
+            import pandas as pd
+            if not os.path.isfile(filename):
+                raise ValueError('File does not exist: {}'.format(filename))
+            # pandas can be slow to import
+            if filename.endswith('.csv'):
+                data = pd.read_csv(filename)
+            else:
+                data = pd.read_excel(filename)
+            # convert everything to str
+            data = data.applymap(str)
+            #
+            # if query?
+            if query is not None:
+                if re.match('.*[\d\w_]+\s*=\s*[\d\w_]+.*', query):
+                    raise ValueError('Syntax "a=b" is not allowed. Please use "a==b" instead: {}'.format(query))
+                try:
+                    data = data.query(query)
+                except Exception as e:
+                    raise ValueError('Failed to apply query "{}" to data file {}: {}'
+                        .format(query, filename, e))
+            #
+            values = None
+            for col in re.split('([^\w\d_])', colname):
+                if re.match('[^\w\d_]', col):
+                    if values is None:
+                        raise ValueError('Leading non-ascii word is not allowed. {}'.format(colname))
+                    else:
+                        values = [x+col for x in values]
+                    continue
+                if col not in data.columns:
+                    raise ValueError('File {} does not have column {}. Available columns are {}'
+                        .format(filename, col, ', '.join(list(data.columns))))
+                if values is None:
+                    values = list(data[col].fillna(''))
+                else:
+                    values = [x+y for x,y in zip(values, data[col].fillna(''))]
+            #
+            self.items = values
+            if self.name == default_name:
+                self.name = colname
+
+def rvec(vec):
+    return 'c(' + ','.join([repr(x) for x in vec]) + ')'
 
 class SkipIf:
     '''An input emitter that skips the step (does not pass any input to the
@@ -1369,7 +1510,7 @@ class ExecutePythonCode(PipelineAction):
         Raises an error if the python code fails to execute.
 
     '''
-    def __init__(self, script='', output=[], modules=[], **kwargs):
+    def __init__(self, script='', output=[], modules=[], export=None, **kwargs):
         '''This action accepts one or a list of strings and execute it as a piece of Python
         code. Pipeline variables are made available as a dictionary "pvars".
 
@@ -1378,11 +1519,21 @@ class ExecutePythonCode(PipelineAction):
                 One or more strings to execute. List of strings will be concatenated by new
                 lines.
 
+            modules (string or list of strings):
+                Modules to import for this step. It is similar to action ImportModules but
+                the imported symbols are available to this action only.
+
+            export (None or filename):
+                A filename to which the execute code will be exported. This option is useful
+                for debugging because pipeline variables will be prepended to the script so
+                that the exported script could be executed with no or minimal modification.
+
             kwargs (additional parameters):
                 Any additional kwargs will be passed to the function executed.
         '''
         if not script:
-            raise ValueError('No valid script is specified.')
+            env.logger.warning('No valid script is specified.')
+            script = ''
         if isinstance(script, str):
             self.script = script
         else:
@@ -1393,10 +1544,33 @@ class ExecutePythonCode(PipelineAction):
         #
         self.kwargs = kwargs
         self.modules = modules
+        self.export = export
         #
         PipelineAction.__init__(self, cmd='python -e {} {}'.format(m.hexdigest(), kwargs), output=output)
 
     def _execute(self, ifiles, pipeline=None):
+        if self.export is not None:
+            with open(self.export, 'w') as exported_script:
+                exported_script.write('#!/usr/env python\n')
+                exported_script.write('#\n#Script exported by action ExecutePythonCode\n')
+                # modules?
+                exported_script.write(''.join(['import {}\n'.format(x) for x in ('sys', 'os', 're', 'glob')]))
+                exported_script.write('\nfrom variant_tools.pipeline import *\n')
+                for module in self.modules:
+                    exported_script.write('import {}\n'.format(os.path.basename(module)[:-3] if module.endswith('.py') else module))
+                #
+                # pipeline variables
+                exported_script.write('pvars=')
+                pprint.pprint(pipeline.VARS.dict(), stream=exported_script)
+                exported_script.write('\n')
+                #
+                exported_script.write('# Pipeline variables are case insensitive\n')
+                exported_script.write('pvars.update({x.upper():y for x,y in pvars.items()})\n')
+                exported_script.write('pvars.update({x.lower():y for x,y in pvars.items()})\n')
+                #
+                # script
+                exported_script.write(self.script)
+            env.logger.info('Python code exported to {}'.format(self.export))
         for module in self.modules:
             # this is a path to a .py file
             if module.endswith('.py'):
@@ -1462,8 +1636,8 @@ class ExecuteScript(PipelineAction):
         Raises an error if an command fails to execute.
 
     """
-    def __init__(self, script='', interpreter='', args='', output=[], working_dir=None, submitter=None,
-        suffix=None):
+    def __init__(self, script='', interpreter='', args='', output=[], working_dir=None, 
+         export=None, submitter=None, suffix=None):
         '''This action accepts one or a list of strings, write them to a temporary file
         and executes them by a interpreter, possibly as a separate job. 
         
@@ -1492,6 +1666,11 @@ class ExecuteScript(PipelineAction):
                 Working directory of the command. Variant Tools will change to
                 this directory before executing the commands if a valid directory
                 is passed.
+
+            export (None or string):
+                A filename to which the script will be exported before execution. 
+                This option makes it easier to debug the script because the script in the
+                spec file might contain pipeline variables.
 
             submitter (None or string):
                 If a submitter is specified and the pipeline is executed in multi-job
@@ -1548,6 +1727,10 @@ class ExecuteScript(PipelineAction):
         with open(self.script_file, 'w') as script_file:
             script_file.write(self.script)
         #
+        if export is not None:
+            with open(export, 'w') as exported_script:
+                exported_script.write(self.script)
+                env.logger.info('Script exported to {}'.format(export))
         PipelineAction.__init__(self, cmd='{} {}'.format(interpreter, m.hexdigest()), output=output)
 
     def __del__(self):
@@ -1746,54 +1929,54 @@ class ExecuteRScript(ExecuteScript):
     '''Execute in-line R script using Rscript as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', args='', output=[], working_dir=None, submitter=None):
+    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
         ExecuteScript.__init__(self, script=script, interpreter='Rscript', args=args,
-            output=output, working_dir=working_dir, submitter=submitter,
+            output=output, export=None, working_dir=working_dir, submitter=submitter,
             suffix='.R')
 
 class ExecuteShellScript(ExecuteScript):
     '''Execute in-line shell script using bash as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', args='', output=[], working_dir=None, submitter=None):
+    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
         ExecuteScript.__init__(self, script=script, interpreter='bash', args=args,
-            output=output, working_dir=working_dir, submitter=submitter,
+            output=output, export=None, working_dir=working_dir, submitter=submitter,
             suffix='.sh')
 
 class ExecuteCShellScript(ExecuteScript):
     '''Execute in-line shell script using bash as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', args='', output=[], working_dir=None, submitter=None):
+    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
         ExecuteScript.__init__(self, script=script, interpreter='tcsh', args=args,
-            output=output, working_dir=working_dir, submitter=submitter,
+            output=output, export=None, working_dir=working_dir, submitter=submitter,
             suffix='.csh')
 
 class ExecutePythonScript(ExecuteScript):
     '''Execute in-line python script using python as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', args='', output=[], working_dir=None, submitter=None):
+    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
         ExecuteScript.__init__(self, script=script, interpreter='python', args=args,
-            output=output, working_dir=working_dir, submitter=submitter,
+            output=output, export=None, working_dir=working_dir, submitter=submitter,
             suffix='.py')
 
 class ExecutePython3Script(ExecuteScript):
     '''Execute in-line python script using python3 as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', args='', output=[], working_dir=None, submitter=None):
+    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
         ExecuteScript.__init__(self, script=script, interpreter='python3', args=args,
-            output=output, working_dir=working_dir, submitter=submitter,
+            output=output, export=None, working_dir=working_dir, submitter=submitter,
             suffix='.py')
 
 class ExecutePerlScript(ExecuteScript):
     '''Execute in-line perl script using perl as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', args='',  output=[], working_dir=None, submitter=None):
+    def __init__(self, script='', args='',  output=[], export=None, working_dir=None, submitter=None):
         ExecuteScript.__init__(self, script=script, interpreter='perl', args=args,
-            output=output, working_dir=working_dir, submitter=submitter,
+            output=output, export=None, working_dir=working_dir, submitter=submitter,
             suffix='.perl')
 
 
@@ -1801,9 +1984,9 @@ class ExecuteRubyScript(ExecuteScript):
     '''Execute in-line perl script using perl as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', args='',  output=[], working_dir=None, submitter=None):
+    def __init__(self, script='', args='',  output=[], export=None, working_dir=None, submitter=None):
         ExecuteScript.__init__(self, script=script, interpreter='ruby', args=args,
-            output=output, working_dir=working_dir, submitter=submitter,
+            output=output, export=None, working_dir=working_dir, submitter=submitter,
             suffix='.rb')
 
 
@@ -2301,6 +2484,9 @@ class _CaseInsensitiveDict(MutableMapping):
             raise ValueError('Only string or list of strings are allowed for pipeline variables: {} for key {}'.format(value, key))
         self._store[key.upper()] = (key, value)
 
+    def dict(self):
+        return {x:y for x,y in self._store.values()}
+
     def __getitem__(self, key):
         return self._store[key.upper()][1]
 
@@ -2413,7 +2599,7 @@ class Pipeline:
         # they might refer to each other
         self.VARS.update(self.pipeline.pipeline_vars)
         for key, val in self.pipeline.pipeline_vars.items():
-            self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS)
+            self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
         for key, val in self.VARS.items():
             env.logger.trace('{} is set to {}'.format(key, val))
         #
@@ -2436,6 +2622,11 @@ class Pipeline:
             env.logger.info('Executing [[{}.{}_{}]]: {}'
                 .format(self.pipeline.name, pname, command.index, 
                     ' '.join(command.comment.split())))
+            # init
+            for key, val in command.init_action_vars:
+                self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
+                env.logger.info('Pipeline variable [[{}]] is set to [[{}]]'
+                    .format(key, self.VARS[key]))
             # substitute ${} variables
             emitter = None
             if 'no_input' in command.options or 'passthrough' in command.options:
@@ -2470,7 +2661,7 @@ class Pipeline:
                         else:
                             step_named_input[-1][1] = sum([glob.glob(os.path.expanduser(x)) for x in shlex.split(piece)], [])
                 #
-                step_input = sum([x[1] for x in step_named_input], [])
+                step_input = sum([x[1] for x in step_named_input if x[0] == ''], [])
                 if emitter_part:
                     try:
                         # remove ${INPUT} because it is determined by the emitter
@@ -2487,6 +2678,7 @@ class Pipeline:
             for n, f in step_named_input:
                 if n:
                     self.VARS['input{}_{}'.format(command.index, n)] = f
+                    self.VARS['input_{}'.format(n)] = f
             for opt in command.options:
                 matched = re.match('^input_alias\s*=\s*([\w\d_]+)$', opt)
                 if matched:
@@ -2519,11 +2711,12 @@ class Pipeline:
             # pass Pipeline itself to emitter
             igroups, step_output = emitter(step_input, self)
             try:
+                for key, val in command.pre_action_vars:
+                    self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
+                    env.logger.info('Pipeline variable [[{}]] is set to [[{}]]'
+                        .format(key, self.VARS[key]))
                 for ig in igroups:
                     self.VARS['input'] = ig
-                    for n,f in step_named_input:
-                        if n:
-                            self.VARS['input_{}'.format(n)] = [x for x in ig if x in f]
                     #
                     action = substituteVars(command.action, self.VARS, self.GLOBALS)
                     env.logger.trace('Emitted input of step {}_{}: {}'
@@ -2574,8 +2767,8 @@ class Pipeline:
                         raise RuntimeError('Output file {} does not exist after '
                             'completion of step {}_{}'
                             .format(f, pname, command.index))
-                for key, val in command.pipeline_vars:
-                    self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS)
+                for key, val in command.post_action_vars:
+                    self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
                     env.logger.info('Pipeline variable [[{}]] is set to [[{}]]'
                         .format(key, self.VARS[key]))
                 #
