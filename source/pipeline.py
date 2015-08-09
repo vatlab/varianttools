@@ -1931,7 +1931,7 @@ class ExecuteRScript(ExecuteScript):
     '''
     def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
         ExecuteScript.__init__(self, script=script, interpreter='Rscript', args=args,
-            output=output, export=None, working_dir=working_dir, submitter=submitter,
+            output=output, export=export, working_dir=working_dir, submitter=submitter,
             suffix='.R')
 
 class ExecuteShellScript(ExecuteScript):
@@ -1940,7 +1940,7 @@ class ExecuteShellScript(ExecuteScript):
     '''
     def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
         ExecuteScript.__init__(self, script=script, interpreter='bash', args=args,
-            output=output, export=None, working_dir=working_dir, submitter=submitter,
+            output=output, export=export, working_dir=working_dir, submitter=submitter,
             suffix='.sh')
 
 class ExecuteCShellScript(ExecuteScript):
@@ -1949,7 +1949,7 @@ class ExecuteCShellScript(ExecuteScript):
     '''
     def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
         ExecuteScript.__init__(self, script=script, interpreter='tcsh', args=args,
-            output=output, export=None, working_dir=working_dir, submitter=submitter,
+            output=output, export=export, working_dir=working_dir, submitter=submitter,
             suffix='.csh')
 
 class ExecutePythonScript(ExecuteScript):
@@ -1958,7 +1958,7 @@ class ExecutePythonScript(ExecuteScript):
     '''
     def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
         ExecuteScript.__init__(self, script=script, interpreter='python', args=args,
-            output=output, export=None, working_dir=working_dir, submitter=submitter,
+            output=output, export=export, working_dir=working_dir, submitter=submitter,
             suffix='.py')
 
 class ExecutePython3Script(ExecuteScript):
@@ -1967,7 +1967,7 @@ class ExecutePython3Script(ExecuteScript):
     '''
     def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
         ExecuteScript.__init__(self, script=script, interpreter='python3', args=args,
-            output=output, export=None, working_dir=working_dir, submitter=submitter,
+            output=output, export=export, working_dir=working_dir, submitter=submitter,
             suffix='.py')
 
 class ExecutePerlScript(ExecuteScript):
@@ -1976,7 +1976,7 @@ class ExecutePerlScript(ExecuteScript):
     '''
     def __init__(self, script='', args='',  output=[], export=None, working_dir=None, submitter=None):
         ExecuteScript.__init__(self, script=script, interpreter='perl', args=args,
-            output=output, export=None, working_dir=working_dir, submitter=submitter,
+            output=output, export=export, working_dir=working_dir, submitter=submitter,
             suffix='.perl')
 
 
@@ -1986,7 +1986,7 @@ class ExecuteRubyScript(ExecuteScript):
     '''
     def __init__(self, script='', args='',  output=[], export=None, working_dir=None, submitter=None):
         ExecuteScript.__init__(self, script=script, interpreter='ruby', args=args,
-            output=output, export=None, working_dir=working_dir, submitter=submitter,
+            output=output, export=export, working_dir=working_dir, submitter=submitter,
             suffix='.rb')
 
 
