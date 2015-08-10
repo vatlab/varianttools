@@ -1000,7 +1000,8 @@ class PipelineDescription:
                     if ':' in section:
                         options = [x.strip() for x in section.split(':', 1)[-1].split(',')]
                         for opt in options:
-                            if opt not in ['no_input', 'passthrough', 'skip'] and not re.match('^(output|input)_alias\s*=\s*([\w\d_]+)$', opt):
+                            if opt not in ['no_input', 'passthrough', 'skip'] and not re.match('^(output_alias|input_alias|action)\s*=\s*([\w\d_]+)$', opt) \
+                                and not re.match('^working_dir\s*=\s*(\S+)$', opt):
                                 env.logger.warning('Unrecognized section option: {}'.format(opt))
                     else:
                         options = []
@@ -1017,6 +1018,7 @@ class PipelineDescription:
                     items = [x[0] for x in parser.items(section, raw=True)]
                     if 'action' not in items:
                         raise ValueError('Missing item "action" in section {}.'.format(section))
+                    has_input = False
                     step_init_vars = []
                     step_pre_vars = []
                     step_post_vars = []
@@ -1028,6 +1030,7 @@ class PipelineDescription:
                         if item not in ['input', 'input_emitter', 'comment'] + defaults.keys():
                             if item == 'input':
                                 before_input_action = False
+                                has_input = True
                                 continue
                             elif item == 'action':
                                 before_action = False
@@ -1039,6 +1042,10 @@ class PipelineDescription:
                                 step_pre_vars.append([item, parser.get(section, item, vars=defaults)])
                             else:
                                 step_post_vars.append([item, parser.get(section, item, vars=defaults)])
+                    # if no input, assume post_input, pre-action
+                    if not has_input:
+                        step_pre_vars = step_init_vars
+                        step_init_vars = []
                     for pname,pidx in zip(pnames, pidxs):
                         command = PipelineCommand(index=pidx,
                             options=options,
@@ -1086,6 +1093,27 @@ class PipelineDescription:
                 if cmd is None:
                     raise ValueError('Invalid pipeline {}. Step {} is left unspecified.'
                         .format(pname, idx+1))
+                for opt in cmd.options:
+                    matched = re.match('^action\s*=\s*([\w\d_]+)$', opt)
+                    if matched:
+                        header = matched.group(1)
+                        if not re.match('^([\w*_][\w\d*_]*_)?[\d]+$', header) and not re.match('^[\w][\w\d]*$', header):
+                            raise ValueError('Invalid section header for option {}'.format(opt))
+                        #
+                        pn = header.strip().rsplit('_', 1)[0] if '_' in header else ('default' if header.isdigit() else header)
+                        pi = header.strip().rsplit('_', 1)[1] if '_' in header else (header if header.isdigit() else '0')
+                        if pn not in self.pipelines.items:
+                            raise ValueError('Cannot find pipeline {} for option {}'.format(pn, opt))
+                        found = False
+                        for step in self.pipelines[pn]:
+                            if step.index == pi:
+                                if cmd.action.strip() != '':
+                                    env.logger.warning('Overwrite action of step {}_{} with action from {}_{}'.format(pname, cmd.index, pn, pi))
+                                cmd.action = step.action
+                                found = True
+                                break
+                        if not found:
+                            raise ValueError('Cannot find step {} for option {}'.format(pi, opt))
                 if not cmd.action:
                     raise ValueError('Missing or empty action for step {} of pipeline {}'
                         .format(pname, idx + 1))

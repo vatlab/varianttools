@@ -54,6 +54,7 @@ import csv
 import platform
 import logging
 import random
+import traceback
 from multiprocessing import Process
 from collections import namedtuple, MutableMapping
 
@@ -1607,13 +1608,16 @@ class ExecutePythonCode(PipelineAction):
                     pipeline.GLOBALS.update(local_dict.__dict__)
                 except ImportError as e:
                     raise RuntimeError('Failed to import module {}: {}'.format(module, e))
+        env.logger.info('Executing Python script:\n{}'.format(self.script))
         try:
             globals().update(pipeline.GLOBALS)
             local_dict = self.kwargs
             local_dict['pvars'] = pipeline.VARS
             exec(self.script, globals(), local_dict)
         except Exception as e:
-            raise RuntimeError('Failed to execute script "{}": {}'.format(self.script, e))
+            ex_type, ex, tb = sys.exc_info()
+            traceback.print_tb(tb)
+            raise RuntimeError('Failed to execute script: {}'.format(e))
         return True
 
 
@@ -2677,10 +2681,13 @@ class Pipeline:
             #
             #
             self.VARS['input{}'.format(command.index)] = step_input
+            self.VARS['input'] = step_input
             for n, f in step_named_input:
                 if n:
                     self.VARS['input{}_{}'.format(command.index, n)] = f
                     self.VARS['input_{}'.format(n)] = f
+            #
+            saved_dir = os.getcwd()
             for opt in command.options:
                 matched = re.match('^input_alias\s*=\s*([\w\d_]+)$', opt)
                 if matched:
@@ -2688,10 +2695,16 @@ class Pipeline:
                     for n, f in step_named_input:
                         if n:
                             self.VARS['{}_{}'.format(matched.group(1), n)] = f
+                matched = re.match('^working_dir\s*=\s*(\S+)$', opt)
+                if matched:
+                    working_dir = os.path.expanduser(matched.group(1))
+                    if not os.path.isdir(working_dir):
+                        raise ValueError('Invalid working directory: {}'.format(working_dir))
+                    env.logger.info('Use working directory [[{}]] for {}_{}'.format(working_dir, pname, command.index))
+                    os.chdir(working_dir)
             #
             env.logger.debug('INPUT of step {}_{}: {}'
                     .format(pname, command.index, step_input))
-            self.VARS['action{}'.format(command.index)] = command.action
             # 
             # now, group input files
             if not command.input_emitter:
@@ -2701,16 +2714,11 @@ class Pipeline:
                 if emitter is not None:
                     raise ValueError('Cannot define input emitter in both input and input_emitter')
                 try:
-                    # remove ${INPUT} because it is determined by the emitter
-                    if 'input' in self.VARS:
-                        self.VARS.pop('input')
                     # ${CMD_INPUT} etc can be used.
                     emitter = eval(substituteVars(command.input_emitter, self.VARS, self.GLOBALS), globals(), self.GLOBALS)
                 except Exception as e:
                     raise RuntimeError('Failed to group input files: {}'
                         .format(e))
-            #
-            saved_dir = os.getcwd()
             # pass Pipeline itself to emitter
             igroups, step_output = emitter(step_input, self)
             try:
