@@ -1016,8 +1016,8 @@ class PipelineDescription:
                         self.pipelines[pname] = []
                 try:
                     items = [x[0] for x in parser.items(section, raw=True)]
-                    if 'action' not in items:
-                        raise ValueError('Missing item "action" in section {}.'.format(section))
+                    #if 'action' not in items:
+                    #    raise ValueError('Missing item "action" in section {}.'.format(section))
                     has_input = False
                     step_init_vars = []
                     step_pre_vars = []
@@ -1102,14 +1102,27 @@ class PipelineDescription:
                         #
                         pn = header.strip().rsplit('_', 1)[0] if '_' in header else ('default' if header.isdigit() else header)
                         pi = header.strip().rsplit('_', 1)[1] if '_' in header else (header if header.isdigit() else '0')
-                        if pn not in self.pipelines.items:
+                        if pn not in self.pipelines:
                             raise ValueError('Cannot find pipeline {} for option {}'.format(pn, opt))
                         found = False
                         for step in self.pipelines[pn]:
                             if step.index == pi:
                                 if cmd.action.strip() != '':
-                                    env.logger.warning('Overwrite action of step {}_{} with action from {}_{}'.format(pname, cmd.index, pn, pi))
-                                cmd.action = step.action
+                                    raise ValueError('No action should be specified if option action is used for step {}_{}'.format(pname, cmd.index))
+                                env.logger.info('Using action for step [[{}_{}]] for step [[{}_{}]]'.format( pn, pi, pname, cmd.index))
+                                # have to re-create the whole object
+                                pipeline[idx] = PipelineCommand(
+                                    index=cmd.index,
+                                    options=cmd.options,
+                                    input=cmd.input,
+                                    input_emitter=cmd.input_emitter,
+                                    action=step.action,
+                                    init_action_vars=cmd.init_action_vars,
+                                    pre_action_vars=cmd.pre_action_vars,
+                                    post_action_vars=cmd.post_action_vars,
+                                    comment=cmd.comment, 
+                                )
+                                cmd = pipeline[idx]
                                 found = True
                                 break
                         if not found:
