@@ -1570,7 +1570,7 @@ class ExecutePythonCode(PipelineAction):
                 #
                 # script
                 exported_script.write(self.script)
-            env.logger.info('Python code exported to {}'.format(self.export))
+            env.logger.info('Python code exported to [[{}]]'.format(self.export))
         for module in self.modules:
             # this is a path to a .py file
             if module.endswith('.py'):
@@ -1730,7 +1730,7 @@ class ExecuteScript(PipelineAction):
         if export is not None:
             with open(export, 'w') as exported_script:
                 exported_script.write(self.script)
-                env.logger.info('Script exported to {}'.format(export))
+                env.logger.info('Script exported to [[{}]]'.format(export))
         PipelineAction.__init__(self, cmd='{} {}'.format(interpreter, m.hexdigest()), output=output)
 
     def __del__(self):
@@ -1782,12 +1782,14 @@ class ExecuteScript(PipelineAction):
                 .format(cmd, self._elapsed_time(), ret))
         else:
             # write standard out to terminal
-            with open(self.proc_out) as proc_out:
-                for line in proc_out:
-                    env.logger.info(line)
-            with open(self.proc_err) as proc_err:
-                for line in proc_err:
-                    env.logger.info(line.rstrip())
+            if self.proc_out:
+                with open(self.proc_out) as proc_out:
+                    for line in proc_out:
+                        env.logger.info(line.rstrip())
+            if self.proc_err:
+                with open(self.proc_err) as proc_err:
+                    for line in proc_err:
+                        env.logger.warning(line.rstrip())
 
     def _monitor(self):
         while True:
@@ -2689,6 +2691,7 @@ class Pipeline:
             #
             env.logger.debug('INPUT of step {}_{}: {}'
                     .format(pname, command.index, step_input))
+            self.VARS['action{}'.format(command.index)] = command.action
             # 
             # now, group input files
             if not command.input_emitter:

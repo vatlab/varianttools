@@ -845,7 +845,7 @@ class PipelineDescription:
                 if not in_default:
                     # not in default section, we expand action
                     # automatically
-                    if (not line.startswith('#')) and re.match('^[\w\d_]+\s*\(', line):
+                    if (not line.startswith('#')) and (re.match('^[\w\d_]+\s*\(', line) or re.match('^\${', line)):
                         pieces[-1] = 'action: ' + line
                     continue
                 elif re.match('^\[', line):
