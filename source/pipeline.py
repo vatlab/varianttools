@@ -618,7 +618,7 @@ class PipelineAction:
                 with open(self.proc_info) as exe_info:
                     cmd = exe_info.readline().strip()
                 if self._useVars(cmd, pipeline.VARS) == self._useVars('; '.join(self.cmd), pipeline.VARS) \
-                    and existAndNewerThan(self.output, ifiles,
+                    and existAndNewerThan(self.output, ifiles + pipeline.step_dependent_files,
                     md5file=self.proc_info, pipeline=pipeline):
                     env.logger.info('Reuse existing {}'.format(', '.join(self.output)))
                     self._bypass(ifiles, pipeline)
@@ -644,7 +644,7 @@ class PipelineAction:
             with open(self.proc_info, 'w') as exe_info:
                 exe_info.write('{}\n'.format(self._useVars('; '.join(self.cmd), pipeline.VARS)))
                 exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
-                for f in ifiles:
+                for f in ifiles + pipeline.step_dependent_files:
                     # for performance considerations, use partial MD5
                     exe_info.write('{}\t{}\t{}\n'.format(self._useVars(f, pipeline.VARS), os.path.getsize(f),
                         calculateMD5(f, partial=True)))
@@ -2682,10 +2682,12 @@ class Pipeline:
             #
             self.VARS['input{}'.format(command.index)] = step_input
             self.VARS['input'] = step_input
+            self.step_dependent_files = []
             for n, f in step_named_input:
                 if n:
                     self.VARS['input{}_{}'.format(command.index, n)] = f
                     self.VARS['input_{}'.format(n)] = f
+                    self.step_dependent_files.extend(f)
             #
             saved_dir = os.getcwd()
             for opt in command.options:
@@ -2850,6 +2852,11 @@ class Pipeline:
                     .format(self.pipeline.name, pname, command.index))
                 raise RuntimeError('Failed to execute step {}_{}: {}'
                     .format(pname, command.index, e))
+            #
+            # clear variables that are local to step
+            for n, f in step_named_input:
+                if n:
+                    self.VARS.pop('input_{}'.format(n))
         #
         # at the end of pipeline wait for all threads to complete
         if self.THREADS:
