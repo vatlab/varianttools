@@ -93,7 +93,7 @@ def RdeviceFromFilename(filename, width=800, height=600):
         elif ext.lower() == '.eps':
             device = 'postscript'
             params = ', width={}/90, height={}/90'.format(width, height)
-    except Exception, e:
+    except Exception as e:
         logger.warning('Can not determine which device to use to save file {}. A postscript driver is used: {}'.format(name, e))
         device = 'postscript'
     return '{}("{}" {})'.format(device, filename, params)

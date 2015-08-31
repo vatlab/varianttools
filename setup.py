@@ -633,30 +633,34 @@ if 'beta' in VTOOLS_VERSION or 'rc' in VTOOLS_VERSION:
 # during the creation of executables. It is therefore safer to move these
 # files away.
 #
-for filename in [WRAPPER_CPP_FILE, WRAPPER_PY_FILE, CGATOOLS_WRAPPER_CPP_FILE,
-    CGATOOLS_WRAPPER_PY_FILE, UCSCTOOLS_WRAPPER_CPP_FILE,
-    UCSCTOOLS_WRAPPER_PY_FILE, SQLITE_PY_FILE]:
-    if sys.version_info.major == 2:
-        filename1 = filename.format('py2')
-        filename2 = filename.format('py3')
-    else:
-        filename1 = filename.format('py3')
-        filename2 = filename.format('py2')
-    # if FILENAME was moved to FIELANEM_temp
-    if os.path.isfile(filename1 + '_temp') and not os.path.isfile(filename1):
-        os.rename(filename1 + '_temp', filename1)
-    #
-    if SDIST:
-        # if building source, rename all _temp files back
-        if os.path.isfile(filename2 + '_temp') and not os.path.isfile(filename2):
-            os.rename(filename2 + '_temp', filename2)
-    else:
-        # otherwise, move file for another version of python away
-        if os.path.isfile(filename2):
-            if os.path.isfile(filename2 + '_temp'):
-                os.remove(filename2 + '_temp')
-            os.rename(filename2, filename2 + '_temp')
-
+# I am not sure if this is still necessary. Beacuse renaming files confuses
+# version control systems, let us see if the following is still needed by
+# commenting it out.
+#
+# for filename in [WRAPPER_CPP_FILE, WRAPPER_PY_FILE, CGATOOLS_WRAPPER_CPP_FILE,
+#     CGATOOLS_WRAPPER_PY_FILE, UCSCTOOLS_WRAPPER_CPP_FILE,
+#     UCSCTOOLS_WRAPPER_PY_FILE, SQLITE_PY_FILE]:
+#     if sys.version_info.major == 2:
+#         filename1 = filename.format('py2')
+#         filename2 = filename.format('py3')
+#     else:
+#         filename1 = filename.format('py3')
+#         filename2 = filename.format('py2')
+#     # if FILENAME was moved to FIELANEM_temp
+#     if os.path.isfile(filename1 + '_temp') and not os.path.isfile(filename1):
+#         os.rename(filename1 + '_temp', filename1)
+#     #
+#     if SDIST:
+#         # if building source, rename all _temp files back
+#         if os.path.isfile(filename2 + '_temp') and not os.path.isfile(filename2):
+#             os.rename(filename2 + '_temp', filename2)
+#     else:
+#         # otherwise, move file for another version of python away
+#         if os.path.isfile(filename2):
+#             if os.path.isfile(filename2 + '_temp'):
+#                 os.remove(filename2 + '_temp')
+#             os.rename(filename2, filename2 + '_temp')
+# 
          
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.
 if sys.platform == 'linux2':
