@@ -26,7 +26,12 @@
 
 import sys
 import os
-import ConfigParser
+try:
+    # Python 3
+    import ConfigParser
+except ImportError:
+    # Python 2
+    import configparser as ConfigParser
 import shutil
 import urlparse
 import gzip
