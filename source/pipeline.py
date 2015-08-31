@@ -2571,7 +2571,7 @@ class Pipeline:
                 spec_file=self.spec_file,
                 model_name=pname,
                 vtools_version=proj.version,
-                working_dir=getcwd(),
+                working_dir=os.getcwd(),
                 pipeline_format=self.pipeline.pipeline_format)
         # these are command line options
         if float(self.pipeline.pipeline_format) <= 1.0:
@@ -2610,7 +2610,7 @@ class Pipeline:
             self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
         for key, val in self.VARS.items():
             env.logger.trace('{} is set to {}'.format(key, val))
-            if key == 'working_dir' and val != getcwd():
+            if key == 'working_dir' and val != os.getcwd():
                 env.logger.warning('Changing working directory to {}'.format(val))
                 os.chdir(val)
         #
@@ -2784,7 +2784,7 @@ class Pipeline:
                     if not (os.path.isfile(f) or os.path.isfile(f + '.file_info') or f in self.THREADS):
                         raise RuntimeError('Output file {} does not exist after '
                             'completion of step {}_{} (working directory: {})'
-                            .format(f, pname, command.index, getcwd()))
+                            .format(f, pname, command.index, os.getcwd()))
                 for key, val in command.post_action_vars:
                     self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
                     env.logger.info('Pipeline variable [[{}]] is set to [[{}]]'
