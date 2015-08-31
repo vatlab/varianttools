@@ -1211,7 +1211,7 @@ class NullAction(PipelineAction):
         action=
         action=NullAction()
     '''
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         '''A null action that does nothing.'''
         PipelineAction.__init__(self)
 
