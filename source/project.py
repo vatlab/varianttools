@@ -823,7 +823,7 @@ class PipelineDescription:
                 #
                 if re.match('^\[\s*pipeline desciption\]\s*$', line):
                     has_pipeline_description_section = True
-                if re.match('^description\s[:=]', line):
+                if re.match('^description\s*[=\:]', line):
                     has_pipeline_description = True
                 if line.startswith('#'):
                     if not in_comment:
@@ -863,8 +863,8 @@ class PipelineDescription:
             self.config_text = '\n'.join(pieces)
             if not has_pipeline_description:
                 self.config_text = self.config_text.replace('[pipeline description]', '[pipeline description]\ndescription:\n{}'.format('\n'.join(second_comment)))
-            with open('temp', 'w') as tmp:
-                tmp.write(self.config_text)
+            #with open(os.path.join(env.temp_dir, 'pipeline_executed.tmp'), 'w') as tmp:
+            #    tmp.write(self.config_text)
         return self.config_text
         
     def parseArgs(self, filename, fmt_args):
