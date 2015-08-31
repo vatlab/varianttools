@@ -31,8 +31,6 @@ pipeline actions.
 import os
 import sys
 import subprocess
-# for parallel execution of steps
-import Queue
 import threading
 import pipes
 import pprint
@@ -67,7 +65,10 @@ from .project import PipelineDescription, Project
 
 if sys.version_info.major == 2:
     from ucsctools_py2 import showTrack
+    # for parallel execution of steps
+    import Queue
 else:
+    import queue as Queue
     from ucsctools_py3 import showTrack
 
 try:

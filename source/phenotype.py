@@ -26,7 +26,13 @@
 
 import sys
 import threading
-import Queue
+try:
+    # python 2.x
+    import Queue as queue
+except ImportError:
+    # python 3.x
+    import queue
+
 import time
 import tempfile
 import re
@@ -380,7 +386,7 @@ class Sample:
         # at least one, at most number of IDs
         nJobs = max(min(self.jobs, len(IDs)), 1)
         # start all workers
-        idQueue = Queue.Queue()
+        idQueue = queue.Queue()
         status = GenotypeStatStatus()
         for j in range(nJobs):
             GenotypeStatCalculator('{}_genotype.DB'.format(self.proj.name),
