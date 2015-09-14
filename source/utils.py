@@ -3799,18 +3799,18 @@ class VariableSubstitutor:
 
 
     def substituteWith(self, PipelineVars, PipelineGlobals):
-        if self.asString:
-            count = 1
-            while count < 10:
+        count = 1
+        while count < 10:
+            if isinstance(self.text, str):
                 new_text = self._substitute(self.text, PipelineVars, PipelineGlobals)
-                if new_text == self.text:
-                    return new_text
-                else:
-                    self.text = new_text
-                count += 1
-            raise ValueError('Failed to evaluate pipeline varialbe {}. Perhpas the variable is nested.'.format(self.text))
-        else:
-            return self._substitute(self.text, PipelineVars, PipelineGlobals)
+            else:
+                new_text = [self._substitute(x, PipelineVars, PipelineGlobals) for x in self.text]
+            if new_text == self.text:
+                return new_text
+            else:
+                self.text = new_text
+            count += 1
+        raise ValueError('Failed to evaluate pipeline varialbe {}. Perhpas the variable is nested.'.format(self.text))
     
 def substituteVars(text, PipelineVars, PipelineGlobals, asString=True):
     # if asString is to, the return value is forced to be string
