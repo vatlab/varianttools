@@ -184,13 +184,18 @@ class NamedList:
                 data = pd.read_excel(filename)
             # convert everything to str
             data = data.applymap(str)
+            env.logger.trace("{} records are loaded from {}".format(data.shape[0], filename))
             #
             # if query?
             if query is not None:
                 if re.match('.*[\d\w_]+\s*=\s*[\d\w_]+.*', query):
                     raise ValueError('Syntax "a=b" is not allowed. Please use "a==b" instead: {}'.format(query))
                 try:
+                    pre_filter = data.shape[0]
                     data = data.query(query)
+                    if pre_filter != data.shape[0]:
+                        env.logger.info('{} out of {} records are removed by filter {}'.format(pre_filter - data.shape[0], 
+                            pre_filter, query))
                 except Exception as e:
                     raise ValueError('Failed to apply query "{}" to data file {}: {}'
                         .format(query, filename, e))
@@ -1542,7 +1547,7 @@ class ExecutePythonCode(PipelineAction):
             self.script = '\n'.join(script)
         #
         m = hashlib.md5()
-        m.update(self.script.encode())
+        m.update(self.script.encode('utf-8'))
         #
         self.kwargs = kwargs
         self.modules = modules
@@ -1726,7 +1731,7 @@ class ExecuteScript(PipelineAction):
         env.logger.info('Executing\n{}'.format(self.script))
         #
         m = hashlib.md5()
-        m.update(self.script)
+        m.update(self.script.encode('utf-8'))
         #
         self.script_file = tempfile.NamedTemporaryFile(mode='w+t', suffix=suffix, delete=False).name
         with open(self.script_file, 'w') as script_file:
@@ -2574,6 +2579,8 @@ class Pipeline:
                 vtools_version=proj.version,
                 working_dir=os.getcwd(),
                 pipeline_format=self.pipeline.pipeline_format)
+        if not os.path.isdir(env.cache_dir):
+            os.makedirs(env.cache_dir)
         # these are command line options
         if float(self.pipeline.pipeline_format) <= 1.0:
             if 'cmd_input' in self.pipeline.commandline_opts:
@@ -2606,8 +2613,8 @@ class Pipeline:
         # they might refer to each other
         self.VARS.update(self.pipeline.pipeline_vars)
         for key, val in self.pipeline.pipeline_vars.items():
-            if key in ('vtools_version', 'spec_file', 'home', 'pipeline_name', 'model_name'):
-                raise ValueError('Cannot reset read-only pipeline variable {}'.format(key))
+            #if key in ('vtools_version', 'spec_file', 'home', 'pipeline_name', 'model_name'):
+            #    raise ValueError('Cannot reset read-only pipeline variable {}'.format(key))
             self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
         for key, val in self.VARS.items():
             env.logger.trace('{} is set to {}'.format(key, val))
