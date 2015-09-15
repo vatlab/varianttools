@@ -1863,9 +1863,9 @@ class ExecuteScript(PipelineAction):
             # we try to reproduce the environment as much as possible becaus ehte
             # script might be executed in a different environment
             for k, v in os.environ.items():
-                if any([k.startswith('x') for x in ('SSH', 'PBS', '_')]):
+                if any([k.startswith(x) for x in ('SSH', 'PBS', '_')]) or not k.replace('_', '').isalpha():
                     continue
-                sh_file.write('export {}={}\n'.format(k, v))
+                sh_file.write('export {}="{}"\n'.format(k, v.replace('\n', '\\n')))
             #
             sh_file.write('\ncd {}\n'.format(os.path.abspath(os.getcwd())))
             if self.working_dir is not None:
