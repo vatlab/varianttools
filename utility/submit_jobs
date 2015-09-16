@@ -187,7 +187,7 @@ class Jobs:
         # submit jobs
         submitted = 0
         for name in [x for x,y in self.jobs.items() if y.status in ['unsubmitted', 'failed']]:
-            if submitted + len(running_jobs) + len(pending_jobs) > self.max_jobs:
+            if self.max_jobs > 0 and submitted + len(running_jobs) + len(pending_jobs) > self.max_jobs:
                 break
             if self.jobs[name] == 'failed':
                 self.mailer.sendmail('Failed job {} has been resumitted.'.format(name))
@@ -246,7 +246,7 @@ notification_email (optional): an email address to which major events such as
     parser.add_argument('-c', '--conf', default='jobs.lst',
         help='''A configuration file that defines at least script and joblist.
             defula to jobs.lst.''')
-    parser.add_argument('-m', '--max_jobs', type=int, default=100,
+    parser.add_argument('-m', '--max_jobs', type=int, default=0,
         help='Maximum number of running and waiting jobs. Default to 100.')
     parser.add_argument('--wait', action='store_true',
         help='''If specified, this script will check if all jobs have completed
