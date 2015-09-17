@@ -1368,7 +1368,23 @@ class RunCommand(PipelineAction):
                     .format(cur_cmd, self._elapsed_time(), ret))
 
     def _monitor(self):
+        start_time = time.time()
+        prog_time = None
         while True:
+            if os.path.isfile(self.proc_prog):
+                os.remove(self.proc_prog)
+                prog_time = time.time()
+            #
+            if prog_time is None:
+                # if the job has not been started for 10 minutes, quite
+                if time.time() - start_time > 600:
+                    env.logger.error('Background job has not been started after 10 minutes.')
+                    return
+            else:
+                if time.time() - prog_time > 60:
+                    env.logger.errorr('Background job has not updated it progress for 1 minutes.')
+                    return
+            #
             if os.path.isfile(self.proc_done):
                 break
             else:
@@ -1417,6 +1433,7 @@ class RunCommand(PipelineAction):
         # use full path because the command might be submitted to a remote machine
         self.proc_cmd = os.path.abspath(self.output[0] + '.sh')
         self.proc_done = os.path.abspath(self.output[0]) + '.done_{}'.format(os.getpid())
+        self.proc_prog = os.path.abspath(self.output[0]) + '.working_{}'.format(os.getpid())
         #
         if os.path.isfile(self.proc_done):
             os.remove(self.proc_done)
@@ -1440,12 +1457,26 @@ class RunCommand(PipelineAction):
             sh_file.write('\ncd {}\n'.format(os.path.abspath(os.getcwd())))
             if self.working_dir is not None:
                 sh_file.write('[ -d {0} ] || mkdir -p {0}\ncd {0}\n'.format(os.path.abspath(self.working_dir)))
+            #
+            sh_file.write('''
+progress() {
+  while true
+  do
+    touch {}"
+    sleep 30
+  done
+}
+
+progress &
+MYSELF=$!
+'''.format(self.proc_prog))
             sh_file.write('\n'.join(self.cmd))
             #
             sh_file.write('\n\nCMD_RET=$?\nif [ $CMD_RET == 0 ]; then vtools admin --record_exe_info {} {}; fi\n'
                 .format(os.getpid(), ' '.join(self.output)))
             # a signal to show the successful completion of the job
-            sh_file.write('\necho $CMD_RET > {}\n'.format(self.proc_done))
+            sh_file.write('\nrm -f {}\nkill $MYSELF >/dev/null 2>&1\necho $CMD_RET > {}\n'
+                .format(self.proc_prog, self.proc_done))
         #
         # try to submit command
         if '{}' in self.submitter:
@@ -1802,7 +1833,22 @@ class ExecuteScript(PipelineAction):
                         env.logger.warning(line.rstrip())
 
     def _monitor(self):
+        start_time = time.time()
+        prog_time = None
         while True:
+            if os.path.isfile(self.proc_prog):
+                os.remove(self.proc_prog)
+                prog_time = time.time()
+            #
+            if prog_time is None:
+                # if the job has not been started for 10 minutes, quite
+                if time.time() - start_time > 600:
+                    env.logger.error('Background job has not been started after 10 minutes.')
+                    return
+            else:
+                if time.time() - prog_time > 60:
+                    env.logger.errorr('Background job has not updated it progress for 1 minutes.')
+                    return
             if os.path.isfile(self.proc_done):
                 break
             else:
@@ -1847,6 +1893,7 @@ class ExecuteScript(PipelineAction):
         # use full path because the command might be submitted to a remote machine
         self.proc_cmd = os.path.abspath(self.output[0] + '.sh')
         self.proc_done = os.path.abspath(self.output[0]) + '.done_{}'.format(os.getpid())
+        self.proc_prog = os.path.abspath(self.output[0]) + '.working_{}'.format(os.getpid())
         #
         if os.path.isfile(self.proc_done):
             os.remove(self.proc_done)
@@ -1870,6 +1917,19 @@ class ExecuteScript(PipelineAction):
             sh_file.write('\ncd {}\n'.format(os.path.abspath(os.getcwd())))
             if self.working_dir is not None:
                 sh_file.write('[ -d {0} ] || mkdir -p {0}\ncd {0}\n'.format(os.path.abspath(self.working_dir)))
+#
+            sh_file.write('''
+progress() {
+  while true
+  do
+    touch {}"
+    sleep 30
+  done
+}
+
+progress &
+MYSELF=$!
+'''.format(self.proc_prog))
 
             # interpreter
             if '{}' in self.interpreter:
@@ -1882,7 +1942,8 @@ class ExecuteScript(PipelineAction):
             sh_file.write('\n\nCMD_RET=$?\nif [ $CMD_RET == 0 ]; then vtools admin --record_exe_info {} {}; fi\n'
                 .format(os.getpid(), ' '.join(self.output)))
             # a signal to show the successful completion of the job
-            sh_file.write('\necho $CMD_RET > {}\n'.format(self.proc_done))
+            sh_file.write('\nrm -f {}\nkill $MYSELF >/dev/null 2>&1\necho $CMD_RET > {}\n'
+                .format(self.proc_prog, self.proc_done))
         #
         # try to submit command
         if '{}' in self.submitter:
@@ -1890,6 +1951,16 @@ class ExecuteScript(PipelineAction):
         else:
             submit_cmd = self.submitter
         #
+        if old_script is not None:
+            #with open(self.proc_cmd) as new_cmd:
+            #     if old_script == new_cmd.read():
+                     # if there is no change in command
+                     other_prog = glob.glob(os.path.abspath(self.output[0]) + '.working_*')
+                     if other_prog:
+                         for op in other_prog:
+                             # if the working file is less than 2 minutes old, ...
+                             if time.time() - os.path.getmtime(op) < 120:
+                                 raise RuntimeError('Failed to submit job because a job is currently running.')
         env.logger.info('Running job {} with command "{}" from directory {}'.format(
             self.proc_cmd, submit_cmd, os.getcwd()))
         ret = subprocess.call(submit_cmd, shell=True,
@@ -2763,7 +2834,8 @@ class Pipeline:
                             # thread closed, remove from self.THREADS
                             self.THREADS.pop(ifile)
                         if not (os.path.isfile(ifile) or os.path.isfile(ifile + '.file_info')):
-                            raise RewindExecution(ifile)
+                            #raise RewindExecution(ifile)
+                            raise RuntimeError('Non-existent input file {} due to ongoing or failed background job'.format(ifile))
                     #
                     if not action.strip():
                         action = 'NullAction()'
@@ -2785,6 +2857,7 @@ class Pipeline:
                 for opt in command.options:
                     matched = re.match('^output_alias\s*=\s*([\w\d_]+)$', opt)
                     if matched:
+                        env.logger.debug('Setting variable {} to {}'.format(matched.group(1), step_output))
                         self.VARS[matched.group(1)] = step_output
                 env.logger.debug('OUTPUT of step {}_{}: {}'
                     .format(pname, command.index, step_output))
