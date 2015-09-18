@@ -1372,6 +1372,8 @@ class RunCommand(PipelineAction):
         prog_time = None
         while True:
             if os.path.isfile(self.proc_prog):
+                if prog_time is None:
+                    env.logger.trace('Job started with progress file {}'.format(self.proc_prog))
                 os.remove(self.proc_prog)
                 prog_time = time.time()
             #
@@ -1382,7 +1384,7 @@ class RunCommand(PipelineAction):
                     return
             else:
                 if time.time() - prog_time > 60:
-                    env.logger.errorr('Background job has not updated it progress for 1 minutes.')
+                    env.logger.error('Background job has not updated it progress for 1 minutes.')
                     return
             #
             if os.path.isfile(self.proc_done):
@@ -1440,6 +1442,11 @@ class RunCommand(PipelineAction):
         if self.proc_lck:
             env.lock(self.proc_lck, str(os.getpid()))
         #
+        if os.path.isfile(self.proc_cmd):
+            with open(self.proc_cmd) as old_cmd:
+                old_script = old_cmd.read()
+        else:
+            old_script = None
         # create a batch file for execution
         with open(self.proc_cmd, 'w') as sh_file:
             sh_file.write('#PBS -o {}\n'.format(os.path.abspath(self.proc_out)))
@@ -1459,13 +1466,13 @@ class RunCommand(PipelineAction):
                 sh_file.write('[ -d {0} ] || mkdir -p {0}\ncd {0}\n'.format(os.path.abspath(self.working_dir)))
             #
             sh_file.write('''
-progress() {
+progress() {{
   while true
   do
-    touch {}"
+    touch {}
     sleep 30
   done
-}
+}}
 
 progress &
 MYSELF=$!
@@ -1478,6 +1485,17 @@ MYSELF=$!
             sh_file.write('\nrm -f {}\nkill $MYSELF >/dev/null 2>&1\necho $CMD_RET > {}\n'
                 .format(self.proc_prog, self.proc_done))
         #
+        if old_script is not None:
+            #with open(self.proc_cmd) as new_cmd:
+            #     if old_script == new_cmd.read():
+            #         env.logger.debug('Identical script {}'.format(self.proc_cmd))
+                     # if there is no change in command
+                     other_prog = glob.glob(os.path.abspath(self.output[0]) + '.working_*')
+                     if other_prog:
+                         for op in other_prog:
+                             # if the working file is less than 2 minutes old, ...
+                             if time.time() - os.path.getmtime(op) < 120:
+                                 raise RuntimeError('Failed to submit job because a job is currently running.')
         # try to submit command
         if '{}' in self.submitter:
             submit_cmd = self.submitter.replace('{}', self.proc_cmd)
@@ -1837,6 +1855,8 @@ class ExecuteScript(PipelineAction):
         prog_time = None
         while True:
             if os.path.isfile(self.proc_prog):
+                if prog_time is None:
+                    env.logger.trace('Job started with progress file {}'.format(self.proc_prog))
                 os.remove(self.proc_prog)
                 prog_time = time.time()
             #
@@ -1847,7 +1867,7 @@ class ExecuteScript(PipelineAction):
                     return
             else:
                 if time.time() - prog_time > 60:
-                    env.logger.errorr('Background job has not updated it progress for 1 minutes.')
+                    env.logger.error('Background job has not updated it progress for 1 minutes.')
                     return
             if os.path.isfile(self.proc_done):
                 break
@@ -1900,6 +1920,11 @@ class ExecuteScript(PipelineAction):
         if self.proc_lck:
             env.lock(self.proc_lck, str(os.getpid()))
         #
+        if os.path.isfile(self.proc_cmd):
+            with open(self.proc_cmd) as old_cmd:
+                old_script = old_cmd.read()
+        else:
+            old_script = None
         # create a batch file for execution
         with open(self.proc_cmd, 'w') as sh_file:
             sh_file.write('#PBS -o {}\n'.format(os.path.abspath(self.proc_out)))
@@ -1919,13 +1944,13 @@ class ExecuteScript(PipelineAction):
                 sh_file.write('[ -d {0} ] || mkdir -p {0}\ncd {0}\n'.format(os.path.abspath(self.working_dir)))
 #
             sh_file.write('''
-progress() {
+progress() {{
   while true
   do
-    touch {}"
+    touch {}
     sleep 30
   done
-}
+}}
 
 progress &
 MYSELF=$!
@@ -2737,6 +2762,7 @@ class Pipeline:
                     emitter_part = ''
                 #
                 input_line = substituteVars(input_part, self.VARS, self.GLOBALS)
+                env.logger.trace('INPUT LINE "{}"'.format(input_line))
                 # look for pattern of name=filenames
                 pieces = re.split('([\w\d_]+\s*=)', input_line)
                 step_named_input = []
