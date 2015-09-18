@@ -1022,12 +1022,13 @@ class PipelineDescription:
                     step_init_vars = []
                     step_pre_vars = []
                     step_post_vars = []
+                    before_input_action = True
+                    before_action = True
                     for item in items:
                         if item.endswith('_comment'):
                             continue
-                        before_input_action = True
-                        before_action = True
-                        if item not in ['input', 'input_emitter', 'comment'] + defaults.keys():
+                        if item not in ['input_emitter', 'comment'] + defaults.keys():
+                            #env.logger.warning('ITEM {}'.format(item))
                             if item == 'input':
                                 before_input_action = False
                                 has_input = True
@@ -1042,6 +1043,9 @@ class PipelineDescription:
                                 step_pre_vars.append([item, parser.get(section, item, vars=defaults)])
                             else:
                                 step_post_vars.append([item, parser.get(section, item, vars=defaults)])
+                    #env.logger.warning('INIT VAR {}'.format(step_init_vars))
+                    #env.logger.warning('PRE ACTION VAR {}'.format(step_pre_vars))
+                    #env.logger.warning('POST ACTION VAR {}'.format(step_post_vars))
                     # if no input, assume post_input, pre-action
                     if not has_input:
                         step_pre_vars = step_init_vars
