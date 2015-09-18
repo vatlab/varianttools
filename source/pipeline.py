@@ -256,13 +256,15 @@ class EmitInput:
     def __init__(self, group_by='all', select=True, skip=False, pass_unselected=True):
         '''Select input files of certain types, group them, and send input files
         to action. Selection criteria can be True (all input file types, default),
-        'False' (select no input file), 'fastq' (check content of files), or one or
+        'False' (select no input file, but an empty list will still be passed to
+        pipeline action), 'fastq' (check content of files), or one or
         more file extensions (e.g. ['.sam', '.bam']).  Eligible files are by default
         sent altogether (group_by='all') to action (${INPUT} equals ${INPUT#} where
         # is the index of step, but can also be sent individually (group_by='single',
         ${INPUT} equals to a list of a single file) or in pairs 
         (group_by='paired', e.g. filename_1.txt and filename_2.txt). Unselected
-        files are by default passed directly as output of a step.'''
+        files are by default passed directly as output of a step. If skip is set to
+        True, the whole step will be skipped'''
         self.group_by = group_by
         if type(select) == str:
             if select not in ['fastq', 'bam', 'sam'] and not str(select).startswith('.'):
@@ -2747,13 +2749,9 @@ class Pipeline:
             if 'no_input' in command.options or 'passthrough' in command.options:
                 step_input = []
                 step_named_input = []
-            elif command.input is None:
+            elif command.input is None or not command.input.strip():
                 step_input = ifiles
                 step_named_input = [['', ifiles]]
-            # if this is an empty string
-            elif not command.input.strip():
-                step_input = []
-                step_named_input = []
             else:
                 if ':' in command.input:
                     input_part, emitter_part = command.input.split(':', 1)
@@ -2762,22 +2760,25 @@ class Pipeline:
                     emitter_part = ''
                 #
                 input_line = substituteVars(input_part, self.VARS, self.GLOBALS)
-                env.logger.trace('INPUT LINE "{}"'.format(input_line))
-                # look for pattern of name=filenames
-                pieces = re.split('([\w\d_]+\s*=)', input_line)
-                step_named_input = []
-                for piece in pieces:
-                    if not piece:
-                        continue
-                    if piece.endswith('='):
-                        step_named_input.append([piece[:-1].strip(), []])
-                    else:
-                        if not step_named_input:
-                            step_named_input.append(['', sum([glob.glob(os.path.expanduser(x)) for x in shlex.split(piece)], [])])
+                if not input_line.strip():
+                    step_input = ifiles
+                    step_named_input = [['', ifiles]]
+                else:
+                    # look for pattern of name=filenames
+                    pieces = re.split('([\w\d_]+\s*=)', input_line)
+                    step_named_input = []
+                    for piece in pieces:
+                        if not piece:
+                            continue
+                        if piece.endswith('='):
+                            step_named_input.append([piece[:-1].strip(), []])
                         else:
-                            step_named_input[-1][1] = sum([glob.glob(os.path.expanduser(x)) for x in shlex.split(piece)], [])
-                #
-                step_input = sum([x[1] for x in step_named_input if x[0] == ''], [])
+                            if not step_named_input:
+                                step_named_input.append(['', sum([glob.glob(os.path.expanduser(x)) for x in shlex.split(piece)], [])])
+                            else:
+                                step_named_input[-1][1] = sum([glob.glob(os.path.expanduser(x)) for x in shlex.split(piece)], [])
+                    #
+                    step_input = sum([x[1] for x in step_named_input if x[0] == ''], [])
                 if emitter_part:
                     try:
                         # remove ${INPUT} because it is determined by the emitter
