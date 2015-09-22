@@ -626,41 +626,6 @@ if 'beta' in VTOOLS_VERSION or 'rc' in VTOOLS_VERSION:
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for ucsctools.')
             os.rename('source/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER))
-# 
-# 
-# Although wrapper files for another version of python are not used, they
-# will be installed due to a bug of setuptools. This will cause trouble
-# during the creation of executables. It is therefore safer to move these
-# files away.
-#
-# I am not sure if this is still necessary. Beacuse renaming files confuses
-# version control systems, let us see if the following is still needed by
-# commenting it out.
-#
-# for filename in [WRAPPER_CPP_FILE, WRAPPER_PY_FILE, CGATOOLS_WRAPPER_CPP_FILE,
-#     CGATOOLS_WRAPPER_PY_FILE, UCSCTOOLS_WRAPPER_CPP_FILE,
-#     UCSCTOOLS_WRAPPER_PY_FILE, SQLITE_PY_FILE]:
-#     if sys.version_info.major == 2:
-#         filename1 = filename.format('py2')
-#         filename2 = filename.format('py3')
-#     else:
-#         filename1 = filename.format('py3')
-#         filename2 = filename.format('py2')
-#     # if FILENAME was moved to FIELANEM_temp
-#     if os.path.isfile(filename1 + '_temp') and not os.path.isfile(filename1):
-#         os.rename(filename1 + '_temp', filename1)
-#     #
-#     if SDIST:
-#         # if building source, rename all _temp files back
-#         if os.path.isfile(filename2 + '_temp') and not os.path.isfile(filename2):
-#             os.rename(filename2 + '_temp', filename2)
-#     else:
-#         # otherwise, move file for another version of python away
-#         if os.path.isfile(filename2):
-#             if os.path.isfile(filename2 + '_temp'):
-#                 os.remove(filename2 + '_temp')
-#             os.rename(filename2, filename2 + '_temp')
-# 
          
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.
 if sys.platform == 'linux2':
@@ -671,24 +636,6 @@ if sys.platform == 'linux2':
 else:
     libs = []
     gccargs = []
-  
-# Enable support for loadable extensions in the sqlite3 module by not defining
-# SQLITE_OMIT_LOAD_EXTENSION
-SQLITE_DEFINES = []
-if sys.platform == "win32":
-   SQLITE_DEFINES.append(('MODULE_NAME', '\\"vt_sqlite3\\"'))
-   ASSOCIATION_MODULE = []
-else:
-   SQLITE_DEFINES.append(('MODULE_NAME', '"vt_sqlite3"'))
-   ASSOCIATION_MODULE = [
-        Extension('variant_tools._assoTests',
-            sources = [WRAPPER_CPP_FILE.format(PYVERSION)] + ASSOC_FILES
-                  + LIB_GSL + LIB_STAT,
-            extra_compile_args = gccargs,
-            library_dirs = [],
-            libraries = libs,
-            include_dirs = [".", "source", "gsl"],
-        )]
 
 setup(name = "variant_tools",
     version = VTOOLS_VERSION,
@@ -713,17 +660,44 @@ setup(name = "variant_tools",
             'Programming Language :: Python :: 3',
             'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
-    packages = ['variant_tools'],
+    #packages = ['variant_tools'],
     scripts = [
         'vtools',
         'vtools_report'
     ],
     cmdclass = {'build_py': build_py },
-    package_dir = {'variant_tools': 'source'},
+    #package_dir = {'variant_tools': 'source'},
+    py_modules = [
+        # __init__ is automatically installed
+        'variant_tools.annotation',
+        'variant_tools.association',
+        'variant_tools.assoTests_' + PYVERSION,
+        'variant_tools.cgatools_' + PYVERSION,
+        'variant_tools.compare',
+        'variant_tools.exporter',
+        'variant_tools.importer',
+        'variant_tools.liftOver',
+        'variant_tools.meta',
+        'variant_tools.phenotype',
+        'variant_tools.pipeline',
+        'variant_tools.plinkfile',
+        'variant_tools.plot',
+        'variant_tools.project',
+        'variant_tools.preprocessor',
+        'variant_tools.rtester',
+        'variant_tools.simulation',
+        'variant_tools.site_options',
+        'variant_tools.tester',
+        'variant_tools.ucsctools_' + PYVERSION,
+        'variant_tools.update',
+        'variant_tools.utils',
+        'variant_tools.variant',
+        'variant_tools.vt_sqlite3_' + PYVERSION,
+        ],
     ext_modules = [
         Extension('variant_tools._vt_sqlite3',
             sources = SQLITE_FILES,
-            define_macros = SQLITE_DEFINES,
+            define_macros = [('MODULE_NAME', '"vt_sqlite3"')],
             include_dirs = ['sqlite', SQLITE_FOLDER.format(PYVERSION)],
         ),
         Extension('variant_tools._vt_sqlite3_ext',
@@ -732,7 +706,9 @@ setup(name = "variant_tools",
                 'sqlite', "source", "gsl", "cgatools", "boost_1_49_0"],
             libraries = ['z', 'bz2'] + \
                 ([] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
-            define_macros = SQLITE_DEFINES + [('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
+            define_macros = [
+                ('MODULE_NAME', '"vt_sqlite3"'),
+                ('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"'), ('USE_TABIX', '1'), ('USE_BAM', '1'),
                 ('_FILE_OFFSET_BITS', '64'), ('_USE_KNETFILE', None), 
                 ('BGZF_CACHE', None)],
@@ -758,6 +734,14 @@ setup(name = "variant_tools",
             swig_opts = ['-O', '-shadow', '-c++', '-keyword',],
             include_dirs = [".", "cgatools", "boost_1_49_0"],
         ),
-      ] + ASSOCIATION_MODULE   # association module is not available under windows
+        Extension('variant_tools._assoTests',
+            sources = [WRAPPER_CPP_FILE.format(PYVERSION)] + ASSOC_FILES
+                  + LIB_GSL + LIB_STAT,
+            extra_compile_args = gccargs,
+            library_dirs = [],
+            libraries = libs,
+            include_dirs = [".", "source", "gsl"],
+        )
+      ] 
 )
 
