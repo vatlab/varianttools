@@ -82,11 +82,11 @@ try:
 except ImportError:
     sys.exit('variant tools requires Python 2.7.2 or higher, or Python 3.2 or higher. Please upgrade your version (%s) of Python and try again.' % (sys.version.split()[0]))
 
-from source import VTOOLS_VERSION
+from variant_tools import VTOOLS_VERSION
 
 EMBEDED_BOOST = os.path.isdir('boost_1_49_0')
 SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511', '-w-509',
-    '-outdir', 'source']
+    '-outdir', 'variant_tools']
 
 if sys.version_info.major == 2:
     PYVERSION = 'py2'
@@ -94,32 +94,32 @@ else:
     PYVERSION = 'py3'
 
 SQLITE_FOLDER = 'sqlite/{}'
-WRAPPER_CPP_FILE = 'source/assoTests_wrap_{}.cpp'
-WRAPPER_PY_FILE = 'source/assoTests_{}.py'
-INTERFACE_FILE = 'source/assoTests.i'
-CGATOOLS_WRAPPER_CPP_FILE = 'source/cgatools_wrap_{}.cpp'
-CGATOOLS_WRAPPER_PY_FILE = 'source/cgatools_{}.py'
-CGATOOLS_INTERFACE_FILE = 'source/cgatools.i'
-UCSCTOOLS_WRAPPER_CPP_FILE = 'source/ucsctools_wrap_{}.cpp'
-UCSCTOOLS_WRAPPER_PY_FILE = 'source/ucsctools_{}.py'
-UCSCTOOLS_INTERFACE_FILE = 'source/ucsctools.i'
-SQLITE_PY_FILE = 'source/vt_sqlite3_{}.py'
+WRAPPER_CPP_FILE = 'variant_tools/assoTests_wrap_{}.cpp'
+WRAPPER_PY_FILE = 'variant_tools/assoTests_{}.py'
+INTERFACE_FILE = 'variant_tools/assoTests.i'
+CGATOOLS_WRAPPER_CPP_FILE = 'variant_tools/cgatools_wrap_{}.cpp'
+CGATOOLS_WRAPPER_PY_FILE = 'variant_tools/cgatools_{}.py'
+CGATOOLS_INTERFACE_FILE = 'variant_tools/cgatools.i'
+UCSCTOOLS_WRAPPER_CPP_FILE = 'variant_tools/ucsctools_wrap_{}.cpp'
+UCSCTOOLS_WRAPPER_PY_FILE = 'variant_tools/ucsctools_{}.py'
+UCSCTOOLS_INTERFACE_FILE = 'variant_tools/ucsctools.i'
+SQLITE_PY_FILE = 'variant_tools/vt_sqlite3_{}.py'
 
 
 ASSOC_HEADER = [
-    'source/assoTests.i',
-    'source/assoTests.h',
-    'source/assoData.h',
-    'source/action.h',
-    'source/utils.h',
-    'source/lm.h'
+    'variant_tools/assoTests.i',
+    'variant_tools/assoTests.h',
+    'variant_tools/assoData.h',
+    'variant_tools/action.h',
+    'variant_tools/utils.h',
+    'variant_tools/lm.h'
 ]
 
 ASSOC_FILES = [
-    'source/assoData.cpp',
-    'source/action.cpp',
-    'source/utils.cpp',
-    'source/lm.cpp'
+    'variant_tools/assoData.cpp',
+    'variant_tools/action.cpp',
+    'variant_tools/utils.cpp',
+    'variant_tools/lm.cpp'
 ]
 
 SQLITE_FILES = [os.path.join(SQLITE_FOLDER.format(PYVERSION), x) for x in [
@@ -523,30 +523,7 @@ LIB_UCSC_FILES = [
     'ucsc/samtools/bam_aux.c',
 ]
     
-LIB_STAT = ['source/fisher2.c']
-
-VTOOLS_FILES = ['source.__init__',
-        'source.utils',
-        'source.project',
-        'source.preprocessor',
-        'source.plinkfile',
-        'source.importer',
-        'source.update',
-        'source.exporter',
-        'source.phenotype',
-        'source.variant',
-        'source.compare',
-        'source.annotation',
-        'source.liftOver',
-        'source.association',
-        'source.tester',
-        'source.rtester',
-        'source.meta',
-        'source.plot',
-        'source.pipeline',
-        'source.simulation'
-]
-
+LIB_STAT = ['variant_tools/fisher2.c']
 
 if not EMBEDED_BOOST:
     def downloadProgress(count, blockSize, totalSize):
@@ -590,7 +567,7 @@ if not EMBEDED_BOOST:
 if 'beta' in VTOOLS_VERSION or 'rc' in VTOOLS_VERSION:
     #
     try:
-       ret = subprocess.call(['swig -python -external-runtime source/swigpyrun.h'], shell=True)
+       ret = subprocess.call(['swig -python -external-runtime variant_tools/swigpyrun.h'], shell=True)
        if ret != 0: sys.exit('Failed to generate swig runtime header file.')
     except OSError as e:
         sys.exit('Failed to generate wrapper file. Please install swig (www.swig.org).')
@@ -609,7 +586,7 @@ if 'beta' in VTOOLS_VERSION or 'rc' in VTOOLS_VERSION:
             ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', WRAPPER_CPP_FILE.format(PYVER), INTERFACE_FILE]), shell=True)
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for association module.')
-            os.rename('source/assoTests.py', WRAPPER_PY_FILE.format(PYVER))
+            os.rename('variant_tools/assoTests.py', WRAPPER_PY_FILE.format(PYVER))
         #
         if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE.format(PYVER))) or (not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER))) \
           or os.path.getmtime(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER)) < os.path.getmtime(CGATOOLS_INTERFACE_FILE):
@@ -617,7 +594,7 @@ if 'beta' in VTOOLS_VERSION or 'rc' in VTOOLS_VERSION:
             ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', CGATOOLS_WRAPPER_CPP_FILE.format(PYVER), CGATOOLS_INTERFACE_FILE]), shell=True)
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for cgatools.')
-            os.rename('source/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(PYVER))
+            os.rename('variant_tools/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(PYVER))
         #
         if (not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER))) or (not os.path.isfile(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER))) \
           or os.path.getmtime(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER)) < os.path.getmtime(UCSCTOOLS_INTERFACE_FILE):
@@ -625,7 +602,7 @@ if 'beta' in VTOOLS_VERSION or 'rc' in VTOOLS_VERSION:
             ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER), UCSCTOOLS_INTERFACE_FILE]), shell=True)
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for ucsctools.')
-            os.rename('source/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER))
+            os.rename('variant_tools/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER))
          
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.
 if sys.platform == 'linux2':
@@ -703,7 +680,7 @@ setup(name = "variant_tools",
         Extension('variant_tools._vt_sqlite3_ext',
             sources = ['sqlite/vt_sqlite3_ext.cpp'] + SQLITE_GSL + LIB_STAT + LIB_UCSC_FILES + LIB_CGATOOLS + (LIB_BOOST if EMBEDED_BOOST else []),
             include_dirs = [".", 'ucsc/inc', 'ucsc/tabix', 'ucsc/samtools', 
-                'sqlite', "source", "gsl", "cgatools", "boost_1_49_0"],
+                'sqlite', "variant_tools", "gsl", "cgatools", "boost_1_49_0"],
             libraries = ['z', 'bz2'] + \
                 ([] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
             define_macros = [
@@ -740,7 +717,7 @@ setup(name = "variant_tools",
             extra_compile_args = gccargs,
             library_dirs = [],
             libraries = libs,
-            include_dirs = [".", "source", "gsl"],
+            include_dirs = [".", "variant_tools", "gsl"],
         )
       ] 
 )
