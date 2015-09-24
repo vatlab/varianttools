@@ -322,9 +322,18 @@ class VcfGenotype:
         self.map = {'0/0': default, '0|0': default,
             '0/1': ('1',), '1/0': ('1',), '0|1': ('1',), '1|0': ('1',),
             '1/1': ('2',), '1|1': ('2',),
-            '0/2': ('0', '1'), '2/0': ('0', '1'), '0|2': ('0', '1'), '2|0': ('0', '1'), 
+            '0/2': (None, '1'), '2/0': (None, '1'), '0|2': (None, '1'), '2|0': (None, '1'), 
             '1/2': ('-1', '-1'), '2/1': ('-1', '-1'), '1|2': ('-1', '-1'), '2|1': ('-1', '-1'),
-            '2/2': ('0', '2'), '2|2': ('0', '2'),
+            '2/2': (None, '2'), '2|2': (None, '2'),
+            '0/3': (None, None, '1'), '3/0': (None, None, '1'), '0|3': (None, None, '1'), '3|0': (None, None, '1'), 
+            '1/3': ('-1', None, '-1'), '3/1': ('-1', None, '-1'), '1|3': ('-1', None, '-1'), '3|1': ('-1', None, '-1'), 
+            '2/3': (None, '-1', '-1'), '3/2': (None, '-1', '-1'), '2|3': (None, '-1', '-1'), '3|2': (None, '-1', '-1'), 
+            '3/3': (None, None, '2'), '3|3': (None, None, '2'), 
+            '0/4': (None, None, None, '1'), '4/0': (None, None, None, '1'), '0|4': (None, None, None, '1'), '4|0': (None, None, None, '1'), 
+            '1/4': ('-1', None, '-1'), '4/1': ('-1', None, '-1'), '1|4': ('-1', None, '-1'), '4|1': ('-1', None, '-1'), 
+            '2/4': (None, '-1', None, '-1'), '4/2': (None, '-1', None, '-1'), '2|4': (None, '-1', None, '-1'), '4|2': (None, '-1', None, '-1'), 
+            '3/4': (None, None, '-1', '-1'), '4/3': (None, None, '-1', '-1'), '3|4': (None, None, '-1', '-1'), '4|3': (None, None, '-1', '-1'), 
+            '4/4': (None, None, None, '2'), '4|4': (None, None, None, '2'), 
             '0': default, '1': ('1',)}
 
     def __call__(self, item):
@@ -332,6 +341,7 @@ class VcfGenotype:
         try:
             return self.map[item.partition(':')[0]]
         except KeyError:
+            env.logger.debug('Genotype {} cannot be imported'.format(item))
             return None
 
 class VcfGenoFromFormat:
@@ -345,9 +355,18 @@ class VcfGenoFromFormat:
         self.map = {'0/0': default, '0|0': default,
             '0/1': ('1',), '1/0': ('1',), '0|1': ('1',), '1|0': ('1',),
             '1/1': ('2',), '1|1': ('2',),
-            '0/2': ('0', '1'), '2/0': ('0', '1'), '0|2': ('0', '1'), '2|0': ('0', '1'), 
+            '0/2': (None, '1'), '2/0': (None, '1'), '0|2': (None, '1'), '2|0': (None, '1'), 
             '1/2': ('-1', '-1'), '2/1': ('-1', '-1'), '1|2': ('-1', '-1'), '2|1': ('-1', '-1'),
-            '2/2': ('0', '2'), '2|2': ('0', '2'),
+            '2/2': (None, '2'), '2|2': (None, '2'),
+            '0/3': (None, None, '1'), '3/0': (None, None, '1'), '0|3': (None, None, '1'), '3|0': (None, None, '1'), 
+            '1/3': ('-1', None, '-1'), '3/1': ('-1', None, '-1'), '1|3': ('-1', None, '-1'), '3|1': ('-1', None, '-1'), 
+            '2/3': (None, '-1', '-1'), '3/2': (None, '-1', '-1'), '2|3': (None, '-1', '-1'), '3|2': (None, '-1', '-1'), 
+            '3/3': (None, None, '2'), '3|3': (None, None, '2'), 
+            '0/4': (None, None, None, '1'), '4/0': (None, None, None, '1'), '0|4': (None, None, None, '1'), '4|0': (None, None, None, '1'), 
+            '1/4': ('-1', None, '-1'), '4/1': ('-1', None, '-1'), '1|4': ('-1', None, '-1'), '4|1': ('-1', None, '-1'), 
+            '2/4': (None, '-1', None, '-1'), '4/2': (None, '-1', None, '-1'), '2|4': (None, '-1', None, '-1'), '4|2': (None, '-1', None, '-1'), 
+            '3/4': (None, None, '-1', '-1'), '4/3': (None, None, '-1', '-1'), '3|4': (None, None, '-1', '-1'), '4|3': (None, None, '-1', '-1'), 
+            '4/4': (None, None, None, '2'), '4|4': (None, None, None, '2'), 
             '0': default, '1': ('1',)}
 
     def __call__(self, item):
@@ -367,6 +386,7 @@ class VcfGenoFromFormat:
                     return self.default
             return self.map[item[1].split(':', self.idx + 1)[self.idx]] if self.idx is not None else self.default
         except KeyError:
+            env.logger.debug('Genotype {} cannot be imported'.format(item))
             return None
         
 class ExtractValue:
