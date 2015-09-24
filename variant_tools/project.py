@@ -994,8 +994,8 @@ class PipelineDescription:
                         if not re.match('^([\w*_][\w\d*_]*_)?[\d]+$', header) and not re.match('^[\w][\w\d]*$', header):
                             raise ValueError('Invalid section header "{}"'.format(section))
                     #
-                    pnames = [x.strip().rsplit('_', 1)[0] if '_' in x else ('default' if x.isdigit() else x) for x in section_headers]
-                    pidxs = [x.strip().rsplit('_', 1)[1] if '_' in x else (x if x.isdigit() else '0') for x in section_headers]
+                    pnames = [x.strip().rsplit('_', 1)[0] if '_' in x and x.rsplit('_',1)[-1].isdigit() else ('default' if x.isdigit() else x) for x in section_headers]
+                    pidxs = [x.strip().rsplit('_', 1)[1] if '_' in x and x.rsplit('_',1)[-1].isdigit() else (x if x.isdigit() else '0') for x in section_headers]
                     #
                     if ':' in section:
                         options = [x.strip() for x in section.split(':', 1)[-1].split(',')]
