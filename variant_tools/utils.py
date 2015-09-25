@@ -2473,7 +2473,8 @@ def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
                 # we do not check if f is one of _ifiles or _ofiles because presentation
                 # of files might differ
                 if not any([os.path.abspath(f) == x for x in ifiles_checked.keys()]):
-                    env.logger.warning('{} in exe_info is not an required input or putput file.'.format(f))
+                    if not any([os.path.abspath(f) == os.path.abspath(x) for x in _ofiles]):
+                        env.logger.warning('{} in exe_info is not an required input or putput file.'.format(f))
                 else:
                     ifiles_checked[os.path.abspath(f)] = True
                 #
