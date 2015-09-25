@@ -2442,6 +2442,7 @@ def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
         return False
     #
     # compare timestamp of input and output files
+    ifiles_checked = {os.path.abspath(x):False for x in _ifiles}
     md5matched = []
     if md5file:
         nFiles = [0]
@@ -2471,6 +2472,11 @@ def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
                     continue
                 # we do not check if f is one of _ifiles or _ofiles because presentation
                 # of files might differ
+                if not any([os.path.abspath(f) == x for x in ifiles_checked.keys()]):
+                    env.logger.warning('{} in exe_info is not an required input or putput file.'.format(f))
+                else:
+                    ifiles_checked[os.path.abspath(f)] = True
+                #
                 if not (os.path.isfile(f) or os.path.isfile(f + '.file_info')):
                     env.logger.warning('{} in {} does not exist.'.format(f, md5file))
                     return False
@@ -2490,6 +2496,10 @@ def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
                     env.logger.warning(e)
                     return False
                 md5matched.append(f)
+            #
+            if not all(ifiles_checked.values()):
+                env.logger.error('Input or dependent file {} is not recorded in exe_info file.'.format(', '.join([x for x,y in ifiles_checked.items() if not y])))
+                return False
         if len(nFiles) != 2 or nFiles[1] == 0:
             env.logger.warning('Corrupted exe_info file {}'.format(md5file))
             return False    
