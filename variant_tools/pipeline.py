@@ -1268,7 +1268,7 @@ class RunCommand(PipelineAction):
            submitter='sh {} &')
 
     """
-    def __init__(self, cmd='', output=[], working_dir=None, submitter=None, max_jobs=None):
+    def __init__(self, cmd='', output=[], working_dir=None, submitter=None, wait=True, max_jobs=None):
         '''This action accepts one (a string) or more command (a list of strings)
         and executes them in a shell environment, possibly as a separate job. 
         
@@ -1300,10 +1300,20 @@ class RunCommand(PipelineAction):
                 to replace the running process by start a new job and terminate the
                 existing process intentionally.
 
+            wait (True, False, or number of seconds):
+                If a job is submitted, whether or not wait it to be completed. The default
+                is True, meaning that the master thread will continue to execute until
+                is will be waiting for the outcome of this command. If you set this parameter
+                to False, the pipeline execute will be stopped and you can re-run the
+                pipeline till the subcommand is completed. You can also set a number
+                to let the master thread wait for a pre-determined period of time. This 
+                option is useful if the subprocess might die.
+
             max_jobs: (deprecated)
         '''
         self.submitter = submitter
         self.working_dir = working_dir
+        self.wait = wait
         if type(output) == str:
             self.output = [os.path.expanduser(output)]
         else:
@@ -1392,6 +1402,11 @@ class RunCommand(PipelineAction):
             if os.path.isfile(self.proc_done):
                 break
             else:
+                if self.wait is False:
+                    return
+                if isinstance(self.wait, int) and time.time() - prog_time > self.wait:
+                    env.logger.info('Quitted after waiting {} seconds.'.format(self.wait))
+                    return
                 time.sleep(10)
         try:
             env.unlock(self.proc_lck, str(os.getpid()))
@@ -1698,7 +1713,7 @@ class ExecuteScript(PipelineAction):
 
     """
     def __init__(self, script='', interpreter='', args='', output=[], working_dir=None, 
-         export=None, submitter=None, suffix=None):
+         export=None, submitter=None, suffix=None, wait=True):
         '''This action accepts one or a list of strings, write them to a temporary file
         and executes them by a interpreter, possibly as a separate job. 
         
@@ -1747,10 +1762,20 @@ class ExecuteScript(PipelineAction):
 
             suffix (None or string):
                 An optional suffix (file extension) to the temporary script.
+
+            wait (True, False, or number of seconds):
+                If a job is submitted, whether or not wait it to be completed. The default
+                is True, meaning that the master thread will continue to execute until
+                is will be waiting for the outcome of this command. If you set this parameter
+                to False, the pipeline execute will be stopped and you can re-run the
+                pipeline till the subcommand is completed. You can also set a number
+                to let the master thread wait for a pre-determined period of time. This 
+                option is useful if the subprocess might die.
         '''
         self.interpreter = interpreter
         self.submitter = submitter
         self.working_dir = working_dir
+        self.wait = wait
         if type(output) == str:
             self.output = [os.path.expanduser(output)]
         else:
@@ -1874,6 +1899,11 @@ class ExecuteScript(PipelineAction):
             if os.path.isfile(self.proc_done):
                 break
             else:
+                if self.wait is False:
+                    return
+                if isinstance(self.wait, int) and time.time() - prog_time > self.wait:
+                    env.logger.info('Quitted after waiting {} seconds.'.format(self.wait))
+                    return
                 time.sleep(10)
         try:
             env.unlock(self.proc_lck, str(os.getpid()))
@@ -2799,6 +2829,8 @@ class Pipeline:
                     self.VARS['input{}_{}'.format(command.index, n)] = f
                     self.VARS['input_{}'.format(n)] = f
                     self.step_dependent_files.extend(f)
+            if self.step_dependent_files:
+                env.logger.debug('Step dependent files are {}'.format(', '.join(self.step_dependent_files)))
             #
             saved_dir = os.getcwd()
             for opt in command.options:
