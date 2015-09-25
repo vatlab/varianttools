@@ -45,11 +45,11 @@ if sys.version.startswith('2.7.4') or sys.version.startswith('3.3.1'):
         'tools due to a regression bug in the gzip module.')
 
 def modifyVersion(version):
-    # modify source/__init__.py to write version string
+    # modify variant_tools/__init__.py to write version string
     if version is not None:
         content = []
         rev = runCommand('git rev-list --count HEAD').strip()
-        with open('source/__init__.py', 'r') as init_file:
+        with open('variant_tools/__init__.py', 'r') as init_file:
             for x in init_file.readlines():
                 if x.startswith('VTOOLS_VERSION'):
                     content.append("VTOOLS_VERSION='{}'\n".format(version))
@@ -60,7 +60,7 @@ def modifyVersion(version):
                     content.append("VTOOLS_REVISION='{}'\n".format(rev))
                 else:
                     content.append(x)
-        with open('source/__init__.py', 'w') as init_file:
+        with open('variant_tools/__init__.py', 'w') as init_file:
             init_file.write(''.join(content))
         return version
     else:
@@ -72,7 +72,7 @@ def setupEnvironment(version):
     #
     if 'beta' in version or 'rc' in version:
         print('WARNING: You are releasing a subversion version of variant tools.')
-        print('To make a formal release, you will need to change version string in source/__init__.py')
+        print('To make a formal release, you will need to change version string in variant_tools/__init__.py')
     #
     if os.path.isdir('build'):
         print('Removing directory build')
@@ -90,19 +90,19 @@ def generateSWIGWrappers():
     # 
     # generate wrapper files to make sure they are up to date
     SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511',
-        '-w-509', '-outdir', 'source']
-    WRAPPER_CPP_FILE = 'source/assoTests_wrap_{}.cpp'
-    WRAPPER_PY_FILE = 'source/assoTests_{}.py'
-    UCSCTOOLS_WRAPPER_CPP_FILE = 'source/ucsctools_wrap_{}.cpp'
-    UCSCTOOLS_WRAPPER_PY_FILE = 'source/ucsctools_{}.py'
-    CGATOOLS_WRAPPER_CPP_FILE = 'source/cgatools_wrap_{}.cpp'
-    CGATOOLS_WRAPPER_PY_FILE = 'source/cgatools_{}.py'
+        '-w-509', '-outdir', 'variant_tools']
+    WRAPPER_CPP_FILE = 'variant_tools/assoTests_wrap_{}.cpp'
+    WRAPPER_PY_FILE = 'variant_tools/assoTests_{}.py'
+    UCSCTOOLS_WRAPPER_CPP_FILE = 'variant_tools/ucsctools_wrap_{}.cpp'
+    UCSCTOOLS_WRAPPER_PY_FILE = 'variant_tools/ucsctools_{}.py'
+    CGATOOLS_WRAPPER_CPP_FILE = 'variant_tools/cgatools_wrap_{}.cpp'
+    CGATOOLS_WRAPPER_PY_FILE = 'variant_tools/cgatools_{}.py'
     SQLITE_FOLDER = 'sqlite/{}'
-    SQLITE_PY_FILE = 'source/vt_sqlite3_{}'
+    SQLITE_PY_FILE = 'variant_tools/vt_sqlite3_{}'
     with open(os.devnull, 'w') as fnull:
         try:
-           print('Generating source/swigpyrun.h ...')
-           ret = subprocess.call('swig -python -external-runtime source/swigpyrun.h', shell=True, stdout=fnull)
+           print('Generating variant_tools/swigpyrun.h ...')
+           ret = subprocess.call('swig -python -external-runtime variant_tools/swigpyrun.h', shell=True, stdout=fnull)
            if ret != 0:
                sys.exit('Failed to generate swig runtime header file.')
         except OSError as e:
@@ -112,22 +112,22 @@ def generateSWIGWrappers():
             print('Generating {} wrapper files for module assoTests ...'.format(ver))
             if ver == 'py3':
                 SWIG_OPTS.append('-py3')
-            ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', WRAPPER_CPP_FILE.format(ver), 'source/assoTests.i'], shell=False, stdout=fnull)
+            ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', WRAPPER_CPP_FILE.format(ver), 'variant_tools/assoTests.i'], shell=False, stdout=fnull)
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for association module.')
-            os.rename('source/assoTests.py', WRAPPER_PY_FILE.format(ver))
+            os.rename('variant_tools/assoTests.py', WRAPPER_PY_FILE.format(ver))
             #
             print('Generating {} wrapper files for module cgatools ...'.format(ver))
-            ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', CGATOOLS_WRAPPER_CPP_FILE.format(ver), 'source/cgatools.i'], shell=False, stdout=fnull)
+            ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', CGATOOLS_WRAPPER_CPP_FILE.format(ver), 'variant_tools/cgatools.i'], shell=False, stdout=fnull)
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for cgatools.')
-            os.rename('source/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(ver))
+            os.rename('variant_tools/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(ver))
             #
             print('Generating {} wrapper files for module ucsctools ...'.format(ver))
-            ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', UCSCTOOLS_WRAPPER_CPP_FILE.format(ver), 'source/ucsctools.i'], shell=False, stdout=fnull)
+            ret = subprocess.call(['swig'] + SWIG_OPTS + ['-o', UCSCTOOLS_WRAPPER_CPP_FILE.format(ver), 'variant_tools/ucsctools.i'], shell=False, stdout=fnull)
             if ret != 0:
                 sys.exit('Failed to generate wrapper file for ucsctools.')
-            os.rename('source/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE.format(ver))
+            os.rename('variant_tools/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE.format(ver))
              
 
 def buildVariantTools(extra_args):
@@ -208,7 +208,7 @@ def buildExecutables(git_dir, option):
             print('Building executable {} ...'.format(exe))
             # pyinstaller unfornately needs these files but cannot process them...
             # I have to overwrite these files with the py2 version.
-            for f in ['source/assoTests_py3.py', 'source/cgatools_py3.py', 'source/ucsctools_py3.py']:
+            for f in ['variant_tools/assoTests_py3.py', 'variant_tools/cgatools_py3.py', 'variant_tools/ucsctools_py3.py']:
                 shutil.copy(f.replace('py3', 'py2'), f)
             with open(os.devnull, 'w') as fnull:
                 cmd = 'pyinstaller {} --log-level=ERROR {} {} '.format(option,
@@ -345,7 +345,7 @@ if __name__ == '__main__':
         parameters version and tag, extra parameters would be specified and 
         will be passed directly to the 'python setup.py install' process. ''')
     parser.add_argument('--version',
-        help='''Modify source/__init__.py to the specified version string and
+        help='''Modify variant_tools/__init__.py to the specified version string and
             make the release.''')
     parser.add_argument('--tag', action='store_true',
         help='If specified, tag this release.')
