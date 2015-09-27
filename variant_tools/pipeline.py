@@ -2069,65 +2069,65 @@ class ExecuteRScript(ExecuteScript):
     '''Execute in-line R script using Rscript as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
+    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None, wait=True):
         ExecuteScript.__init__(self, script=script, interpreter='Rscript', args=args,
             output=output, export=export, working_dir=working_dir, submitter=submitter,
-            suffix='.R')
+            suffix='.R', wait=wait)
 
 class ExecuteShellScript(ExecuteScript):
     '''Execute in-line shell script using bash as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
+    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None, wait=True):
         ExecuteScript.__init__(self, script=script, interpreter='bash', args=args,
             output=output, export=export, working_dir=working_dir, submitter=submitter,
-            suffix='.sh')
+            suffix='.sh', wait=wait)
 
 class ExecuteCShellScript(ExecuteScript):
     '''Execute in-line shell script using bash as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
+    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None, wait=True):
         ExecuteScript.__init__(self, script=script, interpreter='tcsh', args=args,
             output=output, export=export, working_dir=working_dir, submitter=submitter,
-            suffix='.csh')
+            suffix='.csh', wait=wait)
 
 class ExecutePythonScript(ExecuteScript):
     '''Execute in-line python script using python as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
+    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None, wait=True):
         ExecuteScript.__init__(self, script=script, interpreter='python', args=args,
             output=output, export=export, working_dir=working_dir, submitter=submitter,
-            suffix='.py')
+            suffix='.py', wait=wait)
 
 class ExecutePython3Script(ExecuteScript):
     '''Execute in-line python script using python3 as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None):
+    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None, wait=True):
         ExecuteScript.__init__(self, script=script, interpreter='python3', args=args,
             output=output, export=export, working_dir=working_dir, submitter=submitter,
-            suffix='.py')
+            suffix='.py', wait=wait)
 
 class ExecutePerlScript(ExecuteScript):
     '''Execute in-line perl script using perl as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', args='',  output=[], export=None, working_dir=None, submitter=None):
+    def __init__(self, script='', args='',  output=[], export=None, working_dir=None, submitter=None, wait=True):
         ExecuteScript.__init__(self, script=script, interpreter='perl', args=args,
             output=output, export=export, working_dir=working_dir, submitter=submitter,
-            suffix='.perl')
+            suffix='.perl', wait=wait)
 
 
 class ExecuteRubyScript(ExecuteScript):
     '''Execute in-line perl script using perl as interpreter. Please
     check action ExecuteScript for more details.
     '''
-    def __init__(self, script='', args='',  output=[], export=None, working_dir=None, submitter=None):
+    def __init__(self, script='', args='',  output=[], export=None, working_dir=None, submitter=None, wait=True):
         ExecuteScript.__init__(self, script=script, interpreter='ruby', args=args,
             output=output, export=export, working_dir=working_dir, submitter=submitter,
-            suffix='.rb')
+            suffix='.rb', wait=wait)
 
 
 class CheckRLibraries(ExecuteRScript):
