@@ -11,4 +11,16 @@ build
 dist
 *.pyc
 *.log
-
+variant_tools/assoTests_py2.py
+variant_tools/assoTests_py3.py
+variant_tools/assoTests_wrap_py2.cpp
+variant_tools/assoTests_wrap_py3.cpp
+variant_tools/cgatools_py2.py
+variant_tools/cgatools_py3.py
+variant_tools/cgatools_wrap_py2.cpp
+variant_tools/cgatools_wrap_py3.cpp
+variant_tools/swigpyrun.h
+variant_tools/ucsctools_py2.py
+variant_tools/ucsctools_py3.py
+variant_tools/ucsctools_wrap_py2.cpp
+variant_tools/ucsctools_wrap_py3.cpp
