@@ -1225,6 +1225,20 @@ class NullAction(PipelineAction):
     def __call__(self, ifiles, pipeline=None):
         return ifiles
         
+class MonitorThread(threading.Thread):
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs={}, Verbose=None):
+        threading.Thread.__init__(self, group, target, name, args, kwargs, Verbose)
+        self._return = None
+
+    def run(self):
+        if self._Thread__target is not None:
+            self._return = self._Thread__target(*self._Thread__args,
+                                                **self._Thread__kwargs)
+    def join(self):
+        threading.Thread.join(self)
+        return self._return
+
 class RunCommand(PipelineAction):
     """This action execute specified commands. If the pipeline is running
     in parallel mode and a submitter is specified, it will use the submitter
@@ -1393,11 +1407,11 @@ class RunCommand(PipelineAction):
                 # if the job has not been started for 10 minutes, quite
                 if time.time() - start_time > 600:
                     env.logger.error('Background job has not been started after 10 minutes.')
-                    return
+                    return False
             else:
                 if time.time() - prog_time > 60:
                     env.logger.error('Background job has not updated it progress for 1 minutes.')
-                    return
+                    return False
             #
             if os.path.isfile(self.proc_done):
                 break
@@ -1417,22 +1431,26 @@ class RunCommand(PipelineAction):
             with open(self.proc_done) as done:
                 ret = int(done.read().strip())
         except Exception as e:
-            raise RuntimeError('Failed to retrive return information for forked process from {}. {}'
+            env.logger.error('Failed to retrive return information for forked process from {}. {}'
                 .format(self.proc_done, e))
+            return False
         #
         if ret < 0:
-            raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
+            env.logger.error("Command '{}' was terminated by signal {} after executing {}"
                 .format('; '.join(self.cmd), -ret, self._elapsed_time()))
+            return False
         elif ret > 0:
             if self.output:
                 with open(self.proc_err) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
-            raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
+            env.logger.error("Execution of command '{}' failed after {} (return code {})."
                 .format('; '.join(self.cmd), self._elapsed_time(), ret))
+            return False
         # remove the .done file
         if not self.output[0] in self.pipeline.THREADS:
-            raise RuntimeError('Output is not waited by any threads')
+            env.logger.error('Output is not waited by any threads')
+            return False
         # DO NOT POP FROM ANOTHER THREAD, this will cause race condition
         # (unless we use thread safe dictionry). In this case, we only need
         # to monitor the status of threads from the master threads.
@@ -1446,6 +1464,7 @@ class RunCommand(PipelineAction):
             except Exception as e:
                 env.logger.warning('Fail to remove {}: {}'
                     .format(filename, e))
+        return True
 
     def _submit_command(self):
         '''Submit a job and wait for its completion.'''
@@ -1540,7 +1559,7 @@ MYSELF=$!
                 msg = ''
             raise RuntimeError("Failed to submit job {} using submiter '{}': {}".format(self.proc_cmd, self.submitter, msg))
         else:
-            t = threading.Thread(target=self._monitor)
+            t = MonitorThread(target=self._monitor)
             t.daemon = True
             t.start()
             if self.output[0] in self.pipeline.THREADS:
@@ -1914,18 +1933,21 @@ class ExecuteScript(PipelineAction):
             ret = int(done.read().strip())
         #
         if ret < 0:
-            raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
+            env.logger.error("Command '{}' was terminated by signal {} after executing {}"
                 .format('; '.join(self.cmd), -ret, self._elapsed_time()))
+            return False
         elif ret > 0:
             if self.output:
                 with open(self.proc_err) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
-            raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
+            env.logger.error("Execution of command '{}' failed after {} (return code {})."
                 .format('; '.join(self.cmd), self._elapsed_time(), ret))
+            return False
         # remove the .done file
         if not self.output[0] in self.pipeline.THREADS:
-            raise RuntimeError('Output is not waited by any threads')
+            env.logger.error('Output is not waited by any threads')
+            return False
         # DO NOT POP FROM ANOTHER THREAD, this will cause race condition
         # (unless we use thread safe dictionry). In this case, we only need
         # to monitor the status of threads from the master threads.
@@ -1939,6 +1961,7 @@ class ExecuteScript(PipelineAction):
             except Exception as e:
                 env.logger.warning('Fail to remove {}: {}'
                     .format(filename, e))
+        return True
 
     def _submit_command(self):
         '''Submit a job and wait for its completion.'''
@@ -2039,7 +2062,7 @@ MYSELF=$!
                 msg = ''
             raise RuntimeError("Failed to submit job {} using submiter '{}': {}".format(self.proc_cmd, self.submitter, msg))
         else:
-            t = threading.Thread(target=self._monitor)
+            t = MonitorThread(target=self._monitor)
             t.daemon = True
             t.start()
             if self.output[0] in self.pipeline.THREADS:
@@ -2888,10 +2911,12 @@ class Pipeline:
                             # wait for the thread to complete
                             env.logger.info('Waiting for the input file {} to be available.'
                                 .format(ifile))
-                            while self.THREADS[ifile].isAlive():
-                                self.THREADS[ifile].join(5)
+                            #while self.THREADS[ifile].isAlive():
+                            ret = self.THREADS[ifile].join()
                             # thread closed, remove from self.THREADS
                             self.THREADS.pop(ifile)
+                            if not ret:
+                                raise RuntimeError('Forked process to generate {} failed.'.format(ifile))
                         if not (os.path.isfile(ifile) or os.path.isfile(ifile + '.file_info')):
                             #raise RewindExecution(ifile)
                             raise RuntimeError('Non-existent input file {} due to ongoing or failed background job'.format(ifile))
