@@ -3690,8 +3690,8 @@ class VariableSubstitutor:
             # replaced with ' '. The newer version (1.0+) keeps newline to faciliate the
             # inclusion of multi-line scripts etc.
             text =  ' '.join(text.split())
-        # now, find ${}
-        pieces = re.split('(\${(?:[^{}]|{[^}]*})*})', text)
+        # now, find ${}, excluding simple {}, {{}} etc
+        pieces = re.split('(\${(?:[^{}]|{[^{}]*{[^}]*}[^{}]*}|{[^}]*})*})', text)
         for idx, piece in enumerate(pieces):
             if piece.startswith('${') and piece.endswith('}'):
                 KEY = piece[2:-1].lower()

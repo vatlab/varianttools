@@ -1418,7 +1418,7 @@ class RunCommand(PipelineAction):
             else:
                 if self.wait is False:
                     return
-                if isinstance(self.wait, int) and time.time() - prog_time > self.wait:
+                if self.wait is not True and isinstance(self.wait, int) and prog_time is not None and time.time() - prog_time > self.wait:
                     env.logger.info('Quitted after waiting {} seconds.'.format(self.wait))
                     return
                 time.sleep(10)
@@ -1531,7 +1531,12 @@ MYSELF=$!
                          for op in other_prog:
                              # if the working file is less than 2 minutes old, ...
                              if time.time() - os.path.getmtime(op) < 120:
-                                 raise RuntimeError('Failed to submit job because a job is currently running.')
+                                 env.logger.info('Another process appears to be working on {}, checking ...'.format(self.output[0]))
+                                 last_time = os.path.getmtime(op)
+                                 time.sleep(60)
+                                 # if the working file does not change after 60 seconds
+                                 if os.path.getmtime(op) != last_time:
+                                     raise RuntimeError('Failed to submit job because a job is currently running or has been failed within 2 minutes. Status file is {} (pid is {})'.format(op, os.getpid()))
         # try to submit command
         if '{}' in self.submitter:
             submit_cmd = self.submitter.replace('{}', self.proc_cmd)
@@ -1920,7 +1925,7 @@ class ExecuteScript(PipelineAction):
             else:
                 if self.wait is False:
                     return
-                if isinstance(self.wait, int) and time.time() - prog_time > self.wait:
+                if self.wait is not True and isinstance(self.wait, int) and prog_time is not None and time.time() - prog_time > self.wait:
                     env.logger.info('Quitted after waiting {} seconds.'.format(self.wait))
                     return
                 time.sleep(10)
@@ -2038,9 +2043,13 @@ MYSELF=$!
                      other_prog = glob.glob(os.path.abspath(self.output[0]) + '.working_*')
                      if other_prog:
                          for op in other_prog:
-                             # if the working file is less than 2 minutes old, ...
                              if time.time() - os.path.getmtime(op) < 120:
-                                 raise RuntimeError('Failed to submit job because a job is currently running.')
+                                 env.logger.info('Another process appears to be working on {}, checking ...'.format(self.output[0]))
+                                 last_time = os.path.getmtime(op)
+                                 time.sleep(60)
+                                 # if the working file does not change after 60 seconds
+                                 if os.path.getmtime(op) != last_time:
+                                     raise RuntimeError('Failed to submit job because a job is currently running or has been failed within 2 minutes. Status file is {} (pid is {})'.format(op, os.getpid()))
         env.logger.info('Running job {} with command "{}" from directory {}'.format(
             self.proc_cmd, submit_cmd, os.getcwd()))
         ret = subprocess.call(submit_cmd, shell=True,
@@ -2768,7 +2777,7 @@ class Pipeline:
             #    raise ValueError('Cannot reset read-only pipeline variable {}'.format(key))
             self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
         for key, val in self.VARS.items():
-            env.logger.trace('{} is set to {}'.format(key, val))
+            env.logger.debug('{} is set to {}'.format(key, val))
             if key == 'working_dir' and val != os.getcwd():
                 env.logger.warning('Changing working directory to {}'.format(val))
                 os.chdir(val)
@@ -2821,17 +2830,22 @@ class Pipeline:
                     pieces = re.split('([\w\d_]+\s*=)', input_line)
                     step_named_input = []
                     for piece in pieces:
-                        if not piece:
+                        if not piece.strip():
                             continue
                         if piece.endswith('='):
                             step_named_input.append([piece[:-1].strip(), []])
                         else:
+                            expanded_files = sum([glob.glob(os.path.expanduser(x)) for x in shlex.split(piece)], [])
+                            if not expanded_files:
+                                raise ValueError('{} does not expand to any valid file.'.format(piece))
                             if not step_named_input:
-                                step_named_input.append(['', sum([glob.glob(os.path.expanduser(x)) for x in shlex.split(piece)], [])])
+                                step_named_input.append(['', expanded_files]) 
                             else:
-                                step_named_input[-1][1] = sum([glob.glob(os.path.expanduser(x)) for x in shlex.split(piece)], [])
+                                step_named_input[-1][1].extend(expanded_files)
                     #
                     step_input = sum([x[1] for x in step_named_input if x[0] == ''], [])
+                    if not step_input:
+                        step_input = ifiles
                 if emitter_part:
                     try:
                         # remove ${INPUT} because it is determined by the emitter
