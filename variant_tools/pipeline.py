@@ -1406,21 +1406,18 @@ class RunCommand(PipelineAction):
             if prog_time is None:
                 # if the job has not been started for 10 minutes, quite
                 if time.time() - start_time > 600:
-                    env.logger.error('Background job has not been started after 10 minutes.')
-                    return False
+                    return('Background job has not been started after 10 minutes.')
             else:
                 if time.time() - prog_time > 60:
-                    env.logger.error('Background job has not updated it progress for 1 minutes.')
-                    return False
+                    return('Background job has not updated it progress for 1 minutes.')
             #
             if os.path.isfile(self.proc_done):
                 break
             else:
                 if self.wait is False:
-                    return
+                    return('Do not wait for the completion of submitted job (wait=False).')
                 if self.wait is not True and isinstance(self.wait, int) and prog_time is not None and time.time() - prog_time > self.wait:
-                    env.logger.info('Quitted after waiting {} seconds.'.format(self.wait))
-                    return
+                    return('Quitted after waiting {} seconds.'.format(self.wait))
                 time.sleep(10)
         try:
             env.unlock(self.proc_lck, str(os.getpid()))
@@ -1431,26 +1428,22 @@ class RunCommand(PipelineAction):
             with open(self.proc_done) as done:
                 ret = int(done.read().strip())
         except Exception as e:
-            env.logger.error('Failed to retrive return information for forked process from {}. {}'
+            return('Failed to retrive return information for forked process from {}. {}'
                 .format(self.proc_done, e))
-            return False
         #
         if ret < 0:
-            env.logger.error("Command '{}' was terminated by signal {} after executing {}"
+            return("Command '{}' was terminated by signal {} after executing {}"
                 .format('; '.join(self.cmd), -ret, self._elapsed_time()))
-            return False
         elif ret > 0:
             if self.output:
                 with open(self.proc_err) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
-            env.logger.error("Execution of command '{}' failed after {} (return code {})."
+            return("Execution of command '{}' failed after {} (return code {})."
                 .format('; '.join(self.cmd), self._elapsed_time(), ret))
-            return False
         # remove the .done file
         if not self.output[0] in self.pipeline.THREADS:
-            env.logger.error('Output is not waited by any threads')
-            return False
+            return('Output is not waited by any threads')
         # DO NOT POP FROM ANOTHER THREAD, this will cause race condition
         # (unless we use thread safe dictionry). In this case, we only need
         # to monitor the status of threads from the master threads.
@@ -1464,7 +1457,7 @@ class RunCommand(PipelineAction):
             except Exception as e:
                 env.logger.warning('Fail to remove {}: {}'
                     .format(filename, e))
-        return True
+        return('')
 
     def _submit_command(self):
         '''Submit a job and wait for its completion.'''
@@ -1914,20 +1907,17 @@ class ExecuteScript(PipelineAction):
             if prog_time is None:
                 # if the job has not been started for 10 minutes, quite
                 if time.time() - start_time > 600:
-                    env.logger.error('Background job has not been started after 10 minutes.')
-                    return
+                    return('Background job has not been started after 10 minutes.')
             else:
                 if time.time() - prog_time > 60:
-                    env.logger.error('Background job has not updated it progress for 1 minutes.')
-                    return
+                    return('Background job has not updated it progress for 1 minutes.')
             if os.path.isfile(self.proc_done):
                 break
             else:
                 if self.wait is False:
                     return
                 if self.wait is not True and isinstance(self.wait, int) and prog_time is not None and time.time() - prog_time > self.wait:
-                    env.logger.info('Quitted after waiting {} seconds.'.format(self.wait))
-                    return
+                    return('Quitted after waiting {} seconds.'.format(self.wait))
                 time.sleep(10)
         try:
             env.unlock(self.proc_lck, str(os.getpid()))
@@ -1938,21 +1928,18 @@ class ExecuteScript(PipelineAction):
             ret = int(done.read().strip())
         #
         if ret < 0:
-            env.logger.error("Command '{}' was terminated by signal {} after executing {}"
+            return("Command '{}' was terminated by signal {} after executing {}"
                 .format('; '.join(self.cmd), -ret, self._elapsed_time()))
-            return False
         elif ret > 0:
             if self.output:
                 with open(self.proc_err) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
-            env.logger.error("Execution of command '{}' failed after {} (return code {})."
+            return("Execution of command '{}' failed after {} (return code {})."
                 .format('; '.join(self.cmd), self._elapsed_time(), ret))
-            return False
         # remove the .done file
         if not self.output[0] in self.pipeline.THREADS:
-            env.logger.error('Output is not waited by any threads')
-            return False
+            return('Output is not waited by any threads')
         # DO NOT POP FROM ANOTHER THREAD, this will cause race condition
         # (unless we use thread safe dictionry). In this case, we only need
         # to monitor the status of threads from the master threads.
@@ -1966,7 +1953,7 @@ class ExecuteScript(PipelineAction):
             except Exception as e:
                 env.logger.warning('Fail to remove {}: {}'
                     .format(filename, e))
-        return True
+        return('')
 
     def _submit_command(self):
         '''Submit a job and wait for its completion.'''
@@ -2929,8 +2916,8 @@ class Pipeline:
                             ret = self.THREADS[ifile].join()
                             # thread closed, remove from self.THREADS
                             self.THREADS.pop(ifile)
-                            if not ret:
-                                raise RuntimeError('Forked process to generate {} failed.'.format(ifile))
+                            if ret:
+                                raise RuntimeError('Failed to generte {}: {}'.format(ifile, ret))
                         if not (os.path.isfile(ifile) or os.path.isfile(ifile + '.file_info')):
                             #raise RewindExecution(ifile)
                             raise RuntimeError('Non-existent input file {} due to ongoing or failed background job'.format(ifile))
