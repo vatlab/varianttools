@@ -43,6 +43,10 @@ VTOOLS_COPYRIGHT = '''variant tools {} : Copyright (c) 2011 - 2014 Bo Peng'''.fo
 VTOOLS_CITATION = '''San Lucas FA, Wang G, Scheet P, Peng B (2012) Bioinformatics 28(3):421-422'''
 VTOOLS_CONTACT = '''Please visit http://varianttools.sourceforge.net for more information.'''
 
-from .utils import *
-from .preprocessor import *
-from .pipeline import *
+try:
+    from .utils import *
+    from .preprocessor import *
+    from .pipeline import *
+except ImportError as e:
+    print('Failed to import variant_tools. Make sure that variant tools is properly installed '
+        'and you are not importing variant_tools from its source directory.')
