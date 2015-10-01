@@ -175,6 +175,7 @@ class NamedList:
             self.items = comma_list.split(',')
         else:
             import pandas as pd
+            filename = os.path.expanduser(filename)
             if not os.path.isfile(filename):
                 raise ValueError('File does not exist: {}'.format(filename))
             # pandas can be slow to import
