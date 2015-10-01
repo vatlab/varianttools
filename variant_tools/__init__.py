@@ -30,15 +30,19 @@ ver = sys.version_info
 if (ver.major == 2 and (ver.minor, ver.micro) < (7, 1)) or (ver.major == 3 and (ver.minor, ver.micro) < (2, 0)):
     raise SystemError('variant tools requires Python 2.7.1, Python 3.2.1 or higher. Please upgrade your Python {}.{}.{}.'.format(ver.major, ver.minor, ver.micro))
 
-__all__ = ['utils', 'project', 'variant', 'annotation', 'assoTests', 'pipeline', 'simulation']
+
+#__all__ = ['utils', 'project', 'variant', 'annotation', 'assoTests', 'pipeline', 'simulation']
 
 # This should be updated when vtools is released, or there is a need to mark a
 # revision between release cycles
 VTOOLS_VERSION='2.7.0beta'
-VTOOLS_REVISION='2893'
+VTOOLS_REVISION='2961'
 #
 VTOOLS_FULL_VERSION='{} (revision {}) for Python {}.{}.{}'.format(VTOOLS_VERSION, VTOOLS_REVISION, ver.major, ver.minor, ver.micro)
 VTOOLS_COPYRIGHT = '''variant tools {} : Copyright (c) 2011 - 2014 Bo Peng'''.format(VTOOLS_VERSION)
 VTOOLS_CITATION = '''San Lucas FA, Wang G, Scheet P, Peng B (2012) Bioinformatics 28(3):421-422'''
 VTOOLS_CONTACT = '''Please visit http://varianttools.sourceforge.net for more information.'''
 
+from .utils import *
+from .preprocessor import *
+from .pipeline import *

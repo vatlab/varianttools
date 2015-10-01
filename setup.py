@@ -82,7 +82,13 @@ try:
 except ImportError:
     sys.exit('variant tools requires Python 2.7.2 or higher, or Python 3.2 or higher. Please upgrade your version (%s) of Python and try again.' % (sys.version.split()[0]))
 
-from variant_tools import VTOOLS_VERSION
+# do not import variant_tools because __init__ might not be imported properly 
+# before installation
+with open('variant_tools/__init__.py') as init:
+    for line in init:
+        if line.startswith('VTOOLS_VERSION='):
+            VTOOLS_VERSION = line[15:].strip().strip('"').strip("'")
+            break
 
 EMBEDED_BOOST = os.path.isdir('boost_1_49_0')
 SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511', '-w-509',

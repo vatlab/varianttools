@@ -182,9 +182,11 @@ class NamedList:
                 data = pd.read_csv(filename)
             else:
                 data = pd.read_excel(filename)
-            # convert everything to str
+            # convert everything to str, however, there are cases where 1 is converted to 1.0 when missing value
+            # is present (na is considered float, thus the behavior)
             data = data.applymap(str)
             env.logger.trace("{} records are loaded from {}".format(data.shape[0], filename))
+            #env.logger.trace(data)
             #
             # if query?
             if query is not None:
@@ -763,7 +765,7 @@ class ImportModules(PipelineAction):
 
                      Pipeline
                         ^
-            INPUT =============》INPUT
+            INPUT =============> INPUT
 
     Raises:
         Raise a RuntimeError if one or more modules can not
