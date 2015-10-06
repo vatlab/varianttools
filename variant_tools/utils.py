@@ -2004,6 +2004,8 @@ def decompressGzFile(filename, inplace=True, force=False, md5=None):
         #
         # check if dest_dir is writable
         dest_dir = os.path.dirname(filename)
+        if not dest_dir.strip():
+            dest_dir = '.'
         if not os.access(dest_dir, os.W_OK):
             # if we are decompressing files from a read-only shared repository
             # write to local_resource
@@ -2018,7 +2020,7 @@ def decompressGzFile(filename, inplace=True, force=False, md5=None):
                         env.logger.debug('Reusing existing decompressed file {}'.format(new_filename))
                         return new_filename
             else:
-                raise RuntimeError('Failed to decompress file {}: directory not writable'.format(filename))
+                raise RuntimeError('Failed to decompress {} to {}: directory not writable'.format(filename, dest_dir))
         # dest_dir can be '' if there is no path for filename
         if dest_dir and not os.path.isdir(dest_dir):
             os.makedirs(dest_dir)
@@ -2783,10 +2785,12 @@ class DatabaseEngine:
     def close(self):
         self.database.close()
 
-    def attach(self, db, name=None, lock=None):
+    def attach(self, db, name=None, lock=None, openExisting=False):
         '''Attach another database to this one. Only needed by sqlite'''
         if db.endswith('.DB') or db.endswith('.proj'):
             db = os.path.expanduser(db)
+            if openExisting and not os.path.isfile(db):
+                raise ValueError('Database does not exist')
             #if not os.path.isfile(db):
             #    raise RuntimeError('Failed to attach database {}: file does not exist'
             #        .format(db))
@@ -2809,6 +2813,8 @@ class DatabaseEngine:
             return dbName
         else:
             db = os.path.expanduser(db)
+            if openExisting and not os.path.isfile(db):
+                raise ValueError('Database does not exist')
             #if not os.path.isfile(db + '.DB' if db != ':memory:' else db):
             #    raise RuntimeError('Failed to attach database {}: file does not exist'
             #        .format(db))

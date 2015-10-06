@@ -1689,7 +1689,10 @@ class Project:
                     linked_by = eval(self.loadProperty('{}_linked_by'.format(db_name), default='[]'))
                     anno_type = self.loadProperty('{}_anno_type'.format(db_name), default='None')
                     linked_fields = eval(self.loadProperty('{}_linked_fields'.format(db_name), default='None'))
-                    self.db.attach(db[0], db_name)
+                    try:
+                        self.db.attach(db[0], db_name, openExisting=True)
+                    except:
+                        env.logger.warning('Failed to open attached database {}'.format(db[0]))
                     self._attachedDB.append((db[0], db_name))
                     self.annoDB.append(AnnoDB(self, db[0], linked_by, anno_type, linked_fields, db_name))
                 else:
@@ -1700,7 +1703,10 @@ class Project:
                     linked_by = eval(self.loadProperty('{}_linked_by'.format(db_name), default='[]'))
                     anno_type = self.loadProperty('{}_anno_type'.format(db_name), default='None')
                     linked_fields = eval(self.loadProperty('{}_linked_fields'.format(db_name), default='None'))
-                    self.db.attach(db)
+                    try:
+                        self.db.attach(db, openExisting=True)
+                    except:
+                        env.logger.warning('Failed to open attached database {}'.format(db))
                     self._attachedDB.append((db,))
                     self.annoDB.append(AnnoDB(self, db, linked_by, anno_type, linked_fields))
             except Exception as e:
