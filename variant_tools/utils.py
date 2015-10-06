@@ -3514,7 +3514,19 @@ def normalizeVariant(pos, ref, alt):
         # STEP 0: structural variants with <> and [ ] stuff in VCF file? 
         if len(alt) > 1 and not alt.isalpha():
             raise ValueError('Unsupported variant {} -> {} at {}'.format(ref, alt, pos))
-        # STEP 1: remove leading common string
+        #
+        #env.logger.trace('start {} {} {}'.format(pos, ref, alt))
+        # STEP 1: remove ending common string
+        common_ending = 0
+        for i in range(-1, - min(len(ref), len(alt)) - 1, -1):
+            if ref[i] == alt[i]:
+                common_ending -= 1
+            else:
+                break
+        if common_ending < 0:
+            ref = ref[:common_ending]
+            alt = alt[:common_ending]
+        # STEP 2: remove leading common string
         # 1. C -> G  (SNV)  
         #    C -> G  
         # 2. C -> '' (deletion)
@@ -3525,6 +3537,7 @@ def normalizeVariant(pos, ref, alt):
         #    G -> AG
         #    '' -> TAG
         #    '' -> CG
+        # now insertion should have empty ref, deletion should have empty alt
         common_leading = 0
         for i in range(min(len(ref), len(alt))):
             if ref[i] == alt[i]:
@@ -3537,18 +3550,7 @@ def normalizeVariant(pos, ref, alt):
             ref = ref[common_leading:]
             alt = alt[common_leading:]
         #
-        # STEP 2: remove ending common string
-        # now insertion should have empty ref, deletion should have empty alt
-        common_ending = 0
-        for i in range(-1, - min(len(ref), len(alt)) - 1, -1):
-            if ref[i] == alt[i]:
-                common_ending -= 1
-            else:
-                break
-        if common_ending < 0:
-            ref = ref[:common_ending]
-            alt = alt[:common_ending]
-    #
+        #env.logger.trace('normalized {} {} {}'.format(pos, ref, alt))
     # ref or alt is something like '', '-', '.' or '*'
     if not alt.isalpha():
         if not ref.isalpha():
