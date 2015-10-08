@@ -1221,12 +1221,12 @@ class NullAction(PipelineAction):
         action=
         action=NullAction()
     '''
-    def __init__(self, *args, **kwargs):
+    def __init__(self, output=[], *args, **kwargs):
         '''A null action that does nothing.'''
-        PipelineAction.__init__(self)
+        PipelineAction.__init__(self, cmd='NullAction', output=output)
 
-    def __call__(self, ifiles, pipeline=None):
-        return ifiles
+    def _execute(self, ifiles, pipeline=None):
+        return True
         
 class MonitorThread(threading.Thread):
     def __init__(self, group=None, target=None, name=None,
@@ -2907,6 +2907,7 @@ class Pipeline:
                 for ig in igroups:
                     self.VARS['input'] = ig
                     if not ig and float(self.pipeline.pipeline_format) <= 1.0:
+                        env.logger.trace('Step skipped due to no input file (for pipeline format < 1.0 only)')
                         continue
                     #
                     action = substituteVars(command.action, self.VARS, self.GLOBALS)
