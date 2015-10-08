@@ -666,7 +666,7 @@ class SequentialExtractor:
                     raise ValueError('Nested vector extracted is not allowed')
                 item = tuple(e(x) for x in item)
             # if item is None or ''
-            elif not item:
+            elif item is None or item == '':
                 return item
             else:
                 item = e(item)
