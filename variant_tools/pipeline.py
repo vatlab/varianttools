@@ -1221,12 +1221,12 @@ class NullAction(PipelineAction):
         action=
         action=NullAction()
     '''
-    def __init__(self, *args, **kwargs):
+    def __init__(self, output=[], *args, **kwargs):
         '''A null action that does nothing.'''
-        PipelineAction.__init__(self)
+        PipelineAction.__init__(self, cmd='NullAction', output=output)
 
-    def __call__(self, ifiles, pipeline=None):
-        return ifiles
+    def _execute(self, ifiles, pipeline=None):
+        return True
         
 class MonitorThread(threading.Thread):
     def __init__(self, group=None, target=None, name=None,
@@ -2734,9 +2734,15 @@ class Pipeline:
         # these are command line options
         if float(self.pipeline.pipeline_format) <= 1.0:
             if 'cmd_input' in self.pipeline.commandline_opts:
-                self.pipeline.commandline_opts['cmd_input'] = self.pipeline.commandline_opts['cmd_input'].split(',')
+                if not self.pipeline.commandline_opts['cmd_input']:
+                    self.pipeline.commandline_opts['cmd_input'] = []
+                else:
+                    self.pipeline.commandline_opts['cmd_input'] = self.pipeline.commandline_opts['cmd_input'].split(',')
             if 'cmd_output' in self.pipeline.commandline_opts:
-                self.pipeline.commandline_opts['cmd_output'] = self.pipeline.commandline_opts['cmd_output'].split(',')
+                if not self.pipeline.commandline_opts['cmd_output']:
+                    self.pipeline.commandline_opts['cmd_output'] = []
+                else:
+                    self.pipeline.commandline_opts['cmd_output'] = self.pipeline.commandline_opts['cmd_output'].split(',')
         self.VARS.update(self.pipeline.commandline_opts)
         self.VARS.update({k:str(v) for k,v in kwargs.items()})
         if 'cmd_input' not in self.VARS:
@@ -2805,13 +2811,13 @@ class Pipeline:
                 step_input = ifiles
                 step_named_input = [['', ifiles]]
             else:
-                if ':' in command.input:
-                    input_part, emitter_part = command.input.split(':', 1)
+                command_input_line = substituteVars(command.input, self.VARS, self.GLOBALS)
+                if ':' in command_input_line:
+                    input_line, emitter_part = command_input_line.split(':', 1)
                 else:
-                    input_part = command.input
+                    input_line = command_input_line
                     emitter_part = ''
                 #
-                input_line = substituteVars(input_part, self.VARS, self.GLOBALS)
                 if not input_line.strip():
                     step_input = ifiles
                     step_named_input = [['', ifiles]]
@@ -2900,6 +2906,9 @@ class Pipeline:
                         .format(key, self.VARS[key]))
                 for ig in igroups:
                     self.VARS['input'] = ig
+                    if not ig and float(self.pipeline.pipeline_format) <= 1.0:
+                        env.logger.trace('Step skipped due to no input file (for pipeline format < 1.0 only)')
+                        continue
                     #
                     action = substituteVars(command.action, self.VARS, self.GLOBALS)
                     env.logger.trace('Emitted input of step {}_{}: {}'
