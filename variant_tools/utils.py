@@ -237,7 +237,7 @@ class RuntimeEnvironments(object):
         # a default value
         self.command_line = ''
         # path to the project cache
-        self._cache_dir = 'cache'
+        self._cache_dir = os.path.realpath('.vtools_cache')
         #
         self._local_resource = self.persistent_options['local_resource'][0]
         if site_options.shared_resource is None:
@@ -376,14 +376,14 @@ class RuntimeEnvironments(object):
     #
     def _set_cache_dir(self, path=None):
         if path is not None:
-            self._cache_dir = path
+            self._cache_dir = os.path.realpath(os.path.expanduser(path))
         try:
             if not os.path.isdir(self._cache_dir):
                 os.makedirs(self._cache_dir)
         except:
             raise RuntimeError('Failed to create cache directory '.format(self._cache_dir))
     #
-    cache_dir = property(lambda self: 'cache', _set_cache_dir)
+    cache_dir = property(lambda self: self._cache_dir, _set_cache_dir)
     #
     # attribute shared_resource
     #
@@ -1377,7 +1377,7 @@ class GenomicRegions(object):
         regions = []
         field, value = region.rsplit(':', 1)
         # what field is this?
-        query, fields = consolidateFieldName(self.proj, 'variant', field, False) 
+        query, fields, tmp_header = consolidateFieldName(self.proj, 'variant', field, False) 
         # query should be just one of the fields according to things that are passed
         annoName = query.split('.')[0]
         if query.strip() not in fields:
@@ -2009,9 +2009,9 @@ def decompressGzFile(filename, inplace=True, force=False, md5=None):
         if not os.access(dest_dir, os.W_OK):
             # if we are decompressing files from a read-only shared repository
             # write to local_resource
-            if os.path.abspath(dest_dir).startswith(os.path.abspath(env.shared_resource)):
+            if os.path.realpath(dest_dir).startswith(os.path.realpath(env.shared_resource)):
                 new_filename = '{}/{}'.format(env.local_resource, 
-                    os.path.abspath(filename)[len(os.path.abspath(env.shared_resource)):-3])
+                    os.path.realpath(filename)[len(os.path.realpath(env.shared_resource)):-3])
                 if os.path.isfile(new_filename) and not force:
                     if md5 is not None and md5 != calculateMD5(new_filename, partial=True):
                         env.logger.warning('MD5 signature mismatch: {} (signature: {} calculated: {})'
@@ -2444,7 +2444,7 @@ def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
         return False
     #
     # compare timestamp of input and output files
-    ifiles_checked = {os.path.abspath(x):False for x in _ifiles}
+    ifiles_checked = {os.path.realpath(x):False for x in _ifiles}
     md5matched = []
     if md5file:
         nFiles = [0]
@@ -2474,11 +2474,11 @@ def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
                     continue
                 # we do not check if f is one of _ifiles or _ofiles because presentation
                 # of files might differ
-                if not any([os.path.abspath(f) == x for x in ifiles_checked.keys()]):
-                    if not any([os.path.abspath(f) == os.path.abspath(x) for x in _ofiles]):
+                if not any([os.path.realpath(f) == x for x in ifiles_checked.keys()]):
+                    if not any([os.path.realpath(f) == os.path.realpath(x) for x in _ofiles]):
                         env.logger.warning('{} in exe_info is not an required input or putput file.'.format(f))
                 else:
-                    ifiles_checked[os.path.abspath(f)] = True
+                    ifiles_checked[os.path.realpath(f)] = True
                 #
                 if not (os.path.isfile(f) or os.path.isfile(f + '.file_info')):
                     env.logger.warning('{} in {} does not exist.'.format(f, md5file))
@@ -4264,5 +4264,68 @@ def dehtml(text):
     except Exception as e:
         env.logger.warning('Failed to dehtml text: {}'.format(e))
         return text
+
+
+
+class RuntimeFiles: 
+    def __init__(self, output_files=[]):
+        if not output_files:
+            self.sig_file = None
+            self.proc_out = None
+            self.proc_err = None
+            self.proc_lck = None
+            self.proc_info = None
+            self.proc_cmd = None
+            self.proc_prog = None
+            self.proc_done = None
+        else:
+            if isinstance(output_files, list):
+                output_file = output_files[0]
+            elif isinstance(output_files, str):
+                output_file = output_files
+            else:
+                raise ValueError('Invalid output file specification: {}'.format(output_files))
+            #
+            # what is the relative 
+            # The parental directory of cache?
+            cache_parent = os.path.dirname(env.cache_dir.rstrip(os.sep))
+            #
+            # is the file relative to this cache_parent?
+            rel_path = os.path.relpath(os.path.realpath(os.path.expanduser(output_file)), cache_parent)
+            # if this file is not relative to cache, use global signature file
+            if rel_path.startswith('../'):
+                self.sig_file = os.path.join(env.local_resource, '.runtime', os.path.realpath(os.path.expanduser(output_file)).lstrip(os.sep))
+            else:
+                # if this file is relative to cache, use cache to store signature file
+                self.sig_file = os.path.join(env.cache_dir, '.runtime', rel_path)
+            # path to file
+            sig_path = os.path.split(self.sig_file)[0]
+            if not os.path.isdir(sig_path):
+                try:
+                    os.makedirs(sig_path)
+                except Exception as e:
+                    raise RuntimeError('Failed to create runtime directory {}: {}'.format(sig_path, e))
+            env.logger.trace('Using signature file {} for output {}'.format(self.sig_file, output_file))
+            self.proc_out = '{}.out_{}'.format(self.sig_file, os.getpid())
+            self.proc_err = '{}.err_{}'.format(self.sig_file, os.getpid())
+            self.proc_lck = '{}.lck'.format(self.sig_file)
+            self.proc_info = '{}.exe_info'.format(self.sig_file)
+            self.proc_cmd = '{}.cmd'.format(self.sig_file)
+            self.proc_done = '{}.done_{}'.format(self.sig_file, os.getpid())
+            self.proc_prog = '{}.working_{}'.format(self.sig_file, os.getpid())
+            #
+            # now if there is an old signature file, let us move it to the new location
+            if os.path.isfile('{}.exe_info'.format(output_file)):
+                env.logger.info('Moving {}.exe_info from older version of variant tools to local cache'.format(output_file))
+                shutil.move('{}.exe_info'.format(output_file), self.proc_info)
+            
+    def clear(self, types=['out', 'err', 'done']):
+        if self.sig_file is None:
+            return
+        for filename in sum([glob.glob(self.sig_file + '.{}_*'.format(x)) for x in types], []):
+            try:
+                os.remove(filename)
+            except Exception as e:
+                env.logger.warning('Fail to remove {}: {}'.format(filename, e))
 
 
