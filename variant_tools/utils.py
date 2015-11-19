@@ -151,16 +151,13 @@ try:
         import pickle
         from io import StringIO
         import urllib.parse as urlparse
-        import vt_sqlite3_py3 as sqlite3
-        from cgatools_py3 import CrrFile, Location, Range
-        from vt_sqlite3_py3 import OperationalError
-
-
+        import variant_tools.vt_sqlite3_py3 as sqlite3
+        from variant_tools.cgatools_py3 import CrrFile, Location, Range
+        from variant_tools.vt_sqlite3_py3 import OperationalError
 except ImportError as e:
     sys.exit('Failed to import module ({})\n'
         'Please verify if you have installed variant tools successfully (using command '
-        '"python setup.py install") and you are NOT running command vtools from within '
-        'the source directory.'.format(e))
+        '"python setup.py install")'.format(e))
 
 try:
     # fake import to make this sqlite module bundled by pyinstaller
