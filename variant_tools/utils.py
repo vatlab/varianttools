@@ -68,6 +68,10 @@ Number of processes to read genotype data for association tests. The default
 value is the minimum of value of option --jobs and 8. A smaller number
 might provide better performance for file system with slow random I/O
 access.'''),
+    ('local_resource', '~/.variant_tools', '''
+A directory to store variant tools related resources such as reference genomes
+and annotation database. This option will be ignored if a writable shared
+resource directory is specified by the system admin.'''),
     ('temp_dir', None, '''
 root of tempory directory to store temporary files (default to system default)
 Setting it to a different physical disk than user projects can generally
@@ -218,7 +222,7 @@ class RuntimeEnvironments(object):
                 'local or online storage of such files. variant tools will append trailing '
                 'directories such as annoDB for certain types of data so only root directories '
                 'should be listed in this search path.'),
-            'local_resource': ('~/.variant_tools', 'A directory to store variant tools related '
+            'local_resource': (site_options.local_resource, 'A directory to store variant tools related '
                 'resources such as reference genomes and annotation database. This option will '
                 'be ignored if a writable shared resource directory is specified by the system '
                 'admin.'),

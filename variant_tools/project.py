@@ -5068,7 +5068,7 @@ def admin(args):
                 else:
                     raise ValueError('File does not exist: {}'.format(ifile))
             sys.exit(0)
-        elif args.set_runtime_option is not None and vars(arg)['global']:
+        elif args.set_runtime_option is not None and vars(args)['global']:
             for option in args.set_runtime_option:
                 if '=' not in option:
                     raise ValueError('Runtime option should be specified as opt=value')
@@ -5095,7 +5095,8 @@ def admin(args):
 ''' + '\n'.join(
 ['#{}\n{}={}\n'.format([c for c in default_user_options if c[0] == x][0][2].replace('\n', '\n# '),
     x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in _user_options.items()]))
-        elif args.reset_runtime_option is not None and vars(arg)['global']:
+            sys.exit(0)
+        elif args.reset_runtime_option is not None and vars(args)['global']:
             if args.reset_runtime_option not in env.persistent_options:
                 raise ValueError('Option {} is not a valid runtime option. '
                     'Use "vtools show runtime_options" to list currently '
@@ -5121,6 +5122,7 @@ def admin(args):
 ''' + '\n'.join(
 ['#{}\n{}={}\n'.format([c for c in default_user_options if c[0] == x][0][2].replace('\n', '\n# '),
 x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in _user_options.items()]))
+            sys.exit(0)
         #
         # other options requires a project
         with Project(verbosity=args.verbosity) as proj:
