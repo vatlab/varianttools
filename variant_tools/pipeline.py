@@ -31,6 +31,7 @@ pipeline actions.
 import os
 import sys
 import subprocess
+from multiprocessing import Process
 import threading
 import pipes
 import pprint
@@ -1232,6 +1233,45 @@ class MonitorThread(threading.Thread):
     def join(self):
         threading.Thread.join(self)
         return self._return
+
+class SharedProcess:
+    def __init__(self, runtime):
+        self.runtime = runtime
+
+    def update_prog(self):
+        while True:
+            with open(self.runtime.proc_prog, 'w') as prog:
+                prog.write(' ')
+            time.sleep(30)
+
+    def __enter__(self):
+        # wait for the availability of lock
+        start_time = time.time()
+        prog_time = None
+        while True:
+            # there is a progress file
+            if os.path.isfile(self.runtime.proc_prog):
+                if prog_time is None:
+                    env.logger.trace('Job started with progress file {}'.format(self.runtime.proc_prog))
+                os.remove(self.runtime.proc_prog)
+                prog_time = time.time()
+            #
+            if prog_time is None or time.time() - prog_time > 60:
+                # no progress by another thread
+                break
+            #
+            if os.path.isfile(self.runtime.proc_done):
+                break
+        #
+        # start monitoring process
+        self.update_process = Process(target=self.update_prog)
+        self.update_process.start()
+
+    def __exit__(self, type, value, traceback):
+        with open(self.runtime.proc_done, 'w') as prog:
+            prog.write('1')
+        self.runtime.clear(['prog'])
+        self.update_process.terminate()
 
 class RunCommand(PipelineAction):
     """This action execute specified commands. If the pipeline is running
@@ -2677,6 +2717,7 @@ class Pipeline:
                 vtools_version=proj.version,
                 working_dir=os.getcwd(),
                 pipeline_format=self.pipeline.pipeline_format)
+        
         if not os.path.isdir(env.cache_dir):
             os.makedirs(env.cache_dir)
         # these are command line options
@@ -2755,7 +2796,7 @@ class Pipeline:
                     .format(key, self.VARS[key]))
             # substitute ${} variables
             emitter = None
-            if 'no_input' in command.options or 'passthrough' in command.options:
+            if 'no_input' in command.options or 'independent' in command.options:
                 step_input = []
                 step_named_input = []
             elif command.input is None or not command.input.strip():
@@ -2880,7 +2921,7 @@ class Pipeline:
                             # thread closed, remove from self.THREADS
                             self.THREADS.pop(ifile)
                             if ret:
-                                raise RuntimeError('Failed to generte {}: {}'.format(ifile, ret))
+                                raise RuntimeError('Failed to generate {}: {}'.format(ifile, ret))
                         if not (os.path.isfile(ifile) or os.path.isfile(ifile + '.file_info')):
                             #raise RewindExecution(ifile)
                             raise RuntimeError('Non-existent input file {} due to ongoing or failed background job'.format(ifile))
@@ -2895,7 +2936,12 @@ class Pipeline:
                     # pass the Pipeline object itself to action
                     # this allows the action to have access to pipeline variables
                     # and other options
-                    ofiles = action(ig, self)
+                    if 'blocking' in command.options:
+                        self.runtime = RuntimeFiles('{}_{}'.format(pname, command.index))
+                        with SharedProcess(self.runtime) as protection:
+                            ofiles = action(ig, self)
+                    else:
+                        ofiles = action(ig, self)
                     if type(ofiles) == str:
                         step_output.append(ofiles)
                     else:
@@ -2921,7 +2967,7 @@ class Pipeline:
                 #
                 # In case of passthrough, the original input files will be passed to 
                 # the next step regardless what has been produced during the step.
-                if 'passthrough' not in command.options:
+                if 'independent' not in command.options:
                     ifiles = step_output
                 # this step is successful, go to next
                 os.chdir(saved_dir)
