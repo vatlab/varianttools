@@ -393,6 +393,29 @@ def sequenceArguments(parser):
             a region (e.g. refGene_exon.name:NM_000947), or a particular sequence (e.g. TCGGA)
             in red in the output. If a variant is specified, the changed nucleotide or amino
             acid will be printed. Currently only single nucleotide polymorphisms are supported.''')
+    parser.add_argument('--mark_complement', default=False, action='store_true',
+        help='''If set, also try to mark the complement of the specified sequence''')
+    parser.add_argument('--mark_reverse', default=False, action='store_true',
+        help='''If set, also try to mark the reverse sequence of the specified sequence.
+            If both mark_complemnt and mark_reverse are set, four different sequences
+            will be searched.''')
+    parser.add_argument('--hide_unmatched', default=False, action='store_true',
+        help='''If set, only display regions with marked variants or sequences''')
+
+complement_table = {
+        'A': 'T',
+        'T': 'A',
+        'a': 't',
+        't': 'a',
+        'U': 'A',
+        'u': 'a',
+        'G': 'C',
+        'C': 'G',
+        'g': 'c',
+        'c': 'g',
+        'N': 'N',
+        'n': 'n',
+    }
 
 def sequence(args):
     #
@@ -404,7 +427,7 @@ def sequence(args):
         # if a region is specified
         args.mark_sequence = ''
         if args.mark:
-            if len(args.mark) == 1 and ':' in args.mark:
+            if len(args.mark) == 1 and ':' in args.mark[0]:
                 regs = expandRegions(args.mark[0], proj, mergeRegions=True)
                 args.mark = []
                 for r in regs:
@@ -437,18 +460,6 @@ def markSequence(seq):
 
 
 def printDNASequence(args, regions):
-    complement_table = {
-        'A': 'T',
-        'T': 'A',
-        'a': 't',
-        't': 'a',
-        'G': 'C',
-        'C': 'G',
-        'g': 'c',
-        'c': 'g',
-        'N': 'N',
-        'n': 'n'
-    }
     ref = RefGenome(args.build)
     # get chromosomal region
     for chr, start, end, comment in regions:
@@ -470,7 +481,7 @@ def printDNASequence(args, regions):
                         seq[idx] = seq[idx].lower()
                     mut_idx = idx
                 else:
-                    env.logger.debug('Failed to mark mutant {}'.format(loc))
+                    env.logger.debug('Failed to mark mutant {}'.format(m))
         #
         if 'reverse' in comment:
             start, end = end, start
@@ -479,10 +490,23 @@ def printDNASequence(args, regions):
         else:
             reversed_seq = False
             seq = ''.join(seq)
-        print('>ref|{}|{}:{}-{} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr,
-            start, end, '({})'.format(comment) if comment else ''))
         if args.mark_sequence:
-            seq = seq.upper().replace(args.mark_sequence.upper(), args.mark_sequence.lower())
+            seq = seq.replace(args.mark_sequence.upper(), args.mark_sequence.lower())
+            if args.mark_complement:
+                comp = ''.join([complement_table[x] for x in args.mark_sequence])
+                seq = seq.replace(comp.upper(), comp.lower())
+            if args.mark_reverse:
+                rev = args.mark_sequence[::-1]
+                seq = seq.replace(rev.upper(), rev.lower())
+            if args.mark_complement and args.mark_reverse:
+                comprev = ''.join([complement_table[x] for x in args.mark_sequence][::-1])
+                seq = seq.replace(comprev.upper(), comprev.lower())
+        unmatched = not any([x.islower() for x in seq])
+        print('>ref|{}|{}:{}-{} {} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr,
+            start, end, '({})'.format(comment) if comment else '',
+            'unmatched' if unmatched and args.hide_unmatched else ''))
+        if unmatched and args.hide_unmatched:
+            continue
         # break into pieces of 70 bp
         if args.numbered:
             char_per_line = 60 if args.char_per_line is None else args.char_per_line
@@ -524,19 +548,34 @@ def printRNASequence(args, regions):
                 continue
             else:
                 chr = coding[0][0]
-            if strand == '+':
-                print('>mRNA|{}|{}:{} ({} bp)'.format(gene,
-                    chr if chr.startswith('chr') else 'chr' + chr,
-                    ','.join(['{}-{}'.format(x,y) for ch,x,y in coding]),
-                    sum([y-x+1 for ch,x,y in coding])))
-            else:
-                print('>mRNA|{}|{}:{} ({} bp on reverse strand)'.format(gene,
-                    chr if chr.startswith('chr') else 'chr' + chr,
-                    ','.join(['{}-{}'.format(y,x) for ch,x,y in coding[::-1]]),
-                    sum([y-x+1 for ch,x,y in coding])))
             seq = getRNASequence(structure, mutants=args.mark)
             if args.mark_sequence:
-                seq = seq.upper().replace(args.mark_sequence.upper(), args.mark_sequence.lower())
+                seq = seq.replace(args.mark_sequence.upper().replace('T', 'U'),
+                    args.mark_sequence.lower().replace('t', 'u'))
+                if args.mark_complement:
+                    comp = ''.join([complement_table[x] for x in args.mark_sequence])
+                    seq = seq.replace(comp.upper().replace('T', 'U'), comp.lower().replace('t', 'u'))
+                if args.mark_reverse:
+                    rev = args.mark_sequence[::-1]
+                    seq = seq.replace(rev.upper().replace('T', 'U'), rev.lower().replace('t', 'u'))
+                if args.mark_complement and args.mark_reverse:
+                    comprev = ''.join([complement_table[x] for x in args.mark_sequence][::-1])
+                    seq = seq.replace(comprev.upper().replace('T', 'U'), comprev.lower().replace('t', 'u'))
+            unmatch = not any([x.islower() for x in seq])
+            if strand == '+':
+                print('>mRNA|{}|{}:{} ({} bp) {}'.format(gene,
+                    chr if chr.startswith('chr') else 'chr' + chr,
+                    ','.join(['{}-{}'.format(x,y) for ch,x,y in coding]),
+                    sum([y-x+1 for ch,x,y in coding]),
+                    'unmatch' if unmatch and args.hide_unmatched else ''))
+            else:
+                print('>mRNA|{}|{}:{} ({} bp on reverse strand) {}'.format(gene,
+                    chr if chr.startswith('chr') else 'chr' + chr,
+                    ','.join(['{}-{}'.format(y,x) for ch,x,y in coding[::-1]]),
+                    sum([y-x+1 for ch,x,y in coding]),
+                    'unmatch' if unmatch and args.hide_unmatched else ''))
+            if unmatch and args.hide_unmatched:
+                continue
             # break into pieces of 70 bp
             if args.numbered:
                 char_per_line = 60 if args.char_per_line is None else args.char_per_line
@@ -562,8 +601,6 @@ def printRNASequence(args, regions):
                 print('\n'.join([markSequence(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)]))
 
 
-
-
 def printProteinSequence(args, regions):
     # get chromosomal region
     with Project(verbosity=0) as proj:
@@ -579,19 +616,24 @@ def printProteinSequence(args, regions):
                 continue
             else:
                 chr = coding[0][0]
+            seq = getProteinSequence(structure, mutants=args.mark)
+            if args.mark_sequence:
+                seq = seq.upper().replace(args.mark_sequence.upper(), args.mark_sequence.lower())
+            unmatch = not any([x.islower() for x in seq])
             if strand == '+':
-                print('>protein|{}|{}:{} ({} bp)'.format(gene,
+                print('>protein|{}|{}:{} ({} bp) {}'.format(gene,
                     chr if chr.startswith('chr') else 'chr' + chr,
                     ','.join(['{}-{}'.format(x,y) for ch,x,y in coding]),
-                    sum([y-x+1 for ch,x,y in coding])))
+                    sum([y-x+1 for ch,x,y in coding]),
+                    'unmatch' if unmatch and args.hide_unmatched else ''))
             else:
                 print('>protein|{}|{}:{} ({} bp on reverse strand)'.format(gene,
                     chr if chr.startswith('chr') else 'chr' + chr,
                     ','.join(['{}-{}'.format(y,x) for ch,x,y in coding[::-1]]),
-                    sum([y-x+1 for ch,x,y in coding])))
-            seq = getProteinSequence(structure, mutants=args.mark)
-            if args.mark_sequence:
-                seq = seq.upper().replace(args.mark_sequence.upper(), args.mark_sequence.lower())
+                    sum([y-x+1 for ch,x,y in coding]),
+                    'unmatch' if unmatch and args.hide_unmatched else ''))
+            if unmatch and args.hide_unmatched:
+                continue
             # break into pieces of 70 bp
             if args.numbered:
                 char_per_line = 60 if args.char_per_line is None else args.char_per_line

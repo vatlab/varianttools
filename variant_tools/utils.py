@@ -1378,7 +1378,7 @@ class GenomicRegions(object):
         regions = []
         field, value = region.rsplit(':', 1)
         # what field is this?
-        query, fields, tmp_header = consolidateFieldName(self.proj, 'variant', field, False) 
+        query, fields = consolidateFieldName(self.proj, 'variant', field, False) 
         # query should be just one of the fields according to things that are passed
         annoName = query.split('.')[0]
         if query.strip() not in fields:
@@ -1409,7 +1409,7 @@ class GenomicRegions(object):
         # find the regions
         cur = self.proj.db.cursor()
         try:
-            cur.execute('SELECT {},{},{} FROM {}.{} WHERE {}="{}"'.format(
+            cur.execute('SELECT {0},{1},{2} FROM {3}.{4} WHERE {5}="{6}" GROUP BY {0},{1},{2} '.format(
                 chr_field, start_field, end_field, annoDB.linked_name, annoDB.name,
                 field.rsplit('.',1)[-1], value))
         except Exception as e:
@@ -4132,12 +4132,12 @@ def getRNASequence(structure, mutants=[]):
     are given (as a list of (chr, pos, ref, alt))'''
     ref = RefGenome(structure['build'])
     seq = ''
-    for reg in structure['coding']:
+    for reg in structure['exon']:
         seq += ref.getSequence(reg[0], reg[1], reg[2])
     if mutants:
         loc_map = {}
         index = 0
-        for reg in structure['coding']:
+        for reg in structure['exon']:
             for pos in range(reg[1], reg[2]+1):
                 loc_map[(reg[0], pos)] = index
                 index += 1
@@ -4160,12 +4160,22 @@ def getRNASequence(structure, mutants=[]):
             #else:
             #    env.logger.debug('Failed to mark mutant {}'.format(loc))
     #
-    if len(seq) // 3 * 3 != len(seq):
-        raise ValueError('Transcribed sequence should have length that is multiple of 3')
+    # if len(seq) // 3 * 3 != len(seq):
+    #    raise ValueError('Transcribed sequence should have length that is multiple of 3')
     if structure['strand'] == '-':
         # if len(seq) == 9, range(0, 9, 3) ==> 0, 3, 6
         seq = [complement_table[x] for x in reversed(seq)]
-    return ''.join(seq)
+    TtoU = {
+        'a': 'a',
+        'A': 'A',
+        'c': 'c',
+        'C': 'C',
+        'g': 'g',
+        'G': 'G',
+        't': 'u',
+        'T': 'U'
+    }
+    return ''.join([TtoU[x] for x in seq])
 
 
 def getProteinSequence(structure, mutants=[]):
