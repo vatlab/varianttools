@@ -309,7 +309,7 @@ static void mut_sequence(
 		if (a_ref[0] == '-') {
 			// insertion only appears if the location is included in the range
 			if (a_pos >= start && a_pos < start + res.size())
-				res.insert(a_pos - start, a_alt);
+				res.insert(a_pos - start, "\033[32m" + a_alt + "\033[0m");
 		} else {
 			// case 1
 			//        [xxxxxxxxxx----xxxxxxxxx]
@@ -329,6 +329,8 @@ static void mut_sequence(
 				else
 					for (size_t i = 0; i < d_end - d_start; ++i)
 						res[d_start + i] = a_alt[i];
+				res.insert(d_end, "\033[0m");
+				res.insert(d_start, "\033[32m");
 			}
 		}
 	}
