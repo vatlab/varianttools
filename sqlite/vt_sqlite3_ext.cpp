@@ -190,6 +190,153 @@ static void ref_sequence(
 }
 
 
+static void mut_sequence(
+                         sqlite3_context * context,
+                         int argc,
+                         sqlite3_value ** argv
+                         )
+{
+	if (argc < 7 || argc > 8 ||
+		// ref file
+	    sqlite3_value_type(argv[0]) == SQLITE_NULL ||
+		// allele chr
+	    sqlite3_value_type(argv[1]) == SQLITE_NULL ||
+		// allele pos
+	    sqlite3_value_type(argv[2]) == SQLITE_NULL ||
+		// allele ref
+	    sqlite3_value_type(argv[3]) == SQLITE_NULL ||
+		// allele alt
+	    sqlite3_value_type(argv[4]) == SQLITE_NULL ||
+		// range chr
+	    sqlite3_value_type(argv[5]) == SQLITE_NULL ||
+		// range start
+	    sqlite3_value_type(argv[6]) == SQLITE_NULL) {
+		sqlite3_result_error(context, "Wrong number of parameters.", -1);
+		return;
+	}
+	// auto passed, should be string
+	std::string ref_file = std::string((char *)sqlite3_value_text(argv[0]));
+	// chr
+	if (sqlite3_value_type(argv[1]) != SQLITE_TEXT) {
+		sqlite3_result_error(context, "A chromosome name is expected.", -1);
+		return;
+	}
+	std::string a_chr = std::string((char *)sqlite3_value_text(argv[1]));
+	// pos
+	if (sqlite3_value_type(argv[2]) != SQLITE_INTEGER) {
+		sqlite3_result_error(context, "A 1-based position of integer type is expected.", -1);
+		return;
+	}
+	int a_pos = sqlite3_value_int(argv[2]);
+	// ref
+	std::string a_ref = std::string((char *)sqlite3_value_text(argv[3]));
+	// alt
+	std::string a_alt = std::string((char *)sqlite3_value_text(argv[4]));
+	// need to check type
+	if (sqlite3_value_type(argv[5]) != SQLITE_TEXT) {
+		sqlite3_result_error(context, "A chromosome name is expected.", -1);
+		return;
+	}
+	std::string chr = std::string((char *)sqlite3_value_text(argv[5]));
+	if (sqlite3_value_type(argv[6]) != SQLITE_INTEGER) {
+		sqlite3_result_error(context, "A 1-based position of integer type is expected.", -1);
+		return;
+	}
+	int start = sqlite3_value_int(argv[6]);
+	int end = 0;
+
+	if (argc == 8) {
+		end = sqlite3_value_int(argv[7]);
+
+		if (start > end) {
+			sqlite3_result_error(context, "incorrect chromosomal range", -1);
+			return;
+		}
+	}
+
+	// get reference genome file
+	RefGenomeFileMap::const_iterator it = refFileMap.find(ref_file);
+	cgatools::reference::CrrFile * cf = NULL;
+
+	if (it == refFileMap.end()) {
+		try {
+			cf = new cgatools::reference::CrrFile(ref_file);
+		} catch (cgatools::util::Exception & e) {
+			sqlite3_result_error(context, e.what(), -1);
+			return;
+		}
+		refFileMap[ref_file] = cf;
+	} else {
+		cf = it->second;
+	}
+	//
+	// get chromosome index
+	int chrIdx = 0;
+	ChrNameMap::const_iterator cit = chrNameMap.find(chr);
+	if (cit == chrNameMap.end()) {
+		try {
+			// cgatools' chromosome names have leading chr
+			// we add chr to 1, 2, 3, ... etc but not to other
+			// names. There might be a problem here.
+			if (chr.size() <= 2)
+				chrIdx = cf->getChromosomeId("chr" + chr);
+			else
+				chrIdx = cf->getChromosomeId(chr);
+			chrNameMap[chr] = chrIdx;
+		} catch (cgatools::util::Exception & e) {
+			// unrecognized chromosome
+			//sqlite3_result_error(context, e.what(), -1);
+			sqlite3_result_null(context);
+			return;
+		}
+	} else {
+		chrIdx = cit->second;
+	}
+	//
+	std::string res("?");
+	try {
+		if (argc == 8) 
+			res = cf->getSequence(cgatools::reference::Range(chrIdx, start - 1, end));
+		else
+			res[0] = cf->getBase(cgatools::reference::Location(chrIdx, start - 1));
+	} catch (cgatools::util::Exception & e) {
+		// position out of range
+		sqlite3_result_null(context);
+	}
+	// if on the same chromosome, and position overlap 
+	if (chr == a_chr) {
+		// insertion
+		if (a_ref[0] == '-') {
+			// insertion only appears if the location is included in the range
+			if (a_pos >= start && a_pos < start + res.size())
+				res.insert(a_pos - start, a_alt);
+		} else {
+			// case 1
+			//        [xxxxxxxxxx----xxxxxxxxx]
+			// case 2
+			//    ----[-----xxxxxxx]
+			// case 3
+			//        [xxxxxxxxxxxxxxx] -----
+			// case 4
+			//   -----[xxxxxxxxxxx]
+			//
+			int d_start = std::max(start, a_pos) - start;
+			int d_end = std::min(start + res.size(), a_pos + a_ref.size()) - start;
+			if (d_start < res.size()) {
+				if (a_alt[0] == '-')
+					for (size_t i = d_start; i < d_end; ++i)
+						res[i] = '-';				
+				else
+					for (size_t i = 0; i < d_end - d_start; ++i)
+						res[d_start + i] = a_alt[i];
+			}
+		}
+	}
+	sqlite3_result_text(context, (char *)(res.c_str()), -1, SQLITE_TRANSIENT);
+}
+
+
+
 static void vcf_variant(
                         sqlite3_context * context,
                         int argc,
@@ -2405,6 +2552,8 @@ int sqlite3_my_extension_init(
 	sqlite3_create_function(db, "Fisher_exact", 4, SQLITE_ANY, 0, fisher_exact, 0, 0);
 	// ref_sequence(file, chr, start, end)
 	sqlite3_create_function(db, "ref_sequence", -1, SQLITE_ANY, 0, ref_sequence, 0, 0);
+	// mut_sequence(file, chr_allele, pos_allele, ref_allele, alt_allele, chr, start, end)
+	sqlite3_create_function(db, "mut_sequence", -1, SQLITE_ANY, 0, mut_sequence, 0, 0);
 	// pad_variant(file, chr, pos, ref, alt, name)  ==> 10 - A ==> 9 name G GA
 	sqlite3_create_function(db, "vcf_variant", -1, SQLITE_ANY, 0, vcf_variant, 0, 0);
 	sqlite3_create_function(db, "track", -1, SQLITE_ANY, 0, track, 0, 0);

@@ -3104,6 +3104,7 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
     has_ref_query = False
     ref_tokens = {
         'ref_sequence': '__REFSEQ__',
+        'mut_sequence': '__MUTSEQ__',
         'vcf_variant': '__VCFVARIANT__',
     }
     has_track_query = False
@@ -3193,7 +3194,11 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
             except Exception as e:
                 raise ValueError('Cannot find reference genome for build {}: {}'.format(build, e))
         for k,v in ref_tokens.items():
-            query = re.sub(r'{}\s*\('.format(v), " {}('{}', ".format(k, crrFile), query)
+            if v == '__MUTSEQ__':
+                query = re.sub(r'{}\s*\('.format(v), " {}('{}', chr, pos, ref, alt, ".format(k, crrFile), query)
+            else:
+                query = re.sub(r'{}\s*\('.format(v), " {}('{}', ".format(k, crrFile), query)
+
         # chr and pos will be passed to ref_sequence
         if alt_build:
             fields.append('variant.alt_chr')
