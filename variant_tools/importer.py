@@ -40,7 +40,7 @@ from collections import defaultdict
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
-    normalizeVariant, openFile, DatabaseEngine, hasCommand, consolidateFieldName, \
+    normalizeVariant, openFile, DatabaseEngine, hasCommand, \
     downloadFile, env, RefGenome
 
 # preprocessors

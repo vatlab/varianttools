@@ -91,7 +91,7 @@ comment=Create an annotation definition file (.ann)
 # input   not used
 # output  cache/$name.proj.dump
 RunCommand(cmd='sqlite3 ${CMD_INPUT} 
-	"select * from variant ${: "" if "%(export)s" == "variant" else ", %(export)s WHERE %(export)s.variant_id = variant.variant_id"};"
+	"select * from variant ${: "" if "${export}" == "variant" else ", ${export} WHERE ${export}.variant_id = variant.variant_id"};"
 	> ${CACHE_DIR}/${CMD_INPUT: CMD_INPUT[0] + ".dump"}',
 	output='${CACHE_DIR}/${CMD_INPUT: CMD_INPUT[0] + ".dump"}')
 comment=Dump the variant table to a text file

@@ -31,6 +31,7 @@ pipeline actions.
 import os
 import sys
 import subprocess
+from multiprocessing import Process
 import threading
 import pipes
 import pprint
@@ -59,7 +60,7 @@ from collections import namedtuple, MutableMapping
 from .utils import env, ProgressBar, downloadFile, downloadURL, calculateMD5, delayedAction, \
     existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName, \
     FileInfo, convertDoubleQuote, openFile, encodeTableName, expandRegions, \
-    substituteVars, which
+    substituteVars, which, RuntimeFiles
     
 from .project import PipelineDescription, Project
 
@@ -489,11 +490,11 @@ class EmitInput:
 class PipelineAction:
     '''Base class for all pipeline actions. If one or more output files
     are specified, the pipeline will record the runtime signature of
-    this action in a file ``$OUTPUT[0].exe_info``, which consists of the
-    MD5 signature of input and output files, command used, and additional
-    information such as start and end time of execution, standard and error
-    outputs. An action will be skipped if the action is re-run with the
-    same input, output and command.
+    this action in a file ``${cache_dir}/path/to/$OUTPUT[0].exe_info``, which 
+    consists of the MD5 signature of input and output files, command used, 
+    and additional information such as start and end time of execution,
+    standard and error outputs. An action will be skipped if the action
+    is re-run with the same input, output and command.
 
     NOTE: The ``__call__`` function or a pipeline action implements the 
     runtime signature feature and calls function ``execute`` for actual work.
@@ -531,11 +532,7 @@ class PipelineAction:
         else:
             self.output = output
         #
-        if self.output:
-            self.proc_out = '{}.out_{}'.format(self.output[0], os.getpid())
-            self.proc_err = '{}.err_{}'.format(self.output[0], os.getpid())
-            self.proc_lck = '{}.lck'.format(self.output[0])
-            self.proc_info = '{}.exe_info'.format(self.output[0])
+        self.runtime = RuntimeFiles(self.output)
 
     def _bypass(self, ifiles, pipeline=None):
         '''Function called by ``__call__`` if the step is bypassed due to identical
@@ -553,7 +550,7 @@ class PipelineAction:
     def _write_info(self, pipeline=None):
         if not self.output:
             return
-        with open(self.proc_info, 'a') as exe_info:
+        with open(self.runtime.proc_info, 'a') as exe_info:
             exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
             for f in self.output:
                 if not os.path.isfile(f):
@@ -563,23 +560,18 @@ class PipelineAction:
                     calculateMD5(f, partial=True)))
             # write standard output to exe_info
             exe_info.write('\n\nSTDOUT\n\n')
-            if os.path.isfile(self.proc_out):
-                with open(self.proc_out) as stdout:
+            if os.path.isfile(self.runtime.proc_out):
+                with open(self.runtime.proc_out) as stdout:
                     for line in stdout:
                         exe_info.write(line)
             # write standard error to exe_info
             exe_info.write('\n\nSTDERR\n\n')
-            if os.path.isfile(self.proc_err):
-                with open(self.proc_err) as stderr:
+            if os.path.isfile(self.runtime.proc_err):
+                with open(self.runtime.proc_err) as stderr:
                     for line in stderr:
                         exe_info.write(line)
         # if command succeed, remove all out_ and err_ files, 
-        for filename in glob.glob(self.output[0] + '.out_*') + \
-            glob.glob(self.output[0] + '.err_*') + glob.glob(self.output[0] + '.done_*'):
-            try:
-                os.remove(filename)
-            except Exception as e:
-                env.logger.warning('Fail to remove {}: {}'.format(filename, e))
+        self.runtime.clear()
 
     def _useVars(self, text, pipeline_vars={}):
         # reduce extra newline, space etc
@@ -625,12 +617,12 @@ class PipelineAction:
             through and returned.
         '''
         if self.output:
-            if os.path.isfile(self.proc_info):
-                with open(self.proc_info) as exe_info:
+            if os.path.isfile(self.runtime.proc_info):
+                with open(self.runtime.proc_info) as exe_info:
                     cmd = exe_info.readline().strip()
                 if self._useVars(cmd, pipeline.VARS) == self._useVars('; '.join(self.cmd), pipeline.VARS) \
                     and existAndNewerThan(self.output, ifiles + pipeline.step_dependent_files,
-                    md5file=self.proc_info, pipeline=pipeline):
+                    md5file=self.runtime.proc_info, pipeline=pipeline):
                     env.logger.info('Reuse existing {}'.format(', '.join(self.output)))
                     self._bypass(ifiles, pipeline)
                     if self.output:
@@ -652,7 +644,7 @@ class PipelineAction:
                 raise RewindExecution(ifile)
         #
         if self.output:
-            with open(self.proc_info, 'w') as exe_info:
+            with open(self.runtime.proc_info, 'w') as exe_info:
                 exe_info.write('{}\n'.format(self._useVars('; '.join(self.cmd), pipeline.VARS)))
                 exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
                 for f in ifiles + pipeline.step_dependent_files:
@@ -1242,6 +1234,45 @@ class MonitorThread(threading.Thread):
         threading.Thread.join(self)
         return self._return
 
+class SharedProcess:
+    def __init__(self, runtime):
+        self.runtime = runtime
+
+    def update_prog(self):
+        while True:
+            with open(self.runtime.proc_prog, 'w') as prog:
+                prog.write(' ')
+            time.sleep(30)
+
+    def __enter__(self):
+        # wait for the availability of lock
+        start_time = time.time()
+        prog_time = None
+        while True:
+            # there is a progress file
+            if os.path.isfile(self.runtime.proc_prog):
+                if prog_time is None:
+                    env.logger.trace('Job started with progress file {}'.format(self.runtime.proc_prog))
+                os.remove(self.runtime.proc_prog)
+                prog_time = time.time()
+            #
+            if prog_time is None or time.time() - prog_time > 60:
+                # no progress by another thread
+                break
+            #
+            if os.path.isfile(self.runtime.proc_done):
+                break
+        #
+        # start monitoring process
+        self.update_process = Process(target=self.update_prog)
+        self.update_process.start()
+
+    def __exit__(self, type, value, traceback):
+        with open(self.runtime.proc_done, 'w') as prog:
+            prog.write('1')
+        self.runtime.clear(['prog'])
+        self.update_process.terminate()
+
 class RunCommand(PipelineAction):
     """This action execute specified commands. If the pipeline is running
     in parallel mode and a submitter is specified, it will use the submitter
@@ -1336,20 +1367,7 @@ class RunCommand(PipelineAction):
         else:
             self.output = [os.path.expanduser(x) for x in output]
         #
-        for filename in self.output:
-            if filename.lower().rsplit('.', 1)[-1] in ['exe_info', 'lck']:
-                raise RuntimeError('Output file with extension .exe_info and .lck are reserved.')
-        #
-        if not self.output:
-            self.proc_out = None
-            self.proc_err = None
-            self.proc_lck = None
-            self.proc_info = None
-        else:
-            self.proc_out = '{}.out_{}'.format(self.output[0], os.getpid())
-            self.proc_err = '{}.err_{}'.format(self.output[0], os.getpid())
-            self.proc_lck = '{}.lck'.format(self.output[0])
-            self.proc_info = '{}.exe_info'.format(self.output[0])
+        self.runtime = RuntimeFiles(self.output)
         self.start_time = time.time()
         if not cmd:
             cmd = ['echo "None command executed."']
@@ -1365,32 +1383,32 @@ class RunCommand(PipelineAction):
     def _run_command(self):
         '''Call a list of external command cmd, raise an error if any of them
         fails. '''
-        if self.proc_lck:
-            env.lock(self.proc_lck, str(os.getpid()))
+        if self.runtime.proc_lck:
+            env.lock(self.runtime.proc_lck, str(os.getpid()))
         for cur_cmd in self.cmd:
             if self.working_dir is not None and not os.path.isdir(self.working_dir):
                 os.makedirs(self.working_dir)
             env.logger.info('Running [[{}]]{}'.format(cur_cmd,
                 ' under {}'.format(self.working_dir) if self.working_dir else ''))
             ret = subprocess.call(cur_cmd, shell=True, 
-                stdout=None if self.proc_out is None else open(self.proc_out, 'w'),
-                stderr=None if self.proc_err is None else open(self.proc_err, 'w'),
+                stdout=None if self.runtime.proc_out is None else open(self.runtime.proc_out, 'w'),
+                stderr=None if self.runtime.proc_err is None else open(self.runtime.proc_err, 'w'),
                 cwd=self.working_dir)
             if ret < 0:
                 if self.output:
                     try:
-                        env.unlock(self.proc_lck, str(os.getpid()))
+                        env.unlock(self.runtime.proc_lck, str(os.getpid()))
                     except:
                         pass
                 raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
                     .format(cur_cmd, -ret, self._elapsed_time()))
             elif ret > 0:
                 if self.output:
-                    with open(self.proc_err) as err:
+                    with open(self.runtime.proc_err) as err:
                         for line in err.read().split('\n')[-50:]:
                             env.logger.error(line)
                     try:
-                        env.unlock(self.proc_lck, str(os.getpid()))
+                        env.unlock(self.runtime.proc_lck, str(os.getpid()))
                     except:
                         pass
                 raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
@@ -1400,10 +1418,10 @@ class RunCommand(PipelineAction):
         start_time = time.time()
         prog_time = None
         while True:
-            if os.path.isfile(self.proc_prog):
+            if os.path.isfile(self.runtime.proc_prog):
                 if prog_time is None:
-                    env.logger.trace('Job started with progress file {}'.format(self.proc_prog))
-                os.remove(self.proc_prog)
+                    env.logger.trace('Job started with progress file {}'.format(self.runtime.proc_prog))
+                os.remove(self.runtime.proc_prog)
                 prog_time = time.time()
             #
             if prog_time is None:
@@ -1414,7 +1432,7 @@ class RunCommand(PipelineAction):
                 if time.time() - prog_time > 60:
                     return('Background job has not updated it progress for 1 minutes.')
             #
-            if os.path.isfile(self.proc_done):
+            if os.path.isfile(self.runtime.proc_done):
                 break
             else:
                 if self.wait is False:
@@ -1423,23 +1441,23 @@ class RunCommand(PipelineAction):
                     return('Quitted after waiting {} seconds.'.format(self.wait))
                 time.sleep(10)
         try:
-            env.unlock(self.proc_lck, str(os.getpid()))
+            env.unlock(self.runtime.proc_lck, str(os.getpid()))
         except:
             env.logger.warning('Failed to remove lock for file {}'.format(self.output[0]))
             pass
         try:
-            with open(self.proc_done) as done:
+            with open(self.runtime.proc_done) as done:
                 ret = int(done.read().strip())
         except Exception as e:
             return('Failed to retrive return information for forked process from {}. {}'
-                .format(self.proc_done, e))
+                .format(self.runtime.proc_done, e))
         #
         if ret < 0:
             return("Command '{}' was terminated by signal {} after executing {}"
                 .format('; '.join(self.cmd), -ret, self._elapsed_time()))
         elif ret > 0:
             if self.output:
-                with open(self.proc_err) as err:
+                with open(self.runtime.proc_err) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
             return("Execution of command '{}' failed after {} (return code {})."
@@ -1454,37 +1472,28 @@ class RunCommand(PipelineAction):
         #
         # the thread will end here
         env.logger.trace('Thread for output {} ends.'.format(self.output[0]))
-        for filename in glob.glob(self.output[0] + '.done_*'):
-            try:
-                os.remove(filename)
-            except Exception as e:
-                env.logger.warning('Fail to remove {}: {}'
-                    .format(filename, e))
+        self.runtime.clear(['done'])
         return('')
 
     def _submit_command(self):
         '''Submit a job and wait for its completion.'''
         # use full path because the command might be submitted to a remote machine
-        self.proc_cmd = os.path.abspath(self.output[0] + '.sh')
-        self.proc_done = os.path.abspath(self.output[0]) + '.done_{}'.format(os.getpid())
-        self.proc_prog = os.path.abspath(self.output[0]) + '.working_{}'.format(os.getpid())
+        if os.path.isfile(self.runtime.proc_done):
+            os.remove(self.runtime.proc_done)
+        if self.runtime.proc_lck:
+            env.lock(self.runtime.proc_lck, str(os.getpid()))
         #
-        if os.path.isfile(self.proc_done):
-            os.remove(self.proc_done)
-        if self.proc_lck:
-            env.lock(self.proc_lck, str(os.getpid()))
-        #
-        if os.path.isfile(self.proc_cmd):
-            with open(self.proc_cmd) as old_cmd:
+        if os.path.isfile(self.runtime.proc_cmd):
+            with open(self.runtime.proc_cmd) as old_cmd:
                 old_script = old_cmd.read()
         else:
             old_script = None
         # create a batch file for execution
-        with open(self.proc_cmd, 'w') as sh_file:
-            sh_file.write('#PBS -o {}\n'.format(os.path.abspath(self.proc_out)))
-            sh_file.write('#PBS -e {}\n'.format(os.path.abspath(self.proc_err)))
+        with open(self.runtime.proc_cmd, 'w') as sh_file:
+            sh_file.write('#PBS -o {}\n'.format(os.path.abspath(self.runtime.proc_out)))
+            sh_file.write('#PBS -e {}\n'.format(os.path.abspath(self.runtime.proc_err)))
             sh_file.write('#PBS -N {}\n'.format(os.path.basename(self.output[0])))
-            #sh_file.write('#PBS -N {}.{}_{}\n'.format(self.proc_err))
+            #sh_file.write('#PBS -N {}.{}_{}\n'.format(self.runtime.proc_err))
             sh_file.write('#PBS -V\n')
             # we try to reproduce the environment as much as possible becaus ehte
             # script might be executed in a different environment
@@ -1508,19 +1517,19 @@ progress() {{
 
 progress &
 MYSELF=$!
-'''.format(self.proc_prog))
+'''.format(self.runtime.proc_prog))
             sh_file.write('\n'.join(self.cmd))
             #
             sh_file.write('\n\nCMD_RET=$?\nif [ $CMD_RET == 0 ]; then vtools admin --record_exe_info {} {}; fi\n'
                 .format(os.getpid(), ' '.join(self.output)))
             # a signal to show the successful completion of the job
             sh_file.write('\nrm -f {}\nkill $MYSELF >/dev/null 2>&1\necho $CMD_RET > {}\n'
-                .format(self.proc_prog, self.proc_done))
+                .format(self.runtime.proc_prog, self.runtime.proc_done))
         #
         if old_script is not None:
-            #with open(self.proc_cmd) as new_cmd:
+            #with open(self.runtime.proc_cmd) as new_cmd:
             #     if old_script == new_cmd.read():
-            #         env.logger.debug('Identical script {}'.format(self.proc_cmd))
+            #         env.logger.debug('Identical script {}'.format(self.runtime.proc_cmd))
                      # if there is no change in command
                      other_prog = glob.glob(os.path.abspath(self.output[0]) + '.working_*')
                      if other_prog:
@@ -1535,30 +1544,30 @@ MYSELF=$!
                                      raise RuntimeError('Failed to submit job because a job is currently running or has been failed within 2 minutes. Status file is {} (pid is {})'.format(op, os.getpid()))
         # try to submit command
         if '{}' in self.submitter:
-            submit_cmd = self.submitter.replace('{}', self.proc_cmd)
+            submit_cmd = self.submitter.replace('{}', self.runtime.proc_cmd)
         else:
             submit_cmd = self.submitter
         #
         env.logger.info('Running job {} with command "{}" from directory {}'.format(
-            self.proc_cmd, submit_cmd, os.getcwd()))
+            self.runtime.proc_cmd, submit_cmd, os.getcwd()))
         ret = subprocess.call(submit_cmd, shell=True,
-            stdout=open(self.proc_out, 'w'), stderr=open(self.proc_err, 'w'),
+            stdout=open(self.runtime.proc_out, 'w'), stderr=open(self.runtime.proc_err, 'w'),
             cwd=self.working_dir)
         if ret != 0:
             try:
-                env.unlock(self.proc_out, str(os.getpid()))
+                env.unlock(self.runtime.proc_out, str(os.getpid()))
             except:
                 pass
         # 
         if ret < 0:
-            raise RuntimeError("Failed to submit job {} due to signal {} (submitter='{}')" .format(self.proc_cmd, -ret, self.submitter))
+            raise RuntimeError("Failed to submit job {} due to signal {} (submitter='{}')" .format(self.runtime.proc_cmd, -ret, self.submitter))
         elif ret > 0:
-            if os.path.isfile(self.proc_err):
-                 with open(self.proc_err) as err:
+            if os.path.isfile(self.runtime.proc_err):
+                 with open(self.runtime.proc_err) as err:
                      msg = err.read()
             else:
                 msg = ''
-            raise RuntimeError("Failed to submit job {} using submiter '{}': {}".format(self.proc_cmd, self.submitter, msg))
+            raise RuntimeError("Failed to submit job {} using submiter '{}': {}".format(self.runtime.proc_cmd, self.submitter, msg))
         else:
             t = MonitorThread(target=self._monitor)
             t.daemon = True
@@ -1801,20 +1810,7 @@ class ExecuteScript(PipelineAction):
         else:
             self.output = [os.path.expanduser(x) for x in output]
         #
-        for filename in self.output:
-            if filename.lower().rsplit('.', 1)[-1] in ['exe_info', 'lck']:
-                raise RuntimeError('Output file with extension .exe_info and .lck are reserved.')
-        #
-        if not self.output:
-            self.proc_out = None
-            self.proc_err = None
-            self.proc_lck = None
-            self.proc_info = None
-        else:
-            self.proc_out = '{}.out_{}'.format(self.output[0], os.getpid())
-            self.proc_err = '{}.err_{}'.format(self.output[0], os.getpid())
-            self.proc_lck = '{}.lck'.format(self.output[0])
-            self.proc_info = '{}.exe_info'.format(self.output[0])
+        self.runtime = RuntimeFiles(self.output)
         self.start_time = time.time()
         if not script:
             raise ValueError('No valid script is specified.')
@@ -1855,8 +1851,8 @@ class ExecuteScript(PipelineAction):
     def _run_command(self):
         '''Call a list of external command cmd, raise an error if any of them
         fails. '''
-        if self.proc_lck:
-            env.lock(self.proc_lck, str(os.getpid()))
+        if self.runtime.proc_lck:
+            env.lock(self.runtime.proc_lck, str(os.getpid()))
         if '{}' in self.interpreter:
             cmd = self.interpreter.replace('{}', pipes.quote(self.script_file))
         else:
@@ -1864,36 +1860,36 @@ class ExecuteScript(PipelineAction):
                 (self.args if isinstance(self.args, str) else ' '.join(pipes.quote(x) for x in self.args))
         env.logger.info('Running [[{}]]'.format(cmd))
         ret = subprocess.call(cmd, shell=True, 
-            stdout=None if self.proc_out is None else open(self.proc_out, 'w'),
-            stderr=None if self.proc_err is None else open(self.proc_err, 'w'),
+            stdout=None if self.runtime.proc_out is None else open(self.runtime.proc_out, 'w'),
+            stderr=None if self.runtime.proc_err is None else open(self.runtime.proc_err, 'w'),
             cwd=self.working_dir)
         if ret < 0:
             if self.output:
                 try:
-                    env.unlock(self.proc_lck, str(os.getpid()))
+                    env.unlock(self.runtime.proc_lck, str(os.getpid()))
                 except:
                     pass
             raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
                 .format(cmd, -ret, self._elapsed_time()))
         elif ret > 0:
             if self.output:
-                with open(self.proc_err) as err:
+                with open(self.runtime.proc_err) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
                 try:
-                    env.unlock(self.proc_lck, str(os.getpid()))
+                    env.unlock(self.runtime.proc_lck, str(os.getpid()))
                 except:
                     pass
             raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
                 .format(cmd, self._elapsed_time(), ret))
         else:
             # write standard out to terminal
-            if self.proc_out:
-                with open(self.proc_out) as proc_out:
+            if self.runtime.proc_out:
+                with open(self.runtime.proc_out) as proc_out:
                     for line in proc_out:
                         env.logger.info(line.rstrip())
-            if self.proc_err:
-                with open(self.proc_err) as proc_err:
+            if self.runtime.proc_err:
+                with open(self.runtime.proc_err) as proc_err:
                     for line in proc_err:
                         env.logger.warning(line.rstrip())
 
@@ -1901,10 +1897,10 @@ class ExecuteScript(PipelineAction):
         start_time = time.time()
         prog_time = None
         while True:
-            if os.path.isfile(self.proc_prog):
+            if os.path.isfile(self.runtime.proc_prog):
                 if prog_time is None:
-                    env.logger.trace('Job started with progress file {}'.format(self.proc_prog))
-                os.remove(self.proc_prog)
+                    env.logger.trace('Job started with progress file {}'.format(self.runtime.proc_prog))
+                os.remove(self.runtime.proc_prog)
                 prog_time = time.time()
             #
             if prog_time is None:
@@ -1914,7 +1910,7 @@ class ExecuteScript(PipelineAction):
             else:
                 if time.time() - prog_time > 60:
                     return('Background job has not updated it progress for 1 minutes.')
-            if os.path.isfile(self.proc_done):
+            if os.path.isfile(self.runtime.proc_done):
                 break
             else:
                 if self.wait is False:
@@ -1923,11 +1919,11 @@ class ExecuteScript(PipelineAction):
                     return('Quitted after waiting {} seconds.'.format(self.wait))
                 time.sleep(10)
         try:
-            env.unlock(self.proc_lck, str(os.getpid()))
+            env.unlock(self.runtime.proc_lck, str(os.getpid()))
         except:
             env.logger.warning('Failed to remove lock for file {}'.format(self.output[0]))
             pass
-        with open(self.proc_done) as done:
+        with open(self.runtime.proc_done) as done:
             ret = int(done.read().strip())
         #
         if ret < 0:
@@ -1935,7 +1931,7 @@ class ExecuteScript(PipelineAction):
                 .format('; '.join(self.cmd), -ret, self._elapsed_time()))
         elif ret > 0:
             if self.output:
-                with open(self.proc_err) as err:
+                with open(self.runtime.proc_err) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
             return("Execution of command '{}' failed after {} (return code {})."
@@ -1950,37 +1946,29 @@ class ExecuteScript(PipelineAction):
         #
         # the thread will end here
         env.logger.info('{} has been successfully generated.'.format(self.output[0]))
-        for filename in glob.glob(self.output[0] + '.done_*'):
-            try:
-                os.remove(filename)
-            except Exception as e:
-                env.logger.warning('Fail to remove {}: {}'
-                    .format(filename, e))
+        self.runtime.clear(['done'])
         return('')
 
     def _submit_command(self):
         '''Submit a job and wait for its completion.'''
         # use full path because the command might be submitted to a remote machine
-        self.proc_cmd = os.path.abspath(self.output[0] + '.sh')
-        self.proc_done = os.path.abspath(self.output[0]) + '.done_{}'.format(os.getpid())
-        self.proc_prog = os.path.abspath(self.output[0]) + '.working_{}'.format(os.getpid())
         #
-        if os.path.isfile(self.proc_done):
-            os.remove(self.proc_done)
-        if self.proc_lck:
-            env.lock(self.proc_lck, str(os.getpid()))
+        if os.path.isfile(self.runtime.proc_done):
+            os.remove(self.runtime.proc_done)
+        if self.runtime.proc_lck:
+            env.lock(self.runtime.proc_lck, str(os.getpid()))
         #
-        if os.path.isfile(self.proc_cmd):
-            with open(self.proc_cmd) as old_cmd:
+        if os.path.isfile(self.runtime.proc_cmd):
+            with open(self.runtime.proc_cmd) as old_cmd:
                 old_script = old_cmd.read()
         else:
             old_script = None
         # create a batch file for execution
-        with open(self.proc_cmd, 'w') as sh_file:
-            sh_file.write('#PBS -o {}\n'.format(os.path.abspath(self.proc_out)))
-            sh_file.write('#PBS -e {}\n'.format(os.path.abspath(self.proc_err)))
+        with open(self.runtime.proc_cmd, 'w') as sh_file:
+            sh_file.write('#PBS -o {}\n'.format(os.path.abspath(self.runtime.proc_out)))
+            sh_file.write('#PBS -e {}\n'.format(os.path.abspath(self.runtime.proc_err)))
             sh_file.write('#PBS -N {}\n'.format(os.path.basename(self.output[0])))
-            #sh_file.write('#PBS -N {}.{}_{}\n'.format(self.proc_err))
+            #sh_file.write('#PBS -N {}.{}_{}\n'.format(self.runtime.proc_err))
             sh_file.write('#PBS -V\n')
             # we try to reproduce the environment as much as possible becaus ehte
             # script might be executed in a different environment
@@ -2004,7 +1992,7 @@ progress() {{
 
 progress &
 MYSELF=$!
-'''.format(self.proc_prog))
+'''.format(self.runtime.proc_prog))
 
             # interpreter
             if '{}' in self.interpreter:
@@ -2018,16 +2006,16 @@ MYSELF=$!
                 .format(os.getpid(), ' '.join(self.output)))
             # a signal to show the successful completion of the job
             sh_file.write('\nrm -f {}\nkill $MYSELF >/dev/null 2>&1\necho $CMD_RET > {}\n'
-                .format(self.proc_prog, self.proc_done))
+                .format(self.runtime.proc_prog, self.runtime.proc_done))
         #
         # try to submit command
         if '{}' in self.submitter:
-            submit_cmd = self.submitter.replace('{}', self.proc_cmd)
+            submit_cmd = self.submitter.replace('{}', self.runtime.proc_cmd)
         else:
             submit_cmd = self.submitter
         #
         if old_script is not None:
-            #with open(self.proc_cmd) as new_cmd:
+            #with open(self.runtime.proc_cmd) as new_cmd:
             #     if old_script == new_cmd.read():
                      # if there is no change in command
                      other_prog = glob.glob(os.path.abspath(self.output[0]) + '.working_*')
@@ -2041,25 +2029,25 @@ MYSELF=$!
                                  if os.path.getmtime(op) != last_time:
                                      raise RuntimeError('Failed to submit job because a job is currently running or has been failed within 2 minutes. Status file is {} (pid is {})'.format(op, os.getpid()))
         env.logger.info('Running job {} with command "{}" from directory {}'.format(
-            self.proc_cmd, submit_cmd, os.getcwd()))
+            self.runtime.proc_cmd, submit_cmd, os.getcwd()))
         ret = subprocess.call(submit_cmd, shell=True,
-            stdout=open(self.proc_out, 'w'), stderr=open(self.proc_err, 'w'),
+            stdout=open(self.runtime.proc_out, 'w'), stderr=open(self.runtime.proc_err, 'w'),
             cwd=self.working_dir)
         if ret != 0:
             try:
-                env.unlock(self.proc_out, str(os.getpid()))
+                env.unlock(self.runtime.proc_out, str(os.getpid()))
             except:
                 pass
         # 
         if ret < 0:
-            raise RuntimeError("Failed to submit job {} due to signal {} (submitter='{}')" .format(self.proc_cmd, -ret, self.submitter))
+            raise RuntimeError("Failed to submit job {} due to signal {} (submitter='{}')" .format(self.runtime.proc_cmd, -ret, self.submitter))
         elif ret > 0:
-            if os.path.isfile(self.proc_err):
-                 with open(self.proc_err) as err:
+            if os.path.isfile(self.runtime.proc_err):
+                 with open(self.runtime.proc_err) as err:
                      msg = err.read()
             else:
                 msg = ''
-            raise RuntimeError("Failed to submit job {} using submiter '{}': {}".format(self.proc_cmd, self.submitter, msg))
+            raise RuntimeError("Failed to submit job {} using submiter '{}': {}".format(self.runtime.proc_cmd, self.submitter, msg))
         else:
             t = MonitorThread(target=self._monitor)
             t.daemon = True
@@ -2729,6 +2717,7 @@ class Pipeline:
                 vtools_version=proj.version,
                 working_dir=os.getcwd(),
                 pipeline_format=self.pipeline.pipeline_format)
+        
         if not os.path.isdir(env.cache_dir):
             os.makedirs(env.cache_dir)
         # these are command line options
@@ -2777,6 +2766,9 @@ class Pipeline:
             if key == 'working_dir' and val != os.getcwd():
                 env.logger.warning('Changing working directory to {}'.format(val))
                 os.chdir(val)
+            if key == 'cache_dir' and val != env.cache_dir:
+                env.logger.warning('Changing cache directory to {}'.format(val))
+                env.cache_dir = val
         #
         ifiles = self.VARS['cmd_input']
         step_index = 0
@@ -2804,7 +2796,7 @@ class Pipeline:
                     .format(key, self.VARS[key]))
             # substitute ${} variables
             emitter = None
-            if 'no_input' in command.options or 'passthrough' in command.options:
+            if 'no_input' in command.options or 'independent' in command.options:
                 step_input = []
                 step_named_input = []
             elif command.input is None or not command.input.strip():
@@ -2929,7 +2921,7 @@ class Pipeline:
                             # thread closed, remove from self.THREADS
                             self.THREADS.pop(ifile)
                             if ret:
-                                raise RuntimeError('Failed to generte {}: {}'.format(ifile, ret))
+                                raise RuntimeError('Failed to generate {}: {}'.format(ifile, ret))
                         if not (os.path.isfile(ifile) or os.path.isfile(ifile + '.file_info')):
                             #raise RewindExecution(ifile)
                             raise RuntimeError('Non-existent input file {} due to ongoing or failed background job'.format(ifile))
@@ -2944,7 +2936,12 @@ class Pipeline:
                     # pass the Pipeline object itself to action
                     # this allows the action to have access to pipeline variables
                     # and other options
-                    ofiles = action(ig, self)
+                    if 'blocking' in command.options:
+                        self.runtime = RuntimeFiles('{}_{}'.format(pname, command.index))
+                        with SharedProcess(self.runtime) as protection:
+                            ofiles = action(ig, self)
+                    else:
+                        ofiles = action(ig, self)
                     if type(ofiles) == str:
                         step_output.append(ofiles)
                     else:
@@ -2970,7 +2967,7 @@ class Pipeline:
                 #
                 # In case of passthrough, the original input files will be passed to 
                 # the next step regardless what has been produced during the step.
-                if 'passthrough' not in command.options:
+                if 'independent' not in command.options:
                     ifiles = step_output
                 # this step is successful, go to next
                 os.chdir(saved_dir)
