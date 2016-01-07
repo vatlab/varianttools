@@ -44,7 +44,7 @@ from .project import AnnoDB, Project, Field, AnnoDBWriter
 from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressGzFile, \
     compressFile, SQL_KEYWORDS, extractField, env, isAnnoDB, \
-    calculateMD5, ResourceManager
+    calculateMD5, ResourceManager, RefGenome
 from .importer import LineProcessor, TextReader
 from .preprocessor import *
   
@@ -303,12 +303,13 @@ class AnnoDBConfiger:
                 continue
             try:
                 # items have chr/pos, chr/pos/ref/alt, chr/start/end for different annotation types
+                chr_idx = [i for i,x in enumerate(self.fields) if x.name == extractField(items[0])][0]
                 pos_idx = [i for i,x in enumerate(self.fields) if x.name == extractField(items[1])][0]
                 if self.anno_type == 'variant':
                     # save indexes for pos, ref and alt
                     ref_idx = [i for i,x in enumerate(self.fields) if x.name == extractField(items[2])][0]
                     alt_idx = [i for i,x in enumerate(self.fields) if x.name == extractField(items[3])][0]
-                    build_info.append((pos_idx, ref_idx, alt_idx))
+                    build_info.append((RefGenome(key).crr, chr_idx, pos_idx, ref_idx, alt_idx))
                 else:
                     build_info.append((pos_idx, ))
             except Exception as e:

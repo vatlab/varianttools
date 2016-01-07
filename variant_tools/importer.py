@@ -40,8 +40,20 @@ from collections import defaultdict
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
-    normalizeVariant, openFile, DatabaseEngine, hasCommand, \
+    openFile, DatabaseEngine, hasCommand, \
     downloadFile, env, RefGenome
+
+
+try:
+    if sys.version_info.major == 2:
+        from cgatools_py2 import normalize_variant
+    else:
+        from variant_tools.cgatools_py3 import normalize_variant
+except ImportError as e:
+    sys.exit('Failed to import module ({})\n'
+        'Please verify if you have installed variant tools successfully (using command '
+        '"python setup.py install")'.format(e))
+
 
 # preprocessors
 from .preprocessor import *
@@ -52,10 +64,10 @@ from .preprocessor import *
 #
 class LineProcessor:
     '''An interpreter that read a record (a line), process it and return processed records.'''
-    def __init__(self, fields, build, delimiter, ranges):
+    def __init__(self, fields, build_info, delimiter, ranges):
         '''
         fields: a list of fields with index, adj (other items are not used)
-        builds: index(es) of position, reference allele and alternative alleles. If 
+        build_info: reference genome and index(es) of chromosome, position, reference allele and alternative alleles. If 
             positions are available, UCSC bins are prepended to the records. If reference
             and alternative alleles are available, the records are processed for correct
             format of ref and alt alleles.
@@ -63,7 +75,7 @@ class LineProcessor:
         ranges: range of fields (var, var_info, GT, GT_info), used to determine
             var_info and GT fields when subsets of samples are imported.
         '''
-        self.build = build
+        self.build_info = build_info
         self.raw_fields = fields
         self.fields = []
         self.delimiter = delimiter
@@ -244,34 +256,36 @@ class LineProcessor:
         #
         num_records = max([len(item) if type(item) is tuple else 1 for item in records]) if records else 1
         # handle records
-        if not self.build:
+        if not self.build_info:
             # there is no build information, this is 'field' annotation, nothing to worry about
             if num_records == 1:
                 yield [], [x[0] if type(x) is tuple else x for x in records]
             else:
                 for i in range(num_records):
                     yield [], [(x[i] if i < len(x) else None) if type(x) is tuple else x for x in records]
-        elif len(self.build[0]) == 1:
+        elif len(self.build_info[0]) == 1:
+            # this is a range format
             for i in range(num_records):
                 if i == 0:  # try to optimize a little bit because most of the time we only have one record
                     rec = [x[0] if type(x) is tuple else x for x in records]
                 else:
                     rec = [(x[i] if i < len(x) else None) if type(x) is tuple else x for x in records]
-                bins = [getMaxUcscBin(int(rec[pos_idx]) - 1, int(rec[pos_idx])) if rec[pos_idx] else None for pos_idx, in self.build]
+                bins = [getMaxUcscBin(int(rec[pos_idx]) - 1, int(rec[pos_idx])) if rec[pos_idx] else None for pos_idx, in self.build_info]
                 yield bins, rec
         else:
+            # this is a variant format
             for i in range(num_records):
                 bins = []
                 if i == 0:  # try to optimize a little bit because most of the time we only have one record
                     rec = [x[0] if type(x) is tuple else x for x in records]
                 else:
                     rec = [(x[i] if i < len(x) else None) if type(x) is tuple else x for x in records]
-                for pos_idx, ref_idx, alt_idx in self.build:
-                    bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], rec[alt_idx])
-                    bins.append(bin)
-                    rec[pos_idx] = pos
-                    rec[ref_idx] = ref
-                    rec[alt_idx] = alt
+                for ref_genome, chr_idx, pos_idx, ref_idx, alt_idx in self.build_info:
+                    # bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], rec[alt_idx])
+                    msg = normalize_variant(ref_genome, rec, chr_idx, pos_idx, ref_idx, alt_idx)
+                    if msg:
+                        env.logger.warning(msg)
+                    bins.append(getMaxUcscBin(int(rec[pos_idx]) - 1, int(rec[pos_idx])))
                 yield bins, rec
 
 
@@ -1262,8 +1276,8 @@ class Importer:
             raise ValueError('GT (genotype) field should not be explicitly specified.')
         #
         if fmt.input_type == 'variant':
-            # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
-            self.processor = LineProcessor(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.ranges)
+            # process variants, the fields for chr, pos, ref, alt are 0, 1, 2, 3 in fields.
+            self.processor = LineProcessor(fmt.fields, [(RefGenome(self.build).crr, 0, 1, 2, 3)], fmt.delimiter, self.ranges)
         else:  # position or range type
             raise ValueError('Can only import data with full variant information (chr, pos, ref, alt)')
         # probe number of samples

@@ -1725,6 +1725,8 @@ class ResourceManager:
             return 'hg18'
         elif filename.endswith('build37.crr'):
             return 'hg19'
+        elif filename.endswith('hg38.crr'):
+            return 'hg38'
         elif filename.endswith('.crr'):
             return os.path.basename(filename)[:-4]
         else:
@@ -1882,8 +1884,10 @@ class ResourceManager:
             self.manifest = {x:y for x,y in self.manifest.iteritems() if '*' in y[2] or 'hg18' in y[2]}
         elif resource_type == 'hg19':
             self.manifest = {x:y for x,y in self.manifest.iteritems() if '*' in y[2] or 'hg19' in y[2]}
+        elif resource_type == 'hg38':
+            self.manifest = {x:y for x,y in self.manifest.iteritems() if '*' in y[2] or 'hg38' in y[2]}
         # remove obsolete annotation databases 
-        if resource_type in ('hg18', 'hg19', 'current', 'annotation'):
+        if resource_type in ('hg18', 'hg19', 'hg38', 'current', 'annotation'):
             # y[2] is reference genome
             annoDBs = [(x.split('-', 1), y[2]) for x,y in self.manifest.iteritems() if x.startswith('annoDB/') and not x.endswith('.ann')]
             # find the latest version of each db
@@ -2611,6 +2615,10 @@ class RefGenome:
             crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
             self.crr = CrrFile(crrFile)
             self.name = 'hg19'
+        elif build in ['hg38', 'build38']:
+            crrFile = downloadFile('reference/hg38.crr')
+            self.crr = CrrFile(crrFile)
+            self.name = 'hg38'
         elif os.path.isfile('{}.crr'.format(build)):
             self.crr = CrrFile('{}.crr'.format(build))
             self.name = build
@@ -2632,13 +2640,10 @@ class RefGenome:
             return self.crr.getBase(Location(self.chrIdx[chr], pos - 1))
         except KeyError:
             try:
-                self.chrIdx[chr] = self.crr.getChromosomeId('chr{}'.format(chr)) 
-            except ValueError:
-                try:
-                    self.chrIdx[chr] = self.crr.getChromosomeId(str(chr))
-                except Exception as e:
-                    raise ValueError('Failed to locate chromosome {} in reference genome {}: e'
-                        .format(chr, self.name, e))
+                self.chrIdx[chr] = self.crr.getChromosomeId(str(chr))
+            except Exception as e:
+                raise ValueError('Failed to locate chromosome {} in reference genome {}: e'
+                    .format(chr, self.name, e))
             try:
                 # ok?
                 return self.crr.getBase(Location(self.chrIdx[chr], pos - 1))
@@ -2651,13 +2656,10 @@ class RefGenome:
             return self.crr.getSequence(Range(self.chrIdx[chr], start - 1, end))
         except KeyError:
             try:
-                self.chrIdx[chr] = self.crr.getChromosomeId('chr{}'.format(chr)) 
-            except ValueError:
-                try:
-                    self.chrIdx[chr] = self.crr.getChromosomeId(str(chr))
-                except Exception as e:
-                    raise ValueError('Failed to locate chromosome {} in reference genome {}: {}'
-                        .format(chr, self.name, e))
+                self.chrIdx[chr] = self.crr.getChromosomeId(str(chr))
+            except Exception as e:
+                raise ValueError('Failed to locate chromosome {} in reference genome {}: {}'
+                    .format(chr, self.name, e))
             # ok?
             try:
                 return self.crr.getSequence(Range(self.chrIdx[chr], start - 1, end))
@@ -3184,6 +3186,8 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
             crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build36.crr')
         elif build in ['hg19', 'build37']:
             crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
+        elif build in ['hg38', 'build38']:
+            crrFile = downloadFile('reference/hg38.crr')
         elif os.path.isfile('{}.crr'.format(build)):
             crrFile = '{}.crr'.format(build)
         elif os.path.isfile(os.path.join(env.local_resource, 'reference', '{}.crr'.format(build))):
@@ -3228,6 +3232,8 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
                 crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build36.crr')
             elif build in ['hg19', 'build37']:
                 crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
+            elif build in ['hg38', 'build38']:
+                crrFile = downloadFile('reference/hg38.crr')
             elif os.path.isfile(os.path.join(env.local_resource, 'reference', '{}.crr'.format(build))):
                 crrFile = os.path.join(env.local_resource, 'reference', '{}.crr'.format(build))
             else:

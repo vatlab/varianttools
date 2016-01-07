@@ -129,8 +129,8 @@ class Updater:
             raise ValueError('No variant or genotype info needs to be updated')
         #
         if fmt.input_type == 'variant':
-            # process variants, the fields for pos, ref, alt are 1, 2, 3 in fields.
-            self.processor = LineProcessor(fmt.fields, [(1, 2, 3)], fmt.delimiter, self.ranges)
+            # process variants, the fields for chr, pos, ref, alt are 0, 1, 2, 3 in fields.
+            self.processor = LineProcessor(fmt.fields, [(RefGenome(self.build).crr, 0, 1, 2, 3)], fmt.delimiter, self.ranges)
         else:  # position or range type
             self.processor = LineProcessor(fmt.fields, [(1,)], fmt.delimiter, self.ranges)
         # probe number of sample
