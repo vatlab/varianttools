@@ -703,7 +703,7 @@ def validFieldName(name, reserved=[]):
     '''Return a valid field name from a name by converting non-alnum 
     characters with _, and add _ if the name starts with a number. If
     the new name is one of reserved, prefix it with _'''
-    new_name = re.sub('[\W]', '_', name.strip())
+    new_name = re.sub('[\W]+', '_', name.strip())
     if new_name[0].isdigit() or new_name in reserved:
         new_name = '_' + new_name
     return new_name
@@ -3104,12 +3104,22 @@ class DatabaseEngine:
 
 import token
 
-def consolidateFieldName(proj, table, clause, alt_build=False):
+def consolidateFieldName(proj, table, clause_or_list, alt_build=False):
     '''For input sift_score > 0.5, this function expand it to
     dbNSFP.sift_score > 0.5 and return a list of fields (dbNSFP.sift_score
     in this case). It also change pos to alt_pos if alt_build is true.
     We are using a Python tokenizer here so the result might be wrong.
+
+    If clause is passed as a list of fields, they will be connected by ','.
+    However, the list can potentially be changed to reflect for example
+    wildcard character expansion in functions such as track('d*.vcf').
+    It is therefore highly recommended that you pass a list instead of a 
+    joint fields.
     '''
+    if isinstance(clause_or_list, list):
+        clause = ', '.join(clause_or_list)
+    else:
+        clause = clause_or_list
     tokens = [x for x in tokenize.generate_tokens(StringIO(clause).readline)]
     res = []
     fields = []
@@ -3237,6 +3247,11 @@ def consolidateFieldName(proj, table, clause, alt_build=False):
             if len(filenames) > 1:
                 env.logger.info('Filename "{}" matches {} files: {}'
                     .format(filename, len(filenames), ', '.join(filenames)))
+                # this will expand clause_or_list ...
+                if isinstance(clause_or_list, list):
+                    for idx,cl in enumerate(clause_or_list):
+                        if isinstance(cl, str) and filename in cl:
+                            clause_or_list[idx] = [clause_or_list[idx].replace(filename, x) for x in filenames]
             # if the string has option 'matched', we need reference genome information
             if build in ['hg18', 'build36']:
                 crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build36.crr')
