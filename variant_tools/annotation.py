@@ -542,9 +542,14 @@ def use(args):
                             raise ValueError('No database with matching reference genome is found: {}, available {}'
                                 .format(args.source, ', '.join(all_versions)))
                         # now, we use the latest version
-                        args.source = sorted(ref_filtered)[-1]
-                        env.logger.trace('Choosing version {} from annotation databases {}'.format(
-                            args.source, ', '.join(ref_filtered)))
+                        # search for date information ...
+                        if all([re.search('\d\d\d\d\d\d\d\d', x) for x in ref_filtered]):
+                            # date information information is used, use it.
+                            args.source = sorted(ref_filtered, key=lambda x: re.search('\d\d\d\d\d\d\d\d', x).group(0))[-1]
+                        else:
+                            args.source = sorted(ref_filtered)[-1]
+                        env.logger.info('Choosing version {} from {} available databases.'.format(args.source.split('/')[-1].split('.')[0],
+                            len(all_versions)))
                 # download?
                 env.logger.info('Downloading annotation database {}'.format(args.source))
                 try:
