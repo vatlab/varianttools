@@ -858,6 +858,11 @@ class PrettyPrinter:
         if not self.width:
             self.width = [len(x) for x in trimmed_data]
         else:
+            if len(self.width) != len(trimmed_data):
+                env.logger.warning('Inconsistent number of columns ({} and {}), perhaps incorrect header has been specified.'
+                    .format(len(self.width), len(trimmed_data)))
+                if len(self.width) < len(trimmed_data):
+                    self.width.extend([0]*(len(trimmed_data) - len(self.width) ))
             self.width = [max(y, len(x)) for y,x in zip(self.width, trimmed_data)]
         # cache size exceeds, use collected width and stop checking
         if len(self.rows) > self.cache_size:
@@ -903,6 +908,11 @@ class PrettyPrinter:
         if not self.width:
             self.width = [len(x) for x in data]
         else:
+            if len(self.width) != len(data):
+                env.logger.warning('Inconsistent number of columns ({} and {}), perhaps incorrect header has been specified.'
+                    .format(len(self.width), len(data)))
+                if len(self.width) < len(data):
+                    self.width.extend([0]*(len(data) - len(self.width) ))
             self.width = [max(y, len(x)) for y,x in zip(self.width, data)]
         # cache size exceeds, use collected width and stop checking
         if len(self.rows) > self.cache_size:

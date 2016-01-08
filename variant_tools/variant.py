@@ -187,8 +187,6 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
             print(sys.stdin.read().rstrip())
         else:
             # other wise, use the user-provided header
-            if len(args.header) != len(output_fields):
-                env.logger.warning('User-provided header ({}) does not match number of fields ({})'.format(len(args.header), len(output_fields)))
             prt.write(args.header)
     for rec in cur:
         prt.write([args.na if x is None else str(x) for x in rec])
