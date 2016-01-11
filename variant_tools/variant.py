@@ -81,8 +81,11 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
         raise ValueError('Variant table {} does not exist.'.format(table_name))
     #
     # fields
-    select_clause, select_fields = consolidateFieldName(proj, table, ','.join(output_fields),
+    select_clause, select_fields = consolidateFieldName(proj, table, output_fields,
         args.build and args.build == proj.alt_build)
+    # output_fields might be changed by the consolidateFieldName function for wildcard character expansion
+    # so we need to force it to a list of string again.
+    output_fields = sum([[x] if isinstance(x, str) else x for x in output_fields], [])
     #
     # GROUP BY clause
     group_clause = ''
