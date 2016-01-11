@@ -33,14 +33,23 @@ if (ver.major == 2 and (ver.minor, ver.micro) < (7, 1)) or (ver.major == 3 and (
 
 #__all__ = ['utils', 'project', 'variant', 'annotation', 'assoTests', 'pipeline', 'simulation']
 
-# This should be updated when vtools is released, or there is a need to mark a
-# revision between release cycles
-VTOOLS_VERSION='2.7.0beta'
-VTOOLS_REVISION='2961'
 #
-VTOOLS_FULL_VERSION='{} (revision {}) for Python {}.{}.{}'.format(VTOOLS_VERSION, VTOOLS_REVISION, ver.major, ver.minor, ver.micro)
-VTOOLS_COPYRIGHT = '''variant tools {} : Copyright (c) 2011 - 2014 Bo Peng'''.format(VTOOLS_VERSION)
-VTOOLS_CITATION = '''San Lucas FA, Wang G, Scheet P, Peng B (2012) Bioinformatics 28(3):421-422'''
+# The vtools version string consists of three digits where the REVISION will be
+# changed during development, especially with each addition or change of feature.
+# The development version usually has non-zero revision number where a formal 
+# release has .0 revision number.
+#
+# MAJOR.MINOR.REVISION
+#
+VTOOLS_VERSION='2.7.20'
+#
+# Variant Tools no longer uses revision information after switching from SVN to GIT
+# the version string will be more frequently updated.
+#
+# VTOOLS_REVISION='2961'
+#
+VTOOLS_FULL_VERSION='{} for Python {}.{}.{}'.format(VTOOLS_VERSION, ver.major, ver.minor, ver.micro)
+VTOOLS_COPYRIGHT = '''variant tools {} : Copyright (c) 2011 - 2016 Bo Peng'''.format(VTOOLS_VERSION)
 VTOOLS_CONTACT = '''Please visit http://varianttools.sourceforge.net for more information.'''
 
 try:

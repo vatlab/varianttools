@@ -236,9 +236,12 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
 {
     //
     char * chr = PyString_AsString(PyList_GetItem(rec, chr_idx));
-    size_t pos = atol(PyString_AsString(PyList_GetItem(rec, pos_idx)));
+    PyObject * pos_obj = PyList_GetItem(rec, pos_idx);
+    bool int_pos = PyInt_Check(pos_obj);
+    uint32_t pos = int_pos ? PyInt_AsLong(pos_obj) : atol(PyString_AsString(pos_obj));
     char * ref = PyString_AsString(PyList_GetItem(rec, ref_idx));
     char * alt = PyString_AsString(PyList_GetItem(rec, alt_idx));
+
     //
     // first, if chr starts with chr, trim it. This should not be necessary because
     // the adjust function must have done that.
@@ -254,14 +257,18 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
         } catch (std::exception & e) {
             return (boost::format("Failed to get chromosome %s from reference genome") % chr).str();
         }
-        if (strlen(ref) == 1) {
-            char base = crr->getBase(cgatools::reference::Location(chrIdx, pos - 1));
-            if (base != ref[0])
-                return (boost::format("Inconsistent base allele %s at %d on chromosome %s") % ref[0] % pos % chr).str();
-        } else {
-            std::string bases = crr->getSequence(cgatools::reference::Range(chrIdx, pos - 1, pos + strlen(ref)));
-            if (strncmp(bases.c_str(), ref, strlen(ref)) != 0)
-                return (boost::format("Inconsistent base allele %s at %d on chromosome %s") % ref % pos % chr).str();
+        try {
+            if (strlen(ref) == 1) {
+                char base = crr->getBase(cgatools::reference::Location(chrIdx, pos - 1));
+                if (base != ref[0])
+                    return (boost::format("Inconsistent base allele %s at %d on chromosome %s") % ref[0] % pos % chr).str();
+            } else {
+                std::string bases = crr->getSequence(cgatools::reference::Range(chrIdx, pos - 1, pos + strlen(ref)));
+                if (strncmp(bases.c_str(), ref, strlen(ref)) != 0)
+                    return (boost::format("Inconsistent base allele %s at %d on chromosome %s") % ref % pos % chr).str();
+            }
+        } catch (std::exception & e) {
+            return (boost::format("Failed to get reference sequence: %s") % e.what()).str();
         }
     }
 
@@ -292,8 +299,12 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
     left_trim(alleles, pos1, left_trimmed);
 
     // change values
-    if (pos != pos1)
-        PyList_SetItem(rec, pos_idx, PyString_FromFormat("%d", pos1));
+    if (pos != pos1) {
+        if (int_pos)
+            PyList_SetItem(rec, pos_idx, PyInt_FromLong(pos1));
+        else
+            PyList_SetItem(rec, pos_idx, PyString_FromFormat("%d", pos1));
+    }
     if (alleles[0].compare(ref) != 0) {
         if (alleles[0].empty())
             PyList_SetItem(rec, ref_idx, PyString_FromString("-"));

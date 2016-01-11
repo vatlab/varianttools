@@ -1664,7 +1664,7 @@ class ResourceManager:
         prog = ProgressBar('Scanning {} files under {}'
             .format(len(filenames), resource_dir), sum([min(x[1], 2**26) for x in filenames]))
         total_size = 0
-        allowed_directory = ['test_data', 'snapshot', 'resource', 'programs', 'pipeline', 'simulation', 'ftp.completegenomics.com', 'format', 'annoDB', 'reference']
+        allowed_directory = ['test_data', 'snapshot', 'resource', 'programs', 'pipeline', 'simulation', 'format', 'annoDB', 'reference']
         for filename, filesize in filenames:
             if (not any([y in allowed_directory for y in filename.split('/')])) or filename.endswith('.DB') or \
                 filename.endswith('.bak') or filename.endswith('.htaccess') or filename.endswith('.log') \
@@ -2205,6 +2205,17 @@ def downloadURL(URL, dest, quiet, message=None):
 def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
     message=None):
     '''Download file from URL to filename.'''
+    # two special cases. Move files around to avoid re-download these files.
+    if fileToGet == 'reference/hg18.crr':
+        if os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build36.crr')) and \
+            not os.path.isfile(os.path.join(env.local_resource, 'reference/hg18.crr')):
+            shutil.move(os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build36.crr')),
+                os.path.isfile(os.path.join(env.local_resource, 'reference/hg18.crr')))
+    elif fileToGet == 'reference/hg19.crr':
+        if os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build37.crr')) and \
+            not os.path.isfile(os.path.join(env.local_resource, 'reference/hg19.crr')):
+            shutil.move(os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build37.crr')),
+                os.path.isfile(os.path.join(env.local_resource, 'reference/hg19.crr')))
     #
     # if a complete URL is given, DO NOT download from variant tools repository
     # 
@@ -2620,19 +2631,7 @@ def isAnnoDB(annoDB):
 #
 class RefGenome:
     def __init__(self, build):
-        if build in ['hg18', 'build36']:
-            crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build36.crr')
-            self.crr = CrrFile(crrFile)
-            self.name = 'hg18'
-        elif build in ['hg19', 'build37']:
-            crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
-            self.crr = CrrFile(crrFile)
-            self.name = 'hg19'
-        elif build in ['hg38', 'build38']:
-            crrFile = downloadFile('reference/hg38.crr')
-            self.crr = CrrFile(crrFile)
-            self.name = 'hg38'
-        elif os.path.isfile('{}.crr'.format(build)):
+        if os.path.isfile('{}.crr'.format(build)):
             self.crr = CrrFile('{}.crr'.format(build))
             self.name = build
         elif os.path.isfile(os.path.join(env.local_resource, 'reference', '{}.crr'.format(build))):
@@ -3205,13 +3204,7 @@ def consolidateFieldName(proj, table, clause_or_list, alt_build=False):
     # reference genome file
     if has_ref_query:
         build = proj.alt_build if alt_build else proj.build
-        if build in ['hg18', 'build36']:
-            crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build36.crr')
-        elif build in ['hg19', 'build37']:
-            crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
-        elif build in ['hg38', 'build38']:
-            crrFile = downloadFile('reference/hg38.crr')
-        elif os.path.isfile('{}.crr'.format(build)):
+        if os.path.isfile('{}.crr'.format(build)):
             crrFile = '{}.crr'.format(build)
         elif os.path.isfile(os.path.join(env.local_resource, 'reference', '{}.crr'.format(build))):
             crrFile = os.path.join(env.local_resource, 'reference', '{}.crr'.format(build))
@@ -3256,12 +3249,8 @@ def consolidateFieldName(proj, table, clause_or_list, alt_build=False):
                         if isinstance(cl, str) and filename in cl:
                             clause_or_list[idx] = [clause_or_list[idx].replace(filename, x) for x in filenames]
             # if the string has option 'matched', we need reference genome information
-            if build in ['hg18', 'build36']:
-                crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build36.crr')
-            elif build in ['hg19', 'build37']:
-                crrFile = downloadFile('ftp://ftp.completegenomics.com/ReferenceFiles/build37.crr')
-            elif build in ['hg38', 'build38']:
-                crrFile = downloadFile('reference/hg38.crr')
+            if os.path.isfile('{}.crr'.format(build)):
+                crrFile = '{}.crr'.format(build)
             elif os.path.isfile(os.path.join(env.local_resource, 'reference', '{}.crr'.format(build))):
                 crrFile = os.path.join(env.local_resource, 'reference', '{}.crr'.format(build))
             else:
@@ -3526,93 +3515,6 @@ def getMaxUcscBin(start, end):
         startBin >>= _BINNEXTSHIFT
         endBin >>= _BINNEXTSHIFT
     return bin
-
-
-def normalizeVariant(pos, ref, alt):
-    '''Normailize variants in different formats into a standard
-    format that variant tool accepts. This function returns a tuple
-    with UCSC bin, pos, ref, alt
-    '''
-    # this is usually the case but some badly formatted
-    # vcf file use small case for variants
-    try:
-        ref = ref.upper()
-        alt = alt.upper()
-    except Exception as e:
-        raise ValueError('Invalid reference ({}) or alternative ({}) allele.'.format(ref, alt))
-    # different types of variants
-    # 1. C -> G  (SNV)  
-    #    TC-> TG  
-    # 2. TC -> T (deletion)
-    #    TCG -> TG
-    #    TCG -> T
-    #    TCGCG -> TCG
-    # 3. TC -> TCA (insertion)
-    #    TCG -> TCAG
-    #    C -> CTAG
-    #    TCGCG -> TCGCGCG
-    # 4. Complex:
-    #    AA -> ATAAC
-    #    TACT -> TCTA
-    #    (as shown in 1000g vcf files)
-    #
-    if len(ref) > 1 or len(alt) > 1:
-        # STEP 0: structural variants with <> and [ ] stuff in VCF file? 
-        if len(alt) > 1 and not alt.isalpha():
-            raise ValueError('Unsupported variant {} -> {} at {}'.format(ref, alt, pos))
-        #
-        #env.logger.trace('start {} {} {}'.format(pos, ref, alt))
-        # STEP 1: remove ending common string
-        common_ending = 0
-        for i in range(-1, - min(len(ref), len(alt)) - 1, -1):
-            if ref[i] == alt[i]:
-                common_ending -= 1
-            else:
-                break
-        if common_ending < 0:
-            ref = ref[:common_ending]
-            alt = alt[:common_ending]
-        # STEP 2: remove leading common string
-        # 1. C -> G  (SNV)  
-        #    C -> G  
-        # 2. C -> '' (deletion)
-        #    CG -> G
-        #    CG -> ''
-        #    CG -> ''
-        # 3. '' -> A (insertion)
-        #    G -> AG
-        #    '' -> TAG
-        #    '' -> CG
-        # now insertion should have empty ref, deletion should have empty alt
-        common_leading = 0
-        for i in range(min(len(ref), len(alt))):
-            if ref[i] == alt[i]:
-                common_leading += 1
-            else:
-                break
-        if common_leading > 0:
-            if pos:
-                pos += common_leading
-            ref = ref[common_leading:]
-            alt = alt[common_leading:]
-        #
-        #env.logger.trace('normalized {} {} {}'.format(pos, ref, alt))
-    # ref or alt is something like '', '-', '.' or '*'
-    if not alt.isalpha():
-        if not ref.isalpha():
-            raise ValueError('Unsupported variant {} -> {} at {}'.format(ref, alt, pos))
-        if len(alt) <= 1:  # something like '', '-', '.', '*'
-            alt = '-'
-        else:
-            raise ValueError('Unsupported variant {} -> {} at {}'.format(ref, alt, pos))
-    elif not ref.isalpha():
-        if len(ref) <= 1:
-            ref = '-'
-        else:
-            raise ValueError('Unsupported variant {} -> {} at {}'.format(ref, alt, pos))
-    bin = getMaxUcscBin(pos - 1, pos) if pos else None
-    return bin, pos, ref, alt
-
 
 def executeUntilSucceed(cur, query, attempts, operation_msg, data = None):
     '''try to execute queries a few times before it fails'''

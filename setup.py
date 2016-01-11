@@ -100,9 +100,9 @@ else:
     PYVERSION = 'py3'
 
 SQLITE_FOLDER = 'sqlite/{}'
-WRAPPER_CPP_FILE = 'variant_tools/assoTests_wrap_{}.cpp'
-WRAPPER_PY_FILE = 'variant_tools/assoTests_{}.py'
-INTERFACE_FILE = 'variant_tools/assoTests.i'
+ASSO_WRAPPER_CPP_FILE = 'variant_tools/assoTests_wrap_{}.cpp'
+ASSO_WRAPPER_PY_FILE = 'variant_tools/assoTests_{}.py'
+ASSO_INTERFACE_FILE = 'variant_tools/assoTests.i'
 CGATOOLS_WRAPPER_CPP_FILE = 'variant_tools/cgatools_wrap_{}.cpp'
 CGATOOLS_WRAPPER_PY_FILE = 'variant_tools/cgatools_{}.py'
 CGATOOLS_INTERFACE_FILE = 'variant_tools/cgatools.i'
@@ -570,45 +570,45 @@ if not EMBEDED_BOOST:
 #
 # Generate wrapper files (only in development mode)
 #
-if 'beta' in VTOOLS_VERSION or 'rc' in VTOOLS_VERSION:
-    #
+#
+if not os.path.isfile('variant_tools/swigpyrun.h'):
     try:
        ret = subprocess.call(['swig -python -external-runtime variant_tools/swigpyrun.h'], shell=True)
        if ret != 0: sys.exit('Failed to generate swig runtime header file.')
     except OSError as e:
         sys.exit('Failed to generate wrapper file. Please install swig (www.swig.org).')
+#
+# generate wrapper files for both versions of python. This will make sure sdist gets
+# all files needed for the source package
+#
+for PYVER, PYVEROPT in zip(['py2', 'py3'], ['', '-py3']):
+    # we re-generate wrapper files for all versions of python only for
+    # source distribution
+    if (not SDIST) and (not PYVER.endswith(str(sys.version_info.major))):
+        continue
+    if (not os.path.isfile(ASSO_WRAPPER_PY_FILE.format(PYVER)) or not os.path.isfile(ASSO_WRAPPER_CPP_FILE.format(PYVER)) \
+      or os.path.getmtime(ASSO_WRAPPER_CPP_FILE.format(PYVER)) < max([os.path.getmtime(x) for x in ASSOC_HEADER + ASSOC_FILES])):
+        print('Generating {}'.format(ASSO_WRAPPER_CPP_FILE.format(PYVER)))
+        ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', ASSO_WRAPPER_CPP_FILE.format(PYVER), ASSO_INTERFACE_FILE]), shell=True)
+        if ret != 0:
+            sys.exit('Failed to generate wrapper file for association module.')
+        os.rename('variant_tools/assoTests.py', ASSO_WRAPPER_PY_FILE.format(PYVER))
     #
-    # generate wrapper files for both versions of python. This will make sure sdist gets
-    # all files needed for the source package
+    if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE.format(PYVER))) or (not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER))) \
+      or os.path.getmtime(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER)) < os.path.getmtime(CGATOOLS_INTERFACE_FILE):
+        print('Generating {}'.format(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER)))
+        ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', CGATOOLS_WRAPPER_CPP_FILE.format(PYVER), CGATOOLS_INTERFACE_FILE]), shell=True)
+        if ret != 0:
+            sys.exit('Failed to generate wrapper file for cgatools.')
+        os.rename('variant_tools/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(PYVER))
     #
-    for PYVER, PYVEROPT in zip(['py2', 'py3'], ['', '-py3']):
-        # we re-generate wrapper files for all versions of python only for
-        # source distribution
-        if (not SDIST) and (not PYVER.endswith(str(sys.version_info.major))):
-            continue
-        if (not os.path.isfile(WRAPPER_PY_FILE.format(PYVER)) or not os.path.isfile(WRAPPER_CPP_FILE.format(PYVER)) \
-          or os.path.getmtime(WRAPPER_CPP_FILE.format(PYVER)) < max([os.path.getmtime(x) for x in ASSOC_HEADER + ASSOC_FILES])):
-            print('Generating {}'.format(WRAPPER_CPP_FILE.format(PYVER)))
-            ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', WRAPPER_CPP_FILE.format(PYVER), INTERFACE_FILE]), shell=True)
-            if ret != 0:
-                sys.exit('Failed to generate wrapper file for association module.')
-            os.rename('variant_tools/assoTests.py', WRAPPER_PY_FILE.format(PYVER))
-        #
-        if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE.format(PYVER))) or (not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER))) \
-          or os.path.getmtime(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER)) < os.path.getmtime(CGATOOLS_INTERFACE_FILE):
-            print('Generating {}'.format(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER)))
-            ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', CGATOOLS_WRAPPER_CPP_FILE.format(PYVER), CGATOOLS_INTERFACE_FILE]), shell=True)
-            if ret != 0:
-                sys.exit('Failed to generate wrapper file for cgatools.')
-            os.rename('variant_tools/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(PYVER))
-        #
-        if (not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER))) or (not os.path.isfile(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER))) \
-          or os.path.getmtime(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER)) < os.path.getmtime(UCSCTOOLS_INTERFACE_FILE):
-            print('Generating {}'.format(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER)))
-            ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER), UCSCTOOLS_INTERFACE_FILE]), shell=True)
-            if ret != 0:
-                sys.exit('Failed to generate wrapper file for ucsctools.')
-            os.rename('variant_tools/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER))
+    if (not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER))) or (not os.path.isfile(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER))) \
+      or os.path.getmtime(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER)) < os.path.getmtime(UCSCTOOLS_INTERFACE_FILE):
+        print('Generating {}'.format(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER)))
+        ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER), UCSCTOOLS_INTERFACE_FILE]), shell=True)
+        if ret != 0:
+            sys.exit('Failed to generate wrapper file for ucsctools.')
+        os.rename('variant_tools/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER))
          
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.
 if sys.platform == 'linux2':
@@ -718,7 +718,7 @@ setup(name = "variant_tools",
             include_dirs = [".", "cgatools", "boost_1_49_0"],
         ),
         Extension('variant_tools._assoTests',
-            sources = [WRAPPER_CPP_FILE.format(PYVERSION)] + ASSOC_FILES
+            sources = [ASSO_WRAPPER_CPP_FILE.format(PYVERSION)] + ASSOC_FILES
                   + LIB_GSL + LIB_STAT,
             extra_compile_args = gccargs,
             library_dirs = [],

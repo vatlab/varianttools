@@ -58,13 +58,25 @@ from multiprocessing import Process
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
 from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, \
-    VTOOLS_CITATION, VTOOLS_REVISION, VTOOLS_CONTACT
+    VTOOLS_CONTACT
 from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
     RefGenome, filesInURL, downloadFile, getMaxUcscBin, env, sizeExpr, \
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName, \
     PrettyPrinter, determineSexOfSamples, getVariantsOnChromosomeX, \
     getVariantsOnChromosomeY, getTermWidth, matchName, ProgressFileObj, \
     substituteVars, calculateMD5, dehtml, default_user_options
+
+
+try:
+    if sys.version_info.major == 2:
+        from cgatools_py2 import normalize_variant
+    else:
+        from variant_tools.cgatools_py3 import normalize_variant
+except ImportError as e:
+    sys.exit('Failed to import module ({})\n'
+        'Please verify if you have installed variant tools successfully (using command '
+        '"python setup.py install")'.format(e))
+
 
 # define a field type
 Field = namedtuple('Field', ['name', 'index', 'adj', 'fmt', 'type', 'comment'])
@@ -1508,7 +1520,10 @@ class Project:
         # version of vtools, useful when opening a project created by a previous
         # version of vtools.
         self.version = VTOOLS_VERSION
-        self.revision = VTOOLS_REVISION
+        # 
+        # There is no revision information after migrating from SVN to GIT
+        #
+        #self.revision = VTOOLS_REVISION
         #
         files = glob.glob('*.proj')
         if 'NEW_PROJ' in self.mode: # new project
@@ -1610,7 +1625,6 @@ class Project:
         '''Create a new project'''
         # open the project file
         env.logger.info(VTOOLS_COPYRIGHT)
-        env.logger.info(VTOOLS_CITATION)
         env.logger.info(VTOOLS_CONTACT)
         env.logger.info('Creating a new project {}'.format(self.name))
         self.db = DatabaseEngine()
@@ -1628,7 +1642,9 @@ class Project:
         env.logger.trace('Creating core tables')
         self.createProjectTable()
         self.saveProperty('version', self.version)
-        self.saveProperty('revision', self.revision)
+        #
+        # Variant Tools no longer has revision information after switching from SVN to GIT
+        # self.saveProperty('revision', self.revision)
         self.saveProperty('__option_verbosity', env.verbosity)
         self.saveProperty('name', self.name)
         self.saveProperty('creation_date', self.creation_date)
@@ -1674,7 +1690,7 @@ class Project:
         # existing project
         cur = self.db.cursor()
         self.version = self.loadProperty('version', '1.0')
-        self.revision = self.loadProperty('revision', '0')
+        old_revision = self.loadProperty('revision', None)
         self.build = self.loadProperty('build')
         self.alt_build = self.loadProperty('alt_build')
         self.creation_date = self.loadProperty('creation_date', '')
@@ -1717,17 +1733,17 @@ class Project:
         self.variant_meta = self.db.getHeaders('variant_meta')
         self.sample_meta = self.db.getHeaders('sample_meta')
         #
-        if self.revision != VTOOLS_REVISION:
-            proj_rev = int(self.revision)
-            vtools_rev = int(VTOOLS_REVISION)
-            if proj_rev > vtools_rev:
+        if self.version != VTOOLS_VERSION:
+            proj_version = tuple(int(re.sub('\D', '', x)) for x in self.version.split('.'))
+            vtools_version = tuple(int(re.sub('\D', '', x)) for x in VTOOLS_VERSION.split('.'))
+            if proj_version > vtools_version:
                 env.logger.warning('Opening a project that is created by an '
-                    'newer version of vtools ({}, rev {}) is dangerous.'
-                    .format(self.version, self.revision))
-            elif proj_rev < vtools_rev:
+                    'newer version of vtools ({}) is dangerous.'
+                    .format(self.version))
+            elif proj_version < vtools_version:
                 # upgrade project
                 try:
-                    self.upgrade(proj_rev)
+                    self.upgrade(proj_version)
                 except Exception as e:
                     env.logger.warning('Skip upgrading project: {}'.format(e))
 
@@ -1815,15 +1831,14 @@ class Project:
                 del s
         self.db.commit()
         
-    def upgrade(self, proj_revision):
-        for ver, rev, proc in project_format_history:
+    def upgrade(self, proj_version):
+        for ver, proc in project_format_history:
             # for example, if the project version if 1.0.6
             # it will call the upgrade version for 1.0.7 and higher
-            if proj_revision < rev:
+            if proj_version < ver:
                 proc(self)
         # mark the version of the project
         self.saveProperty('version', VTOOLS_VERSION)
-        self.saveProperty('revision', VTOOLS_REVISION)
 
     def useAnnoDB(self, db):
         '''Add annotation database to current project.'''
@@ -3952,30 +3967,40 @@ def remove_duplicate_genotype(proj):
             .format(duplicated_genotype, len(tables),
                 's' if len(tables) > 1 else ''))
 
-def move_hg18_hg19_crr_file(proj):
+def verify_variants(proj):
     #
     # starting from version 2.7.0, all reference genomes are downloaded from
     # variant tools repository so ftp.completegenmics is no longer used.
-    env.logger.info('Upgrading variant tools project to version 2.7.0')
-    try:
-        if os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build36.crr')) and \
-            not os.path.isfile(os.path.join(env.local_resource, 'reference/hg18.crr')):
-            shutil.move(os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build36.crr')),
-                os.path.isfile(os.path.join(env.local_resource, 'reference/hg18.crr')))
-        if os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build37.crr')) and \
-            not os.path.isfile(os.path.join(env.local_resource, 'reference/hg19.crr')):
-            shutil.move(os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build37.crr')),
-                os.path.isfile(os.path.join(env.local_resource, 'reference/hg19.crr')))
-        shutil.rmtree(os.path.join(env.local_resource, 'ftp.completegenomics.com'))
-    except Exception as e:
-        env.logger.error('Failed to upgrade project: {}'.format(e))
+    env.logger.info('Upgrading variant tools project to version 2.7.20')
+    if not proj.db.hasTable('variant'):
+        return
+    numVariants = proj.db.numOfRows('variant')
+    prog = ProgressBar('Verifying variants', numVariants)
+    ref_genome = RefGenome(proj.build).crr
+    cur = proj.db.cursor()
+    cur.execute('SELECT chr, pos, ref, alt, variant_id FROM variant')
+    new_variants = []
+    for idx, rec in enumerate(cur):
+        new_variant = list(rec)
+        msg = normalize_variant(ref_genome, new_variant, 0, 1, 2, 3)
+        if msg:
+            env.logger.warning(msg)
+        if new_variant[0] != rec[0] or new_variant[1] != rec[1] or new_variant[2] != rec[2] or new_variant[3] != rec[3]:
+            env.logger.debug('Normalizing variant {} to {}'.format(rec[1:], new_variant[1:]))
+            new_variants.append(new_variant)
+        prog.update(idx+1)
+    prog.done()
+    # updating variants
+    if new_variants:
+        cur.executemany('UPDATE variant SET chr=?, pos=?, ref=?, alt=? WHERE variant_id=?',
+            new_variants)
+    env.logger.info('{} variants are updated'.format(len(new_variants)))
 
-    #
 project_format_history = [
     # version (for documentation purpose only), revision, upgrade function
-    ['1.0.7', 1915, remove_duplicate_genotype],
-    ['2.0.1', 2307, replace_null_sample_name],
-    ['2.7.0', 2961, move_hg18_hg19_crr_file],
+    [(1, 0, 7), remove_duplicate_genotype],
+    [(2, 0, 1), replace_null_sample_name],
+    [(2, 7, 20), verify_variants],
 ]
 
 #
