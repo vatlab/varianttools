@@ -3952,10 +3952,30 @@ def remove_duplicate_genotype(proj):
             .format(duplicated_genotype, len(tables),
                 's' if len(tables) > 1 else ''))
 
+def move_hg18_hg19_crr_file(proj):
+    #
+    # starting from version 2.7.0, all reference genomes are downloaded from
+    # variant tools repository so ftp.completegenmics is no longer used.
+    env.logger.info('Upgrading variant tools project to version 2.7.0')
+    try:
+        if os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build36.crr')) and \
+            not os.path.isfile(os.path.join(env.local_resource, 'reference/hg18.crr')):
+            shutil.move(os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build36.crr')),
+                os.path.isfile(os.path.join(env.local_resource, 'reference/hg18.crr')))
+        if os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build37.crr')) and \
+            not os.path.isfile(os.path.join(env.local_resource, 'reference/hg19.crr')):
+            shutil.move(os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build37.crr')),
+                os.path.isfile(os.path.join(env.local_resource, 'reference/hg19.crr')))
+        shutil.rmtree(os.path.join(env.local_resource, 'ftp.completegenomics.com'))
+    except Exception as e:
+        env.logger.error('Failed to upgrade project: {}'.format(e))
+
+    #
 project_format_history = [
     # version (for documentation purpose only), revision, upgrade function
     ['1.0.7', 1915, remove_duplicate_genotype],
     ['2.0.1', 2307, replace_null_sample_name],
+    ['2.7.0', 2961, move_hg18_hg19_crr_file],
 ]
 
 #
