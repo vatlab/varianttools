@@ -2074,7 +2074,10 @@ def TEMP(filename):
     # files. That is to say, if two processes are working on the same step
     # they will produce different temp files, and the final results should 
     # still be valid.
-    return '_tmp{}.'.format(os.getpid()).join(filename.rsplit('.', 1))
+    if '.' in os.path.basename(filename):
+        return '_tmp{}.'.format(os.getpid()).join(filename.rsplit('.', 1))
+    else:
+        return '{}_tmp{}'.format(filename, os.getpid())
 
 
 # the following is copied from shutils.which from Python 3.3
@@ -2249,8 +2252,8 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
         try:
             env.logger.trace('Downloading {} to {}'.format(fileToGet, dest))
             return downloadURL(fileToGet, dest, quiet, message)
-        except:
-            raise ValueError('Failed to download URL {}'.format(fileToGet))
+        except Exception as e:
+            raise ValueError('Failed to download URL {}: {}'.format(fileToGet, e))
     # 
     # otherwise, download from variant tools repository, but first let us check
     # if the file is in the repository
