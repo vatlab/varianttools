@@ -280,14 +280,15 @@ class LineProcessor:
                     rec = [x[0] if type(x) is tuple else x for x in records]
                 else:
                     rec = [(x[i] if i < len(x) else None) if type(x) is tuple else x for x in records]
-                last_msg = None
                 for ref_genome, chr_idx, pos_idx, ref_idx, alt_idx in self.build_info:
                     # bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], rec[alt_idx])
+                    #env.logger.error('{} {} {} {}'.format(rec[chr_idx], rec[pos_idx], rec[ref_idx], rec[alt_idx]))
                     msg = normalize_variant(ref_genome, rec, chr_idx, pos_idx, ref_idx, alt_idx)
+                    #env.logger.error('{} {} {} {}'.format(rec[chr_idx], rec[pos_idx], rec[ref_idx], rec[alt_idx]))
+                    #if rec[ref_idx] == rec[alt_idx]:
+                    #    continue
                     if msg:
-                        if msg != last_msg:
-                            env.logger.warning(msg)
-                            last_msg = msg
+                        env.logger.warning(msg)
                     bins.append(getMaxUcscBin(int(rec[pos_idx]) - 1, int(rec[pos_idx])))
                 yield bins, rec
 

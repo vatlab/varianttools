@@ -2209,13 +2209,13 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
     if fileToGet == 'reference/hg18.crr':
         if os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build36.crr')) and \
             not os.path.isfile(os.path.join(env.local_resource, 'reference/hg18.crr')):
-            shutil.move(os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build36.crr')),
-                os.path.isfile(os.path.join(env.local_resource, 'reference/hg18.crr')))
+            shutil.move(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build36.crr'),
+                os.path.join(env.local_resource, 'reference/hg18.crr'))
     elif fileToGet == 'reference/hg19.crr':
         if os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build37.crr')) and \
             not os.path.isfile(os.path.join(env.local_resource, 'reference/hg19.crr')):
-            shutil.move(os.path.isfile(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build37.crr')),
-                os.path.isfile(os.path.join(env.local_resource, 'reference/hg19.crr')))
+            shutil.move(os.path.join(env.local_resource, 'ftp.completegenomics.com/ReferenceFiles/build37.crr'),
+                os.path.join(env.local_resource, 'reference/hg19.crr'))
     #
     # if a complete URL is given, DO NOT download from variant tools repository
     # 

@@ -4014,7 +4014,7 @@ def verify_variants(proj):
     # starting from version 2.7.0, all reference genomes are downloaded from
     # variant tools repository so ftp.completegenmics is no longer used.
     env.logger.info('Upgrading variant tools project to version 2.7.20')
-    if not proj.db.hasTable('variant'):
+    if not proj.db.hasTable('variant') or proj.build is None:
         return
     numVariants = proj.db.numOfRows('variant')
     prog = ProgressBar('Verifying variants', numVariants)
