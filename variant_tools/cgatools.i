@@ -240,8 +240,10 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
     PyObject * pos_obj = PyList_GetItem(rec, pos_idx);
     bool int_pos = PyInt_Check(pos_obj);
     uint32_t pos = int_pos ? PyInt_AsLong(pos_obj) : atol(PyString_AsString(pos_obj));
-    char * ref = PyString_AsString(PyList_GetItem(rec, ref_idx));
-    char * alt = PyString_AsString(PyList_GetItem(rec, alt_idx));
+    PyObject * ref_obj = PyList_GetItem(rec, ref_idx);
+    char * ref = PyString_Check(ref_obj) || PyUnicode_Check(ref_obj) ? PyString_AsString(ref_obj) : PyString_AsString(PyObject_Repr(ref_obj));
+    PyObject * alt_obj = PyList_GetItem(rec, alt_idx);
+    char * alt = PyString_Check(alt_obj) || PyUnicode_Check(alt_obj) ? PyString_AsString(alt_obj) : PyString_AsString(PyObject_Repr(alt_obj));
 
     //
     // first, if chr starts with chr, trim it. This should not be necessary because
@@ -290,17 +292,59 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
     }
     
     std::vector<std::string> alleles;
-    alleles.push_back(std::string(ref));
-    alleles.push_back(std::string(alt));
+    // check - and other characters
+    bool normalize_allele = true;
+    for (size_t i = 0; i < 2; ++i) {
+        std::string allele;
+        char * a = i == 0 ? ref : alt;
+        for (; *a != '\0'; ++a) {
+            switch (*a) {
+            case '-':
+                // pass
+                break;
+            case 'a':
+                allele.append(1, 'A');
+                break;
+            case 'c':
+                allele.append(1, 'C');
+                break;
+            case 't':
+                allele.append(1, 'T');
+                break;
+            case 'g':
+                allele.append(1, 'G');
+                break;
+            case 'A':
+                allele.append(1, 'A');
+                break;
+            case 'C':
+                allele.append(1, 'C');
+                break;
+            case 'T':
+                allele.append(1, 'T');
+                break;
+            case 'G':
+                allele.append(1, 'G');
+                break;
+            default:
+                msg = (boost::format("Unrecognized allele %s") % (i == 0 ? ref : alt)).str();
+                normalize_allele = false;
+                break;
+            }
+        }
+        alleles.push_back(allele);
+    }
     //
-    uint32_t left_extended = 0;
-    uint32_t left_trimmed = 0;
-    uint32_t right_trimmed = 0;
     uint32_t pos1 = pos;
-    // if there is something wrong with reference genome, DO NOT extend to the left
-    right_trim_or_left_extend(msg.empty() ? crr : NULL,  alleles, pos1, chrIdx, left_extended, right_trimmed);
+    if (normalize_allele) {
+        uint32_t left_extended = 0;
+        uint32_t left_trimmed = 0;
+        uint32_t right_trimmed = 0;
+        // if there is something wrong with reference genome, DO NOT extend to the left
+        right_trim_or_left_extend(msg.empty() ? crr : NULL,  alleles, pos1, chrIdx, left_extended, right_trimmed);
 
-    left_trim(alleles, pos1, left_trimmed);
+        left_trim(alleles, pos1, left_trimmed);
+    }
 
     // change values
     if (pos != pos1) {
@@ -323,7 +367,6 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
     }
     // no error message
     return msg;
-
 }
 
 %}
