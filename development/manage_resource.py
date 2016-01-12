@@ -65,7 +65,7 @@ def uploadFile(local_file, remote_file, repo):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''Manage variant tools resources''')
-    parser.add_argument('--generate_local_manifest', nargs='?', const='~/.variant_tools',
+    parser.add_argument('--generate_local_manifest', nargs='?', const=env.local_resource,
         help='''Generate a manifest of local resource files. If a directory is not specified,
             $HOME/.variant_tools will be assumed. The manifest will be saved to 
             MANIFEST_local.txt.''')
@@ -94,7 +94,7 @@ if __name__ == '__main__':
             --repo.''')
     parser.add_argument('--upload', metavar='FILE', nargs='+',
         help='''Upload specified files to the server. The file should 
-            be under the local resource directory ~/.variant_tools.''')
+            be under the local resource directory (default to ~/.variant_tools).''')
     parser.add_argument('--remove', metavar='FILENAME', nargs='+',
         help='''Remove specified files from the online manifest so that it will no
             longer be listed as part of the resource. The file itself, if exists, will
@@ -112,7 +112,7 @@ if __name__ == '__main__':
         sys.stderr.write('Local manifest has been saved to MANIFEST_local.txt\n') 
     elif args.list is not None:
         manager = ResourceManager()
-        manager.scanDirectory('~/.variant_tools', args.list)
+        manager.scanDirectory(env.local_resource, args.list)
         local_manifest = {x:y for x,y in manager.manifest.items()}
         manager.manifest.clear()
         manager.getRemoteManifest()
@@ -141,7 +141,7 @@ if __name__ == '__main__':
     elif args.upload:
         manager = ResourceManager()
         manager.getRemoteManifest('http://bioinformatics.mdanderson.org/Software/VariantTools/{}/'.format(args.repo))
-        resource_dir = os.path.expanduser('~/.variant_tools')
+        resource_dir = os.path.expanduser(env.local_resource)
         # get information about file
         for filename in args.upload:
             if filename.endswith('.DB'):
