@@ -80,6 +80,10 @@ class AnnoDBConfiger:
         self.source_files = None
         self.fields = []
         self.delimiter = '\t'
+        # the original version is 1
+        # Databases created using normalized variant importer engine will be assigned
+        # format 2 so that older version will be automatically upgraded.
+        self.database_format = '2'
         self.version = None
         self.encoding = 'utf-8'
         self.preprocessor = None
@@ -381,7 +385,7 @@ class AnnoDBConfiger:
             # we record file as cache files
             source_files = temp_files
         writer = AnnoDBWriter(self.name, self.fields, self.anno_type, self.description,
-            self.version, self.build)
+            self.version, self.build, self.database_format)
         # read records from files
         if self.source_type == 'txt':
             self.importTxtRecords(writer.db, source_files)

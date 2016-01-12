@@ -166,7 +166,8 @@ void right_trim_or_left_extend(cgatools::reference::CrrFile * crr,
             else
             {
                 to_right_trim = false;
-                to_left_extend = true;
+                // if crr is NULL (something wrong with reference genome match, do not left_extend)
+                to_left_extend = (crr != NULL);
                 break;
             }
         }
@@ -250,25 +251,26 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
         chr = PyString_AsString(PyList_GetItem(rec, chr_idx));
     }
     int chrIdx = -1;
+    std::string msg;
     // Check reference genome
     if (strlen(ref) >= 1 && ref[0] != '-') {
         try {
             chrIdx = crr->getChromosomeId(chr);
         } catch (std::exception & e) {
-            return (boost::format("Failed to get chromosome %s from reference genome") % chr).str();
+            msg = (boost::format("Failed to get chromosome %s from reference genome") % chr).str();
         }
         try {
             if (strlen(ref) == 1) {
                 char base = crr->getBase(cgatools::reference::Location(chrIdx, pos - 1));
                 if (base != ref[0])
-                    return (boost::format("Inconsistent base allele %s at %d on chromosome %s") % ref[0] % pos % chr).str();
+                    msg = (boost::format("Inconsistent base allele %s at %d on chromosome %s") % ref[0] % pos % chr).str();
             } else {
                 std::string bases = crr->getSequence(cgatools::reference::Range(chrIdx, pos - 1, pos + strlen(ref)));
                 if (strncmp(bases.c_str(), ref, strlen(ref)) != 0)
-                    return (boost::format("Inconsistent base allele %s at %d on chromosome %s") % ref % pos % chr).str();
+                    msg = (boost::format("Inconsistent base allele %s at %d on chromosome %s") % ref % pos % chr).str();
             }
         } catch (std::exception & e) {
-            return (boost::format("Failed to get reference sequence: %s") % e.what()).str();
+            msg = (boost::format("Failed to get reference sequence: %s") % e.what()).str();
         }
     }
 
@@ -284,7 +286,7 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
             a[0] = std::toupper(alt[0]);
             PyList_SetItem(rec, alt_idx, PyString_FromString(a));
         }
-        return "";
+        return msg;
     }
     
     std::vector<std::string> alleles;
@@ -295,7 +297,9 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
     uint32_t left_trimmed = 0;
     uint32_t right_trimmed = 0;
     uint32_t pos1 = pos;
-    right_trim_or_left_extend(crr,  alleles, pos1, chrIdx, left_extended, right_trimmed);
+    // if there is something wrong with reference genome, DO NOT extend to the left
+    right_trim_or_left_extend(msg.empty() ? crr : NULL,  alleles, pos1, chrIdx, left_extended, right_trimmed);
+
     left_trim(alleles, pos1, left_trimmed);
 
     // change values
@@ -318,7 +322,7 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
             PyList_SetItem(rec, alt_idx, PyString_FromString(alleles[1].c_str()));
     }
     // no error message
-    return "";
+    return msg;
 
 }
 

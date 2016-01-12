@@ -34,7 +34,7 @@ import zipfile
 from collections import defaultdict
 from multiprocessing import Process, Pipe
 import math
-from .project import AnnoDB, Project, Field, AnnoDBWriter, fileFMT
+from .project import AnnoDB, Project, Field, fileFMT
 from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, DatabaseEngine, delayedAction, \
     consolidateFieldName, env, encodeTableName, decodeTableName, \

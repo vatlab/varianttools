@@ -123,6 +123,7 @@ class MetaAnalysis:
                     time.strftime('%a, %d %b %Y %H:%M:%S', time.gmtime())),
                 '1.0',# version 1.0
                 {'*': self.group_names},# link by group fields
+                2, # database format
                 True, # allow updating an existing database
                 True # allow updating an existing field
                 )

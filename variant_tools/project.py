@@ -149,6 +149,7 @@ class AnnoDB:
         self.build = None
         self.alt_build = None
         self.version = None
+        self.database_format = None
         if linked_name is None:
             self.linked_name = self.name
         else:
@@ -162,6 +163,8 @@ class AnnoDB:
                 self.name = rec[1]
             elif rec[0] == 'version':
                 self.version = rec[1]
+            elif rec[0] == 'database_format':
+                self.database_format = rec[1]
             elif rec[0] == 'anno_type':
                 if anno_type is None:
                     self.anno_type = rec[1] if rec[1] != 'attribute' else 'field'
@@ -220,6 +223,8 @@ class AnnoDB:
                 self.db.binningRanges(proj.build, self.build, self.name)
             elif self.alt_build is not None:
                 self.db.binningRanges(proj.alt_build, self.alt_build, self.name)
+        if self.database_format is None:
+            self.upgrade()
 
     def indexLinkedField(self, proj, linked_fields):
         '''Create index for fields that are linked by'''
@@ -283,6 +288,41 @@ class AnnoDB:
             env.logger.debug('The {} unlinked values are: {}'.format('first 100' if len(val_unused) == 100 else len(val_unused),
                 ', '.join([':'.join([str(y) for y in x]) for x in val_unused])))
         
+    def upgrade(self):
+        if self.anno_type == 'variant':
+            cur = self.db.cursor()
+            cur.execute('SELECT value FROM {}_info WHERE name="num_records";'.format(self.name))
+            num_records = int(cur.fetchone()[0])
+            for k,v in self.refGenomes.items():
+                ref_genome = RefGenome(k).crr
+                cur.execute('SELECT {} FROM {}'.format(','.join(v), self.name))
+                new_variants = []
+                prog = ProgressBar('Upgrading {}-{}'.format(self.name, self.version), num_records) 
+                last_msg = None
+                for idx, rec in enumerate(cur):
+                    new_variant = list(rec)
+                    msg = normalize_variant(ref_genome, new_variant, 0, 1, 2, 3)
+                    if msg:
+                        # only display the same message once
+                        if msg != last_msg:
+                            env.logger.warning(msg)
+                            last_msg = msg
+                    if new_variant[0] != rec[0] or new_variant[1] != rec[1] or new_variant[2] != rec[2] or new_variant[3] != rec[3]:
+                        env.logger.debug('Normalizing variant {} to {}'.format(rec[1:], new_variant[1:]))
+                        # needs both new and old variant info for update
+                        new_variants.append(new_variant)
+                        new_variants[-1].extend(rec)
+                    prog.update(idx+1)
+                prog.done()
+                # updating variants
+                if new_variants:
+                    cur.executemany('UPDATE variant SET {0}=?, {1}=?, {2}=?, {3}=? WHERE {0}=? AND {1}=? AND {2}=? {3}=?'.format(*v),
+                        new_variants)
+                env.logger.info('{} variants are updated'.format(len(new_variants)))
+            # update database format
+            cur.execute('INSERT OR REPLACE INTO {}_info (name, value) VALUES ("database_format", "{}")'
+                .format(self.name, 2))
+            self.db.commit()
 
     def describe(self, verbose=False):
         '''Describe this annotation database'''
@@ -1208,14 +1248,15 @@ class AnnoDBWriter:
     '''
     A class to initiate and insert annotation database
     '''
-    def __init__(self, name, fields, anno_type, description, version, build, use_existing_db=False,
-        overwrite_existing_fields=False):
+    def __init__(self, name, fields, anno_type, description, version, build, database_format=2,
+        use_existing_db=False, overwrite_existing_fields=False):
         # remove extension .db
         self.name = name[:-3] if name.lower().endswith('.db') else name
         self.fields = fields
         self.anno_type = anno_type
         self.description = description
         self.version = version
+        self.database_format = database_format
         self.build = build
         # create database and import file
         self.db = DatabaseEngine()
@@ -1251,6 +1292,7 @@ class AnnoDBWriter:
             cur.execute(query, ('anno_type', self.anno_type))
             cur.execute(query, ('description', self.description))
             cur.execute(query, ('version', self.version))
+            cur.execute(query, ('database_format', str(self.database_format)))
             cur.execute(query, ('build', str(self.build)))
             self.db.commit()
         except Exception as e:
@@ -3980,13 +4022,17 @@ def verify_variants(proj):
     cur = proj.db.cursor()
     cur.execute('SELECT chr, pos, ref, alt, variant_id FROM variant')
     new_variants = []
+    last_msg = None
     for idx, rec in enumerate(cur):
         new_variant = list(rec)
         msg = normalize_variant(ref_genome, new_variant, 0, 1, 2, 3)
         if msg:
-            env.logger.warning(msg)
+            # only display the same message once
+            if msg != last_msg:
+                env.logger.warning(msg)
+                last_msg = msg
         if new_variant[0] != rec[0] or new_variant[1] != rec[1] or new_variant[2] != rec[2] or new_variant[3] != rec[3]:
-            env.logger.debug('Normalizing variant {} to {}'.format(rec[1:], new_variant[1:]))
+            env.logger.debug('Normalizing variant {} to {}'.format(rec[:-1], new_variant[:-1]))
             new_variants.append(new_variant)
         prog.update(idx+1)
     prog.done()

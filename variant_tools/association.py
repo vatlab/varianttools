@@ -609,6 +609,7 @@ class ResultRecorder:
                     time.strftime('%a, %d %b %Y %H:%M:%S', time.gmtime())),
                 '1.0',                         # version 1.0
                 {'*': self.group_names},       # link by group fields
+                2,                             # database format
                 True,                          # allow updating an existing database
                 update_existing                # allow updating an existing field
             )
