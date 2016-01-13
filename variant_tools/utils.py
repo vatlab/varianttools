@@ -2160,8 +2160,8 @@ def downloadURL(URL, dest, quiet, message=None):
             return dest
         else:
             raise RuntimeError('Failed to download {} using pycurl'.format(URL))
-    except ImportError:
-        # no pycurl module
+    except Exception:
+        # no pycurl module, or when download fail
         pass
     # use wget? Almost universally available under linux
     if which('wget'):
@@ -2369,8 +2369,8 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
                     'want to remove local file and try again to update your local copy.'
                     .format(downloaded))
             return downloaded
-        except:
-            env.logger.warning('Failed to download {} from {}'.format(fileToGet, servers[idx]))
+        except Exception as e:
+            env.logger.warning('Failed to download {} from {}: {}'.format(fileToGet, servers[idx], e))
             servers.pop(idx)
             weights.pop(idx)
     # failed to get file
