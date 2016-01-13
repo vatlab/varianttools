@@ -282,14 +282,18 @@ class LineProcessor:
                     rec = [(x[i] if i < len(x) else None) if type(x) is tuple else x for x in records]
                 for ref_genome, chr_idx, pos_idx, ref_idx, alt_idx in self.build_info:
                     # bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], rec[alt_idx])
-                    #env.logger.error('{} {} {} {}'.format(rec[chr_idx], rec[pos_idx], rec[ref_idx], rec[alt_idx]))
+                    #env.logger.error('PRE {} {} {} {}'.format(rec[chr_idx], rec[pos_idx], rec[ref_idx], rec[alt_idx]))
                     msg = normalize_variant(ref_genome, rec, chr_idx, pos_idx, ref_idx, alt_idx)
-                    #env.logger.error('{} {} {} {}'.format(rec[chr_idx], rec[pos_idx], rec[ref_idx], rec[alt_idx]))
-                    #if rec[ref_idx] == rec[alt_idx]:
-                    #    continue
+                    #env.logger.error('POST {} {} {} {}'.format(rec[chr_idx], rec[pos_idx], rec[ref_idx], rec[alt_idx]))
+                    #
                     if msg:
-                        env.logger.warning(msg)
-                    bins.append(getMaxUcscBin(int(rec[pos_idx]) - 1, int(rec[pos_idx])))
+                        # if the message says 'Unrecognized allele', the variant will be ignored.
+                        if msg[0] == 'U':
+                            raise ValueError(msg)
+                        else:
+                            env.logger.warning(msg)
+                    # normalization will convert rec[pos_idx] to int if necessary
+                    bins.append(getMaxUcscBin(rec[pos_idx] - 1, rec[pos_idx]))
                 yield bins, rec
 
 
@@ -1365,6 +1369,7 @@ class Importer:
             if len(rec) > 5:
                 self.count[8] += 1
                 cur.execute(self.update_variant_query, rec[5:] + [variant_id])
+            env.logger.info('Overlapping variant {}:{}-{}/{}'.format(rec[1], rec[2], rec[3], rec[4]))
             return variant_id
         else:
             # new variant!

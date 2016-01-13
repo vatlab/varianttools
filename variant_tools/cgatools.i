@@ -254,13 +254,13 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
     }
     int chrIdx = -1;
     std::string msg;
+    try {
+        chrIdx = crr->getChromosomeId(chr);
+    } catch (std::exception & e) {
+        msg = (boost::format("Failed to get chromosome %s from reference genome") % chr).str();
+    }
     // Check reference genome
     if (strlen(ref) >= 1 && ref[0] != '-') {
-        try {
-            chrIdx = crr->getChromosomeId(chr);
-        } catch (std::exception & e) {
-            msg = (boost::format("Failed to get chromosome %s from reference genome") % chr).str();
-        }
         try {
             if (strlen(ref) == 1) {
                 char base = crr->getBase(cgatools::reference::Location(chrIdx, pos - 1));
@@ -276,24 +276,8 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
         }
     }
 
-    // SNP, nothing to worry about, hopefully this will exclude most cases
-    if (strlen(ref) == 1 && strlen(alt) == 1 && ref[0] != '-' && alt[0] != '-') {
-        if (std::islower(ref[0])) {
-            char a[2] = " ";
-            a[0] = std::toupper(ref[0]);
-            PyList_SetItem(rec, ref_idx, PyString_FromString(a));
-        }
-        if (std::islower(alt[0])) {
-            char a[2] = " ";
-            a[0] = std::toupper(alt[0]);
-            PyList_SetItem(rec, alt_idx, PyString_FromString(a));
-        }
-        return msg;
-    }
-    
     std::vector<std::string> alleles;
     // check - and other characters
-    bool normalize_allele = true;
     for (size_t i = 0; i < 2; ++i) {
         std::string allele;
         char * a = i == 0 ? ref : alt;
@@ -327,42 +311,38 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
                 allele.append(1, 'G');
                 break;
             default:
+                // the variant will be ignored in this case
                 msg = (boost::format("Unrecognized allele %s") % (i == 0 ? ref : alt)).str();
-                normalize_allele = false;
-                break;
+                return msg;
             }
         }
         alleles.push_back(allele);
     }
     //
     uint32_t pos1 = pos;
-    if (normalize_allele) {
-        uint32_t left_extended = 0;
-        uint32_t left_trimmed = 0;
-        uint32_t right_trimmed = 0;
-        // if there is something wrong with reference genome, DO NOT extend to the left
-        right_trim_or_left_extend(msg.empty() ? crr : NULL,  alleles, pos1, chrIdx, left_extended, right_trimmed);
+    uint32_t left_extended = 0;
+    uint32_t left_trimmed = 0;
+    uint32_t right_trimmed = 0;
+    // if there is something wrong with reference genome, DO NOT extend to the left
+    right_trim_or_left_extend(msg.empty() ? crr : NULL,  alleles, pos1, chrIdx, left_extended, right_trimmed);
 
-        left_trim(alleles, pos1, left_trimmed);
-    }
+    left_trim(alleles, pos1, left_trimmed);
 
     // change values
-    if (pos != pos1) {
-        if (int_pos)
-            PyList_SetItem(rec, pos_idx, PyInt_FromLong(pos1));
-        else
-            PyList_SetItem(rec, pos_idx, PyString_FromFormat("%d", pos1));
-    }
-    if (alleles[0].compare(ref) != 0) {
-        if (alleles[0].empty())
+    if (pos != pos1 || ! int_pos)
+        PyList_SetItem(rec, pos_idx, PyInt_FromLong(pos1));
+    if (alleles[0].empty()) {
+        if (strlen(ref) != 1 || ref[0] != '-')
             PyList_SetItem(rec, ref_idx, PyString_FromString("-"));
-        else
+    } else {
+        if (alleles[0].compare(ref) != 0)
             PyList_SetItem(rec, ref_idx, PyString_FromString(alleles[0].c_str()));
     }
-    if (alleles[1].compare(alt) != 0) {
-        if (alleles[1].empty())
+    if (alleles[1].empty()) {
+        if (strlen(alt) != 1 || alt[0] != '-')
             PyList_SetItem(rec, alt_idx, PyString_FromString("-"));
-        else
+    } else {
+        if (alleles[1].compare(alt) != 0)
             PyList_SetItem(rec, alt_idx, PyString_FromString(alleles[1].c_str()));
     }
     // no error message
