@@ -129,6 +129,25 @@ prune boost_1_49_0/boost/units
 prune boost_1_49_0/boost/variant
 prune boost_1_49_0/boost/wave
 prune boost_1_49_0/boost/xpressive
+prune boost_1_49_0/boost/math/bindings
+prune boost_1_49_0/boost/math/concepts	
+prune boost_1_49_0/boost/math/complex			
+prune boost_1_49_0/boost/math/constants
+prune boost_1_49_0/boost/math/distributions
+prune boost_1_49_0/boost/mpl/map
+prune boost_1_49_0/boost/mpl/math
+prune boost_1_49_0/boost/mpl/multiset
+prune boost_1_49_0/boost/mpl/set
+prune boost_1_49_0/boost/unordered
+prune boost_1_49_0/boost/parameter
+prune boost_1_49_0/boost/serialization
+prune boost_1_49_0/boost/numeric/internal
+prune boost_1_49_0/boost/numeric/ublas
+prune boost_1_49_0/boost/multi_array
+prune boost_1_49_0/boost/multi_index
+prune boost_1_49_0/boost/archive
+
+
 #
 # ucsc tools
 recursive-include ucsc/tabix *.h *.c
