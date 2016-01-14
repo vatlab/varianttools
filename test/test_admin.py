@@ -1,4 +1,4 @@
-#/usr/bin/env python
+#!/usr/bin/env python
 
 # $file: test_admin.py $
 # $lastChangedDate: 2012-05-14 $
@@ -27,17 +27,9 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, numOfVariant, numOfSample,\
-    getGenotypes, getSamplenames, output2list, getGenotypeInfo, outputOfCmd
+from testUtils import ProcessTestCase
 
 class TestAdmin(ProcessTestCase):
-
-    def setUp(self):
-        'Create a project'
-        runCmd('vtools init test -f')
-
-    def removeProj(self):
-        runCmd('vtools remove project')
 
     def testMergeSamples(self):
         'Test command vtools admin --merge_samples'
@@ -47,24 +39,24 @@ class TestAdmin(ProcessTestCase):
         self.assertFail('vtools admin')
         self.assertSucc('vtools admin -h')
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.assertEqual(numOfSample(), 60)
-        self.assertEqual(numOfVariant(),288)
+        self.assertProj(numOfSamples= 60)
+        self.assertProj(numOfVariants=288)
         self.assertSucc('vtools admin --rename_samples \'sample_name like "%NA069%"\' NA06900')
         #could not merge them together if they are from the same table.
         self.assertFail('vtools admin --merge_samples')
         # Test command vtools admin --merge_samples'
-        runCmd('vtools init test -f')
-        runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
-        runCmd('vtools import vcf/SAMP1.vcf  --build hg18')
-        self.assertEqual(numOfVariant(),577)
-        self.assertEqual(numOfSample(), 61)
-        runCmd('vtools admin --rename_samples \'filename like "%SAMP1%"\' NA06985')
-        self.assertEqual(numOfSample(), 61)
-        runCmd('vtools admin --merge_samples')         
-        self.assertEqual(numOfVariant(),577)
-        self.assertEqual(numOfSample(), 60)
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
+        self.runCmd('vtools import vcf/SAMP1.vcf  --build hg18')
+        self.assertProj(numOfVariants=577)
+        self.assertProj(numOfSamples= 61)
+        self.runCmd('vtools admin --rename_samples \'filename like "%SAMP1%"\' NA06985')
+        self.assertProj(numOfSamples= 61)
+        self.runCmd('vtools admin --merge_samples')         
+        self.assertProj(numOfVariants=577)
+        self.assertProj(numOfSamples= 60)
         # Test merge samples with overlapping variants
-        runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f')
         self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18')
         self.assertSucc('vtools import vcf/SAMP1.vcf  --build hg18')
         self.assertSucc('vtools admin --rename_samples \'filename like "%2%"\' SAMP1')
@@ -73,7 +65,7 @@ class TestAdmin(ProcessTestCase):
 
     def testRenameSamples(self):
         'Test command vtools admin --rename_samples'
-        runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
         self.assertFail('vtools admin --rename_samples 1')
         # all samples are assigned name NA
         self.assertFail('vtools admin --rename_samples "sample_name like \'NA1\'" NA')
@@ -82,24 +74,23 @@ class TestAdmin(ProcessTestCase):
     def testRenameTable(self):
         'test rename tables'
         self.assertSucc('vtools select variant -t "%ad name"')
-        self.assertTrue('%ad name' in outputOfCmd('vtools show tables'))
+        self.assertOutput('vtools show tables', '%ad name', partial=True)
         self.assertTrue('vtools show table "%ad name"')
         self.assertFail('vtools admin --rename_table variant not_allowed')
         self.assertSucc('vtools admin --rename_table "%ad name" UNIQUE')
         self.assertTrue('vtools show table UNIQUE')
-        self.assertTrue('UNIQUE' in outputOfCmd('vtools show tables'))
+        self.assertOutput('vtools show tables', 'UNIQUE', partial=True)
         self.assertSucc('vtools admin --rename_table UNIQUE "%ad newname"')
         self.assertTrue('vtools show table "%ad newname"')
-        self.assertTrue('%ad newname' in outputOfCmd('vtools show tables'))
+        self.assertOutput('vtools show tables', '%ad newname', partial=True)
 
     def testDescribeTable(self):
         'test describe tables'
         self.assertSucc('vtools select variant -t "%%" "DESD"')
-        self.assertTrue('%%' in outputOfCmd('vtools show tables'))
-        self.assertTrue('DESD' in outputOfCmd('vtools show tables'))
+        self.assertOutput('vtools show tables', '%%', partial=True)
+        self.assertOutput('vtools show tables', 'DESD', partial=True)
         self.assertSucc('vtools admin --describe_table %% "NN NN"')
-        self.assertFalse('DESD' in outputOfCmd('vtools show tables'))
-        self.assertTrue('NN NN' in outputOfCmd('vtools show tables'))
+        self.assertOutput('vtools show tables', 'NN NN', partial=True)
 
     def testSaveLoadSnapshot(self):
         'test save/load snapshot'

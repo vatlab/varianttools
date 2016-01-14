@@ -33,14 +33,14 @@ from testUtils import ProcessTestCase, runCmd, output2list
 class TestShow(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        runCmd('vtools init test -f')
-        runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
-        runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
-        runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        runCmd('vtools use ann/testNSFP.ann')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+        self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        self.runCmd('vtools use ann/testNSFP.ann')
         
     def removeProj(self):
-        runCmd('vtools remove project')
+        self.runCmd('vtools remove project')
 
     def testShow(self):
         'Test command vtools show'

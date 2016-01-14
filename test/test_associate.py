@@ -56,7 +56,7 @@ class SetMafTester(ActionTester):
 class TestAsso(ProcessTestCase):
 
     def removeProj(self):
-        runCmd('vtools remove project')
+        self.runCmd('vtools remove project')
 
     def testInterface(self):
         'Test association module interface'
@@ -89,7 +89,7 @@ class TestAsso(ProcessTestCase):
         dir = os.getcwd()
         zip.extractall(dir)
         for i in range(8):
-            runCmd('vtools update variant --from_file output/assogrp{}.txt --format fmt/randcol.fmt --var_info grpby'.format(str(i+1)))
+            self.runCmd('vtools update variant --from_file output/assogrp{}.txt --format fmt/randcol.fmt --var_info grpby'.format(str(i+1)))
             vtoolsout = output2list('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "LinRegBurden --alternative 2" -g grpby')
             vtoolsout = ['\t'.join([j for jdx, j in enumerate(x.split()) if jdx in [0,4,5,6]]) for idx, x in enumerate(vtoolsout) if idx > 0 and 'NAN' not in x]
             vtoolsout.sort()
@@ -103,7 +103,7 @@ class TestAsso(ProcessTestCase):
         dir = os.getcwd()
         zip.extractall(dir)
         for i in range(8):
-            runCmd('vtools update variant --from_file output/assogrp{}.txt --format fmt/randcol.fmt --var_info grpby'.format(str(i+1)))
+            self.runCmd('vtools update variant --from_file output/assogrp{}.txt --format fmt/randcol.fmt --var_info grpby'.format(str(i+1)))
             vtoolsout = output2list('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "WeightedBurdenQt --alternative 2 --weight Browning_all" -g grpby')
             vtoolsout = ['\t'.join([j for jdx, j in enumerate(x.split()) if jdx in [0,4,5,6]]) for idx, x in enumerate(vtoolsout) if idx > 0 and 'NAN' not in x]
             vtoolsout.sort()

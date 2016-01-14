@@ -36,7 +36,7 @@ class TestUse(ProcessTestCase):
         initTest(5)
     
     def removeProj(self):
-        runCmd('vtools remove project')
+        self.runCmd('vtools remove project')
         
     def testShow(self):
         'Test vtools show command'
@@ -88,7 +88,7 @@ class TestUse(ProcessTestCase):
             '1\t83936\t-\tAAA\n')
         #
         # Now, let us import vcf regularly.
-        runCmd('vtools init test --force')
+        self.runCmd('vtools init test --force')
         self.assertSucc('vtools import --format vcf ann/testThousandGenomes.vcf.head --build hg19')
         self.assertSucc('vtools use ann/testThousandGenomes.ann')
         # do we have all the variants matched up?
@@ -96,8 +96,8 @@ class TestUse(ProcessTestCase):
         self.assertOutput('vtools select variant "testThousandGenomes.chr is not NULL" -c', '146\n')
 
     def testESP(self):
-        runCmd('vtools init test -f')
-        runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
         self.assertSucc('vtools use ESP')
         self.assertSucc('vtools show annotation ESP')
         self.assertOutput('vtools execute "select sample_name from sample"', 'WHISP:D967-33\nWHISP:D226958-47\nWHISP:D264508-52\nWHISP:D7476-42\n')
@@ -111,15 +111,15 @@ class TestUse(ProcessTestCase):
         self.assertOutput('''vtools execute "SELECT YRI_alt_lc, YRI_total_lc FROM testNSFP.testNSFP WHERE hg18pos=897662 AND alt='C';"''', '9\t118\n')
 
     def testUseRange_1(self):
-        runCmd('vtools init test -f')
-        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #the annotation file of "knownGene" is a range based database
         self.assertSucc('vtools use knownGene --anno_type range --linked_fields chr txStart txEnd')
         self.assertSucc('vtools update variant --set count1=knownGene.exonCount')
         range_out = output2list('vtools execute "select pos, ref, alt, count1 from variant where count1 is not null"')
         #using another way to export this table
-        runCmd('vtools init test -f')
-        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #this is the default method. the linked_fields have to be in the order in the test below.
         self.assertSucc('vtools use knownGene')
         self.assertSucc('vtools update variant --set count1=knownGene.exonCount')
@@ -128,8 +128,8 @@ class TestUse(ProcessTestCase):
         
 
     def testUseRange_2(self):
-        runCmd('vtools init test -f')
-        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #runCmd('vtools use gwasCatalog')
         #self.assertSucc('vtools show annotation gwasCatalog -v2')
         #the annotation file of "gwasCatalog" is a position-based, but we can use it as range-based as below:
@@ -139,8 +139,8 @@ class TestUse(ProcessTestCase):
         range_out2=len(output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name = \'VAMP3\'"'))
         self.assertSucc('vtools select variant "gwasCatalog.genes == \'RERE\'" -o variant.chr variant.pos variant.ref variant.alt gwasCatalog.trait gwasCatalog.name gwasCatalog.position gwasCatalog.pValue gwasCatalog.journal gwasCatalog.title gwasCatalog.genes')
         #narrow the range of position
-        runCmd('vtools init test -f')
-        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         self.assertSucc('vtools use gwasCatalog --anno_type range --linked_fields chr position-500 position+500')
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
         self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
@@ -149,8 +149,8 @@ class TestUse(ProcessTestCase):
        
 
     def testUseField_1(self):
-        runCmd('vtools init test -f')
-        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields region')
         #under the option of field in --anno_type, the variable for linked_fields have be in the annotation database that you want to use
         #and --linked_by field in the variant or annotation(already imported) table. 
@@ -169,19 +169,19 @@ class TestUse(ProcessTestCase):
         self.assertFail('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
     
     def testUseField_2(self):
-        runCmd('vtools init test -f')
-        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #import the first annotation database
-        runCmd('vtools use cytoBand')
+        self.runCmd('vtools use cytoBand')
         self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields region --linked_by genes')
         self.assertSucc('vtools use gwasCatalog --anno_type field --linked_fields region --linked_by cytoBand.name')
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
         self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
         self.assertSucc('vtools select variant "gwasCatalog.genes == \'VAMP3\'" -o variant.chr variant.pos variant.ref variant.alt gwasCatalog.trait gwasCatalog.name gwasCatalog.position gwasCatalog.pValue gwasCatalog.journal gwasCatalog.title gwasCatalog.genes')
         #For comparison, if we choise "name" in the linked_fields,nothing will be outputed.  
-        runCmd('vtools init test -f')
-        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
-        runCmd('vtools use cytoBand')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.runCmd('vtools use cytoBand')
         self.assertSucc('vtools use gwasCatalog --anno_type field --linked_fields name --linked_by cytoBand.name')
         self.assertSucc('vtools update variant --set gene_name=1')
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
@@ -191,8 +191,8 @@ class TestUse(ProcessTestCase):
         
         
     def testUseVariant(self):
-        runCmd('vtools init test -f')
-        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #this is the default method. the linked_fields have to be in the order in the test below.
         self.assertSucc('vtools use ESP --anno_type variant --linked_fields chr pos ref alt')
         #it is same with
@@ -206,8 +206,8 @@ class TestUse(ProcessTestCase):
         #self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
 
     def testUsePosition(self):
-        runCmd('vtools init test -f')
-        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #If we use the option of positon, the linked_fields have to be "chr" and "position"
         #the following command is current, but no variant was linked to the annotation database
         self.assertSucc('vtools use gwasCatalog --anno_type position --linked_fields chr position')
@@ -217,8 +217,8 @@ class TestUse(ProcessTestCase):
         pos_out = output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
         self.assertEqual(pos_out,['9468354\t-\tA\t1'])
         #using another way to export this table
-        runCmd('vtools init test -f')
-        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         self.assertSucc('vtools use gwasCatalog')
         #the output is none from the command too
         self.assertSucc('vtools update variant --set gene_name=1')
@@ -229,8 +229,8 @@ class TestUse(ProcessTestCase):
     
     def testUseAs(self):
         '''Testing the --as option of command vtools use'''
-        runCmd('vtools init test -f')
-        runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #this is the default method. the linked_fields have to be in the order in the test below.
         self.assertSucc('vtools use ESP --anno_type variant --linked_fields chr pos ref alt')
         #it is same with

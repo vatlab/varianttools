@@ -33,8 +33,8 @@ from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd, output2lis
 class TestOutput(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        runCmd('vtools init test -f')
-        runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18')
         
     def testOutputContents(self):
         'Test command vtools output'
@@ -44,22 +44,22 @@ class TestOutput(ProcessTestCase):
         self.assertFail('vtools output variant')
         self.assertFail('vtools output variant non_existing_field')
         self.assertSucc('vtools output variant chr pos ref alt')
-        runCmd('vtools liftover hg19')
+        self.runCmd('vtools liftover hg19')
         out1 = outputOfCmd('vtools output variant chr pos alt_pos ref alt -d"\t"')
         out2 = outputOfCmd('cat txt/input.tsv')
         self.assertEqual(out1, out2)
-        runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
         self.assertSucc('vtools output CEU chr pos ref alt -l -1')
         self.assertFail('vtools output CEU and variant -l 10')
         # test output of table with non-ascii name
-        runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t "08#x"')
+        self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t "08#x"')
         self.assertSucc('vtools output "08#x" chr pos ref alt -l -1')
 
 
     def testAllOutput(self):
         'Test option --all of command output'
-        runCmd('vtools use refGene-hg18_20110909')
+        self.runCmd('vtools use refGene-hg18_20110909')
         out0 = outputOfCmd('vtools output variant chr ref').split('\n')
         out1 = outputOfCmd('vtools output variant chr ref refGene.name').split('\n')
         out2 = outputOfCmd('vtools output variant chr ref refGene.name --all').split('\n')
@@ -71,15 +71,15 @@ class TestOutput(ProcessTestCase):
         self.assertEqual(len(out2), 407)
         
     def testOutputExpression(self):
-        runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        self.runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
         self.assertFail('vtools output variant sum(num)')
         self.assertSucc('vtools output variant alt "sum(num)" --group_by alt')
         self.assertSucc('vtools output variant alt "sum(num)" --group_by alt --header alt sum') 
         self.assertSucc('vtools output variant alt "sum(num)" --group_by alt --delimiter ","')  
-        self.assertEqual(outputOfCmd('vtools output variant "sum(num)" -v0'), '6383'+'\n')
+        self.assertOutput('vtools output variant "sum(num)" -v0'), '6383'+'\n')
         self.assertFail('vtools output variant count(1)')
-        self.assertEqual(outputOfCmd('vtools output variant "count(1)"'), '626'+'\n')
+        self.assertOutput('vtools output variant "count(1)"'), '626'+'\n')
         self.assertSucc('vtools output variant chr pos ref alt num --order_by num')
         self.assertSucc('vtools output variant chr pos ref alt num --build hg18')
         self.assertSucc('vtools liftover hg19 --flip')

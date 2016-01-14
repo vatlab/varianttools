@@ -34,10 +34,10 @@ class TestRemove(ProcessTestCase):
     def setUp(self):
         'Create a project'
         initTest(6)
-        runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
-        runCmd('vtools select variant --samples "aff=\'1\'" -t unaffected')
-        runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_num=#(alt)"')
-        runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP --build hg18')
+        self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
+        self.runCmd('vtools select variant --samples "aff=\'1\'" -t unaffected')
+        self.runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_num=#(alt)"')
+        self.runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP --build hg18')
 
     def testRemove(self):
         'Test command vtools remove'
@@ -51,7 +51,7 @@ class TestRemove(ProcessTestCase):
         self.assertFail('vtools show table unaffected')
         #
         # remove table with strange names
-        runCmd('vtools select variant -t "NAME WITH #$%"')
+        self.runCmd('vtools select variant -t "NAME WITH #$%"')
         self.assertTrue('NAME WITH #$%' in outputOfCmd('vtools show tables'))
         self.assertSucc('vtools remove tables "NAME WITH #$%"')
         self.assertFalse('NAME WITH #$%' in outputOfCmd('vtools show tables'))
@@ -71,14 +71,14 @@ class TestRemove(ProcessTestCase):
         #remove samples
         self.assertFail('vtools remove sample')
         self.assertFail('vtools remove samples')
-        self.assertEqual(numOfSample(), 63)
+        self.assertProj(numOfSamples= 63)
         self.assertSucc('vtools remove samples "sample_name like \'NA070%\'"')
-        self.assertEqual(numOfSample(), 60) 
+        self.assertProj(numOfSamples= 60) 
         self.assertSucc('vtools remove samples "BMI > 20"')
         # note that the sample with missing BMI is still there
-        self.assertEqual(numOfSample(), 28) 
+        self.assertProj(numOfSamples= 28) 
         self.assertSucc('vtools remove samples "BMI is NULL"')
-        self.assertEqual(numOfSample(), 25) 
+        self.assertProj(numOfSamples= 25) 
 
         #remove variant
     def testRemoveVar(self):
@@ -96,10 +96,10 @@ class TestRemove(ProcessTestCase):
         #remove fields in the variant table
     def testRemoveFields(self):
         #add a field in the variant table
-        runCmd('vtools use testNSFP')
-        runCmd('vtools update variant --set gene_name=testNSFP.genename')
+        self.runCmd('vtools use testNSFP')
+        self.runCmd('vtools update variant --set gene_name=testNSFP.genename')
         self.assertOutput('vtools show table variant', '''Name:                   variant\nDescription:            Master variant table\nCommand:\nFields:                 variant_id, bin, chr, pos, ref, alt, CEU_cases_num,\n                        DP, gene_name\nNumber of variants:     1036\n''', skip=3)
-        runCmd('vtools remove fields CEU_cases_num gene_name DP') 
+        self.runCmd('vtools remove fields CEU_cases_num gene_name DP') 
         self.assertOutput('vtools show table variant', '''Name:                   variant\nDescription:            Master variant table\nCommand:\nFields:                 variant_id, bin, chr, pos, ref, alt\nNumber of variants:     1036\n''', skip=3)
 
     def testRemovePhenotype(self):

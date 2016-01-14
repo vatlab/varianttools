@@ -39,73 +39,66 @@ class ProcessTestCase(unittest.TestCase):
     'A subclass of unittest.TestCase to handle process output'
     def setUp(self):
         'Create a new project. This will be called for each new test'
+        self.test_command = self.id().split('.')[1]
+        with open(self.test_command + '.log', 'a') as fcmd:
+            fcmd.write('\n# {}\n# {} \n'.format(self.id().split('.', 1)[-1], 
+                '' if self.shortDescription() is None else '\n# '.join(self.shortDescription().split('\n'))))
         self.runCmd('vtools init test -f')
+
+    def compare(self, itemA, itemB, partial=None):
+        if isinstance(itemA, str):
+            if partial is None:
+                self.assertEqual(itemA, itemB)
+            elif partial is True:
+                self.assertTrue(itemB in itemA)
+            elif isinstance(partial, int):
+                if partial >= 0:
+                    self.assertEqual(itemA.split('\n')[:partial], itemB.split('\n')[:partial])
+                elif partial < 0:
+                    self.assertEqual(itemA.split('\n')[partial:], itemB.split('\n')[partial:])
+            elif callable(partial):
+                self.assertEqual(partial(itemA.split('\n')), partial(itemB.split('\n')))
+            else:
+                raise ValueError('Partial can be an integer, True, or a lambda function')
+        else: # a list
+            if partial is None:
+                self.assertEqual(itemA, itemB)
+            elif partial is True:
+                if isinstance(itemB, list):
+                    self.assertTrue(all([x in itemA for x in itemB]))
+                else:
+                    self.assertTrue(itemB in itemA)
+            elif isinstance(partial, int):
+                if partial >= 0:
+                    self.assertEqual(itemA[:partial], itemB[:partial])
+                elif partial < 0:
+                    self.assertEqual(itemA[partial:], itemB[partial:])
+            elif callable(partial):
+                self.assertEqual(partial(itemA), partial(itemB))
+            else:
+                raise ValueError('Partial can be an integer, True, or a lambda function')
 
     def runCmd(self, cmd):
         'Run a command in shell process. Does not check its output or return value.'
-        with open('run_tests.log', 'a') as fcmd:
-            fcmd.write(cmd + '\n\n')
+        with open(self.test_command + '.log', 'a') as fcmd:
+            fcmd.write(cmd + '\n')
         with open(os.devnull, 'w') as fnull:
-            subprocess.call(cmd, stdout=fnull, stderr=fnull, shell=True,
-                env=test_env)
-
-    def assertOutput(self, cmd, output, partial=None):
-        '''Compare the output of cmd to either a string output, or content of output file
-        (if output is a filename). If parameter partial is given, texts are split into lines
-        and compares the first partial lines if it is a positive number (slice :partial), the
-        last few lines if it is a negative number (slice partial:), or the result of it if
-        partial is a lambda function.
-            
-        NOTE: if output is a file (with pattern test/*.txt) and the file does not exist, this
-        function will write command output to it with a warning message. This greatly simplies
-        the writing of test functions. Make sure to check if the output is correct though.
-        '''
-        #
-        with open('run_tests.log', 'a') as fcmd:
-            fcmd.write(cmd + '\n\n')
-        with open(os.devnull, 'w') as fnull:
-            cmd_output = subprocess.check_output(cmd, stderr=fnull, env=test_env, shell=True).decode()
-        if os.path.isfile(output):
-            with open(output, 'r') as cf:
-                output = cf.read()
-        else:
-            if output.startswith('test/') and output.endswith('.txt'):
-                print('\041[32mWARNING: output file {} does not exist and has just been created.\033[0m'.format(output))
-                with open(output, 'w') as cf:
-                    cf.write(cmd_output)
-        #
-        if lines is None:
-            self.assertEqual(cmd_output, output)
-        else:
-            # compare slice?
-            if isinstance(partial, int):
-                if partial >= 0:
-                    self.assertEqual(
-                        cmd_output.split('\n')[:partial],
-                        output.split('\n')[:partial])
-                elif partial < 0:
-                    self.assertEqual(
-                        cmd_output.split('\n')[partial:],
-                        output.split('\n')[partial:])
-            elif callable(partial):
-                self.assertEqual(
-                    partial(cmd_output.split('\n')),
-                    partial(output.split('\n')))
-            else:
-                raise ValueError('Partial can be an integer or a lambda function')
+            return subprocess.check_output(cmd, stderr=fnull, shell=True, env=test_env).decode()
 
     def assertSucc(self, cmd):
         'Execute cmd and assert its success'
-        with open('run_tests.log', 'a') as fcmd:
-            fcmd.write(cmd + '\n\n')
+        with open(self.test_command + '.log', 'a') as fcmd:
+            fcmd.write('# expect success\n')
+            fcmd.write(cmd + '\n')
         with open(os.devnull, 'w') as fnull:
             self.assertEqual(subprocess.check_call(cmd, stdout=fnull, stderr=fnull, shell=True,
                 env=test_env), 0)
 
     def assertFail(self, cmd):
         'Execute cmd and assert its failure (return non-zero)'
-        with open('run_tests.log', 'a') as fcmd:
-            fcmd.write(cmd + '\n\n')
+        with open(self.test_command + '.log', 'a') as fcmd:
+            fcmd.write('# expect failure\n')
+            fcmd.write(cmd + '\n')
         try:
             with open(os.devnull, 'w') as fnull:
                 subprocess.check_call(cmd, stdout=fnull, stderr=fnull, shell=True,
@@ -113,7 +106,51 @@ class ProcessTestCase(unittest.TestCase):
         except subprocess.CalledProcessError:
             return
 
-    def assertProj(self, numOfSamples=None, numOfVariants=None, sampleNames=None):
+
+    def assertOutput(self, cmd, output, partial=None):
+        '''Compare the output of cmd  to either a string output, or content of output file
+        (if output is a filename). cmd can be either a command (string) or a list of commands,
+        with output joint together in the latter case. If parameter partial is given,
+        a) positive number: texts are split into lines and compares the first partial lines  ([:partial]),
+        b) negative number: texts are split into lines and compares the last few lines ([partial:])
+        c) a lambda function: texts are split into lines and compare the results returned after
+            applying the lambda function
+        d) True: if output is a substring of cmd (output in cmd)
+            
+        NOTE: if output is a file (with pattern output/*.txt) and the file does not exist, this
+        function will write command output to it with a warning message. This greatly simplies
+        the writing of test functions. Make sure to check if the output is correct though.
+        '''
+        #
+        with open(self.test_command + '.log', 'a') as fcmd:
+            if output.startswith('output/') and output.endswith('.txt'):
+                fcmd.write('# expect output in {}\n'.format(output))
+            else:
+                fcmd.write('# expect output string {}\n'.format('\n#'.join(output.split('\n'))))
+            if isinstance(cmd, str):
+                fcmd.write(cmd + '\n')
+            else:
+                fcmd.write('\n'.join(cmd) + '\n')
+        with open(os.devnull, 'w') as fnull:
+            if isinstance(cmd, str):
+                cmd_output = subprocess.check_output(cmd, stderr=fnull, env=test_env, shell=True).decode()
+            else:
+                cmd_output = '\n'.join([subprocess.check_output(c, stderr=fnull, env=test_env, shell=True).decode() for c in cmd])
+        if os.path.isfile(output):
+            with open(output, 'r') as cf:
+                output = cf.read()
+        else:
+            if output.startswith('output/') and output.endswith('.txt'):
+                print('\033[32mWARNING: output file {} does not exist and has just been created.\033[0m'.format(output))
+                with open(output, 'w') as cf:
+                    cf.write(cmd_output)
+                output = cmd_output
+        #
+        self.compare(cmd_output, output, partial)
+
+
+    def assertProj(self, numOfSamples=None, numOfVariants=None, sampleNames=None, numOfColumns=None, 
+        info=None, genotype=None, genoInfo=None, partial=None):
         '''Check properties of project
 
         numOfSamples:
@@ -122,6 +159,31 @@ class ProcessTestCase(unittest.TestCase):
         numOfVariants: 
             if a single number is given, assert number of variants in the master variant table.
             Otherwise a dictionary with table name and expected number of variants is checked.
+
+        sampleNames:
+            compare sample names with provided list
+
+        numOfColumns:
+            Compare number of columns of a table. If a number is given, it is assumed to be the
+            'variant' table. Otherwise a dictionary with tablename and expected number of columns
+            should be provided.
+
+        info:
+            Compare variant info with specified list. This parameter should be a dictionary
+            with name of info as key.
+
+        genotype:
+            Compare genotype with a provided list. This parameter should be a dictionary with
+            sample_id: genotype.
+        
+        genoInfo:
+            Compare genotype info with a provided list. This parameter should be a dictionary
+            with key (sample_id, geno_info_name): geno_info.
+
+        partial:
+            partial can be True (if specified item is a subset of output list), positive integer
+            (compare the first few items), negative number (compare the last few items), or 
+            a lambda function (compare result of function call).
         '''
         if numOfSamples is not None:
             with open(os.devnull, 'w') as fnull:
@@ -142,27 +204,40 @@ class ProcessTestCase(unittest.TestCase):
         if sampleNames is not None:
             with open(os.devnull, 'w') as fnull:
                 sample_names = subprocess.check_output('vtools execute "SELECT sample_name FROM sample"', shell=True,
-                    stderr=fnull).decode().split('\n')
-                self.assertEqual(sorted([x.strip() for x in sample_names]),
-                    sorted([x.strip() for x in sampleNames])
+                    stderr=fnull).decode().strip().split('\n')
+                self.compare(sorted([x.strip() for x in sample_names]),
+                    sorted([x.strip() for x in sampleNames]), partial=partial)
+        if numOfColumns is not None:
+            with open(os.devnull, 'w') as fnull:
+                if isinstance(numOfColumns, int):
+                    proj_num_of_columns = len(subprocess.check_output('vtools execute "PRAGMA table_info(variant)"', shell=True,
+                        stderr=fnull).decode().strip().split('\n'))
+                    self.assertEqual(proj_num_of_columns, numOfColumns)
+                else:
+                    for table, number in numOfColumns.items():
+                        proj_num_of_columns = len(subprocess.check_output('vtools execute "PRAGMA table_info({})"'.format(table), shell=True,
+                            stderr=fnull).decode().strip().split('\n'))
+                        self.assertEqual(proj_num_of_columns, number)
+        if info is not None:
+            with open(os.devnull, 'w') as fnull:
+                for field, values in info.items():
+                    proj_values = subprocess.check_output('vtools execute "SELECT {} FROM variant"'.format(field), shell=True,
+                        stderr=fnull).decode()
+                    self.compare([x.strip() for x in proj_values.strip().split('\n')], list(values), partial=partial)
+        if genotype is not None:
+            with open(os.devnull, 'w') as fnull:
+                for table, geno in genotype.items():
+                    proj_geno = subprocess.check_output('vtools execute "SELECT GT FROM genotype_{}"'.format(table), shell=True,
+                        stderr=fnull).decode()
+                    self.compare([x.strip() for x in proj_geno.strip().split('\n')], list(geno), partial=partial)
+        if genoInfo is not None:
+            with open(os.devnull, 'w') as fnull:
+                for table, geno in genoInfo.items():
+                    proj_geno = subprocess.check_output('vtools execute "SELECT {} FROM genotype_{}"'.format(table[1], table[0]), shell=True,
+                        stderr=fnull).decode()
+                    self.compare([x.strip() for x in proj_geno.strip().split('\n')], list(geno), partial=partial)
 
-          
-def getGenotypes(projname='test', num=8):
-    nsamples = numOfSample()
-    genotypes = []
-    # getGenotypes for 8 samples
-    for i in range(num):
-        genotypes.append(output2list('vtools execute "select GT from {}_genotype.genotype_{}"'.format(projname, i+1)))
-    return genotypes
-
-def getGenotypeInfo(projname='test', num=8, info=['DP_geno']):
-    nsamples = numOfSample()
-    genotypeInfo = []
-    # getGenotypeInfo for 8 samples
-    for i in range(num):
-        genotypeInfo.append(output2list('vtools execute "select {} from {}_genotype.genotype_{}"'.format(','.join(info), projname, i+1)))
-    return genotypeInfo
-
+         
 def initTest(level):
     i = 1
     while True:

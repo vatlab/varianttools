@@ -34,9 +34,9 @@ class TestPhenotype(ProcessTestCase):
     def setUp(self):
         'Create a project'
         initTest(3)
-        runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno')
+        self.runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno')
     def removeProj(self):
-        runCmd('vtools remove project')
+        self.runCmd('vtools remove project')
     def testImportPhenotype(self):
         'Test command phenotype --from_file'
         # too few arguments
@@ -63,7 +63,7 @@ class TestPhenotype(ProcessTestCase):
     def testImportFields(self):
         'Test command phenotype --from_file FIELD'
         # importing only a few fields, not all fields
-        runCmd('vtools phenotype --from_file phenotype/phenotype.txt aff')
+        self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt aff')
         out3 = output2list('vtools show samples', space2tab=True)
         #the output format was changed, so we reorganize the output and compare
         ori_file2 = open('phenotype/phenotype.txt', 'r')
@@ -105,7 +105,7 @@ class TestPhenotype(ProcessTestCase):
     def testImportFieldsWithFilename(self):
         'Test command phenotype --from_file FIELD'
         # importing only a few fields, not all fields
-        runCmd('vtools phenotype --from_file phenotype/pheno_filename.txt aff')
+        self.runCmd('vtools phenotype --from_file phenotype/pheno_filename.txt aff')
         out3 = output2list('vtools show samples', True)
         #the output format was changed, so we reorganize the output and compare
         ori_file2 = open('phenotype/pheno_filename.txt', 'r')
@@ -142,7 +142,7 @@ class TestPhenotype(ProcessTestCase):
 
     def testPhenotypeOutput(self):
         'Test command phenotype with --output'
-        runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
+        self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
         self.assertSucc('vtools phenotype --output sample_name filename aff sex BMI')
         self.assertSucc('vtools phenotype --set race=1 --samples \'filename like "%CEU%"\' --output sex BMI race')
         self.assertSucc('vtools phenotype --from_stat "numGeno=count(*)" --output sample_name sex numGeno --header sample_name sex numGeno') 

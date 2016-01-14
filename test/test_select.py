@@ -34,12 +34,12 @@ class TestSelect(ProcessTestCase):
     def setUp(self):
         'Create a project'
         initTest(6)
-        runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
-        runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
-        runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_het=#(het)"')
+        self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
+        self.runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
+        self.runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_het=#(het)"')
 
     def removeProj(self):
-        runCmd('vtools remove project')
+        self.runCmd('vtools remove project')
     
     def testSelect(self):
         'Test command vtools select'
@@ -114,13 +114,13 @@ class TestSelect(ProcessTestCase):
         self.assertSucc('vtools select CEU -s "BMI<18.5" -t Underweight')
 
     def testSelectSampleWithWildtypeGenotype(self):
-        runCmd('vtools import vcf/with_wildtype.vcf --sample_name WT')
+        self.runCmd('vtools import vcf/with_wildtype.vcf --sample_name WT')
         # original 989 variants but some of them have only wildtype genotype
         self.assertOutput('''vtools select variant --samples "sample_name='WT'" -c''', "934\n")
 
 
     def testSelectLargeSample(self):
-        runCmd('vtools import vcf/500SAMP.vcf')
+        self.runCmd('vtools import vcf/500SAMP.vcf')
         self.assertSucc('vtools select variant --samples "sample_name like \'SAM%\'" -c')
 
 

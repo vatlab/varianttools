@@ -36,7 +36,7 @@ class TestCompare(ProcessTestCase):
         initTest(10)
 
     def removeProj(self):
-        runCmd('vtools remove project')
+        self.runCmd('vtools remove project')
         
     def testCompare(self):
         'Test command vtools compare'
@@ -66,7 +66,7 @@ class TestCompare(ProcessTestCase):
         # handling of non-alphanum names
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --union "KK@"')
         self.assertTrue('KK@' in outputOfCmd('vtools show tables'))
-        runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
+        self.runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
         self.assertSucc('vtools compare "d@p" ns_damaging --intersection "K&K@"')
         self.assertTrue('K&K@' in outputOfCmd('vtools show tables'))
         #
@@ -102,7 +102,7 @@ class TestCompare(ProcessTestCase):
         # handling of non-alphanum names
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "\'KK@\'=_1 | _2"')
         self.assertTrue('KK@' in outputOfCmd('vtools show tables'))
-        runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
+        self.runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
         self.assertSucc('vtools compare "d@p" ns_damaging --expression "\'K&K@\'=_1 & _2"')
         self.assertTrue('K&K@' in outputOfCmd('vtools show tables'))
 
@@ -134,18 +134,18 @@ class TestCompare(ProcessTestCase):
         # handling of non-alphanum names
         self.assertSucc('vtools compare --expression "\'KK@\'=d_plekhn1 |ns_damaging"')
         self.assertTrue('KK@' in outputOfCmd('vtools show tables'))
-        runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
+        self.runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
         self.assertSucc('vtools compare  --expression "\'K&K@\'=\'d@p\' & ns_damaging"')
         self.assertTrue('K&K@' in outputOfCmd('vtools show tables'))
 
     def testSimpleProj(self):
         'Test compare by site'
-        runCmd('vtools init test -f')
-        runCmd('vtools import vcf/compare.vcf --build hg18')
-        runCmd('vtools execute "DELETE FROM genotype.genotype_1 WHERE GT=0"')
-        runCmd('vtools execute "DELETE FROM genotype.genotype_2 WHERE GT=0"')
-        runCmd('vtools select variant "variant_id in (1, 2)" -t T1')
-        runCmd('vtools select variant "variant_id in (1, 3, 4)" -t T2')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/compare.vcf --build hg18')
+        self.runCmd('vtools execute "DELETE FROM genotype.genotype_1 WHERE GT=0"')
+        self.runCmd('vtools execute "DELETE FROM genotype.genotype_2 WHERE GT=0"')
+        self.runCmd('vtools select variant "variant_id in (1, 2)" -t T1')
+        self.runCmd('vtools select variant "variant_id in (1, 3, 4)" -t T2')
         # variant
         self.assertOutput('vtools compare T1 T2 ', '1\t2\t1\t4\n')
         self.assertOutput('vtools compare T1 T2 --difference', '1\n')

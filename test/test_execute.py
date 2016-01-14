@@ -35,7 +35,7 @@ class TestExecute(ProcessTestCase):
         'Create a project'
         initTest(5)
     def removeProj(self):
-        runCmd('vtools remove project')
+        self.runCmd('vtools remove project')
     def testExecute(self):
         'Test command vtools execute'
         self.assertFail('vtools execute')
@@ -49,11 +49,11 @@ class TestExecute(ProcessTestCase):
         self.assertSucc('vtools execute \'delete FROM sample where aff=2\' -v2')
     
     def testExeAnno(self):
-        runCmd('vtools init test -f')
-        runCmd('vtools import vcf/SAMP1.vcf --build hg19')
-        runCmd('vtools import vcf/SAMP2.vcf')
-        runCmd('vtools use refGene')
-        runCmd('vtools update variant --set ref_name=refGene.name')
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')
+        self.runCmd('vtools import vcf/SAMP2.vcf')
+        self.runCmd('vtools use refGene')
+        self.runCmd('vtools update variant --set ref_name=refGene.name')
         self.assertSucc('vtools execute \'select chr,txStart,txEnd,name from refGene where name is not null\'')
         self.assertOutput('vtools execute \'select chr,txStart,txEnd,name from refGene where name="NR_024321"\'','1\t761586\t762902\tNR_024321\n')
         out2 = output2list('vtools execute \'select chr from variant where ref_name = "NR_024321"\'')
