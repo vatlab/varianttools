@@ -1,0 +1,7 @@
+Name:                   variant
+Description:            Master variant table
+Creation date:          Jan13
+Command:
+Fields:                 variant_id, bin, chr, pos, ref, alt, alt_bin, alt_chr,
+                        alt_pos
+Number of variants:     12
