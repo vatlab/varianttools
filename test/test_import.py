@@ -221,12 +221,12 @@ class TestImport(ProcessTestCase):
         self.assertEqual(output2list('vtools execute "select DP_geno from genotype_1"'), ["6","1","1","0","1","0","0","0","3","1","0","0","0","0","0","2","0","0","1","3","0","0","3","0","0","2","2","7","2","4","2","3","2","0","1","6","0","2","1","3","1","5","3","1","5","1","0","1","2","1","4","2","3","7","1","0","1","1","2","0","0","5","1","0","0","1","3","1","0","3","3","1","0","4","0","4","3","2","0","2","2","4","4","0","0","6","2","0","0","1","1","0","0","2","5","1","1","1","2","1","0","1","1","4","0","6","1","3","3","1","3","1","5","0","1","2","1","0","0","1","1","2","1","3","5","1","3","3","1","0","2","0","1","3","5","9","2","4","2","2","1","2","1","2","1","2","0","7","7","9","6","1","1","1","1","1","7","9","3","2","1","1","2","1","1","1","2","2","5","4","1","5","5","3","2","2","0","3","3","0","2","2","2","3","5","1","2","3","1","3","0","8","2","3","6","2","2","0","4","2","7","1","3","0","3","4","7","3","1","3","4","2","1","3","2","1","1","1","7","1","2","2","0","0","1","2","3","1","4","2","1","1","2","4","1","2","4","3","1","5","2","8","8","5","5","3","6","7","8","5","3","2","5","7","0","3","3","3","2","2","5","1","12","1","1","2","2","0","6","1","2","5","3","3","3","1","1","1","0","0","1","2","2","0","1","3","0"])
 
     def testImportVCFIndel(self):
-        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18')
+        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
         self.assertEqual(numOfSample(), 0)
-        self.assertEqual(numOfVariant(), 137)
+        self.assertEqual(numOfVariant(), 134)
         self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno_info')
         self.assertEqual(numOfSample(), 0)
-        self.assertEqual(numOfVariant(), 137+12159)
+        self.assertEqual(numOfVariant(), 11877)
         
     def testMPImport(self):
         runCmd('vtools init test -f')
@@ -359,8 +359,8 @@ class TestImport(ProcessTestCase):
 
     def testInsertDelete(self):
         'Testing the number of insertions and deletions'
-        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18')
-        self.assertEqual(numOfVariant(), 137)
+        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
+        self.assertEqual(numOfVariant(), 134)
         self.assertSucc('vtools select variant \'ref="-"\' --output chr pos ref alt')
         self.assertOutput('vtools select variant \'ref="-"\' --output chr pos ref alt', '',  0, 'output/import_vcf_ref.txt')
         self.assertOutput('vtools select variant \'ref="-"\' --output chr pos ref alt', '''1	10434	-	C\n1	54790	-	T\n1	81963	-	AA\n1	82135	-	AAAAAAAAAAAAAA\n1	83787	-	A''',  5, 'output/import_vcf_ref.txt')
@@ -382,15 +382,15 @@ class TestImport(ProcessTestCase):
     def testNo_SampleName(self):
         #Testing one sample per file with the default setting(NO sample name)
         #sample name was not given in file, then there is no information about sample name and genotypes except you assign one for it.
-        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18')
+        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
         self.assertEqual(numOfSample(), 0)
-        self.assertEqual(numOfVariant(), 137)
+        self.assertEqual(numOfVariant(), 134)
     
     def testNo_SampleName_assign(self):
         #Assign a sample name if the sample name is not in file
-        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18 --sample_name vcf_test3')
+        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19 --sample_name vcf_test3')
         self.assertEqual(numOfSample(), 1)
-        self.assertEqual(numOfVariant(), 137) 
+        self.assertEqual(numOfVariant(), 134) 
         self.assertEqual(outputOfCmd('vtools execute "select sample_name from sample"'), 'vcf_test3\n')
         
     def testSampleName_single_assign(self):
@@ -399,7 +399,7 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18 --sample_name samp_vcf2')
         self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18 --sample_name samp_vcf3')
         self.assertEqual(numOfSample(), 3)
-        self.assertEqual(numOfVariant(), 289 + 121 + 137)
+        self.assertEqual(numOfVariant(), 545)
         self.assertOutput('vtools show genotypes', '',  0, 'output/vcf_assigned_sample_name_genotype.txt')
         
     def testSampleName_multiple(self):
@@ -433,7 +433,7 @@ class TestImport(ProcessTestCase):
         self.assertEqual(variants, input)
 
     def testCGAImport(self):
-        self.assertSucc('vtools import txt/CGA.tsv.bz2 --format ../format/CGA.fmt --build hg18 --sample_name samp_csv')
+        self.assertSucc('vtools import txt/CGA.tsv.bz2 --format ../format/CGA.fmt --build hg19 --sample_name samp_csv')
         self.assertEqual(numOfSample(), 1)
         self.assertEqual(numOfVariant(),95)
         self.maxDiff = None
