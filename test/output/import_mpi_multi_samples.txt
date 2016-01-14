@@ -1,0 +1,4 @@
+sample_name	filename
+SAMP1      	vcf/V1.vcf
+SAMP1      	vcf/V2.vcf
+SAMP1      	vcf/V3.vcf
