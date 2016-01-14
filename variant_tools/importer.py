@@ -1369,7 +1369,7 @@ class Importer:
             if len(rec) > 5:
                 self.count[8] += 1
                 cur.execute(self.update_variant_query, rec[5:] + [variant_id])
-            env.logger.info('Overlapping variant {}:{}-{}/{}'.format(rec[1], rec[2], rec[3], rec[4]))
+            #env.logger.info('Overlapping variant {}:{}-{}/{}'.format(rec[1], rec[2], rec[3], rec[4]))
             return variant_id
         else:
             # new variant!
