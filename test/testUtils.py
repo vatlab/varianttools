@@ -29,148 +29,124 @@ import unittest
 import shlex, subprocess
 import sys
 
-# we will need to install vtools first, and we put /usr/local/bin
-# before any system path that might have path to local vtools ...
-test_env = {'PATH': os.pathsep.join(['/usr/bin', '/usr/local/bin', os.environ['PATH']]),
-   'PYTHONPATH': os.environ.get('PYTHONPATH', '')}
-
-class PrettyPrinter:
-    def __init__(self, out):
-        ''' delimiter: use specified field to separate fields
-            cache: only use the first cache lines to get column width
-        '''
-        self.width = []
-        self.rows = []
-        self.out = out
-
-    def cache(self, d):
-        data = [x.strip() for x in d]
-        self.rows.append(data)
-        if not self.width:
-            self.width = [len(str(x)) for x in data]
-        else:
-            self.width = [max(y, len(str(x))) for y,x in zip(self.width, data)]
-
-    def write(self):
-        self.width[-1] = 0
-        with open(self.out, 'w') as o:
-            o.write('\n'.join([
-            '\t'.join(
-                [str(col).ljust(width) for col, width in zip(row, self.width)])
-            for row in self.rows]) + '\n')
+test_env = None
+# Sometimes a modified environment for testing is needed.
+#
+#{'PATH': os.pathsep.join(['/usr/bin', '/usr/local/bin', os.environ['PATH']]),
+#   'PYTHONPATH': os.environ.get('PYTHONPATH', '')}
 
 class ProcessTestCase(unittest.TestCase):
     'A subclass of unittest.TestCase to handle process output'
-# used to be empty; force delete
     def setUp(self):
-        'Clear any existing project'
-        runCmd('vtools remove project')
+        'Create a new project. This will be called for each new test'
+        self.runCmd('vtools init test -f')
 
-    def tearDown(self):
-        'Clear any existing project'
-        #runCmd('vtools remove project')
+    def runCmd(self, cmd):
+        'Run a command in shell process. Does not check its output or return value.'
+        with open('run_tests.log', 'a') as fcmd:
+            fcmd.write(cmd + '\n\n')
+        with open(os.devnull, 'w') as fnull:
+            subprocess.call(cmd, stdout=fnull, stderr=fnull, shell=True,
+                env=test_env)
 
-    def fileContent(self, file):
-        with open(file) as ifile:
-            cont = ifile.read()
-        return cont
+    def assertOutput(self, cmd, output, partial=None):
+        '''Compare the output of cmd to either a string output, or content of output file
+        (if output is a filename). If parameter partial is given, texts are split into lines
+        and compares the first partial lines if it is a positive number (slice :partial), the
+        last few lines if it is a negative number (slice partial:), or the result of it if
+        partial is a lambda function.
+            
+        NOTE: if output is a file (with pattern test/*.txt) and the file does not exist, this
+        function will write command output to it with a warning message. This greatly simplies
+        the writing of test functions. Make sure to check if the output is correct though.
+        '''
+        #
+        with open('run_tests.log', 'a') as fcmd:
+            fcmd.write(cmd + '\n\n')
+        with open(os.devnull, 'w') as fnull:
+            cmd_output = subprocess.check_output(cmd, stderr=fnull, env=test_env, shell=True).decode()
+        if os.path.isfile(output):
+            with open(output, 'r') as cf:
+                output = cf.read()
+        else:
+            if output.startswith('test/') and output.endswith('.txt'):
+                print('\041[32mWARNING: output file {} does not exist and has just been created.\033[0m'.format(output))
+                with open(output, 'w') as cf:
+                    cf.write(cmd_output)
+        #
+        if lines is None:
+            self.assertEqual(cmd_output, output)
+        else:
+            # compare slice?
+            if isinstance(partial, int):
+                if partial >= 0:
+                    self.assertEqual(
+                        cmd_output.split('\n')[:partial],
+                        output.split('\n')[:partial])
+                elif partial < 0:
+                    self.assertEqual(
+                        cmd_output.split('\n')[partial:],
+                        output.split('\n')[partial:])
+            elif callable(partial):
+                self.assertEqual(
+                    partial(cmd_output.split('\n')),
+                    partial(output.split('\n')))
+            else:
+                raise ValueError('Partial can be an integer or a lambda function')
 
-# compare if the command output is what we want
-    def assertOutput(self, cmd, output=None, numOfLines=0, file=None, skip=None):
-        cmd = shlex.split(cmd)
-        # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
-        if skip is not None:
-             if numOfLines != 0 or file is not None:
-                 raise ValueError('skip is not implemented with other options')
-        with open('run_tests.log', 'a') as fnull: 
-            if output is None and file is None:
-                raise ValueError('Please specify your OUTPUT or give your file name of the output')
-            if numOfLines == 0:
-                if file is None:        
-                    if skip is None:
-                        self.assertEqual(
-                             subprocess.check_output(cmd, stderr=fnull,
-                             env=test_env).decode(), output)
-                    else:
-                        text = subprocess.check_output(cmd, stderr=fnull,
-                             env=test_env).decode().split('\n')
-                        text = text[:skip-1] + text[skip:]
-                        self.assertEqual('\n'.join(text), output)
-                elif file is not None:
-                        with open(file) as f:
-                             content = f.read()
-                        self.assertEqual(
-                             subprocess.check_output(cmd, stderr=fnull,
-                             env=test_env).decode(),
-                             content)
-            elif numOfLines > 0:            
-                if file is None:            
-                    self.assertEqual(
-                         '\n'.join(subprocess.check_output(cmd, stderr=fnull,
-                         env=test_env).decode().split('\n')[:numOfLines]),
-                         output)
-                elif file is not None:
-                    self.assertEqual(
-                         '\n'.join(subprocess.check_output(cmd, stderr=fnull,
-                         env=test_env).decode().split('\n')[:numOfLines]),
-                         '\n'.join(self.fileContent(file).split('\n')[:numOfLines]))
-            elif numOfLines < 0:            
-                if file is None:            
-                    self.assertEqual(
-                         '\n'.join(subprocess.check_output(cmd, stderr=fnull,
-                         env=test_env).decode().split('\n')[numOfLines:]),
-                         output)
-                elif file is not None:
-                    self.assertEqual(
-                         '\n'.join(subprocess.check_output(cmd, stderr=fnull,
-                         env=test_env).decode().split('\n')[numOfLines:]),
-                         '\n'.join(self.fileContent(file).split('\n')[numOfLines:]))
     def assertSucc(self, cmd):
-        cmd = shlex.split(cmd)
-        # '..' is added to $PATH so that command (vtool) that is in the current directory # can be executed.
-        with open('run_tests.log', 'a') as fnull:
-            self.assertEqual(subprocess.check_call(cmd, stdout=fnull, stderr=fnull,
+        'Execute cmd and assert its success'
+        with open('run_tests.log', 'a') as fcmd:
+            fcmd.write(cmd + '\n\n')
+        with open(os.devnull, 'w') as fnull:
+            self.assertEqual(subprocess.check_call(cmd, stdout=fnull, stderr=fnull, shell=True,
                 env=test_env), 0)
 
     def assertFail(self, cmd):
-        cmd = shlex.split(cmd)
+        'Execute cmd and assert its failure (return non-zero)'
+        with open('run_tests.log', 'a') as fcmd:
+            fcmd.write(cmd + '\n\n')
         try:
-            with open('run_tests.log', 'a') as fnull:
-                subprocess.check_call(cmd, stdout=fnull, stderr=fnull,
+            with open(os.devnull, 'w') as fnull:
+                subprocess.check_call(cmd, stdout=fnull, stderr=fnull, shell=True,
                     env=test_env)
         except subprocess.CalledProcessError:
             return
 
-def outputOfCmd(cmd):
-    cmd = shlex.split(cmd)
-    with open('run_tests.log', 'a') as fnull:
-        return subprocess.check_output(cmd, stderr=fnull,
-            env=test_env).decode()
-        
+    def assertProj(self, numOfSamples=None, numOfVariants=None, sampleNames=None):
+        '''Check properties of project
 
-def output2list(cmd, space2tab=False):
-    txt = list(map(str, ''.join(outputOfCmd(cmd)).split('\n')[:-1]))
-    if space2tab:
-        txt = ['\t'.join(t.split())  for t in txt]
-    return txt
-        
-def runCmd(cmd, shell=False):
-    if not shell:
-        cmd = shlex.split(cmd)
-    with open('run_tests.log', 'a') as fnull:
-        subprocess.call(cmd, stdout=fnull, stderr=fnull, shell=shell,
-            env=test_env)
+        numOfSamples:
+            number of samples in the project
 
-def numOfSample():
-    with open('run_tests.log', 'a') as fnull:
-        return int(subprocess.check_output(['vtools', 'execute', 'SELECT count(1) FROM sample'],
-            stderr=fnull,  env=test_env))
+        numOfVariants: 
+            if a single number is given, assert number of variants in the master variant table.
+            Otherwise a dictionary with table name and expected number of variants is checked.
+        '''
+        if numOfSamples is not None:
+            with open(os.devnull, 'w') as fnull:
+                proj_num_of_sample = subprocess.check_output('vtools execute "SELECT COUNT(1) FROM sample"', shell=True,
+                    stderr=fnull)
+            self.assertEqual(int(proj_num_of_sample), numOfSamples)
+        if numOfVariants is not None:
+            with open(os.devnull, 'w') as fnull:
+                if isinstance(numOfVariants, int):
+                    proj_num_of_variants = subprocess.check_output('vtools execute "SELECT COUNT(1) FROM variant"', shell=True,
+                        stderr=fnull)
+                    self.assertEqual(int(proj_num_of_variants), numOfVariants)
+                else:
+                    for table, number in numOfVariants.items():
+                        proj_num_of_variants = subprocess.check_output('vtools execute "SELECT COUNT(1) FROM {}"'.format(table), shell=True,
+                            stderr=fnull)
+                        self.assertEqual(int(proj_num_of_variants), number)
+        if sampleNames is not None:
+            with open(os.devnull, 'w') as fnull:
+                sample_names = subprocess.check_output('vtools execute "SELECT sample_name FROM sample"', shell=True,
+                    stderr=fnull).decode().split('\n')
+                self.assertEqual(sorted([x.strip() for x in sample_names]),
+                    sorted([x.strip() for x in sampleNames])
 
-def numOfVariant(table='variant'):
-    with open('run_tests.log', 'a') as fnull:
-        return int(subprocess.check_output(['vtools', 'execute', 'SELECT count(1) FROM {}'.format(table)],
-            stderr=fnull,  env=test_env))
-    
+          
 def getGenotypes(projname='test', num=8):
     nsamples = numOfSample()
     genotypes = []
@@ -187,9 +163,6 @@ def getGenotypeInfo(projname='test', num=8, info=['DP_geno']):
         genotypeInfo.append(output2list('vtools execute "select {} from {}_genotype.genotype_{}"'.format(','.join(info), projname, i+1)))
     return genotypeInfo
 
-def getSamplenames():
-    return output2list('vtools execute "select sample_name from sample"')
-        
 def initTest(level):
     i = 1
     while True:
