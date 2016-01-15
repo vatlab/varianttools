@@ -28,16 +28,21 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest, output2list
+from testUtils import ProcessTestCase
 
 class TestUse(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        initTest(5)
-    
-    def removeProj(self):
-        self.runCmd('vtools remove project')
-        
+        ProcessTestCase.setUp(self)
+        if os.path.isfile('TestUse.tar.gz'):
+            self.runCmd('vtools admin --load_snapshot TestUse.tar.gz')
+        else:
+            self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+            self.runCmd('vtools import vcf/SAMP1.vcf')
+            self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+            self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
+            self.runCmd('vtools admin --save_snapshot TestUse.tar.gz "Snapshot of project to test command use"')
+
     def testShow(self):
         'Test vtools show command'
         self.assertSucc('vtools show')
@@ -186,8 +191,7 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools update variant --set gene_name=1')
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
         self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
-        comp = output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
-        self.assertEqual(comp, ['9468354\t-\tA\t1'])
+        self.assertOutput('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', 'output/use_field.txt')
         
         
     def testUseVariant(self):
@@ -223,8 +227,7 @@ class TestUse(ProcessTestCase):
         #the output is none from the command too
         self.assertSucc('vtools update variant --set gene_name=1')
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
-        def_out = output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
-        self.assertEqual(def_out, ['9468354\t-\tA\t1'])
+        self.assertOutput('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', 'output/use_position.txt')
     
     
     def testUseAs(self):

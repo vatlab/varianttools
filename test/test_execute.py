@@ -28,14 +28,16 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest, output2list
+from testUtils import ProcessTestCase
 
 class TestExecute(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        initTest(5)
-    def removeProj(self):
-        self.runCmd('vtools remove project')
+        ProcessTestCase.setUp(self)
+        self.runCmd('vtools import vcf/SAMP1.vcf')
+        self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+        self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
+
     def testExecute(self):
         'Test command vtools execute'
         self.assertFail('vtools execute')
@@ -54,23 +56,11 @@ class TestExecute(ProcessTestCase):
         self.runCmd('vtools import vcf/SAMP2.vcf')
         self.runCmd('vtools use refGene')
         self.runCmd('vtools update variant --set ref_name=refGene.name')
-        self.assertSucc('vtools execute \'select chr,txStart,txEnd,name from refGene where name is not null\'')
-        self.assertOutput('vtools execute \'select chr,txStart,txEnd,name from refGene where name="NR_024321"\'','1\t761586\t762902\tNR_024321\n')
-        out2 = output2list('vtools execute \'select chr from variant where ref_name = "NR_024321"\'')
-        for y in out2:
-            print(y)
-            if int(y) != 1:
-               raise ValueError('The chromosome numbers are not same in variant table and annotation file')            
-        pass
-
-        out1 = output2list('vtools execute \'select pos from variant where ref_name = "NR_024321"\'')
-        for x in out1:
-            print(x)
-            if int(x) < 761586:
-               raise ValueError('Out of the range of the gene position')            
-            if int(x) > 762902:
-               raise ValueError('Out of the range of the gene position')
-        pass
+        self.assertSucc('''vtools execute 'select chr,txStart,txEnd,name from refGene where name is not null' ''')
+        self.assertOutput('''vtools execute 'select chr,txStart,txEnd,name from refGene where name="NR_024321"' ''',
+            '1\t761586\t762902\tNR_024321\n')
+        self.assertOutput('''vtools execute 'select pos from variant where ref_name = "NR_024321"' ''',
+            'output/exclude_anno1.txt')
 
 if __name__ == '__main__':
     unittest.main()

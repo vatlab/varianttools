@@ -28,12 +28,12 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest, output2list
+from testUtils import ProcessTestCase
 
 class TestFunc(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        initTest(1)
+        ProcessTestCase.setUp(self)
     
     def removeProj(self):
         self.runCmd('vtools remove project')

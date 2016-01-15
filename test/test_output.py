@@ -28,12 +28,12 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd, output2list
+from testUtils import ProcessTestCase
 
 class TestOutput(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        self.runCmd('vtools init test -f')
+        ProcessTestCase.setUp(self)
         self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18')
         
     def testOutputContents(self):
@@ -45,8 +45,8 @@ class TestOutput(ProcessTestCase):
         self.assertFail('vtools output variant non_existing_field')
         self.assertSucc('vtools output variant chr pos ref alt')
         self.runCmd('vtools liftover hg19')
-        out1 = outputOfCmd('vtools output variant chr pos alt_pos ref alt -d"\t"')
-        out2 = outputOfCmd('cat txt/input.tsv')
+        out1 = self.runCmd('vtools output variant chr pos alt_pos ref alt -d"\t"')
+        out2 = self.runCmd('cat txt/input.tsv')
         self.assertEqual(out1, out2)
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
@@ -60,9 +60,9 @@ class TestOutput(ProcessTestCase):
     def testAllOutput(self):
         'Test option --all of command output'
         self.runCmd('vtools use refGene-hg18_20110909')
-        out0 = outputOfCmd('vtools output variant chr ref').split('\n')
-        out1 = outputOfCmd('vtools output variant chr ref refGene.name').split('\n')
-        out2 = outputOfCmd('vtools output variant chr ref refGene.name --all').split('\n')
+        out0 = self.runCmd('vtools output variant chr ref').split('\n')
+        out1 = self.runCmd('vtools output variant chr ref refGene.name').split('\n')
+        out2 = self.runCmd('vtools output variant chr ref refGene.name --all').split('\n')
         self.assertEqual(len(set(out0)), 6)
         self.assertEqual(len(set(out1)), 33)
         self.assertEqual(len(set(out2)), 38)
@@ -85,7 +85,8 @@ class TestOutput(ProcessTestCase):
         self.assertSucc('vtools liftover hg19 --flip')
         self.assertSucc('vtools output variant chr pos ref alt num --build hg19')
         self.assertSucc('vtools output variant chr pos ref alt num --header sum_of_num --order_by num')
-        self.assertEqual(output2list('vtools output variant num --order_by num')[-10:], ['110', '110', '110', '113', '114', '119', '119', '120', '120', '120'])
+        self.assertOutput('vtools output variant num --order_by num'),
+            ['110', '110', '110', '113', '114', '119', '119', '120', '120', '120'], partial=-10)
         
 
 if __name__ == '__main__':

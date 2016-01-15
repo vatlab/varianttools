@@ -29,7 +29,7 @@ import glob
 import unittest
 import subprocess
 import shutil
-from testUtils import ProcessTestCase, runCmd, numOfVariant, numOfSample, outputOfCmd
+from testUtils import ProcessTestCase
 
 class TestPipeline(ProcessTestCase):
     def testCheckVariantToolsVersion(self):

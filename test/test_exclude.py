@@ -28,20 +28,17 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd, output2list
+from testUtils import ProcessTestCase
 
 class TestExclude(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        self.runCmd('vtools init test -f')
+        ProcessTestCase.setUp(self)
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
         self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
         self.runCmd('vtools use ann/testNSFP.ann')
         self.runCmd('vtools select variant \'testNSFP.chr is not null\' -t ns')
-        
-    def removeProj(self):
-        self.runCmd('vtools remove project')
         
     def testExclude(self):
         'Test command vtools exclude'
@@ -54,8 +51,9 @@ class TestExclude(ProcessTestCase):
         self.assertSucc('vtools exclude ns "sift_score <= 0.94" -t ns_non_damaging')
         # should have 5 variants
         # select "sift_score >= 0.94" will result in 6 variants
-        self.assertOutput('vtools select ns "sift_score > 0.94" -c'), outputOfCmd('vtools exclude ns "sift_score <= 0.94" -c'))
-        self.assertOutput('vtools exclude ns "variant_id=604" -c'), '6\n')
+        self.assertOutput('vtools select ns "sift_score > 0.94" -c', 'output/exclude_sift.txt')
+        self.assertOutput('vtools exclude ns "sift_score <= 0.94" -c', 'output/exclude_sift.txt')
+        self.assertOutput('vtools exclude ns "variant_id=604" -c', '1445')
 
 
     def testExcludeAnno(self):
@@ -64,11 +62,11 @@ class TestExclude(ProcessTestCase):
         self.runCmd('vtools use dbSNP-hg19_138')
         self.assertSucc('vtools exclude variant "dbSNP.PH3_flag=\'filtered\'" -t no_filtered')
         self.assertSucc('vtools output no_filtered variant_id chr pos ref alt')
-        out1 = output2list('vtools output no_filtered variant_id chr pos ref alt -d"\t"')
+        self.assertOutput('vtools output no_filtered variant_id chr pos ref alt -d"\t"', 'output/exclude_anno.txt')
         self.assertSucc('vtools update variant --set PH3_flag=dbSNP.PH3_flag')
         self.assertSucc('vtools execute "select variant_id, chr, pos, ref, alt from variant where PH3_flag is not \'filtered\'"')
-        out2 = output2list('vtools execute "select variant_id, chr, pos, ref, alt from variant where PH3_flag is not \'filtered\'"')
-        self.assertEqual(out1, out2)
+        self.assertOutput('vtools execute "select variant_id, chr, pos, ref, alt from variant where PH3_flag is not \'filtered\'"',
+            'output/exclude_anno.txt')
 
 
 if __name__ == '__main__':

@@ -46,9 +46,9 @@ class ProcessTestCase(unittest.TestCase):
         self.runCmd('vtools init test -f')
 
     def compare(self, itemA, itemB, partial=None):
-        if isinstance(itemA, str):
+        if not isinstance(itemA, list):
             if partial is None:
-                self.assertEqual(itemA, itemB)
+                self.assertEqual(itemA.strip(), itemB.strip())
             elif partial is True:
                 self.assertTrue(itemB in itemA)
             elif isinstance(partial, int):
@@ -97,7 +97,9 @@ class ProcessTestCase(unittest.TestCase):
     def assertFail(self, cmd):
         'Execute cmd and assert its failure (return non-zero)'
         with open(self.test_command + '.log', 'a') as fcmd:
-            fcmd.write('# expect failure\n')
+            # we write failed command to .log with # so that these commands are not executed
+            # upon examination/rerunning
+            fcmd.write('# expect failure\n#')
             fcmd.write(cmd + '\n')
         try:
             with open(os.devnull, 'w') as fnull:
@@ -108,9 +110,12 @@ class ProcessTestCase(unittest.TestCase):
 
 
     def assertOutput(self, cmd, output, partial=None):
-        '''Compare the output of cmd  to either a string output, or content of output file
-        (if output is a filename). cmd can be either a command (string) or a list of commands,
-        with output joint together in the latter case. If parameter partial is given,
+        '''Compare the output of cmd to either a string output, a list of strings, or content of
+        output file (if output is a filename). cmd can be either a command (string) or a list of commands,
+        with output joint together in the latter case. The output of the command will be converted to
+        a list (split by newline) if output is a list.
+        
+        If parameter partial is given,
         a) positive number: texts are split into lines and compares the first partial lines  ([:partial]),
         b) negative number: texts are split into lines and compares the last few lines ([partial:])
         c) a lambda function: texts are split into lines and compare the results returned after
@@ -122,35 +127,41 @@ class ProcessTestCase(unittest.TestCase):
         the writing of test functions. Make sure to check if the output is correct though.
         '''
         #
-        with open(self.test_command + '.log', 'a') as fcmd:
-            if output.startswith('output/') and output.endswith('.txt'):
-                fcmd.write('# expect output in {}\n'.format(output))
-            else:
-                fcmd.write('# expect output string {}\n'.format('\n#'.join(output.split('\n'))))
-            if isinstance(cmd, str):
-                fcmd.write(cmd + '\n')
-            else:
-                fcmd.write('\n'.join(cmd) + '\n')
         with open(os.devnull, 'w') as fnull:
             if isinstance(cmd, str):
                 cmd_output = subprocess.check_output(cmd, stderr=fnull, env=test_env, shell=True).decode()
             else:
                 cmd_output = '\n'.join([subprocess.check_output(c, stderr=fnull, env=test_env, shell=True).decode() for c in cmd])
-        if os.path.isfile(output):
-            with open(output, 'r') as cf:
-                output = cf.read()
-        else:
-            if output.startswith('output/') and output.endswith('.txt'):
-                print('\033[32mWARNING: output file {} does not exist and has just been created.\033[0m'.format(output))
-                with open(output, 'w') as cf:
-                    cf.write(cmd_output)
-                output = cmd_output
+            if isinstance(output, list):
+                cmd_output = cmd_output.strip().split('\n')
+        with open(self.test_command + '.log', 'a') as fcmd:
+            if isinstance(output, list):
+                fcmd.write('# expect output is a list of {}\n'.format(', '.join(output)))
+            elif output.startswith('output/') and output.endswith('.txt'):
+                fcmd.write('# expect output in {}\n'.format(output))
+            else:
+                fcmd.write('# expect output {} \n# actual output {}\n'
+                    .format('\n#'.join(output.strip().split('\n')), '\n#'.join(cmd_output.strip().split('\n'))))
+            if isinstance(cmd, str):
+                fcmd.write(cmd + '\n')
+            else:
+                fcmd.write('\n'.join(cmd) + '\n')
+        if isinstance(output, str):
+            if os.path.isfile(output):
+                with open(output, 'r') as cf:
+                    output = cf.read()
+            else:
+                if output.startswith('output/') and output.endswith('.txt'):
+                    print('\033[32mWARNING: output file {} does not exist and has just been created.\033[0m'.format(output))
+                    with open(output, 'w') as cf:
+                        cf.write(cmd_output)
+                    output = cmd_output
         #
         self.compare(cmd_output, output, partial)
 
 
     def assertProj(self, numOfSamples=None, numOfVariants=None, sampleNames=None, numOfColumns=None, 
-        info=None, genotype=None, genoInfo=None, partial=None):
+        info=None, genotype=None, genoInfo=None, hasTable=None, partial=None):
         '''Check properties of project
 
         numOfSamples:
@@ -180,10 +191,15 @@ class ProcessTestCase(unittest.TestCase):
             Compare genotype info with a provided list. This parameter should be a dictionary
             with key (sample_id, geno_info_name): geno_info.
 
+        hasTable:
+            If the project has the specified table(s). hasTable should be a string or a list of
+            strings.
+
         partial:
             partial can be True (if specified item is a subset of output list), positive integer
             (compare the first few items), negative number (compare the last few items), or 
             a lambda function (compare result of function call).
+
         '''
         if numOfSamples is not None:
             with open(os.devnull, 'w') as fnull:
@@ -236,6 +252,15 @@ class ProcessTestCase(unittest.TestCase):
                     proj_geno = subprocess.check_output('vtools execute "SELECT {} FROM genotype_{}"'.format(table[1], table[0]), shell=True,
                         stderr=fnull).decode()
                     self.compare([x.strip() for x in proj_geno.strip().split('\n')], list(geno), partial=partial)
+        if hasTable is not None:
+            with open(os.devnull, 'w') as fnull:
+                proj_tables = subprocess.check_output('vtools show tables').strip().split('\n')[1:]
+                proj_tables = [x.split()[0] for x in proj_tables]
+                if isinstance(hasTable, list):
+                    for table in hasTable:
+                        self.assertTrue(table in proj_tables)
+                else:
+                    self.assertTrue(hasTable in proj_tables)
 
          
 def initTest(level):

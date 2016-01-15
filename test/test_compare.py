@@ -28,51 +28,60 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest, output2list, outputOfCmd
+from testUtils import ProcessTestCase
 
 class TestCompare(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        initTest(10)
+        ProcessTestCase.setUp(self)
+        if os.path.isfile('TestCompare.tar.gz'):
+            self.runCmd('vtools admin --load_snapshot TestCompare.tar.gz')
+        else:
+            self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+            self.runCmd('vtools import vcf/SAMP1.vcf')
+            self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+            self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
+            self.runCmd('vtools use ann/testNSFP.ann')
+            self.runCmd('vtools select variant \'testNSFP.chr is not null\' -t ns')
+            self.runCmd('vtools select ns \'sift_score > 0.95\' -t ns_damaging')
+            self.runCmd('vtools select ns \'genename = "PLEKHN1"\' -t plekhn1')
+            self.runCmd('vtools select plekhn1 "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
+            self.runCmd('vtools admin --save_snapshot TestCompare.tar.gz "Snapshot for testing comapre command"')
 
-    def removeProj(self):
-        self.runCmd('vtools remove project')
-        
     def testCompare(self):
         'Test command vtools compare'
         # fix me: the following only test the case with two tables, should also test for one and more than two tables
         self.assertFail('vtools compare')
         self.assertSucc('vtools compare -h')
         # WARNING: No action parameter is specified. Nothing to do.
-        self.assertEqual(output2list('vtools compare plekhn1 d_plekhn1 '), ['0\t0\t6\t6'])
+        self.assertOutput('vtools compare plekhn1 d_plekhn1 ', '431\t0\t996\t1427')
         # error: argument --A_and_B: expected one argument
         self.assertFail('vtools compare d_plekhn1 ns_damaging --intersection')
         self.assertFail('vtools compare d_plekhn1 ns_damaging --intersection unique')
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --intersection common')
         # WARNING: Existing table common is renamed to common_Aug09_170022.
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --intersection common')
-        self.assertEqual(output2list("vtools execute 'select * from common'"), ['880', '881', '882', '893'])
+        self.assertOutput("vtools execute 'select * from common'", '880\n881\n882\n893')
         self.assertSucc('vtools compare d_plekhn1 ns --union AorB')
-        self.assertEqual(output2list("vtools execute 'select * from AorB'"), ['714', '869', '880', '881', '882', '889', '893'])
+        self.assertOutput("vtools execute 'select * from AorB'", '714\n869\n880\n881\n882\n889\n893')
         self.assertSucc('vtools compare d_plekhn1 ns --intersection AandB')
-        self.assertEqual(output2list("vtools execute 'select * from AandB'"), ['869', '880', '881', '882', '889', '893'])
+        self.assertOutput("vtools execute 'select * from AandB'", '869\n880\n881\n882\n889\n893')
         self.assertSucc('vtools compare d_plekhn1 ns --difference AdiffB')
-        self.assertEqual(output2list("vtools execute 'select * from AdiffB'"), [])
+        self.assertOutput("vtools execute 'select * from AdiffB'", '')
         self.assertSucc('vtools compare ns d_plekhn1 --difference BdiffA')
-        self.assertEqual(output2list("vtools execute 'select * from BdiffA'"), ['714'])
+        self.assertOutput("vtools execute 'select * from BdiffA'", '714')
         # use both options in one command should be allowed
         self.assertSucc('vtools compare d_plekhn1 plekhn1  --union A_OR_B')
         #
         # handling of non-alphanum names
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --union "KK@"')
-        self.assertTrue('KK@' in outputOfCmd('vtools show tables'))
+        self.assertProj(hasTable='KK@')
         self.runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
         self.assertSucc('vtools compare "d@p" ns_damaging --intersection "K&K@"')
-        self.assertTrue('K&K@' in outputOfCmd('vtools show tables'))
-        #
+        self.assertProj(hasTable='K&K@')
         # handling of wildcard names
         self.assertSucc('vtools compare \'ns*\' --union u')
-        self.assertTrue('u' in outputOfCmd('vtools show tables'))
+        self.assertProj(hasTable='u')
 
     def testCompareExpression1(self):
         'Test command vtools compare (form 1)'
@@ -80,22 +89,22 @@ class TestCompare(ProcessTestCase):
         self.assertFail('vtools compare')
         self.assertSucc('vtools compare -h')
         # WARNING: No action parameter is specified. Nothing to do.
-        self.assertEqual(output2list('vtools compare plekhn1 d_plekhn1 '), ['0\t0\t6\t6'])
+        self.assertOutput('vtools compare plekhn1 d_plekhn1 ', ['0\t0\t6\t6'])
         # error: argument --A_and_B: expected one argument
         self.assertFail('vtools compare d_plekhn1 ns_damaging --expression "_1 & _2"')
         self.assertFail('vtools compare d_plekhn1 ns_damaging --expression "unique=_1 & _2"')
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "common=_1 & _2"')
         # WARNING: Existing table common is renamed to common_Aug09_170022.
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "common=_1 & _2"')
-        self.assertEqual(output2list("vtools execute 'select * from common'"), ['880', '881', '882', '893'])
+        self.assertOutput("vtools execute 'select * from common'", '880\n881\n882\n893')
         self.assertSucc('vtools compare d_plekhn1 ns --expression "AorB=_1 | _2"')
-        self.assertEqual(output2list("vtools execute 'select * from AorB'"), ['714', '869', '880', '881', '882', '889', '893'])
+        self.assertOutput("vtools execute 'select * from AorB'", ['714', '869', '880', '881', '882', '889', '893'])
         self.assertSucc('vtools compare d_plekhn1 ns --expression "AandB=_1 & _2"')
-        self.assertEqual(output2list("vtools execute 'select * from AandB'"), ['869', '880', '881', '882', '889', '893'])
+        self.assertOutput("vtools execute 'select * from AandB'", ['869', '880', '881', '882', '889', '893'])
         self.assertSucc('vtools compare d_plekhn1 ns --expression "AdiffB=_1 - _2"')
-        self.assertEqual(output2list("vtools execute 'select * from AdiffB'"), [])
+        self.assertOutput("vtools execute 'select * from AdiffB'", [])
         self.assertSucc('vtools compare ns d_plekhn1 --expression "BdiffA=_1 - _2"')
-        self.assertEqual(output2list("vtools execute 'select * from BdiffA'"), ['714'])
+        self.assertOutput("vtools execute 'select * from BdiffA'", ['714'])
         # use both options in one command should be allowed
         self.assertSucc('vtools compare d_plekhn1 plekhn1  --expression "A_OR_B=_1 | _2"')
         #
@@ -112,22 +121,22 @@ class TestCompare(ProcessTestCase):
         self.assertFail('vtools compare')
         self.assertSucc('vtools compare -h')
         # WARNING: No action parameter is specified. Nothing to do.
-        self.assertEqual(output2list('vtools compare plekhn1 d_plekhn1 '), ['0\t0\t6\t6'])
+        self.assertOutput('vtools compare plekhn1 d_plekhn1 ', ['0\t0\t6\t6'], partial=True)
         # error: argument --A_and_B: expected one argument
         self.assertFail('vtools compare --expression "d_plekhn1 & ns_damaging"')
         self.assertFail('vtools compare --expression "unique=d_plekhn1 & ns_damaging"')
         self.assertSucc('vtools compare --expression "common=d_plekhn1 & ns_damaging"')
         # WARNING: Existing table common is renamed to common_Aug09_170022.
         self.assertSucc('vtools compare --expression "common=d_plekhn1 & ns_damaging"')
-        self.assertEqual(output2list("vtools execute 'select * from common'"), ['880', '881', '882', '893'])
+        self.assertOutput("vtools execute 'select * from common'", ['880', '881', '882', '893'])
         self.assertSucc('vtools compare --expression "AorB=d_plekhn1 | ns"')
-        self.assertEqual(output2list("vtools execute 'select * from AorB'"), ['714', '869', '880', '881', '882', '889', '893'])
+        self.assertOutput("vtools execute 'select * from AorB'", ['714', '869', '880', '881', '882', '889', '893'])
         self.assertSucc('vtools compare --expression "AandB=d_plekhn1 & ns"')
-        self.assertEqual(output2list("vtools execute 'select * from AandB'"), ['869', '880', '881', '882', '889', '893'])
+        self.assertOutput("vtools execute 'select * from AandB'", ['869', '880', '881', '882', '889', '893'])
         self.assertSucc('vtools compare --expression "AdiffB=d_plekhn1 -ns"')
-        self.assertEqual(output2list("vtools execute 'select * from AdiffB'"), [])
+        self.assertOutput("vtools execute 'select * from AdiffB'", [])
         self.assertSucc('vtools compare --expression "BdiffA=ns-d_plekhn1"')
-        self.assertEqual(output2list("vtools execute 'select * from BdiffA'"), ['714'])
+        self.assertOutput("vtools execute 'select * from BdiffA'", ['714'])
         # use both options in one command should be allowed
         self.assertSucc('vtools compare --expression "A_OR_B=d_plekhn1|plekhn1"')
         #
@@ -148,22 +157,22 @@ class TestCompare(ProcessTestCase):
         self.runCmd('vtools select variant "variant_id in (1, 3, 4)" -t T2')
         # variant
         self.assertOutput('vtools compare T1 T2 ', '1\t2\t1\t4\n')
-        self.assertOutput('vtools compare T1 T2 --difference', '1\n')
-        self.assertOutput('vtools compare T2 T1 --difference', '2\n')
-        self.assertOutput('vtools compare T1 T2 --intersection', '1\n')
-        self.assertOutput('vtools compare T1 T2 --union', '4\n')
+        self.assertOutput('vtools compare T1 T2 --difference', '1')
+        self.assertOutput('vtools compare T2 T1 --difference', '2')
+        self.assertOutput('vtools compare T1 T2 --intersection', '1')
+        self.assertOutput('vtools compare T1 T2 --union', '4')
         # sample
         self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 ', '1\t1\t1\t3\n')
-        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --difference ', '1\n')
-        self.assertOutput('vtools compare variant --samples SAMP2 SAMP1 --difference ', '1\n')
-        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --intersection ', '1\n')
-        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --union', '3\n')
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --difference ', '1')
+        self.assertOutput('vtools compare variant --samples SAMP2 SAMP1 --difference ', '1')
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --intersection ', '1')
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --union', '3')
         # site
         self.assertOutput('vtools compare T1 T2 --mode site ', '0\t1\t3\t4\n')
-        self.assertOutput('vtools compare T1 T2 --mode site --difference ', '0\n')
-        self.assertOutput('vtools compare T2 T1 --mode site --difference ', '1\n')
-        self.assertOutput('vtools compare T1 T2 --mode site --intersection ', '3\n')
-        self.assertOutput('vtools compare T1 T2 --mode site --union ', '4\n')
+        self.assertOutput('vtools compare T1 T2 --mode site --difference ', '0')
+        self.assertOutput('vtools compare T2 T1 --mode site --difference ', '1')
+        self.assertOutput('vtools compare T1 T2 --mode site --intersection ', '3')
+        self.assertOutput('vtools compare T1 T2 --mode site --union ', '4')
 
 
 
