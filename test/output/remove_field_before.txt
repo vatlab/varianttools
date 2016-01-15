@@ -1,0 +1,7 @@
+Name:                   variant
+Description:            Master variant table
+Creation date:          Jan14
+Command:
+Fields:                 variant_id, bin, chr, pos, ref, alt, CEU_cases_num,
+                        DP, gene_name
+Number of variants:     1036

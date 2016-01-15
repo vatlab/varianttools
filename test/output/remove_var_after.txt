@@ -1,0 +1,3 @@
+table         #variants     date message
+unaffected          289    Jan14
+variant             748    Jan14 Master variant table
