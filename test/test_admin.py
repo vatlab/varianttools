@@ -31,19 +31,12 @@ from testUtils import ProcessTestCase
 
 class TestAdmin(ProcessTestCase):
 
-    def testMergeSamples(self):
-        'Test command vtools admin --merge_samples'
-        #
-        # FIXME: merge that involves all genotype tables will use a 
-        # different algorithm that needs to be tested
+    def testAdminCommand(self):
+        'Test command line options of vtools admin'
         self.assertFail('vtools admin')
         self.assertSucc('vtools admin -h')
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.assertProj(numOfSamples= 60)
-        self.assertProj(numOfVariants=288)
-        self.assertSucc('vtools admin --rename_samples \'sample_name like "%NA069%"\' NA06900')
-        #could not merge them together if they are from the same table.
-        self.assertFail('vtools admin --merge_samples')
+
+    def testMergeSamples(self):
         # Test command vtools admin --merge_samples'
         self.runCmd('vtools init test -f')
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
@@ -68,29 +61,33 @@ class TestAdmin(ProcessTestCase):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
         self.assertFail('vtools admin --rename_samples 1')
         # all samples are assigned name NA
-        self.assertFail('vtools admin --rename_samples "sample_name like \'NA1\'" NA')
-        self.assertFail('vtools admin --rename_samples 1 NA NNA')
+        self.assertSucc('''vtools admin --rename_samples "sample_name like 'NA1'" NA ''')
+        # NA12716 is not renamed because of no match.
+        self.assertProj(sampleNames=['NA12716'], partial=True)
+        self.assertSucc('''vtools admin --rename_samples "sample_name like 'NA1%'" NA ''')
+        self.assertProj(sampleNames=['NA12716'], partial=True, negate=True)
+        self.assertSucc('vtools admin --rename_samples 1 NA NNA')
+        #could not merge them together if they are from the same table.
+        self.assertFail('vtools admin --merge_samples')
 
     def testRenameTable(self):
         'test rename tables'
         self.assertSucc('vtools select variant -t "%ad name"')
-        self.assertOutput('vtools show tables', '%ad name', partial=True)
+        self.assertProj(hasTable='%ad name')
         self.assertTrue('vtools show table "%ad name"')
         self.assertFail('vtools admin --rename_table variant not_allowed')
         self.assertSucc('vtools admin --rename_table "%ad name" UNIQUE')
-        self.assertTrue('vtools show table UNIQUE')
-        self.assertOutput('vtools show tables', 'UNIQUE', partial=True)
+        self.assertProj(hasTable='UNIQUE')
         self.assertSucc('vtools admin --rename_table UNIQUE "%ad newname"')
-        self.assertTrue('vtools show table "%ad newname"')
-        self.assertOutput('vtools show tables', '%ad newname', partial=True)
+        self.assertProj(hasTable='%ad newname')
 
     def testDescribeTable(self):
         'test describe tables'
+        self.runCmd('vtools import vcf/SAMP1.vcf  --build hg19')
         self.assertSucc('vtools select variant -t "%%" "DESD"')
-        self.assertOutput('vtools show tables', '%%', partial=True)
-        self.assertOutput('vtools show tables', 'DESD', partial=True)
+        self.assertProj(hasTable='%%', tableDesc={'%%': 'DESD'})
         self.assertSucc('vtools admin --describe_table %% "NN NN"')
-        self.assertOutput('vtools show tables', 'NN NN', partial=True)
+        self.assertProj(hasTable='%%', tableDesc={'%%': 'NN NN'})
 
     def testSaveLoadSnapshot(self):
         'test save/load snapshot'
@@ -98,22 +95,9 @@ class TestAdmin(ProcessTestCase):
         self.assertSucc('vtools admin --save_snapshot a "some comment"')
         self.assertSucc('vtools admin --load_snapshot a')
         self.assertSucc('vtools admin --save_snapshot a.tar.gz "some comment"')
+        self.assertTrue(os.path.isfile('a.tar.gz'))
         self.assertSucc('vtools admin --load_snapshot a.tar.gz')
-
-    def testRuntimeOption(self):
-        'test set runtime options'
-        # FIXME: test for valid options
-        # FIXME: test for value of options -- for whatever value, vtools should be able to load the project
-        # FIXME: test for non-exist temp_dir
-        # FIXME: test for sqlite_pragma
-        pass
-
-    def testResetRuntimeOption(self):
-        'test reset runtime options'
-        # FIXME: fail no OPT
-        # FIXME: fail invalid OPT
-        # FIXME: set and rest sqlite_pragma, use vtools show to check
-        pass
+        os.remove('a.tar.gz')
         
 if __name__ == '__main__':
     unittest.main()

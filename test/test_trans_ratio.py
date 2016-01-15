@@ -28,15 +28,15 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest
+from testUtils import ProcessTestCase
 
 class TestTransRatio(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        initTest(2)
+        ProcessTestCase.setUp(self)
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools update variant --from_stat "num=#(alt)" "depth=sum(DP_geno)"')
-    def removeProj(self):
-        self.runCmd('vtools remove project')
+
     def testTransRatio(self):
         'Test command vtools_report trans_ratio'
         self.assertFail('vtools_report trans_ratio')
