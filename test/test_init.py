@@ -29,13 +29,12 @@ import glob
 import unittest
 import subprocess
 import shutil
-from testUtils import ProcessTestCase, runCmd, numOfVariant, numOfSample, outputOfCmd
+from testUtils import ProcessTestCase
 
 class TestInit(ProcessTestCase):
     def testInit(self):
         'Test command vtools init'
         self.assertFail('vtools init')
-        self.assertSucc('vtools init test')
         self.assertFail('vtools init test')
         self.assertSucc('vtools init test -f')
     
@@ -49,7 +48,7 @@ class TestInit(ProcessTestCase):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools import vcf/SAMP1.vcf')
         self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
-        self.assertEqual(numOfVariant('ceu'), 288)
+        self.assertProj(numOfVariants={'ceu': 288})
         shutil.move('test.proj', 'parent/test.proj')
         shutil.move('test_genotype.DB', 'parent/test_genotype.DB')
         self.assertSucc('vtools init test --parent parent --variants ceu')
@@ -69,14 +68,13 @@ class TestInit(ProcessTestCase):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools import vcf/SAMP1.vcf')
         self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
-        self.assertEqual(numOfVariant('ceu'), 288)
+        self.assertProj(numOfVariants={'ceu': 288})
         shutil.move('test.proj', 'parent/test.proj')
         shutil.move('test_genotype.DB', 'parent/test_genotype.DB') 
         self.assertSucc('vtools init test --parent parent --samples "filename like \'%CEU%\'"')
         self.assertProj(numOfVariants= 577)
         self.assertProj(numOfSamples= 60)
         shutil.rmtree('parent')
-        #ended __Long__
 
     def testVariantSample(self):
         'Test command init --variants with --samples'
@@ -88,7 +86,7 @@ class TestInit(ProcessTestCase):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools import vcf/SAMP1.vcf')
         self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
-        self.assertEqual(numOfVariant('ceu'), 288)
+        self.assertProj(numOfVariants={'ceu': 288})
         shutil.move('test.proj', 'parent/test.proj')
         shutil.move('test_genotype.DB', 'parent/test_genotype.DB') 
         self.assertSucc('vtools init test --parent parent --variants ceu --samples "filename like \'%CEU%\'"')
@@ -107,21 +105,20 @@ class TestInit(ProcessTestCase):
         #runCmd('vtools import vcf/SAMP1.vcf')
         #runCmd('vtools import --format fmt/genotypes txt/genotypes.txt --build hg18')
         self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
-        self.assertEqual(numOfVariant('ceu'), 288)
+        self.assertProj(numOfVariants={'ceu': 288})
         shutil.move('test.proj', 'parent/test.proj')
         shutil.move('test_genotype.DB', 'parent/test_genotype.DB') 
         self.assertSucc('vtools init test --parent parent --variants variant --genotypes GT=1')
         self.runCmd('vtools phenotype --from_stat "num=#(GT)" "hom=#(hom)" "het=#(het)"')
         #compare the whole output and result table using "file" option, "output" is null and numOfLines=0 
-        self.assertOutput('vtools phenotype --output num hom het', '', 0, 'output/CEU_phynotype_het.txt')
+        self.assertOutput('vtools phenotype --output num hom het', 'output/CEU_phynotype_het.txt')
         #compare the first 5 lines among the output and result 
-        self.assertOutput('vtools phenotype --output num hom het', '', 5, 'output/CEU_phynotype_het.txt')
+        self.assertOutput('vtools phenotype --output num hom het', 'output/CEU_phynotype_het.txt')
         #compare the last 4 lines among the output and result 
-        self.assertOutput('vtools phenotype --output num hom het', '', -5, 'output/CEU_phynotype_het.txt')
+        self.assertOutput('vtools phenotype --output num hom het', 'output/CEU_phynotype_het.txt')
         #compare the last 2 lines among the output and result 
-        self.assertOutput('vtools phenotype --output num hom het', '''63	0	63\n40	0	40\n''', -3)         
+        self.assertOutput('vtools phenotype --output num hom het', '''63	0	63\n40	0	40\n''', partial=True) 
         shutil.rmtree('parent')
-
 
     def testGenotypes_sample(self):
         'Test command init --genotypes with samples option'
@@ -141,7 +138,7 @@ class TestInit(ProcessTestCase):
         self.assertOutput('vtools phenotype --output num hom het', 
                  '''3	0	3\n7	0	7\n7	0	7''', 3)
         #compare the whole output and result table using "file" option, "output" is null and numOfLines=0 
-        self.assertOutput('vtools phenotype --output num hom het', '', 0, 'output/genotype_variant_sample_output.txt')
+        self.assertOutput('vtools phenotype --output num hom het', 'output/genotype_variant_sample_output.txt')
         shutil.rmtree('parent')
 
     def testChildren(self):
@@ -156,11 +153,8 @@ class TestInit(ProcessTestCase):
         self.runCmd('vtools select variant \'ref="A"\' -t refA')
         self.runCmd('vtools select variant \'ref="G"\' -t refG')
         self.runCmd('vtools phenotype --set "column_A=sample_name"')
-        self.runCmd('vtools update --set "ref1=ref"')
-        self.assertEqual(numOfVariant('variant'), 288)
-        self.assertEqual(numOfVariant('refA'), 43)
-        self.assertEqual(numOfVariant('refG'), 96)
-        self.assertProj(numOfSamples= 60 )
+        self.runCmd('vtools update variant --set "ref1=ref"')
+        self.assertProj(numOfVariants={'variant': 288, 'refA': 43, 'refG': 96}, numOfSamples=60)
         shutil.move('ceu.proj', 'ceu/ceu.proj')
         shutil.move('ceu_genotype.DB', 'ceu/ceu_genotype.DB')
         try:
@@ -171,20 +165,13 @@ class TestInit(ProcessTestCase):
         self.runCmd('vtools import vcf/SAMP1.vcf --build hg18')
         self.runCmd('vtools select variant \'ref="A"\' -t refA')
         self.runCmd('vtools select variant \'ref="C"\' -t refC')
-        self.runCmd('vtools phenotype --set "column-a=sample_name"')
+        self.runCmd('vtools phenotype --set "column_A=sample_name"')
         self.runCmd('vtools phenotype --set "column_B=sample_name"')
-        self.assertProj(numOfVariants= 289)
-        self.assertEqual(numOfVariant('refA'), 58)
-        self.assertEqual(numOfVariant('refC'), 85)
-        self.assertProj(numOfSamples= 1)
+        self.assertProj(numOfVariants={'variant': 289, 'refA': 58, 'refC': 85}, numOfSamples=1)
         shutil.move('sam1.proj', 'sam1/sam1.proj')
         shutil.move('sam1_genotype.DB', 'sam1/sam1_genotype.DB')
         self.assertSucc('vtools init test --children ceu sam1') 
-        self.assertProj(numOfSamples= 61)
-        self.assertProj(numOfVariants= 577)
-        self.assertEqual(numOfVariant('refA'), 101)
-        self.assertEqual(numOfVariant('refC'), 85)
-        self.assertEqual(numOfVariant('refG'), 96)
+        self.assertProj(numOfVariants={'variant': 577, 'refA': 101, 'refC': 85, 'refG': 96}, numOfSamples=61)
         #
         shutil.rmtree('ceu')
         shutil.rmtree('sam1')

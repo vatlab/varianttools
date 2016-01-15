@@ -1749,8 +1749,8 @@ class Project:
                     linked_fields = eval(self.loadProperty('{}_linked_fields'.format(db_name), default='None'))
                     try:
                         self.db.attach(db[0], db_name, openExisting=True)
-                    except:
-                        env.logger.warning('Failed to open attached database {}'.format(db[0]))
+                    except Exception as e:
+                        env.logger.warning('Failed to open attached database {}: {}'.format(db[0], e))
                     self._attachedDB.append((db[0], db_name))
                     self.annoDB.append(AnnoDB(self, db[0], linked_by, anno_type, linked_fields, db_name))
                 else:

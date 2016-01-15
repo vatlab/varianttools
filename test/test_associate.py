@@ -4,7 +4,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, output2list
+from testUtils import ProcessTestCase
 from zipfile import ZipFile
 import argparse
 from random import choice

@@ -2828,7 +2828,7 @@ class DatabaseEngine:
             return dbName
         else:
             db = os.path.expanduser(db)
-            if openExisting and not os.path.isfile(db):
+            if openExisting and not os.path.isfile(db + '.DB'):
                 raise ValueError('Database does not exist')
             #if not os.path.isfile(db + '.DB' if db != ':memory:' else db):
             #    raise RuntimeError('Failed to attach database {}: file does not exist'

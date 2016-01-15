@@ -328,6 +328,8 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
 
     left_trim(alleles, pos1, left_trimmed);
 
+    if (left_extended > 1)
+        msg = (boost::format("Variant %s_%d_%s/%s extended %d bp to the left.") % chr % pos % ref % alt % (pos - pos1 + 1)).str();
     // change values
     if (pos != pos1 || ! int_pos)
         PyList_SetItem(rec, pos_idx, PyInt_FromLong(pos1));

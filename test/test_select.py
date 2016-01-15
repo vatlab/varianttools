@@ -28,19 +28,21 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest, outputOfCmd, output2list
+from testUtils import ProcessTestCase
 
 class TestSelect(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        initTest(6)
+        ProcessTestCase.setUp(self)
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        self.runCmd('vtools import vcf/SAMP1.vcf')
+        self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+        self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
+        self.runCmd('vtools use ann/testNSFP.ann')
         self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
         self.runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
         self.runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_het=#(het)"')
 
-    def removeProj(self):
-        self.runCmd('vtools remove project')
-    
     def testSelect(self):
         'Test command vtools select'
         self.assertFail('vtools select')
@@ -52,7 +54,7 @@ class TestSelect(ProcessTestCase):
         # Neither --to_table and --output/--count is specified. Nothing to do.
         self.assertFail('vtools select variant \'testNSFP.chr is not null\'')
         self.assertOutput("vtools select variant -c", '915\n')
-        self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t "ns"')
+        self.assertSucc('''vtools select variant 'testNSFP.chr is not null' -t 'ns' ''')
         self.assertSucc('vtools select variant \'testNSFP.chr is not null\' --output chr pos ref alt')
         self.assertSucc('vtools select variant \'testNSFP.chr is not null\' --output variant_id testNSFP.CHBJPT_total_lc')
         # Existing table ns_input is renamed to ns_input_Aug06_161348. The command below is equivalent to the former two commands.
@@ -65,7 +67,7 @@ class TestSelect(ProcessTestCase):
         # use strange characters 
         self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t "* ns@"')
         self.assertSucc('vtools select "* ns@" \'testNSFP.chr is not null\' -t "ns@sub"')
-        self.assertTrue('* ns@' in '\n'.join(output2list('vtools show tables')))
+        self.assertOutput('vtools show tables', '* ns@', partial=True)
         self.assertSucc('vtools show table "* ns@"')
         self.assertSucc('vtools show table "ns@sub"')
         
