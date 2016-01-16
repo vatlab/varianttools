@@ -24,23 +24,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
-import glob
 import unittest
-import subprocess
-from testUtils import ProcessTestCase, runCmd, initTest
+from testUtils import ProcessTestCase
 
 class TestAvgDepth(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        self.runCmd('vtools init test  -f')
+        ProcessTestCase.setUp(self)
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18 --geno_info DP_geno')
-        self.runCmd('vtools import vcf/SAMP1.vcf --geno_info DP_geno')
         self.runCmd('vtools update variant --from_stat "num=#(alt)" "depth=avg(DP_geno)"')
         
-    def removeProj(self):
-        self.runCmd('vtools remove project')
-
     def testAvgDepth(self):
         'Test command vtools_report avg_depth'
         self.assertFail('vtools_report avg_depth')

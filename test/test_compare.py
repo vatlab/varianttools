@@ -25,9 +25,7 @@
 #
 
 import os
-import glob
 import unittest
-import subprocess
 from testUtils import ProcessTestCase
 
 class TestCompare(ProcessTestCase):
@@ -38,7 +36,6 @@ class TestCompare(ProcessTestCase):
             self.runCmd('vtools admin --load_snapshot TestCompare.tar.gz')
         else:
             self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-            self.runCmd('vtools import vcf/SAMP1.vcf')
             self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
             self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
             self.runCmd('vtools use ann/testNSFP.ann')
@@ -51,25 +48,24 @@ class TestCompare(ProcessTestCase):
     def testCompare(self):
         'Test command vtools compare'
         # fix me: the following only test the case with two tables, should also test for one and more than two tables
-        self.assertFail('vtools compare')
         self.assertSucc('vtools compare -h')
         # WARNING: No action parameter is specified. Nothing to do.
         self.assertOutput('vtools compare plekhn1 d_plekhn1 ', '431\t0\t996\t1427')
         # error: argument --A_and_B: expected one argument
-        self.assertFail('vtools compare d_plekhn1 ns_damaging --intersection')
-        self.assertFail('vtools compare d_plekhn1 ns_damaging --intersection unique')
+        self.assertSucc('vtools compare d_plekhn1 ns_damaging --intersection')
+        self.assertSucc('vtools compare d_plekhn1 ns_damaging --intersection unique')
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --intersection common')
-        # WARNING: Existing table common is renamed to common_Aug09_170022.
+        # WARNING: Existing table common is renamed to common_Aug09_170022. No error 
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --intersection common')
-        self.assertOutput("vtools execute 'select * from common'", '880\n881\n882\n893')
+        self.assertProj(numOfVariants={'common': 572})
         self.assertSucc('vtools compare d_plekhn1 ns --union AorB')
-        self.assertOutput("vtools execute 'select * from AorB'", '714\n869\n880\n881\n882\n889\n893')
+        self.assertProj(numOfVariants={'AorB': 1446})
         self.assertSucc('vtools compare d_plekhn1 ns --intersection AandB')
-        self.assertOutput("vtools execute 'select * from AandB'", '869\n880\n881\n882\n889\n893')
+        self.assertProj(numOfVariants={'AandB': 996})
         self.assertSucc('vtools compare d_plekhn1 ns --difference AdiffB')
-        self.assertOutput("vtools execute 'select * from AdiffB'", '')
+        self.assertProj(numOfVariants={'AdiffB': 0})
         self.assertSucc('vtools compare ns d_plekhn1 --difference BdiffA')
-        self.assertOutput("vtools execute 'select * from BdiffA'", '714')
+        self.assertProj(numOfVariants={'BdiffA': 450})
         # use both options in one command should be allowed
         self.assertSucc('vtools compare d_plekhn1 plekhn1  --union A_OR_B')
         #
@@ -89,31 +85,30 @@ class TestCompare(ProcessTestCase):
         self.assertFail('vtools compare')
         self.assertSucc('vtools compare -h')
         # WARNING: No action parameter is specified. Nothing to do.
-        self.assertOutput('vtools compare plekhn1 d_plekhn1 ', ['0\t0\t6\t6'])
+        self.assertOutput('vtools compare plekhn1 d_plekhn1 ', ['431\t0\t996\t1427'])
         # error: argument --A_and_B: expected one argument
-        self.assertFail('vtools compare d_plekhn1 ns_damaging --expression "_1 & _2"')
-        self.assertFail('vtools compare d_plekhn1 ns_damaging --expression "unique=_1 & _2"')
+        self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "_1 & _2"')
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "common=_1 & _2"')
         # WARNING: Existing table common is renamed to common_Aug09_170022.
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "common=_1 & _2"')
-        self.assertOutput("vtools execute 'select * from common'", '880\n881\n882\n893')
+        self.assertProj(numOfVariants={'common': 572})
         self.assertSucc('vtools compare d_plekhn1 ns --expression "AorB=_1 | _2"')
-        self.assertOutput("vtools execute 'select * from AorB'", ['714', '869', '880', '881', '882', '889', '893'])
+        self.assertProj(numOfVariants={'AorB': 1446})
         self.assertSucc('vtools compare d_plekhn1 ns --expression "AandB=_1 & _2"')
-        self.assertOutput("vtools execute 'select * from AandB'", ['869', '880', '881', '882', '889', '893'])
+        self.assertProj(numOfVariants={'AandB': 996})
         self.assertSucc('vtools compare d_plekhn1 ns --expression "AdiffB=_1 - _2"')
-        self.assertOutput("vtools execute 'select * from AdiffB'", [])
+        self.assertProj(numOfVariants={'AdiffB': 0})
         self.assertSucc('vtools compare ns d_plekhn1 --expression "BdiffA=_1 - _2"')
-        self.assertOutput("vtools execute 'select * from BdiffA'", ['714'])
+        self.assertProj(numOfVariants={'BdiffA': 450})
         # use both options in one command should be allowed
         self.assertSucc('vtools compare d_plekhn1 plekhn1  --expression "A_OR_B=_1 | _2"')
         #
         # handling of non-alphanum names
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "\'KK@\'=_1 | _2"')
-        self.assertTrue('KK@' in outputOfCmd('vtools show tables'))
+        self.assertProj(hasTable='KK@')
         self.runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
         self.assertSucc('vtools compare "d@p" ns_damaging --expression "\'K&K@\'=_1 & _2"')
-        self.assertTrue('K&K@' in outputOfCmd('vtools show tables'))
+        self.assertProj(hasTable='K&K@')
 
     def testCompareExpression2(self):
         'Test command vtools compare (form 2)'
@@ -121,34 +116,34 @@ class TestCompare(ProcessTestCase):
         self.assertFail('vtools compare')
         self.assertSucc('vtools compare -h')
         # WARNING: No action parameter is specified. Nothing to do.
-        self.assertOutput('vtools compare plekhn1 d_plekhn1 ', ['0\t0\t6\t6'], partial=True)
+        self.assertOutput('vtools compare plekhn1 d_plekhn1 ', ['431\t0\t996\t1427'], partial=True)
         # error: argument --A_and_B: expected one argument
-        self.assertFail('vtools compare --expression "d_plekhn1 & ns_damaging"')
-        self.assertFail('vtools compare --expression "unique=d_plekhn1 & ns_damaging"')
+        self.assertSucc('vtools compare --expression "d_plekhn1 & ns_damaging"')
         self.assertSucc('vtools compare --expression "common=d_plekhn1 & ns_damaging"')
         # WARNING: Existing table common is renamed to common_Aug09_170022.
         self.assertSucc('vtools compare --expression "common=d_plekhn1 & ns_damaging"')
-        self.assertOutput("vtools execute 'select * from common'", ['880', '881', '882', '893'])
+        self.assertProj(numOfVariants={'common': 572})
         self.assertSucc('vtools compare --expression "AorB=d_plekhn1 | ns"')
-        self.assertOutput("vtools execute 'select * from AorB'", ['714', '869', '880', '881', '882', '889', '893'])
+        self.assertProj(numOfVariants={'AorB': 1446})
         self.assertSucc('vtools compare --expression "AandB=d_plekhn1 & ns"')
-        self.assertOutput("vtools execute 'select * from AandB'", ['869', '880', '881', '882', '889', '893'])
+        self.assertProj(numOfVariants={'AandB': 996})
         self.assertSucc('vtools compare --expression "AdiffB=d_plekhn1 -ns"')
-        self.assertOutput("vtools execute 'select * from AdiffB'", [])
+        self.assertProj(numOfVariants={'AdiffB': 0})
         self.assertSucc('vtools compare --expression "BdiffA=ns-d_plekhn1"')
-        self.assertOutput("vtools execute 'select * from BdiffA'", ['714'])
+        self.assertProj(numOfVariants={'BdiffA': 450})
         # use both options in one command should be allowed
         self.assertSucc('vtools compare --expression "A_OR_B=d_plekhn1|plekhn1"')
         #
         # handling of non-alphanum names
         self.assertSucc('vtools compare --expression "\'KK@\'=d_plekhn1 |ns_damaging"')
-        self.assertTrue('KK@' in outputOfCmd('vtools show tables'))
+        self.assertProj(hasTable='KK@')
         self.runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
         self.assertSucc('vtools compare  --expression "\'K&K@\'=\'d@p\' & ns_damaging"')
-        self.assertTrue('K&K@' in outputOfCmd('vtools show tables'))
+        self.assertProj(hasTable='K&K@')
 
     def testSimpleProj(self):
         'Test compare by site'
+        # do not use the default project
         self.runCmd('vtools init test -f')
         self.runCmd('vtools import vcf/compare.vcf --build hg18')
         self.runCmd('vtools execute "DELETE FROM genotype.genotype_1 WHERE GT=0"')
