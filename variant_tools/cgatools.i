@@ -238,6 +238,8 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
     //
     char * chr = PyString_AsString(PyList_GetItem(rec, chr_idx));
     PyObject * pos_obj = PyList_GetItem(rec, pos_idx);
+    if (pos_obj == Py_None)
+        return "Unrecognized position";
     bool int_pos = PyInt_Check(pos_obj);
     uint32_t pos = int_pos ? PyInt_AsLong(pos_obj) : atol(PyString_AsString(pos_obj));
     PyObject * ref_obj = PyList_GetItem(rec, ref_idx);
