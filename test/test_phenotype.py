@@ -47,9 +47,9 @@ class TestPhenotype(ProcessTestCase):
         self.assertSucc('vtools phenotype --from_file phenotype/phenotype.txt')
         self.assertOutput('vtools show samples -l -1', 'output/phenotype_import.txt')
         #the output format was changed, so we reorganize the output and compare
-        self.assertFail('vtools phenotype --from_file phenotype/badphenotype1.txt')
-        self.assertFail('vtools phenotype --from_file phenotype/badphenotype2.txt')
-        self.assertFail('vtools phenotype --from_file phenotype/badphenotype3.txt')
+        self.assertSucc('vtools phenotype --from_file phenotype/badphenotype1.txt')
+        self.assertSucc('vtools phenotype --from_file phenotype/badphenotype2.txt')
+        self.assertSucc('vtools phenotype --from_file phenotype/badphenotype3.txt')
         
     def testImportFields(self):
         'Test command phenotype --from_file FIELD'

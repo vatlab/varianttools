@@ -28,15 +28,10 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, output2list 
-#from testUtils import ProcessTestCase, runCmd, numOfVariant, numOfSample, outputOfCmd, getGenotypes, getSamplenames, output2list, getGenotypeInfo
+from testUtils import ProcessTestCase
 
 class TestExport(ProcessTestCase):
     
-    def setUp(self):
-        'Create a project'
-        self.runCmd('vtools init test -f')
-
     def tearDown(self):
         self.runCmd('vtools remove project')
         try:
@@ -69,7 +64,7 @@ class TestExport(ProcessTestCase):
 
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
         self.runCmd('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-        self.runCmd('vtools use dbSNP-hg19_138')
+        self.runCmd('vtools use dbSNP')
 
         #you can assin any word for the suboption of --format_string
         self.assertSucc('vtools export variant --format vcf --format_string GT')
@@ -146,7 +141,7 @@ class TestExport(ProcessTestCase):
         'Test command export with multiple sub-options'
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
         self.runCmd('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-        self.runCmd('vtools use dbSNP-hg19_138')
+        self.runCmd('vtools use dbSNP')
         
         # You can assign a file or give the file format using this export "vcf" command 
         self.assertSucc('vtools export variant --format vcf --pos pos --ref ref')
