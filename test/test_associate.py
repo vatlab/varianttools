@@ -53,16 +53,13 @@ class SetMafTester(ActionTester):
         return True
 
 
-class TestAsso(ProcessTestCase):
-
-    def removeProj(self):
-        self.runCmd('vtools remove project')
+class TestAssociate(ProcessTestCase):
+    def setUp(self):
+        ProcessTestCase.setUp(self)
+        self.runCmd('vtools admin --load_snapshot proj/assoproj.tar.gz')
 
     def testInterface(self):
         'Test association module interface'
-        zip = ZipFile('proj/assoproj.zip')
-        dir = os.getcwd()
-        zip.extractall(dir)
         # basic commands
         self.assertSucc('vtools associate -h')
         self.assertSucc('vtools associate variant filename --method LinRegBurden -h')
@@ -85,12 +82,9 @@ class TestAsso(ProcessTestCase):
 
     def testBasic(self):
         'Test basic association results'
-        zip = ZipFile('proj/assoproj.zip')
-        dir = os.getcwd()
-        zip.extractall(dir)
         for i in range(8):
             self.runCmd('vtools update variant --from_file output/assogrp{}.txt --format fmt/randcol.fmt --var_info grpby'.format(str(i+1)))
-            vtoolsout = output2list('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "LinRegBurden --alternative 2" -g grpby')
+            vtoolsout = self.runCmd('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "LinRegBurden --alternative 2" -g grpby').strip().split('\n')
             vtoolsout = ['\t'.join([j for jdx, j in enumerate(x.split()) if jdx in [0,4,5,6]]) for idx, x in enumerate(vtoolsout) if idx > 0 and 'NAN' not in x]
             vtoolsout.sort()
             with open('output/assores'+str(i+1)+'.txt','r') as f:
@@ -99,12 +93,9 @@ class TestAsso(ProcessTestCase):
 
     def testWeights(self):
         'Test for weighting theme'
-        zip = ZipFile('proj/assoproj.zip')
-        dir = os.getcwd()
-        zip.extractall(dir)
         for i in range(8):
             self.runCmd('vtools update variant --from_file output/assogrp{}.txt --format fmt/randcol.fmt --var_info grpby'.format(str(i+1)))
-            vtoolsout = output2list('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "WeightedBurdenQt --alternative 2 --weight Browning_all" -g grpby')
+            vtoolsout = self.runCmd('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "WeightedBurdenQt --alternative 2 --weight Browning_all" -g grpby').strip().split('\n')
             vtoolsout = ['\t'.join([j for jdx, j in enumerate(x.split()) if jdx in [0,4,5,6]]) for idx, x in enumerate(vtoolsout) if idx > 0 and 'NAN' not in x]
             vtoolsout.sort()
             with open('output/assores_wss'+str(i+1)+'.txt','r') as f:
@@ -113,18 +104,10 @@ class TestAsso(ProcessTestCase):
 
     def testPyAction(self):
         'Test action pyaction'
-        #
-        zip = ZipFile('proj/assoproj.zip')
-        dir = os.getcwd()
-        zip.extractall(dir)
         self.assertSucc('vtools associate variant phen2 -m "test_associate.PyActionTester" -g chr')
 
     def testRext(self):
         'Test R extensions'
-        #
-        zip = ZipFile('proj/assoproj.zip')
-        dir = os.getcwd()
-        zip.extractall(dir)
         self.assertSucc('vtools associate variant phen1 -m "SKAT --name SKAT disease -k IBS" -g chr')
 
 if __name__ == '__main__':

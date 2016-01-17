@@ -24,37 +24,34 @@
 #
 
 import os
-import glob
 import unittest
-import subprocess
 from testUtils import ProcessTestCase
 
 class TestAdmin(ProcessTestCase):
-
     def testAdminCommand(self):
         'Test command line options of vtools admin'
-        self.assertFail('vtools admin')
+        self.assertSucc('vtools admin')
         self.assertSucc('vtools admin -h')
 
     def testMergeSamples(self):
         # Test command vtools admin --merge_samples'
-        self.runCmd('vtools init test -f')
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
+        # this should actually be hg19, but we use it anyway for testing.
         self.runCmd('vtools import vcf/SAMP1.vcf  --build hg18')
-        self.assertProj(numOfVariants=577)
-        self.assertProj(numOfSamples= 61)
+        self.assertProj(numOfVariants=577, numOfSamples= 61)
         self.runCmd('vtools admin --rename_samples \'filename like "%SAMP1%"\' NA06985')
         self.assertProj(numOfSamples= 61)
         self.runCmd('vtools admin --merge_samples')         
-        self.assertProj(numOfVariants=577)
-        self.assertProj(numOfSamples= 60)
+        self.assertProj(numOfVariants=577, numOfSamples= 60)
+
+    def testMergeWithOverlappingSamples(self):
         # Test merge samples with overlapping variants
-        self.runCmd('vtools init test -f')
-        self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18')
-        self.assertSucc('vtools import vcf/SAMP1.vcf  --build hg18')
+        self.assertSucc('vtools import vcf/SAMP2.vcf --build hg19')
+        self.assertSucc('vtools import vcf/SAMP1.vcf')
         self.assertSucc('vtools admin --rename_samples \'filename like "%2%"\' SAMP1')
+        #the reason is that the two samepls have some identical variants. 
+        # If you want to merge them, the samples should have different unique variant information.
         self.assertFail('vtools admin --merge_samples')
-        #the reason is that the two samepls have some identical variants. If you want to merge them, the samples should have different unique variant information.
 
     def testRenameSamples(self):
         'Test command vtools admin --rename_samples'
@@ -65,10 +62,9 @@ class TestAdmin(ProcessTestCase):
         # NA12716 is not renamed because of no match.
         self.assertProj(sampleNames=['NA12716'], partial=True)
         self.assertSucc('''vtools admin --rename_samples "sample_name like 'NA1%'" NA ''')
+        # sample no longer exists
         self.assertProj(sampleNames=['NA12716'], partial=True, negate=True)
         self.assertSucc('vtools admin --rename_samples 1 NA NNA')
-        #could not merge them together if they are from the same table.
-        self.assertFail('vtools admin --merge_samples')
 
     def testRenameTable(self):
         'test rename tables'
@@ -83,7 +79,7 @@ class TestAdmin(ProcessTestCase):
 
     def testDescribeTable(self):
         'test describe tables'
-        self.runCmd('vtools import vcf/SAMP1.vcf  --build hg19')
+        self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')
         self.assertSucc('vtools select variant -t "%%" "DESD"')
         self.assertProj(hasTable='%%', tableDesc={'%%': 'DESD'})
         self.assertSucc('vtools admin --describe_table %% "NN NN"')

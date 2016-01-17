@@ -247,9 +247,9 @@ class ProcessTestCase(unittest.TestCase):
                 proj_num_of_sample = subprocess.check_output('vtools execute "SELECT COUNT(1) FROM sample"', shell=True,
                     stderr=fnull)
             if negate:
-                self.assertEqual(int(proj_num_of_sample), numOfSamples)
-            else:
                 self.assertNotEqual(int(proj_num_of_sample), numOfSamples)
+            else:
+                self.assertEqual(int(proj_num_of_sample), numOfSamples)
         if numOfVariants is not None:
             with open(os.devnull, 'w') as fnull:
                 if isinstance(numOfVariants, int):
@@ -310,8 +310,7 @@ class ProcessTestCase(unittest.TestCase):
                     self.compare([x.strip() for x in proj_geno.strip().split('\n')], list(geno), partial=partial, negate=negate)
         if hasTable is not None:
             with open(os.devnull, 'w') as fnull:
-                proj_tables = subprocess.check_output('vtools show tables', shell=True).strip().split('\n')[1:]
-                proj_tables = [x.split()[0] for x in proj_tables]
+                proj_tables = subprocess.check_output('vtools show tables -v0', shell=True).strip().split('\n')
                 if isinstance(hasTable, list):
                     for table in hasTable:
                         if negate:
