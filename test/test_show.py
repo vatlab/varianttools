@@ -28,20 +28,17 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase, runCmd, output2list
+from testUtils import ProcessTestCase
 
 class TestShow(ProcessTestCase):
     def setUp(self):
         'Create a project'
-        self.runCmd('vtools init test -f')
+        ProcessTestCase.setUp(self)
         self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
         self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools use ann/testNSFP.ann')
         
-    def removeProj(self):
-        self.runCmd('vtools remove project')
-
     def testShow(self):
         'Test command vtools show'
         self.assertSucc('vtools show -h')
@@ -62,7 +59,7 @@ class TestShow(ProcessTestCase):
         self.assertSucc('vtools show format ANNOVAR')
         self.assertSucc('vtools show genotypes')
         self.assertSucc('vtools show annotations')
-        self.assertFail('vtools show annotations testNSFP')
+        self.assertSucc('vtools show annotations testNSFP')
         self.assertSucc('vtools show annotation testNSFP')
         self.assertFail('vtools show test')
         self.assertSucc('vtools show tests')
