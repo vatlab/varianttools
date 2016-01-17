@@ -43,25 +43,6 @@ class TestUse(ProcessTestCase):
             self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
             self.runCmd('vtools admin --save_snapshot TestUse.tar.gz "Snapshot of project to test command use"')
 
-    def testShow(self):
-        'Test vtools show command'
-        self.assertSucc('vtools show')
-        self.assertSucc('vtools show -h')
-        self.assertSucc('vtools show project')
-        self.assertFail('vtools show sample')
-        self.assertSucc('vtools show samples')
-        self.assertSucc('vtools show samples -l -1')
-        self.assertFail('vtools show table')
-        self.assertSucc('vtools show tables')
-        self.assertFail('vtools show genotype')
-        self.assertSucc('vtools show genotypes')
-        self.assertFail('vtools show variant')
-        self.assertSucc('vtools show table variant')
-        self.assertSucc('vtools show fields')
-        self.assertSucc('vtools show formats')
-        self.assertFail('vtools show annotation')
-        self.assertSucc('vtools show annotations')
-
     def testUse(self):
         'Test command vtools use'
         self.assertFail('vtools use')
