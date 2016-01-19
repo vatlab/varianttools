@@ -1078,7 +1078,7 @@ def update(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             if not args.from_file and not args.from_stat and not args.set:
-                env.logger.warning('Please specify one of --from_file, --set '
+                raise ValueError('Please specify one of --from_file, --set '
                     'and --from_stat for command vtools upate')
             if args.from_file:
                 proj.db.attach(proj.name + '_genotype')

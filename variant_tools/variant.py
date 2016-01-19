@@ -241,8 +241,7 @@ def select(args, reverse=False):
             if not proj.isVariantTable(encodeTableName(args.from_table)):
                 raise ValueError('Variant table {} does not exist.'.format(args.from_table))
             if not args.to_table and not args.output and not args.count:
-                env.logger.warning('Neither --to_table and --output/--count is specified. Nothing to do.')
-                return
+                raise ValueError('Neither --to_table and --output/--count is specified. Nothing to do.')
             if len(args.condition) > 0:    
                 # fields? We need to replace things like sift_score to dbNSFP.sift_score
                 condition, fields = consolidateFieldName(proj, encodeTableName(args.from_table), ' AND '.join(['({})'.format(x) for x in args.condition]))
