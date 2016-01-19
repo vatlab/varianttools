@@ -1,4 +1,0 @@
-table         #variants     date message
-CEU                 288    Jan14
-unaffected          552    Jan14
-variant           1,036    Jan14 Master variant table

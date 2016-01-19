@@ -34,15 +34,19 @@ class TestRemove(ProcessTestCase):
     def setUp(self):
         'Create a project'
         ProcessTestCase.setUp(self)
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.runCmd('vtools import vcf/SAMP1.vcf')
-        self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
-        self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
-        self.runCmd('vtools use ann/testNSFP.ann') 
-        self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
-        self.runCmd('vtools select variant --samples "aff=\'1\'" -t unaffected')
-        self.runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_num=#(alt)"')
-        self.runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP --build hg18')
+        if os.path.isfile('TestRemove.tar.gz'):
+            self.runCmd('vtools admin --load_snapshot TestRemove.tar.gz')
+        else:
+            self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+            self.runCmd('vtools import vcf/SAMP1.vcf')
+            self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+            self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
+            self.runCmd('vtools use ann/testNSFP.ann') 
+            self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
+            self.runCmd('vtools select variant --samples "aff=\'1\'" -t unaffected')
+            self.runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_num=#(alt)"')
+            self.runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP --build hg18')
+            self.runCmd('vtools admin --save_snapshot TestRemove.tar.gz "Snapshot for testing command remove"')
 
     def testRemove(self):
         'Test command vtools remove'
@@ -60,9 +64,9 @@ class TestRemove(ProcessTestCase):
         self.assertOutput('vtools show tables', 'NAME WITH #$%', partial=True)
         self.assertSucc('vtools remove tables "NAME WITH #$%"')
         # Removing field CEU_num from variant table CEU
-        count1 = len(self.runCmd('vtools show fields -v0').split('\n'))
+        count1 = len(self.runCmd('vtools show fields -v0').strip().split('\n'))
         self.assertSucc('vtools remove fields CEU_cases_num')
-        count2 = len(self.runCmd('vtools show fields -v0').split('\n'))
+        count2 = len(self.runCmd('vtools show fields -v0').strip().split('\n'))
         self.assertEqual(count1-count2, 1)
 
         #remove annotation
@@ -88,31 +92,31 @@ class TestRemove(ProcessTestCase):
     def testRemoveVar(self):
         self.assertFail('vtools remove variant')
         self.assertFail('vtools remove variants')
-        self.assertOutput('vtools show tables', 'output/remove_var_vefore.txt')
         self.assertSucc('vtools remove variants CEU')
-        self.assertOutput('vtools show tables', 'output/remove_var_after.txt')
+        self.assertProj(hasTable='CEU', negate=True)
 
     def testRemoveFields(self):
         #add a field in the variant table
         self.runCmd('vtools use testNSFP')
         self.runCmd('vtools update variant --set gene_name=testNSFP.genename')
-        self.assertOutput('vtools show table variant', 'output/remove_field_before.txt')
+        self.assertOutput('vtools show table variant', 'output/remove_field_before.txt', partial=-3)
         self.runCmd('vtools remove fields CEU_cases_num gene_name DP') 
-        self.assertOutput('vtools show table variant', 'output/remove_field_after.txt')
+        self.assertOutput('vtools show table variant', 'output/remove_field_after.txt', partial=-3)
 
     def testRemovePhenotype(self):
         #remove genotype 
         self.assertFail('vtools remove phenotype')
         self.assertFail('vtools remove phenotypes')
-        self.assertFail('vtools remove phenotypes sample_name')
-        self.assertFail('vtools remove phenotypes filename')
-        self.assertFail('vtools remove phenotypes "sex = "F""')
+        # return 0 even with incorrect phenotype
+        self.assertSucc('vtools remove phenotypes sample_name')
+        self.assertSucc('vtools remove phenotypes filename')
+        self.assertSucc('vtools remove phenotypes "sex = "F""')
         self.assertSucc('vtools remove phenotypes sex')
         # removing non-existing phenotype should yield just a warning
         self.assertSucc('vtools remove phenotypes non_existing')
         self.assertOutput('vtools show samples', 'output/remove_phenotype.txt')
     
-    def testRemoveGenofield(self):
+    def testRemoveGenoField(self):
         #runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP--build hg18')
         self.maxDiff=None
         self.assertOutput('vtools show genotypes', 'output/remove_genofield_before.txt')
