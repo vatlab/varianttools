@@ -404,7 +404,7 @@ class AnnoDBConfiger:
             for dbFile in (dbFilename, os.path.join(env.local_resource, 'annoDB', dbFilename)):
                 if os.path.isfile(dbFile):
                     if self.db_md5 and calculateMD5(dbFile, partial=True) != self.db_md5:
-                        env.logger.warning('MD5 signature mismatch: {}'.format(dbFile))
+                        env.logger.info('{}: MD5 signature mismatch, the database might have been upgraded locally.'.format(dbFile))
                     try:
                         return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields, linked_name)
                     except ValueError as e:

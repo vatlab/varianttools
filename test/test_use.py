@@ -31,17 +31,6 @@ import subprocess
 from testUtils import ProcessTestCase
 
 class TestUse(ProcessTestCase):
-    def setUp(self):
-        'Create a project'
-        ProcessTestCase.setUp(self)
-        if os.path.isfile('TestUse.tar.gz'):
-            self.runCmd('vtools admin --load_snapshot TestUse.tar.gz')
-        else:
-            self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-            self.runCmd('vtools import vcf/SAMP1.vcf')
-            self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
-            self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
-            self.runCmd('vtools admin --save_snapshot TestUse.tar.gz "Snapshot of project to test command use"')
 
     def testUse(self):
         'Test command vtools use'
@@ -56,6 +45,14 @@ class TestUse(ProcessTestCase):
 
     def testThousandGenomes(self):
         'Test variants in thousand genomes'
+        if os.path.isfile('TestUse.tar.gz'):
+            self.runCmd('vtools admin --load_snapshot TestUse.tar.gz')
+        else:
+            self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+            self.runCmd('vtools import vcf/SAMP1.vcf')
+            self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+            self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
+            self.runCmd('vtools admin --save_snapshot TestUse.tar.gz "Snapshot of project to test command use"')
         # no hg19
         self.assertFail('vtools use ann/testThousandGenomes.ann --files ann/testThousandGenomes.vcf.head')
         # liftover
@@ -78,43 +75,48 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools import --format vcf ann/testThousandGenomes.vcf.head --build hg19')
         self.assertSucc('vtools use ann/testThousandGenomes.ann')
         # do we have all the variants matched up?
-        self.assertOutput('vtools select variant -c', '146\n')
-        self.assertOutput('vtools select variant "testThousandGenomes.chr is not NULL" -c', '146\n')
+        self.assertOutput('vtools select variant -c', '145')
+        self.assertOutput('vtools select variant "testThousandGenomes.chr is not NULL" -c', '145')
 
     def testESP(self):
-        self.runCmd('vtools init test -f')
         self.runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
         self.assertSucc('vtools use ESP')
         self.assertSucc('vtools show annotation ESP')
         self.assertOutput('vtools execute "select sample_name from sample"', 'WHISP:D967-33\nWHISP:D226958-47\nWHISP:D264508-52\nWHISP:D7476-42\n')
-        self.assertOutput('vtools output variant variant_id ref alt DP MQ ANNO SVM --header id ref alt DP MQ ANNO SVM -d"\t"', '', 0,'output/evsVariantTest.txt')
+        self.assertOutput('vtools output variant variant_id ref alt DP MQ ANNO SVM --header id ref alt DP MQ ANNO SVM -d"\t"', 'output/evsVariantTest.txt')
 
     def testNSFP(self):
         'Test variants in dbNSFP'
+        if os.path.isfile('TestUse.tar.gz'):
+            self.runCmd('vtools admin --load_snapshot TestUse.tar.gz')
+        else:
+            self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+            self.runCmd('vtools import vcf/SAMP1.vcf')
+            self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+            self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
+            self.runCmd('vtools admin --save_snapshot TestUse.tar.gz "Snapshot of project to test command use"')
         self.assertSucc('vtools use ann/testNSFP.ann --files ann/testNSFP.zip')
         # see if YRI=10/118 is correctly extracted
-        self.assertOutput('''vtools execute "SELECT YRI_alt_lc, YRI_total_lc FROM testNSFP.testNSFP WHERE hg18pos=898186 AND alt='A';"''', '10\t118\n')
-        self.assertOutput('''vtools execute "SELECT YRI_alt_lc, YRI_total_lc FROM testNSFP.testNSFP WHERE hg18pos=897662 AND alt='C';"''', '9\t118\n')
+        self.assertOutput('''vtools execute "SELECT A_freq, C_freq FROM testNSFP.testNSFP WHERE hg18pos=898186 AND alt='A';"''', '2.0\t0\n')
+        self.assertOutput('''vtools execute "SELECT A_freq, C_freq FROM testNSFP.testNSFP WHERE hg18pos=897662 AND alt='C';"''', 'None\tNone\n')
 
     def testUseRange_1(self):
-        self.runCmd('vtools init test -f')
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #the annotation file of "knownGene" is a range based database
         self.assertSucc('vtools use knownGene --anno_type range --linked_fields chr txStart txEnd')
         self.assertSucc('vtools update variant --set count1=knownGene.exonCount')
-        range_out = output2list('vtools execute "select pos, ref, alt, count1 from variant where count1 is not null"')
+        range_out = self.runCmd('vtools execute "select pos, ref, alt, count1 from variant where count1 is not null"').strip().split('\n')
         #using another way to export this table
         self.runCmd('vtools init test -f')
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #this is the default method. the linked_fields have to be in the order in the test below.
         self.assertSucc('vtools use knownGene')
         self.assertSucc('vtools update variant --set count1=knownGene.exonCount')
-        def_out = output2list('vtools execute "select pos, ref, alt, count1 from variant where count1 is not null"')
+        def_out = self.runCmd('vtools execute "select pos, ref, alt, count1 from variant where count1 is not null"').strip().split('\n')
         self.assertEqual(range_out, def_out)
         
 
     def testUseRange_2(self):
-        self.runCmd('vtools init test -f')
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #runCmd('vtools use gwasCatalog')
         #self.assertSucc('vtools show annotation gwasCatalog -v2')
@@ -122,7 +124,7 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools use gwasCatalog --anno_type range --linked_fields chr position-5000 position+5000')
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
         self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
-        range_out2=len(output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name = \'VAMP3\'"'))
+        range_out2=len(self.runCmd('vtools execute "select pos, ref, alt, gene_name from variant where gene_name = \'VAMP3\'"').strip().split('\n'))
         self.assertSucc('vtools select variant "gwasCatalog.genes == \'RERE\'" -o variant.chr variant.pos variant.ref variant.alt gwasCatalog.trait gwasCatalog.name gwasCatalog.position gwasCatalog.pValue gwasCatalog.journal gwasCatalog.title gwasCatalog.genes')
         #narrow the range of position
         self.runCmd('vtools init test -f')
@@ -130,12 +132,11 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools use gwasCatalog --anno_type range --linked_fields chr position-500 position+500')
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
         self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
-        range_out3=len(output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name = \'VAMP3\'"'))
+        range_out3=len(self.runCmd('vtools execute "select pos, ref, alt, gene_name from variant where gene_name = \'VAMP3\'"').strip().split('\n'))
         self.assertNotEqual(range_out2, range_out3)
        
 
     def testUseField_1(self):
-        self.runCmd('vtools init test -f')
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields region')
         #under the option of field in --anno_type, the variable for linked_fields have be in the annotation database that you want to use
@@ -152,10 +153,8 @@ class TestUse(ProcessTestCase):
         #nothing was outputed
         self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields chr position --linked_by chr')
         self.assertSucc('vtools use gwasCatalog --anno_type field --linked_fields chr position --linked_by chr pos')
-        self.assertFail('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
     
     def testUseField_2(self):
-        self.runCmd('vtools init test -f')
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #import the first annotation database
         self.runCmd('vtools use cytoBand')
@@ -176,7 +175,6 @@ class TestUse(ProcessTestCase):
         
         
     def testUseVariant(self):
-        self.runCmd('vtools init test -f')
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #this is the default method. the linked_fields have to be in the order in the test below.
         self.assertSucc('vtools use ESP --anno_type variant --linked_fields chr pos ref alt')
@@ -191,7 +189,6 @@ class TestUse(ProcessTestCase):
         #self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
 
     def testUsePosition(self):
-        self.runCmd('vtools init test -f')
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #If we use the option of positon, the linked_fields have to be "chr" and "position"
         #the following command is current, but no variant was linked to the annotation database
@@ -199,7 +196,7 @@ class TestUse(ProcessTestCase):
         #the output is none from the command below. in order to get the output, create gene_name in variant first
         self.assertSucc('vtools update variant --set gene_name=1')
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
-        pos_out = output2list('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
+        pos_out = self.runCmd('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"').strip().split('\n')
         self.assertEqual(pos_out,['9468354\t-\tA\t1'])
         #using another way to export this table
         self.runCmd('vtools init test -f')
@@ -213,7 +210,6 @@ class TestUse(ProcessTestCase):
     
     def testUseAs(self):
         '''Testing the --as option of command vtools use'''
-        self.runCmd('vtools init test -f')
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #this is the default method. the linked_fields have to be in the order in the test below.
         self.assertSucc('vtools use ESP --anno_type variant --linked_fields chr pos ref alt')

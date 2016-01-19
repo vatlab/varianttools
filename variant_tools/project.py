@@ -295,7 +295,7 @@ class AnnoDB:
             num_records = int(cur.fetchone()[0])
             for k,v in self.refGenomes.items():
                 ref_genome = RefGenome(k).crr
-                cur.execute('SELECT {} FROM {}'.format(','.join(v), self.name))
+                cur.execute('SELECT {}, rowid FROM {}'.format(','.join(v), self.name))
                 new_variants = []
                 prog = ProgressBar('Upgrading {}-{}'.format(self.name, self.version), num_records) 
                 last_msg = None
@@ -311,12 +311,11 @@ class AnnoDB:
                         env.logger.debug('Normalizing variant {} to {}'.format(rec[1:], new_variant[1:]))
                         # needs both new and old variant info for update
                         new_variants.append(new_variant)
-                        new_variants[-1].extend(rec)
                     prog.update(idx+1)
                 prog.done()
                 # updating variants
                 if new_variants:
-                    cur.executemany('UPDATE variant SET {0}=?, {1}=?, {2}=?, {3}=? WHERE {0}=? AND {1}=? AND {2}=? {3}=?'.format(*v),
+                    cur.executemany('UPDATE {0} SET {1}=?, {2}=?, {3}=?, {4}=? WHERE rowid=?'.format(self.name, *v),
                         new_variants)
                 env.logger.info('{} variants are updated'.format(len(new_variants)))
             # update database format

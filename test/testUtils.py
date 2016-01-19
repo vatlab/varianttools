@@ -157,7 +157,7 @@ class ProcessTestCase(unittest.TestCase):
             
         if negate is True, test for negative assertaion (e.g. not equal, not include etc)
 
-        NOTE: if output is a file (with pattern output/*.txt) and the file does not exist, this
+        NOTE: if output is a file (with pattern output/*) and the file does not exist, this
         function will write command output to it with a warning message. This greatly simplies
         the writing of test functions. Make sure to check if the output is correct though.
         '''
@@ -172,25 +172,23 @@ class ProcessTestCase(unittest.TestCase):
         with open(self.test_command + '.log', 'a') as fcmd:
             if isinstance(output, list):
                 fcmd.write('# expect output is a list of {}\n'.format(', '.join(output)))
-            elif output.startswith('output/') and output.endswith('.txt'):
-                fcmd.write('# expect output in {}\n'.format(output))
-            else:
-                fcmd.write('# expect output {} \n# actual output {}\n'
-                    .format('\n#'.join(output.strip().split('\n')), '\n#'.join(cmd_output.strip().split('\n'))))
-            if isinstance(cmd, str):
-                fcmd.write(cmd + '\n')
-            else:
-                fcmd.write('\n'.join(cmd) + '\n')
-        if isinstance(output, str):
-            if os.path.isfile(output):
-                with open(output, 'r') as cf:
-                    output = cf.read()
-            else:
-                if output.startswith('output/') and output.endswith('.txt'):
+            elif output.startswith('output/'):
+                fcmd.write('# expect output in {} with first 10 lines\n'.format(output))
+                if os.path.isfile(output):
+                    with open(output, 'r') as cf:
+                        output = cf.read()
+                        fcmd.write('# ' + '\n# '.join(output.split('\n')[:10]) + '\n')
+                else:
                     print('\033[32mWARNING: output file {} does not exist and has just been created.\033[0m'.format(output))
                     with open(output, 'w') as cf:
                         cf.write(cmd_output)
                     output = cmd_output
+            else:
+                fcmd.write('# expect output {} \n'.format('\n#'.join(output.strip().split('\n'))))
+            if isinstance(cmd, str):
+                fcmd.write(cmd + '\n')
+            else:
+                fcmd.write('\n'.join(cmd) + '\n')
         #
         self.compare(cmd_output, output, partial, negate=negate)
 

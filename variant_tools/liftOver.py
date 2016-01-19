@@ -68,10 +68,7 @@ class LiftOverTool:
                 liftOverExe = downloadFile(liftOverURL, env.cache_dir)
                 os.chmod(liftOverExe, stat.S_IXUSR | stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH) 
             except Exception as e:
-                env.logger.warning('Failed to download UCSC liftOver tool from {0}'.format(liftOverURL))
-                env.logger.warning('Please check the URL or manually download the file.')
-                env.logger.debug(str(e))
-                return False
+                raise RuntimeError('Failed to download UCSC liftOver tool from {}: {}'.format(liftOverURL, e))
         return True
  
     def obtainLiftOverChainFile(self, from_build, to_build):

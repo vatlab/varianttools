@@ -9,8 +9,7 @@ description=A pipeline for testing features of VST.
 
 seed=12345
 
-[*_0]
-input=${NULL_INPUT}
+[*_0: no_input]
 action=ImportModules('simulation')
 
 [checkvtools_10]

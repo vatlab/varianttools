@@ -32,19 +32,6 @@ from testUtils import ProcessTestCase
 
 class TestExport(ProcessTestCase):
     
-    def tearDown(self):
-        self.runCmd('vtools remove project')
-        try:
-            dir = os.getcwd()
-            vcf = os.path.join(dir, 'my.vcf')
-            annovar = os.path.join(dir, 'annovar.input')
-            tped = os.path.join(dir, 'my.tped')
-            os.remove(annovar)
-            os.remove(vcf)
-            os.remove(tped)
-        except Exception as e:
-            pass
-
     def testExportVcfSnv_single(self):
         'Test command export in vcf format'
         #the output format of vcf has several options:
@@ -79,19 +66,18 @@ class TestExport(ProcessTestCase):
         #self.assertSucc('vtools export variant --format vcf --geno_info test')
         #self.assertSucc('vtools export variant --format vcf --var_info test')
         #self.assertSucc('vtools export variant --format vcf --var_info')
-        self.assertSucc('vtools export variant --format vcf --var_info dbSNP.INT_flag')
-        self.assertSucc('vtools export variant --format vcf --geno_info dbSNP.VC')
+        self.assertSucc('vtools export variant --format vcf --var_info dbSNP.molType')
+        self.assertSucc('vtools export variant --format vcf --geno_info dbSNP.valid')
         
         #for those suboptions, you have to assign the fields
         self.assertSucc('vtools export variant --format vcf --id dbSNP.name')
-        self.assertSucc('vtools export variant --format vcf --pos dbSNP.pos')
-        self.assertSucc('vtools export variant --format vcf --ref dbSNP.ref')
+        self.assertSucc('vtools export variant --format vcf --pos dbSNP.start')
+        self.assertSucc('vtools export variant --format vcf --ref dbSNP.refNCBI')
         self.assertSucc('vtools export variant --format vcf --alt dbSNP.alt')
         
-        self.assertSucc('vtools export variant --format vcf --qual dbSNP.VP')
-        self.assertSucc('vtools export variant --format vcf --filter dbSNP.INT_FLAG')
-        self.assertSucc('vtools export variant --format vcf --info dbSNP.VC')
-        self.assertSucc('vtools export variant --format vcf --geno dbSNP.VP')
+        self.assertSucc('vtools export variant --format vcf --qual dbSNP.valid')
+        self.assertSucc('vtools export variant --format vcf --filter dbSNP.molType')
+        self.assertSucc('vtools export variant --format vcf --info dbSNP.valid')
 
         #"THE FOLLOWING FOUR TESTS SHOULD BE FAIL, NEED TO MODIFY THE CODE"
         # without name, the cmd can be passed, but no output for the field 
@@ -113,7 +99,7 @@ class TestExport(ProcessTestCase):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         # test basic vcf output
         self.assertSucc('vtools export variant --output my.vcf')
-        variants = output2list('vtools output variant chr pos ref alt -d"\t"')
+        variants = self.runCmd('vtools output variant chr pos ref alt -d"\t"').strip().split('\n')
         with open('my.vcf') as infile:
             exported = infile.readlines()
             exported = ['\t'.join([x.split('\t')[0], x.split('\t')[1], x.split('\t')[3], x.split('\t')[4]]) for x in exported]
@@ -155,18 +141,18 @@ class TestExport(ProcessTestCase):
         self.assertSucc('vtools export variant --format vcf --pos pos  --ref ref --alt alt')
 
         #those tests are passed. Please check the fields you want to assign to each suboption, otherwise the output will be messy.
-        self.assertSucc('vtools export variant --format vcf --pos dbSNP.pos --ref ref')
-        self.assertSucc('vtools export variant --format vcf --pos dbSNP.pos --ref dbSNP.ref --alt dbSNP.alt ')
-        self.assertSucc('vtools export variant -o my.vcf --id dbSNP.name --filter dbSNP.VC --info dbSNP.VP')
-        self.assertSucc('vtools export variant --format vcf --id dbSNP.name --filter dbSNP.VC --info dbSNP.VP --samples 1 --format_string GT:DP')
+        self.assertSucc('vtools export variant --format vcf --pos dbSNP.start --ref ref')
+        self.assertSucc('vtools export variant --format vcf --pos dbSNP.start --ref dbSNP.refNCBI --alt dbSNP.alt ')
+        self.assertSucc('vtools export variant -o my.vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.class')
+        self.assertSucc('vtools export variant --format vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.class --samples 1 --format_string GT:DP')
 
         #output in alternative reference genome
         self.runCmd('vtools liftover hg18')
-        self.assertSucc('vtools export variant --format vcf --id dbSNP.name --filter dbSNP.VC --info dbSNP.VP --samples 1 --format_string GT:DP')
+        self.assertSucc('vtools export variant --format vcf --id dbSNP.name --filter dbSNP.valid --info dbSNP.vlass --samples 1 --format_string GT:DP')
 
     def testHeader(self):
         'Test option header of vtools export'
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.assertOutput('vtools export variant --format vcf --header something', 'something', 1)
         self.assertOutput('vtools export variant --format vcf --header a1 a2', 'a1\ta2', 1)
         self.assertOutput('vtools export variant --format vcf --samples 1 --header a1 a2 "%(sample_names)s"', 
@@ -199,38 +185,31 @@ class TestExport(ProcessTestCase):
         self.runCmd('vtools use dbSNP')
         #the output format of 'ANNOVAR' is with one options: --comment_string
         self.assertSucc('vtools export variant --format ANNOVAR') 
-        self.assertSucc('vtools export variant --format ANNOVAR --comment_string dbSNP.VP')
+        self.assertSucc('vtools export variant --format ANNOVAR --comment_string dbSNP.valid')
         #
         # export table with non-ascii name
         self.runCmd('vtools select variant -t "8#?"')
         self.assertSucc('vtools export "8#?" --format ANNOVAR') 
 
-    #def testExportANNOVAR_output(self):
-        'Test command export in annovar input format'
-        #the output format of 'ANNOVAR_output' is with one options: --var_info. This format is not working right now.
-        #runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
-        #runCmd('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-        #runCmd('vtools use dbSNP-hg19_138')
-        #self.assertFail('vtools export variant --format ANNOVAR_output') 
-        #self.assertSucc('vtools export variant --format ANNOVAR_output --var_info dbSNP.name')
-
     def testTped(self):
         'Test command export in tped format'
         #the output format of 'tped' is with two options: --name and --style
         #vtools export variant --format tped -- to query
+        #
+        # we should use hg18 but I do not want to download the hg18 version of dbSNP
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg19')
         self.runCmd('vtools select variant "pos = 533" -t tmp')
         self.assertSucc('vtools export variant --format tped --samples "sample_name like \'NA069%\'"')
         self.assertSucc('vtools export variant --format tped --samples 1 --style numeric')
         self.assertOutput('vtools export tmp --format tped --samples "sample_name like \'NA069%\'"', 
                           '1	.	.	533	G	G	G	G	G	G', 1)
-        self.runCmd('vtools use dbSNP-hg19_138')
+        self.runCmd('vtools use dbSNP')
         self.assertSucc('vtools export variant --format tped --samples \'sample_name like "NA069%"\' --name dbSNP.name')
 
     def testTpedMissingGen(self):
         'Test command export in tped format with missing genotype data'
         self.runCmd('vtools import vcf/missing_gen.vcf --build hg19')
-        self.assertOutput('vtools export variant --format tped --samples 1','', 0, 'output/missing_gen.tped') 
+        self.assertOutput('vtools export variant --format tped --samples 1', 'output/missing_gen.tped') 
 
 if __name__ == '__main__':
     unittest.main()

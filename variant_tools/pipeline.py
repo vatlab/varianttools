@@ -3191,14 +3191,16 @@ def simulate_replicate(args, rep):
                 cfg.write("command={}\n".format(env.command_line))
         #
         env.logger.info('Starting simulation [[{}]]'.format(cfg_file))
-        pipeline = Pipeline(args.specfile, extra_args=args.unknown_args,
+        opt = args.unknown_args
+        opt.extend(['--input'] + [cfg_file])
+        pipeline = Pipeline(args.specfile, extra_args=opt,
             pipeline_type='simulation', verbosity=args.verbosity, jobs=args.jobs)
         # using a pool of simulators 
         if not args.models:
-            pipeline.execute(None, [cfg_file], [], seed=args.seed+rep)
+            pipeline.execute(None, seed=args.seed+rep)
         else:
             for name in args.models:
-                pipeline.execute(name, [cfg_file], [], seed=args.seed+rep)
+                pipeline.execute(name, seed=args.seed+rep)
     except Exception as e:
         env.logger.error('Failed to simulate replicate {} of model {}: {}'.format(rep, model_name, e))
         sys.exit(1)

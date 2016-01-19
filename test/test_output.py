@@ -77,15 +77,15 @@ class TestOutput(ProcessTestCase):
         self.assertSucc('vtools output variant alt "sum(num)" --group_by alt')
         self.assertSucc('vtools output variant alt "sum(num)" --group_by alt --header alt sum') 
         self.assertSucc('vtools output variant alt "sum(num)" --group_by alt --delimiter ","')  
-        self.assertOutput('vtools output variant "sum(num)" -v0'), '6383'+'\n')
+        self.assertOutput('vtools output variant "sum(num)" -v0', '6383'+'\n')
         self.assertFail('vtools output variant count(1)')
-        self.assertOutput('vtools output variant "count(1)"'), '626'+'\n')
+        self.assertOutput('vtools output variant "count(1)"', '626'+'\n')
         self.assertSucc('vtools output variant chr pos ref alt num --order_by num')
         self.assertSucc('vtools output variant chr pos ref alt num --build hg18')
         self.assertSucc('vtools liftover hg19 --flip')
         self.assertSucc('vtools output variant chr pos ref alt num --build hg19')
         self.assertSucc('vtools output variant chr pos ref alt num --header sum_of_num --order_by num')
-        self.assertOutput('vtools output variant num --order_by num'),
+        self.assertOutput('vtools output variant num --order_by num',
             ['110', '110', '110', '113', '114', '119', '119', '120', '120', '120'], partial=-10)
         
 

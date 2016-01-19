@@ -34,8 +34,8 @@ class TestExecute(ProcessTestCase):
     def setUp(self):
         'Create a project'
         ProcessTestCase.setUp(self)
-        self.runCmd('vtools import vcf/SAMP1.vcf')
-        self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+        self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')
+        #self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
         self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
 
     def testExecute(self):

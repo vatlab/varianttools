@@ -36,20 +36,22 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import --build hg18 --format fmt/basic_hg18 txt/invalid.tsv')
         self.assertProj(numOfSamples= 0, numOfVariants=10)
 
-    def testImportTXT(self):
+    def testImportCommand(self):
         'Test command import'
         self.assertFail('vtools import')
         # Cannot guess input file type from filename
         self.assertFail('vtools import txt/input.tsv')
         # no format information, fail
         self.assertFail('vtools import txt/input.tsv --build hg18')
+
+    def testImportTXT(self):
         # help information
         self.assertSucc('vtools import -h')
         # no build information, fail
         self.assertFail('vtools import --format fmt/basic_hg18 txt/input.tsv')
         # no sample name, a sample with NULL name is created
         self.assertSucc('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv')
-        self.assertProj(numOfSamples= 0, numOfVariants=338)
+        self.assertProj(numOfSamples= 0, numOfVariants=1446)
         self.assertFail('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant chr pos ref not_defined_field --force')
         self.assertFail('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant chr pos --force')
         self.assertOutput('vtools output variant chr pos ref alt -d"\t"', 'output/import_txt_1.txt')
@@ -92,8 +94,6 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function --var_info function --force' )
         self.assertSucc('vtools select variant "function is not NULL" -t function')
         self.assertProj(numOfVariants={'function': 78})
-        # mut_type should not be imported because it is not specified
-        self.assertFail('vtools output variant mut_type')
         
     def testCASAVA18_SNP(self):
         'Testing the CASAVA SNP input format'
@@ -169,7 +169,7 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j1')
         self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
         self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt')
+        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
         self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
                 'output/import_mpi_genotype.txt')
         #
@@ -182,7 +182,7 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j3')
         self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
         self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt')
+        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
         self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
                 'output/import_mpi_genotype.txt')
         #
@@ -193,7 +193,7 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j10')
         self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
         self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt')
+        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
         self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
                 'output/import_mpi_genotype.txt')
     
@@ -202,7 +202,7 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j1')
         self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
         self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_multi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt')
+        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
         self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(3)],
                 'output/import_mpi_multi_genotype.txt')
         #
@@ -213,7 +213,7 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j4')
         self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
         self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_multi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt')
+        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
         self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(3)],
                 'output/import_mpi_multi_genotype.txt')
  
