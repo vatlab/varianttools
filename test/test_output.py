@@ -60,9 +60,9 @@ class TestOutput(ProcessTestCase):
     def testAllOutput(self):
         'Test option --all of command output'
         self.runCmd('vtools use refGene-hg18_20110909')
-        out0 = self.runCmd('vtools output variant chr ref').strip().split('\n')
-        out1 = self.runCmd('vtools output variant chr ref refGene.name').strip().split('\n')
-        out2 = self.runCmd('vtools output variant chr ref refGene.name --all').strip().split('\n')
+        out0 = self.runCmd('vtools output variant chr ref', ret='list')
+        out1 = self.runCmd('vtools output variant chr ref refGene.name', ret='list')
+        out2 = self.runCmd('vtools output variant chr ref refGene.name --all', ret='list')
         self.assertEqual(len(set(out0)), 4)
         self.assertEqual(len(set(out1)), 8)
         self.assertEqual(len(set(out2)), 12)

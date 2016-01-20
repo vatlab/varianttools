@@ -99,7 +99,7 @@ class TestExport(ProcessTestCase):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         # test basic vcf output
         self.assertSucc('vtools export variant --output my.vcf')
-        variants = self.runCmd('vtools output variant chr pos ref alt -d"\t"').strip().split('\n')
+        variants = self.runCmd('vtools output variant chr pos ref alt -d"\t"', ret='list')
         with open('my.vcf') as infile:
             exported = infile.readlines()
             exported = ['\t'.join([x.split('\t')[0], x.split('\t')[1], x.split('\t')[3], x.split('\t')[4]]) for x in exported]

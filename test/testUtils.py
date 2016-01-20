@@ -111,12 +111,17 @@ class ProcessTestCase(unittest.TestCase):
             else:
                 raise ValueError('Partial can be an integer, True, or a lambda function')
 
-    def runCmd(self, cmd):
+    def runCmd(self, cmd, ret='string'):
         'Run a command in shell process. Does not check its output or return value.'
         with open(self.test_command + '.log', 'a') as fcmd:
             fcmd.write(cmd + '\n')
         with open(os.devnull, 'w') as fnull:
-            return subprocess.check_output(cmd, stderr=fnull, shell=True, env=test_env).decode()
+            if ret == 'string':
+                return subprocess.check_output(cmd, stderr=fnull, shell=True, env=test_env).decode()
+            elif ret == 'list':
+                return subprocess.check_output(cmd, stderr=fnull, shell=True, env=test_env).decode().strip().split('\n')
+            else:
+                raise ValueError('Unrecognized return type for command runCmd {}'.format(ret))
 
     def assertSucc(self, cmd):
         'Execute cmd and assert its success'
@@ -243,7 +248,7 @@ class ProcessTestCase(unittest.TestCase):
         if numOfSamples is not None:
             with open(os.devnull, 'w') as fnull:
                 proj_num_of_sample = subprocess.check_output('vtools execute "SELECT COUNT(1) FROM sample"', shell=True,
-                    stderr=fnull)
+                    stderr=fnull).decode()
             if negate:
                 self.assertNotEqual(int(proj_num_of_sample), numOfSamples)
             else:
@@ -252,7 +257,7 @@ class ProcessTestCase(unittest.TestCase):
             with open(os.devnull, 'w') as fnull:
                 if isinstance(numOfVariants, int):
                     proj_num_of_variants = subprocess.check_output('vtools execute "SELECT COUNT(1) FROM variant"', shell=True,
-                        stderr=fnull)
+                        stderr=fnull).decode()
                     if negate:
                         self.assertNotEqual(int(proj_num_of_variants), numOfVariants)
                     else:
@@ -260,7 +265,7 @@ class ProcessTestCase(unittest.TestCase):
                 else:
                     for table, number in numOfVariants.items():
                         proj_num_of_variants = subprocess.check_output('vtools execute "SELECT COUNT(1) FROM {}"'.format(table), shell=True,
-                            stderr=fnull)
+                            stderr=fnull).decode()
                         if negate:
                             self.assertNotEqual(int(proj_num_of_variants), number)
                         else:
@@ -308,7 +313,7 @@ class ProcessTestCase(unittest.TestCase):
                     self.compare([x.strip() for x in proj_geno.strip().split('\n')], list(geno), partial=partial, negate=negate)
         if hasTable is not None:
             with open(os.devnull, 'w') as fnull:
-                proj_tables = subprocess.check_output('vtools show tables -v0', shell=True).strip().split('\n')
+                proj_tables = subprocess.check_output('vtools show tables -v0', shell=True).decode().strip().split('\n')
                 if isinstance(hasTable, list):
                     for table in hasTable:
                         if negate:

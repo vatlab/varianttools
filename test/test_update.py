@@ -166,14 +166,14 @@ class TestUpdate(ProcessTestCase):
         self.runCmd('vtools import txt/variants.txt --format basic --build hg19')
         self.runCmd('vtools use refGene')
         self.runCmd('vtools update variant --set "gname=refGene.name2"')
-        lines = self.runCmd('vtools output variant chr pos ref alt gname refGene.name2 -d"\t"').strip().split('\n')
+        lines = self.runCmd('vtools output variant chr pos ref alt gname refGene.name2 -d"\t"', ret='list')
         # does not count duplicate lines
         line_count = len(set(lines))
         for line in lines:
             values = line.split('\t')
             self.assertEqual(values[-2], values[-1])
         self.runCmd('vtools update variant --set "vname=refGene.name"')
-        lines = self.runCmd('vtools output variant chr pos ref alt vname refGene.name').strip().split('\n')
+        lines = self.runCmd('vtools output variant chr pos ref alt vname refGene.name', ret='list')
         # there should not be more lines
         self.assertEqual(line_count, len(set(lines)))
         

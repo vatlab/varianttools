@@ -64,9 +64,9 @@ class TestRemove(ProcessTestCase):
         self.assertOutput('vtools show tables', 'NAME WITH #$%', partial=True)
         self.assertSucc('vtools remove tables "NAME WITH #$%"')
         # Removing field CEU_num from variant table CEU
-        count1 = len(self.runCmd('vtools show fields -v0').strip().split('\n'))
+        count1 = len(self.runCmd('vtools show fields -v0', ret='list'))
         self.assertSucc('vtools remove fields CEU_cases_num')
-        count2 = len(self.runCmd('vtools show fields -v0').strip().split('\n'))
+        count2 = len(self.runCmd('vtools show fields -v0', ret='list'))
         self.assertEqual(count1-count2, 1)
 
         #remove annotation

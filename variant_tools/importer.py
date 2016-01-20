@@ -282,7 +282,7 @@ class LineProcessor:
                     rec = [(x[i] if i < len(x) else None) if type(x) is tuple else x for x in records]
                 for ref_genome, chr_idx, pos_idx, ref_idx, alt_idx in self.build_info:
                     # bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], rec[alt_idx])
-                    #env.logger.error('PRE "{}" {} {} {}'.format(rec[chr_idx], rec[pos_idx], rec[ref_idx], rec[alt_idx]))
+                    #env.logger.error('PRE {} {} {} {}'.format(rec[chr_idx], rec[pos_idx], rec[ref_idx], rec[alt_idx]))
                     msg = normalize_variant(ref_genome, rec, chr_idx, pos_idx, ref_idx, alt_idx)
                     #env.logger.error('POST {} {} {} {}'.format(rec[chr_idx], rec[pos_idx], rec[ref_idx], rec[alt_idx]))
                     #

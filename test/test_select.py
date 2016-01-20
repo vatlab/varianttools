@@ -91,7 +91,7 @@ class TestSelect(ProcessTestCase):
         #
         self.assertSucc('vtools select variant --samples "aff=\'1\' and BMI<20" -t ns3')
         namelist = self.runCmd('vtools execute "select sample_id from sample where aff=1 and BMI<20"')
-        variantlist = [self.runCmd('vtools execute "select variant_id from genotype_{} where GT <> 0"'.format(x)).strip().split('\n') 
+        variantlist = [self.runCmd('vtools execute "select variant_id from genotype_{} where GT <> 0"'.format(x), ret='list') 
             for x in namelist.strip().split('\n')]
         variantlist = [x for y in variantlist for x in y]
         lv = str(len(set(variantlist)))
@@ -102,7 +102,7 @@ class TestSelect(ProcessTestCase):
         #
         self.assertSucc('vtools select variant --samples "aff=\'1\' or BMI<20" -t ns2')
         namelist = self.runCmd('vtools execute "select sample_id from sample where aff=1 or BMI<20"')
-        variantlist = [self.runCmd('vtools execute "select variant_id from genotype_{} where GT <> 0"'.format(x)).strip().split('\n')
+        variantlist = [self.runCmd('vtools execute "select variant_id from genotype_{} where GT <> 0"'.format(x), ret='list')
             for x in namelist.strip().split('\n')]
         variantlist = [x for y in variantlist for x in y]
         lv = str(len(set(variantlist)))
@@ -114,7 +114,7 @@ class TestSelect(ProcessTestCase):
         #
         self.assertSucc('vtools select variant --samples "sample_name like \'NA0%\'" -t NA0')
         namelist = self.runCmd('vtools execute "select sample_id from sample where sample_name like \'NA0%\'"')
-        variantlist = [self.runCmd('vtools execute "select variant_id from genotype_{} where gt <> 0"'.format(x)).strip().split('\n')
+        variantlist = [self.runCmd('vtools execute "select variant_id from genotype_{} where gt <> 0"'.format(x), ret='list')
             for x in namelist.strip().split('\n')]
         variantlist = [x for y in variantlist for x in y]
         lv = str(len(set(variantlist)))
@@ -138,7 +138,7 @@ class TestSelect(ProcessTestCase):
         self.assertSucc('vtools update variant --set "nil=NULL"')
         # the least function will ignore value from nil
         self.assertSucc('vtools update variant --set "lst=least_not_null(hom, het, nil)"')
-        counts = self.runCmd('vtools output variant hom het lst').strip().split('\n')
+        counts = self.runCmd('vtools output variant hom het lst', ret='list')
         for line in counts:
             values = [int(x) for x in line.split()]
             self.assertEqual(min(values[0], values[1]), values[2])

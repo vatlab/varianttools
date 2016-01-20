@@ -84,7 +84,7 @@ class TestAssociate(ProcessTestCase):
         'Test basic association results'
         for i in range(8):
             self.runCmd('vtools update variant --from_file output/assogrp{}.txt --format fmt/randcol.fmt --var_info grpby'.format(str(i+1)))
-            vtoolsout = self.runCmd('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "LinRegBurden --alternative 2" -g grpby').strip().split('\n')
+            vtoolsout = self.runCmd('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "LinRegBurden --alternative 2" -g grpby', ret='list')
             vtoolsout = ['\t'.join([j for jdx, j in enumerate(x.split()) if jdx in [0,4,5,6]]) for idx, x in enumerate(vtoolsout) if idx > 0 and 'NAN' not in x]
             vtoolsout.sort()
             with open('output/assores'+str(i+1)+'.txt','r') as f:
@@ -95,7 +95,7 @@ class TestAssociate(ProcessTestCase):
         'Test for weighting theme'
         for i in range(8):
             self.runCmd('vtools update variant --from_file output/assogrp{}.txt --format fmt/randcol.fmt --var_info grpby'.format(str(i+1)))
-            vtoolsout = self.runCmd('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "WeightedBurdenQt --alternative 2 --weight Browning_all" -g grpby').strip().split('\n')
+            vtoolsout = self.runCmd('vtools associate variant phen2 --covariate phen1 phen3 phen4 -m "WeightedBurdenQt --alternative 2 --weight Browning_all" -g grpby', ret='list')
             vtoolsout = ['\t'.join([j for jdx, j in enumerate(x.split()) if jdx in [0,4,5,6]]) for idx, x in enumerate(vtoolsout) if idx > 0 and 'NAN' not in x]
             vtoolsout.sort()
             with open('output/assores_wss'+str(i+1)+'.txt','r') as f:
