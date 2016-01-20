@@ -82,11 +82,10 @@ class LiftOverTool:
                 env.logger.info('Downloading liftOver chain file from UCSC')
                 chainFile = downloadFile(chainFileURL, env.cache_dir)
             except Exception as e:
-                env.logger.warning('Failed to download chain file from {0}'.format(chainFileURL))
-                env.logger.warning('Please check the URL, change --build and/or --alt_build, and try again')
-                env.logger.warning('Optionally, you can download the right chain file and rename it to the one that is needed')
-                env.logger.debug(e)
-                return None
+                raise RuntimeError(('Failed to download chain file from {0}'
+                    'Please check the URL, change --build and/or --alt_build, and try again'
+                    'Optionally, you can download the right chain file and rename it to the one that is needed: {1}'
+                    ).format(chainFileURL, e))
         return chainFile
 
     def exportVariantsInBedFormat(self, filename):

@@ -803,7 +803,7 @@ def lineCount(filename, encoding='UTF-8'):
         return int(lineCount * (totalSize / 99000.))
 
 class PrettyPrinter:
-    def __init__(self, delimiter=None, max_width={}, cache_size=200):
+    def __init__(self, delimiter=None, precision=None, na='.', max_width={}, cache_size=200):
         ''' delimiter: use specified field to separate fields
             max_width: a dictionary of {col: max_width} to change long
                 text to START...END
@@ -813,6 +813,12 @@ class PrettyPrinter:
         self.rows = []
         self.max_width = max_width
         self.cache_size = cache_size
+        self.precision = precision
+        if precision is None:
+            self.formatter = lambda x : na if x is None else str(x)
+        else:
+            format_string = '{{:.{}f}}'.format(precision)
+            self.formatter = lambda x : na if x is None else (str(x) if precision is None else format_string.format(x)) if isinstance(x, float) else str(x)
         # if a delimiter is specified, use it
         if delimiter is not None:
             self.delimiter = delimiter.replace(r'\t', '\t')
@@ -832,7 +838,7 @@ class PrettyPrinter:
     #
     def direct_print(self, data):
         '''print data directly using specified delimiter'''
-        print(self.delimiter.join([x for x in data]))
+        print(self.delimiter.join([self.formater(x) for x in data]))
 
     def direct_print_rest(self):
         '''No cache so do nothing'''
@@ -841,8 +847,9 @@ class PrettyPrinter:
     #
     # MODE 2: cached, trimmed print
     #
-    def cached_trim_print(self, data):
+    def cached_trim_print(self, raw_data):
         '''Use cache, figure out column width'''
+        data = [self.formatter(x) for x in raw_data]
         trimmed = {}
         for c,m in self.max_width.items():
             if len(data[c]) > m:
@@ -885,7 +892,8 @@ class PrettyPrinter:
         # clear cache
         self.rows = []
 
-    def uncached_trim_print(self, data):
+    def uncached_trim_print(self, raw_data):
+        data = [self.formatter(x) for x in raw_data]
         trimmed = {}
         for c,m in self.max_width.items():
             if len(data[c]) > m:
@@ -903,7 +911,8 @@ class PrettyPrinter:
     #
     # MODE 3: cached, untrimmed print
     # 
-    def cached_print(self, data):
+    def cached_print(self, raw_data):
+        data = [self.formatter(x) for x in raw_data]
         self.rows.append(data)
         if not self.width:
             self.width = [len(x) for x in data]

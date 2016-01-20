@@ -53,7 +53,6 @@ class TestUpdate(ProcessTestCase):
         # no hg19, but will automatically add it
         self.assertSucc('vtools update variant --format fmt/dbSNP_hg19validation --from_file txt/dbSNP_hg19validation.txt --build hg19')
         #If the file is already imported and you can add field(s) using the orginal file without --format
-        self.assertFail('vtools')   
         self.assertSucc('vtools update variant --from_file vcf/CEU.vcf.gz --geno_info DP_geno')
         #you could not use another file which is not loaded into the project to update the current variant table 
         self.assertFail('vtools update variant --from_file vcf/SAMP4_complex_variants.vcf --geno_info DP_geno')
@@ -116,7 +115,7 @@ class TestUpdate(ProcessTestCase):
         self.assertFail('vtools update variant --from_stat "max_gq=max(GQ1)" "min_gq=min(GQ)"')
         self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' \
                             'minDP=min(GD)' 'maxDP=max(GD)' 'meanDP=avg(GD)' 'minGQv=min(GQ)' 'maxGQv=max(GQ)' 'meanGQv=avg(GQ)'")
-        self.assertOutput('vtools output variant maxGQv minGQv meanGQv', 'output/update_sum_stat.txt')
+        self.assertOutput('vtools output variant maxGQv minGQv meanGQv --precision 4', 'output/update_sum_stat.txt')
         self.assertSucc('vtools update variant --from_stat "total_dp=sum(GD)"')
         self.assertProj(info={'total_dp': ['None', 'None', 'None', '60', '7', '4']})
         # ffilter out variants having GQ less than 4,

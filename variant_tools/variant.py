@@ -55,6 +55,10 @@ def generalOutputArguments(parser):
             uses tabs to delimit columns padded to the same width by spaces. You
             can use '-d,' for csv output, or -d'\\t' for unpadded tab-delimited
             output.''')
+    grp.add_argument('--precision', default=None,
+        help='''Precision used to output float numbers. The default value is None which
+            uses system default (e.g. whatever str(number) outputs). You can set it to
+            a positive number (e.g. 4) to limit the number of digits to output.''')
     grp.add_argument('--na', default='.',
         help='Output string for missing value')
     grp.add_argument('-l', '--limit', metavar='N', type=int,
@@ -181,7 +185,7 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
             # if all fields are correctly specified?
             raise RuntimeError('Failed to execute query. One or more fields might '
                         'be misspecified: {}'.format(e))
-    prt = PrettyPrinter(delimiter=args.delimiter)
+    prt = PrettyPrinter(delimiter=args.delimiter, precision=args.precision, na=args.na)
     if args.header is not None:
         if len(args.header) == 0:
             # if no real header is given, use output_fields, but replace things like (, ), and , to space
@@ -192,7 +196,7 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
             # other wise, use the user-provided header
             prt.write(args.header)
     for rec in cur:
-        prt.write([args.na if x is None else str(x) for x in rec])
+        prt.write(rec)
     prt.write_rest()
 
 def output(args):

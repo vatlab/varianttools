@@ -293,12 +293,15 @@ class AssociationTestManager:
                     m_module, m_name = name.split('.', 1)
                     # also search current working directory
                     my_dir = os.getcwd()
+                    env.logger.info('Loading {} from {}'.format(m_module, my_dir))
                     if my_dir not in sys.path:
                         sys.path.append(my_dir)
-                        _temp = __import__(m_module, globals(), locals(), [m_name], -1)
+                        # use the default level, which is -1 for python 2 and 0 for python 3
+                        _temp = __import__(m_module, globals(), locals(), [m_name])
                         sys.path.pop()
                     else:
-                        _temp = __import__(m_module, globals(), locals(), [m_name], -1)
+                        _temp = __import__(m_module, globals(), locals(), [m_name])
+                    env.logger.info('Loading {}'.format(m_module))
                     method = getattr(_temp, m_name)(ncovariates, args)
                 else:
                     method = eval(name)(ncovariates, args)
@@ -310,9 +313,8 @@ class AssociationTestManager:
                     env.logger.warning('Association test {} has invalid or empty fields. '
                                         'No result will be generated.'.format(name))
                 tests.append(method)
-            except NameError as e:
-                env.logger.debug(e)
-                raise ValueError('Failed to load association test {0}: {1}. '
+            except Exception as e:
+                raise ValueError('Failed to load association test {0}: {1}.'
                                  'Please use command "vtools show tests" to list usable tests'.format(name, e))
         return tests
 
