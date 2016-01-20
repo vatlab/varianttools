@@ -838,7 +838,7 @@ class PrettyPrinter:
     #
     def direct_print(self, data):
         '''print data directly using specified delimiter'''
-        print(self.delimiter.join([self.formater(x) for x in data]))
+        print(self.delimiter.join([self.formatter(x) for x in data]))
 
     def direct_print_rest(self):
         '''No cache so do nothing'''
