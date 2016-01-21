@@ -41,7 +41,7 @@ if (ver.major == 2 and (ver.minor, ver.micro) < (7, 1)) or (ver.major == 3 and (
 #
 # MAJOR.MINOR.REVISION
 #
-VTOOLS_VERSION='2.7.20'
+VTOOLS_VERSION='2.7.0'
 #
 # Variant Tools no longer uses revision information after switching from SVN to GIT
 # the version string will be more frequently updated.

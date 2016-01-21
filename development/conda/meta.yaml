@@ -1,11 +1,10 @@
 package:
   name: variant_tools
-  version: !!str 2.6.2
+  version: !!str 2.7.0
 
 source:
-  fn: variant_tools-2.6.2.tar.gz
-  url: https://pypi.python.org/packages/source/v/variant_tools/variant_tools-2.6.2.tar.gz
-  md5: 321e691e0afd9f916dde50e7a9b49168
+  fn: variant_tools-2.7.0.tar.gz
+  url: https://pypi.python.org/packages/source/v/variant_tools/variant_tools-2.7.0.tar.gz
 #  patches:
    # List any patch files here
    # - fix.patch
