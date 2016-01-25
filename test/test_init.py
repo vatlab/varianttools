@@ -34,91 +34,41 @@ from testUtils import ProcessTestCase
 class TestInit(ProcessTestCase):
     def testInit(self):
         'Test command vtools init'
+        # Fail because of no project name
         self.assertFail('vtools init')
+        # Fail because an project already exists
         self.assertFail('vtools init test')
+        # use -f to forcefully create a project
         self.assertSucc('vtools init test -f')
+        # can specify build
+        self.assertSucc('vtools init test --build hg19 -f')
     
-    def testParent(self):
-        'Test command init --parent'
+    def testInitFromParentalProject(self):
+        'Test command init --parent (create a project from a parent project)'
         try:
             os.mkdir('parent')
         except OSError:
             pass
-        self.runCmd('vtools init test -f')
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.runCmd('vtools import vcf/SAMP1.vcf')
-        self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
-        self.assertProj(numOfVariants={'ceu': 288})
+        self.runCmd('''vtools select variant --samples "sample_name like 'NA12%'" -t na12''')
+        self.assertProj(numOfVariants={'variant': 288, 'na12': 280},
+            numOfGenotype={1: 287, 2: 287})
+        # move the project to parent directory
         shutil.move('test.proj', 'parent/test.proj')
         shutil.move('test_genotype.DB', 'parent/test_genotype.DB')
-        self.assertSucc('vtools init test --parent parent --variants ceu')
+        # create a project with parent project parent
+        self.assertSucc('vtools init test --parent parent --variants na12')
+        self.assertProj(numOfVariants={'variant':280, 'na12': 280}, numOfSamples=60,
+            numOfGenotype={1: 279, 2: 279})
         # non-existing genotype field
-        self.assertFail('vtools init test --parent parent --variants ceu --genotypes GD>10')
-        self.assertProj(numOfVariants= 288)
-        self.assertProj(numOfSamples= 61)
-        shutil.rmtree('parent')
-        
-    def testSample(self):
-        'Test command init --samples'
-        try:
-           os.mkdir('parent')
-        except OSError:
-           pass
-        self.runCmd('vtools init test -f')
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.runCmd('vtools import vcf/SAMP1.vcf')
-        self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
-        self.assertProj(numOfVariants={'ceu': 288})
-        shutil.move('test.proj', 'parent/test.proj')
-        shutil.move('test_genotype.DB', 'parent/test_genotype.DB') 
-        self.assertSucc('vtools init test --parent parent --samples "filename like \'%CEU%\'"')
-        self.assertProj(numOfVariants= 577)
-        self.assertProj(numOfSamples= 60)
-        shutil.rmtree('parent')
-
-    def testVariantSample(self):
-        'Test command init --variants with --samples'
-        try:
-           os.mkdir('parent')
-        except OSError:
-           pass
-        self.runCmd('vtools init test -f')
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.runCmd('vtools import vcf/SAMP1.vcf')
-        self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
-        self.assertProj(numOfVariants={'ceu': 288})
-        shutil.move('test.proj', 'parent/test.proj')
-        shutil.move('test_genotype.DB', 'parent/test_genotype.DB') 
-        self.assertSucc('vtools init test --parent parent --variants ceu --samples "filename like \'%CEU%\'"')
-        self.assertProj(numOfVariants= 288)
-        self.assertProj(numOfSamples= 60)
-        shutil.rmtree('parent')
-
-    def testGenotypes(self):
-        'Test command init --genotypes'
-        try:
-           os.mkdir('parent')
-        except OSError:
-           pass
-        self.runCmd('vtools init test -f')
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        #runCmd('vtools import vcf/SAMP1.vcf')
-        #runCmd('vtools import --format fmt/genotypes txt/genotypes.txt --build hg18')
-        self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t ceu')
-        self.assertProj(numOfVariants={'ceu': 288})
-        shutil.move('test.proj', 'parent/test.proj')
-        shutil.move('test_genotype.DB', 'parent/test_genotype.DB') 
-        self.assertSucc('vtools init test --parent parent --variants variant --genotypes GT=1')
-        self.runCmd('vtools phenotype --from_stat "num=#(GT)" "hom=#(hom)" "het=#(het)"')
-        #compare the whole output and result table using "file" option, "output" is null and numOfLines=0 
-        self.assertOutput('vtools phenotype --output num hom het', 'output/CEU_phynotype_het.txt')
-        #compare the first 5 lines among the output and result 
-        self.assertOutput('vtools phenotype --output num hom het', 'output/CEU_phynotype_het.txt')
-        #compare the last 4 lines among the output and result 
-        self.assertOutput('vtools phenotype --output num hom het', 'output/CEU_phynotype_het.txt')
-        #compare the last 2 lines among the output and result 
-        self.assertOutput('vtools phenotype --output num hom het', '''63	0	63\n40	0	40\n''', partial=True) 
-        shutil.rmtree('parent')
+        self.assertFail('vtools init test --parent parent --variants na12 --genotypes GD>10')
+        # create project with only homozygous genotype
+        self.assertSucc('vtools init test --parent parent --variants na12 --genotypes GT=1 -f')
+        self.assertProj(numOfVariants={'variant':280, 'na12': 280}, numOfSamples=60,
+            numOfGenotype={1: 30, 2: 64}, genotype={1: [1]*30, 2: [1]*64})
+        # init with selected samples
+        self.assertSucc('''vtools init test --parent parent --samples "sample_name like 'NA1%'" -f ''')
+        self.assertProj(numOfVariants= 288, numOfSamples=51)
 
     def testGenotypes_sample(self):
         'Test command init --genotypes with samples option'

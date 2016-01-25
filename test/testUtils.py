@@ -198,7 +198,7 @@ class ProcessTestCase(unittest.TestCase):
         self.compare(cmd_output, output, partial, negate=negate)
 
 
-    def assertProj(self, numOfSamples=None, numOfVariants=None, sampleNames=None, numOfColumns=None, 
+    def assertProj(self, numOfSamples=None, numOfVariants=None, numOfGenotype=None, sampleNames=None, numOfColumns=None, 
         info=None, genotype=None, genoInfo=None, hasTable=None, tableDesc=None, partial=None, negate=None):
         '''Check properties of project
 
@@ -220,6 +220,10 @@ class ProcessTestCase(unittest.TestCase):
         info:
             Compare variant info with specified list. This parameter should be a dictionary
             with name of info as key.
+
+        numOfGenotype:
+            Compare number of genotype in specified sample. The parameter should be a dictionary
+            with sample_id as keys.
 
         genotype:
             Compare genotype with a provided list. This parameter should be a dictionary with
@@ -299,12 +303,21 @@ class ProcessTestCase(unittest.TestCase):
                     proj_values = subprocess.check_output('vtools execute "SELECT {} FROM variant"'.format(field), shell=True,
                         stderr=fnull).decode()
                     self.compare([x.strip() for x in proj_values.strip().split('\n')], list(values), partial=partial, negate=negate)
+        if numOfGenotype is not None:
+            with open(os.devnull, 'w') as fnull:
+                for table, numGeno in numOfGenotype.items():
+                    proj_num_geno = subprocess.check_output('vtools execute "SELECT count(*) FROM genotype_{}"'.format(table), shell=True,
+                        stderr=fnull).decode()
+                    if negate:
+                        self.assertNotEqual(int(proj_num_geno), numGeno)
+                    else:
+                        self.assertEqual(int(proj_num_geno), numGeno)
         if genotype is not None:
             with open(os.devnull, 'w') as fnull:
                 for table, geno in genotype.items():
                     proj_geno = subprocess.check_output('vtools execute "SELECT GT FROM genotype_{}"'.format(table), shell=True,
                         stderr=fnull).decode()
-                    self.compare([x.strip() for x in proj_geno.strip().split('\n')], list(geno), partial=partial, negate=negate)
+                    self.compare([int(x.strip()) for x in proj_geno.strip().split('\n')], list([int(x) for x in geno]), partial=partial, negate=negate)
         if genoInfo is not None:
             with open(os.devnull, 'w') as fnull:
                 for table, geno in genoInfo.items():
