@@ -1184,7 +1184,7 @@ class PipelineDescription:
                             raise ValueError('Cannot find step {} for option {}'.format(pi, opt))
                 if not cmd.action:
                     raise ValueError('Missing or empty action for step {} of pipeline {}'
-                        .format(pname, idx + 1))
+                        .format(cmd.index, pname))
                 # step.comment might have expression with pipeline_name and pipeline_step
                 if '${' in cmd.comment:
                     pipeline[idx] = PipelineCommand(

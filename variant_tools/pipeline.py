@@ -1388,7 +1388,7 @@ class RunCommand(PipelineAction):
         for cur_cmd in self.cmd:
             if self.working_dir is not None and not os.path.isdir(self.working_dir):
                 os.makedirs(self.working_dir)
-            env.logger.info('Running [[{}]]{}'.format(cur_cmd,
+            env.logger.info('Running ``{}``{}'.format(cur_cmd,
                 ' under {}'.format(self.working_dir) if self.working_dir else ''))
             ret = subprocess.call(cur_cmd, shell=True, 
                 stdout=None if self.runtime.proc_out is None else open(self.runtime.proc_out, 'w'),
@@ -1672,7 +1672,7 @@ class ExecutePythonCode(PipelineAction):
                 #
                 # script
                 exported_script.write(self.script)
-            env.logger.info('Python code exported to [[{}]]'.format(self.export))
+            env.logger.info('Python code exported to ``{}``'.format(self.export))
         for module in self.modules:
             # this is a path to a .py file
             if module.endswith('.py'):
@@ -1832,7 +1832,7 @@ class ExecuteScript(PipelineAction):
         if export is not None:
             with open(export, 'w') as exported_script:
                 exported_script.write(self.script)
-                env.logger.info('Script exported to [[{}]]'.format(export))
+                env.logger.info('Script exported to ``{}``'.format(export))
         PipelineAction.__init__(self, cmd='{} {}'.format(interpreter, m.hexdigest()), output=output)
 
     def __del__(self):
@@ -1858,7 +1858,7 @@ class ExecuteScript(PipelineAction):
         else:
             cmd = self.interpreter + ' ' + pipes.quote(self.script_file) + \
                 (self.args if isinstance(self.args, str) else ' '.join(pipes.quote(x) for x in self.args))
-        env.logger.info('Running [[{}]]'.format(cmd))
+        env.logger.info('Running ``{}``'.format(cmd))
         ret = subprocess.call(cmd, shell=True, 
             stdout=None if self.runtime.proc_out is None else open(self.runtime.proc_out, 'w'),
             stderr=None if self.runtime.proc_err is None else open(self.runtime.proc_err, 'w'),
@@ -2786,13 +2786,13 @@ class Pipeline:
                 step_output = []
                 continue
             self.VARS['pipeline_step'] = command.index
-            env.logger.info('Executing [[{}.{}_{}]]: {}'
+            env.logger.info('Executing ``{}.{}_{}``: {}'
                 .format(self.pipeline.name, pname, command.index, 
                     ' '.join(command.comment.split())))
             # init
             for key, val in command.init_action_vars:
                 self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
-                env.logger.info('Pipeline variable [[{}]] is set to [[{}]]'
+                env.logger.info('Pipeline variable ``{}`` is set to ``{}``'
                     .format(key, self.VARS[key]))
             # substitute ${} variables
             emitter = None
@@ -2870,7 +2870,7 @@ class Pipeline:
                     working_dir = os.path.expanduser(matched.group(1))
                     if not os.path.isdir(working_dir):
                         raise ValueError('Invalid working directory: {}'.format(working_dir))
-                    env.logger.info('Use working directory [[{}]] for {}_{}'.format(working_dir, pname, command.index))
+                    env.logger.info('Use working directory ``{}`` for {}_{}'.format(working_dir, pname, command.index))
                     os.chdir(working_dir)
             #
             env.logger.debug('INPUT of step {}_{}: {}'
@@ -2894,7 +2894,7 @@ class Pipeline:
             try:
                 for key, val in command.pre_action_vars:
                     self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
-                    env.logger.info('Pipeline variable [[{}]] is set to [[{}]]'
+                    env.logger.info('Pipeline variable ``{}`` is set to ``{}``'
                         .format(key, self.VARS[key]))
                 for ig in igroups:
                     self.VARS['input'] = ig
@@ -2962,7 +2962,7 @@ class Pipeline:
                             .format(f, pname, command.index, os.getcwd()))
                 for key, val in command.post_action_vars:
                     self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
-                    env.logger.info('Pipeline variable [[{}]] is set to [[{}]]'
+                    env.logger.info('Pipeline variable ``{}`` is set to ``{}``'
                         .format(key, self.VARS[key]))
                 #
                 # In case of passthrough, the original input files will be passed to 
@@ -3024,7 +3024,7 @@ class Pipeline:
                     ifiles = self.VARS['output{}'.format(psteps[step_index - 1].index)]
                 else:
                     ifiles = self.VARS['cmd_input']
-                env.logger.warning('Rewinding to [[{}.{}_{}]]: input files {} need to be re-generated.'
+                env.logger.warning('Rewinding to ``{}.{}_{}``: input files {} need to be re-generated.'
                     .format(self.pipeline.name, pname, command.index, ', '.join(to_be_regenerated)))
                 os.chdir(saved_dir)
             except Exception as e:
@@ -3190,7 +3190,7 @@ def simulate_replicate(args, rep):
             else:
                 cfg.write("command={}\n".format(env.command_line))
         #
-        env.logger.info('Starting simulation [[{}]]'.format(cfg_file))
+        env.logger.info('Starting simulation ``{}``'.format(cfg_file))
         opt = args.unknown_args
         opt.extend(['--input'] + [cfg_file])
         pipeline = Pipeline(args.specfile, extra_args=opt,
