@@ -582,7 +582,7 @@ class RuntimeEnvironments(object):
             # This is done for levelname not in self.LEVEL_COLOR, e.g.
             # for info that uses native color. The text will not be 
             # visible if someone is using a green background
-            return re.sub(r'``(.*)``', '\033[32m\\1\033[0m', str(msg))
+            return re.sub(r'``([^`]*)``', '\033[32m\\1\033[0m', str(msg))
 
         def format(self, record):
             record = copy.copy(record)
@@ -4230,7 +4230,7 @@ def dehtml(text):
 
 
 class RuntimeFiles: 
-    def __init__(self, output_files=[]):
+    def __init__(self, output_files=[], pid=None):
         if not output_files:
             self.sig_file = None
             self.proc_out = None
@@ -4268,13 +4268,17 @@ class RuntimeFiles:
                 except Exception as e:
                     raise RuntimeError('Failed to create runtime directory {}: {}'.format(sig_path, e))
             env.logger.trace('Using signature file {} for output {}'.format(self.sig_file, output_file))
-            self.proc_out = '{}.out_{}'.format(self.sig_file, os.getpid())
-            self.proc_err = '{}.err_{}'.format(self.sig_file, os.getpid())
+            if pid is None:
+                self.pid = os.getpid()
+            else:
+                self.pid = pid
+            self.proc_out = '{}.out_{}'.format(self.sig_file, self.pid)
+            self.proc_err = '{}.err_{}'.format(self.sig_file, self.pid)
             self.proc_lck = '{}.lck'.format(self.sig_file)
             self.proc_info = '{}.exe_info'.format(self.sig_file)
             self.proc_cmd = '{}.cmd'.format(self.sig_file)
-            self.proc_done = '{}.done_{}'.format(self.sig_file, os.getpid())
-            self.proc_prog = '{}.working_{}'.format(self.sig_file, os.getpid())
+            self.proc_done = '{}.done_{}'.format(self.sig_file, self.pid)
+            self.proc_prog = '{}.working_{}'.format(self.sig_file, self.pid)
             #
             # now if there is an old signature file, let us move it to the new location
             if os.path.isfile('{}.exe_info'.format(output_file)):

@@ -64,7 +64,7 @@ from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName, \
     PrettyPrinter, determineSexOfSamples, getVariantsOnChromosomeX, \
     getVariantsOnChromosomeY, getTermWidth, matchName, ProgressFileObj, \
-    substituteVars, calculateMD5, dehtml, default_user_options
+    substituteVars, calculateMD5, dehtml, default_user_options, RuntimeFiles
 
 
 try:
@@ -5106,15 +5106,11 @@ def admin(args):
                 res.downloadResources(dest_dir=args.mirror_repository)
             sys.exit(0)
         elif args.record_exe_info is not None:
-            pid = args.record_exe_info[0]
-            output = args.record_exe_info[1:]
-            proc_out = '{}.out_{}'.format(output[0], pid)
-            proc_err = '{}.err_{}'.format(output[0], pid)
-            proc_info = '{}.exe_info'.format(output[0])
+            runtime = RuntimeFiles(args.record_exe_info[1:], pid=args.record_exe_info[0])
             #
-            with open(proc_info, 'a') as exe_info:
+            with open(runtime.proc_info, 'a') as exe_info:
                 exe_info.write('#End: {}\n'.format(time.asctime(time.localtime())))
-                for f in output:
+                for f in args.record_exe_info[1:]:
                     if not os.path.isfile(f):
                         raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
                     # for performance considerations, use partial MD5
@@ -5122,14 +5118,14 @@ def admin(args):
                         calculateMD5(f, partial=True)))
                 # write standard output to exe_info
                 exe_info.write('\n\nSTDOUT\n\n')
-                if os.path.isfile(proc_out):
-                    with open(proc_out) as stdout:
+                if os.path.isfile(runtime.proc_out):
+                    with open(runtime.proc_out) as stdout:
                         for line in stdout:
                             exe_info.write(line)
                 # write standard error to exe_info
                 exe_info.write('\n\nSTDERR\n\n')
-                if os.path.isfile(proc_err):
-                    with open(proc_err) as stderr:
+                if os.path.isfile(runtime.proc_err):
+                    with open(runtime.proc_err) as stderr:
                         for line in stderr:
                             exe_info.write(line)
             sys.exit(0)
