@@ -2626,21 +2626,28 @@ class _CaseInsensitiveDict(MutableMapping):
     def __setitem__(self, key, value):
         # Use the uppercased key for lookups, but store the actual
         # key alongside the value.
-        if key.upper in self._store and value == self._store[key.upper()][1]:
-            env.logger.warning('Changing value of pipeline variable ({} from {} to {}) is strongly discouraged.'
-                .format(key, self._store[key.upper()][1], value))
+        reset = 'reset' if key.upper() in self._store else 'set' # and value != self._store[key.upper()][1] else 'set'
         if not isinstance(value, (str, list, tuple)):
             value = str(value)
             env.logger.warning('Pipeline variable {} is converted to "{}"'.format(key, value))
         if isinstance(value, (list, tuple)) and not all([isinstance(x, str) for x in value]):
             raise ValueError('Only string or list of strings are allowed for pipeline variables: {} for key {}'.format(value, key))
         self._store[key.upper()] = (key, value)
+        if isinstance(value, str) or len(value) <= 2 or len(str(value)) < 50:
+            env.logger.debug('Pipeline variable ``{}`` is {} to ``{}``'.format(key, reset, str(value)))
+        else: # should be a list or tuple
+            val = str(value).split(' ')[0] + ' ...] ({} items)'.format(len(value))
+            env.logger.debug('Pipeline variable ``{}`` is {} to ``{}``'.format(key, reset, val))
+
 
     def dict(self):
         return {x:y for x,y in self._store.values()}
 
     def __setattr__(self, key, value):
-        self.__setitem__(key, value)
+        if key == '_store':
+            self.__dict__[key] = value
+        else:
+            self.__setitem__(key, value)
 
     def __getattr__(self, key):
         return self.__getitem__(key)
@@ -2774,7 +2781,6 @@ class Pipeline:
             #    raise ValueError('Cannot reset read-only pipeline variable {}'.format(key))
             self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
         for key, val in self.VARS.items():
-            env.logger.debug('{} is set to {}'.format(key, val))
             if key == 'working_dir' and val != os.getcwd():
                 env.logger.warning('Changing working directory to {}'.format(val))
                 os.chdir(val)
@@ -2804,8 +2810,6 @@ class Pipeline:
             # init
             for key, val in command.init_action_vars:
                 self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
-                env.logger.info('Pipeline variable ``{}`` is set to ``{}``'
-                    .format(key, self.VARS[key]))
             # substitute ${} variables
             emitter = None
             if 'no_input' in command.options or 'independent' in command.options:
@@ -2885,7 +2889,7 @@ class Pipeline:
                     env.logger.info('Use working directory ``{}`` for {}_{}'.format(working_dir, pname, command.index))
                     os.chdir(working_dir)
             #
-            env.logger.debug('INPUT of step {}_{}: {}'
+            env.logger.trace('INPUT of step {}_{}: {}'
                     .format(pname, command.index, step_input))
             # 
             # now, group input files
@@ -2906,10 +2910,9 @@ class Pipeline:
             try:
                 for key, val in command.pre_action_vars:
                     self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
-                    env.logger.info('Pipeline variable ``{}`` is set to ``{}``'
-                        .format(key, self.VARS[key]))
                 for ig in igroups:
-                    self.VARS['input'] = ig
+                    if ig != self.VARS['input']:
+                        self.VARS['input'] = ig
                     if not ig and float(self.pipeline.pipeline_format) <= 1.0:
                         env.logger.trace('Step skipped due to no input file (for pipeline format < 1.0 only)')
                         continue
@@ -2965,7 +2968,7 @@ class Pipeline:
                     if matched:
                         env.logger.debug('Setting variable {} to {}'.format(matched.group(1), step_output))
                         self.VARS[matched.group(1)] = step_output
-                env.logger.debug('OUTPUT of step {}_{}: {}'
+                env.logger.trace('OUTPUT of step {}_{}: {}'
                     .format(pname, command.index, step_output))
                 for f in step_output:
                     if not (os.path.isfile(f) or os.path.isfile(f + '.file_info') or f in self.THREADS):
@@ -2974,8 +2977,6 @@ class Pipeline:
                             .format(f, pname, command.index, os.getcwd()))
                 for key, val in command.post_action_vars:
                     self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
-                    env.logger.info('Pipeline variable ``{}`` is set to ``{}``'
-                        .format(key, self.VARS[key]))
                 #
                 # In case of passthrough, the original input files will be passed to 
                 # the next step regardless what has been produced during the step.

@@ -577,21 +577,26 @@ class RuntimeEnvironments(object):
             return '\033[{}m{}\033[{}m'.format(self.COLOR_CODE[color], astr,
                 self.COLOR_CODE['ENDC'])
 
-        def emphasize(self, msg):
+        def emphasize(self, msg, in_color):
             # display text within `` and `` in green
             # This is done for levelname not in self.LEVEL_COLOR, e.g.
             # for info that uses native color. The text will not be 
             # visible if someone is using a green background
-            return re.sub(r'``([^`]*)``', '\033[32m\\1\033[0m', str(msg))
+            if in_color == 0:
+                return re.sub(r'``([^`]*)``', '\033[32m\\1\033[0m', str(msg))
+            else:
+                return re.sub(r'``([^`]*)``', '\033[32m\\1\033[{}m'.format(self.COLOR_CODE[in_color]), str(msg))
 
         def format(self, record):
             record = copy.copy(record)
             levelname = record.levelname
-            record.msg = self.emphasize(record.msg)
             if levelname in self.LEVEL_COLOR:
                 record.levelname = self.colorstr(levelname, self.LEVEL_COLOR[levelname])
                 record.name = self.colorstr(record.name, 'BOLD')
-                record.msg = self.colorstr(record.msg, self.LEVEL_COLOR[levelname])
+                record.msg = self.colorstr(self.emphasize(record.msg,
+                    self.LEVEL_COLOR[levelname]), self.LEVEL_COLOR[levelname])
+            else:
+                record.msg = self.emphasize(record.msg, 0)
             return logging.Formatter.format(self, record)
 
     def _set_logger(self, logfile=None):
@@ -2133,7 +2138,7 @@ def downloadURL(URL, dest, quiet, message=None):
     # use libcurl? Recommended but not always available
     if 'VTOOLS_ENV' in os.environ and 'NOWEB' in os.environ['VTOOLS_ENV']:
          raise RuntimeError('Failed to download from {}: no internet connection (set by NOWEB in VTOOLS_ENV environment variable)'.format(URL))
-    env.logger.debug('Download {}'.format(URL))
+    env.logger.trace('Download {}'.format(URL))
     filename = os.path.split(urlparse.urlsplit(URL).path)[-1]
     # message during downloading
     if message is None:
