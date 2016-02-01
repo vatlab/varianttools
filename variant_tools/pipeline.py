@@ -2612,8 +2612,10 @@ class DownloadResource(PipelineAction):
  
 
 class _CaseInsensitiveDict(MutableMapping):
-    """A case-insensitive ``dict``-like object.
-    That limits the type of items to string or list of strings.
+    """A case-insensitive ``dict``-like object that
+    1. limits the type of items to string or list of strings.
+    2. returns '' is the key does not exist (yield a warning)
+    3. allows attribute-like access
     """
     def __init__(self, data=None, **kwargs):
         self._store = dict()
@@ -2637,8 +2639,18 @@ class _CaseInsensitiveDict(MutableMapping):
     def dict(self):
         return {x:y for x,y in self._store.values()}
 
+    def __setattr__(self, key, value):
+        self.__setitem__(key, value)
+
+    def __getattr__(self, key):
+        return self.__getitem__(key)
+
     def __getitem__(self, key):
-        return self._store[key.upper()][1]
+        try:
+            return self._store[key.upper()][1]
+        except:
+            env.logger.warning('Pipeline variable "{}" does not exist. A blank string is returned.'.format(key))
+            return ''
 
     def __delitem__(self, key):
         del self._store[key.upper()]
