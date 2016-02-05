@@ -4245,6 +4245,7 @@ class RuntimeFiles:
             self.proc_cmd = None
             self.proc_prog = None
             self.proc_done = None
+            self.manifest = None
         else:
             if isinstance(output_files, list):
                 output_file = output_files[0]
@@ -4284,6 +4285,7 @@ class RuntimeFiles:
             self.proc_cmd = '{}.cmd'.format(self.sig_file)
             self.proc_done = '{}.done_{}'.format(self.sig_file, self.pid)
             self.proc_prog = '{}.working_{}'.format(self.sig_file, self.pid)
+            self.manifest = '{}.manifest'.format(self.sig_file)
             #
             # now if there is an old signature file, let us move it to the new location
             if os.path.isfile('{}.exe_info'.format(output_file)):

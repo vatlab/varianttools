@@ -2300,7 +2300,7 @@ class DecompressFiles(PipelineAction):
             # the whole file to determine its content. I am therefore creating a manifest
             # file for the tar file in the dest_dir, and avoid re-opening when the tar file
             # is processed again.
-            manifest = os.path.join(self.dest_dir, os.path.basename(filename) + '.manifest')
+            manifest = RuntimeFiles(filename).manifest
             all_extracted = False
             dest_files = []
             if existAndNewerThan(ofiles=manifest, ifiles=filename):
@@ -2507,10 +2507,10 @@ class DownloadResource(PipelineAction):
     
     NOTE:
         1. If FILE.md5 file is downloaded, it will be used to validate FILE.
-        2. The resources will be automatically decompressed. You would get both 
-            FILE and FILE.gz if you downloaded FILE.gz
+        2. The resources will be automatically decompressed if decompress=True (default). You would get both 
+            FILE and FILE.gz if you downloaded FILE.gz.
     '''
-    def __init__(self, resource, dest_dir):
+    def __init__(self, resource, dest_dir, decompress=True):
         '''Download resources from specified URLs in ``resource``. 
 
         Parameters:
@@ -2532,6 +2532,7 @@ class DownloadResource(PipelineAction):
         except:
             raise RuntimeError('Failed to create pipeline resource directory '
                 .format(self.pipeline_resource))
+        self.decompress=decompress
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
@@ -2584,8 +2585,8 @@ class DownloadResource(PipelineAction):
                     .format(filename, type(e).__name__, e))
             #
             if filename.endswith('.tar.gz'):
-                manifest = filename + '.manifest'
-                if not os.path.isfile(manifest):
+                manifest_file = RuntimeFiles(filename).manifest
+                if not os.path.isfile(manifest_file):
                     with tarfile.open(filename, 'r:gz') as tar: 
                         s = delayedAction(env.logger.info, 'Extracting {}'.format(filename))
                         tar.extractall(self.pipeline_resource)
@@ -2593,7 +2594,7 @@ class DownloadResource(PipelineAction):
                         # only extract files
                         files = [x.name for x in tar.getmembers() if x.isfile()]
                         # save content to a manifest
-                        with open(manifest, 'w') as manifest:
+                        with open(manifest_file, 'w') as manifest:
                             for f in files:
                                 manifest.write(f + '\n')
             elif filename.endswith('.gz'):
@@ -2602,6 +2603,17 @@ class DownloadResource(PipelineAction):
                         'Decompressing {}'.format(filename))
                     decompressGzFile(filename, inplace=False, force=True)
                     del s
+            elif filename.endswith('.zip'):
+                manifest_file = RuntimeFiles(filename).manifest
+                if not os.path.isfile(manifest_file):
+                    s = delayedAction(env.logger.info,
+                        'Decompressing {}'.format(filename))
+                    bundle = zipfile.ZipFile(filename)
+                    bundle.extractall(os.path.dirname(filename))
+                    with open(manifest_file, 'w') as manifest:
+                        for f in bundle.namelist():
+                            manifest.write(f + '\n')
+
             #
             if filename.endswith('.md5') and os.path.isfile(filename[:-4]):
                 md5_files.append([filename[:-4], os.path.getsize(filename[:-4])])
