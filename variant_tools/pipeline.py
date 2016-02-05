@@ -2908,15 +2908,16 @@ class Pipeline:
             # pass Pipeline itself to emitter
             igroups, step_output = emitter(step_input, self)
             try:
-                for key, val in command.pre_action_vars:
-                    self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
                 for ig in igroups:
                     if ig != self.VARS['input']:
                         self.VARS['input'] = ig
                     if not ig and float(self.pipeline.pipeline_format) <= 1.0:
                         env.logger.trace('Step skipped due to no input file (for pipeline format < 1.0 only)')
                         continue
-                    #
+                    # pre action variables are evaluated for each ig because they might involve
+                    # changing ${input}
+                    for key, val in command.pre_action_vars:
+                        self.VARS[key] = substituteVars(val, self.VARS, self.GLOBALS, asString=False)
                     action = substituteVars(command.action, self.VARS, self.GLOBALS)
                     env.logger.trace('Emitted input of step {}_{}: {}'
                         .format(pname, command.index, ig))
