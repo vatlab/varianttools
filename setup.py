@@ -612,14 +612,15 @@ for PYVER, PYVEROPT in zip(['py2', 'py3'], ['', '-py3']):
         os.rename('variant_tools/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER))
          
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.
-if sys.platform == 'linux2':
+if sys.platform in 'linux2':
     libs = ['stdc++']
     # gcc optimizations
     # gccargs = ["-O3", "-march=native"]
-    gccargs = ["-O3"]
+    gccargs = ["-O3", '-Wno-unused-local-typedef']
 else:
+    # mac system
     libs = []
-    gccargs = []
+    gccargs = ['-O3', '-Wno-unused-local-typedef', '-Wno-return-type']
 
 if EMBEDED_BOOST:
     try:
@@ -751,6 +752,7 @@ setup(name = "variant_tools",
             library_dirs = ["build"],
             libraries = ['z', 'bz2', 'sqlite_gsl', 'stat', 'ucsc', 'cgatools'] + \
                 (['embeded_boost'] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
+            extra_compile_args = gccargs,
             define_macros = [
                 ('MODULE_NAME', '"vt_sqlite3"'),
                 ('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
@@ -764,16 +766,16 @@ setup(name = "variant_tools",
                 (['embeded_boost'] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
             define_macros = [('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
+            extra_compile_args = gccargs,
             swig_opts = ['-O', '-shadow', '-c++', '-keyword'],
             include_dirs = [".", "cgatools", "boost_1_49_0"],
             library_dirs = ["build"],
         ),
         Extension('variant_tools._assoTests',
-            sources = [ASSO_WRAPPER_CPP_FILE.format(PYVERSION)] + ASSOC_FILES
-                  + LIB_GSL + LIB_STAT,
+            sources = [ASSO_WRAPPER_CPP_FILE.format(PYVERSION)] + ASSOC_FILES,
             extra_compile_args = gccargs,
-            library_dirs = [],
-            libraries = libs,
+            libraries = libs + ['gsl', 'stat'],
+            library_dirs = ["build"],
             include_dirs = [".", "variant_tools", "gsl"],
         )
       ] 

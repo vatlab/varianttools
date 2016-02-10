@@ -664,7 +664,6 @@ static void bigWigTrack(void * track_file, char * chr, int pos, char *, char *, 
 			std::stringstream res;
 			struct bbiInterval * iv;
 			bool first = true;
-			double val = 0;
 			for (iv = ivList; iv != NULL; iv = iv->next) {
 				if (!first)
 					res << "|";
@@ -3251,7 +3250,7 @@ static void signFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
 static void ceilFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
 {
 	double rVal = 0.0;
-	i64 iVal = 0;
+	// i64 iVal = 0;
 
 	assert(argc == 1);
 	switch (sqlite3_value_type(argv[0]) ) {
@@ -3284,7 +3283,7 @@ static void floorFunc(sqlite3_context * context, int argc, sqlite3_value ** argv
 	assert(argc == 1);
 	switch (sqlite3_value_type(argv[0]) ) {
 	case SQLITE_INTEGER: {
-		i64 iVal = sqlite3_value_int64(argv[0]);
+		iVal = sqlite3_value_int64(argv[0]);
 		sqlite3_result_int64(context, iVal);
 		break;
 	}
