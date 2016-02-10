@@ -24,6 +24,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from distutils.core import setup, Extension
+from distutils.ccompiler import new_compiler
 
 try:
    from distutils.command.build_py import build_py_2to3 as build_py
@@ -620,6 +621,47 @@ else:
     libs = []
     gccargs = []
 
+if EMBEDED_BOOST:
+    try:
+        c = new_compiler()
+        # -w suppress all warnings caused by the use of boost libraries
+        objects = c.compile(LIB_BOOST,
+            include_dirs=['boost_1_49_0'],
+            output_dir='build',
+            extra_preargs = ['-w'],
+            macros = [('BOOST_ALL_NO_LIB', None)])
+        c.create_static_lib(objects, "embeded_boost", output_dir='build')
+    except Exception as e:
+        sys.exit("Failed to build embeded boost library: {}".format(e))
+
+# building other libraries
+for files, incs, macs, libname in [
+    (SQLITE_GSL, ['.', 'gsl'], [], 'sqlite_gsl'),
+    (LIB_STAT, ['.'], [], 'stat'),
+    (LIB_UCSC_FILES, ['ucsc/inc', 'ucsc/tabix', 'ucsc/samtools'], 
+        [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
+         ('_USE_KNETFILE', None), ('BGZF_CACHE', None)],
+        'ucsc'),
+    (LIB_CGATOOLS, ['.', 'cgatools', 'boost_1_49_0'],
+        [('CGA_TOOLS_IS_PIPELINE', 0), ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
+        'cgatools'),
+    (LIB_GSL, ['.', 'gsl'], [], 'gsl')]:
+    try:
+        print('Building embeded library {}'.format(libname))
+        c = new_compiler()
+        # -w suppress all warnings caused by the use of boost libraries
+        objects = c.compile(files,
+            include_dirs=incs,
+            output_dir='build',
+            extra_preargs = ['-w'],
+            macros = macs)
+        c.create_static_lib(objects, libname, output_dir='build')
+    except Exception as e:
+        sys.exit("Failed to build embeded {} library: {}".format(libname, e))
+
+
+
+
 setup(name = "variant_tools",
     version = VTOOLS_VERSION,
     description = "Variant tools: an integrated annotation and analysis package for next-generation sequencing data",
@@ -679,43 +721,52 @@ setup(name = "variant_tools",
         ],
     ext_modules = [
         Extension('variant_tools._vt_sqlite3',
+            # stop warning message for sqlite because it is written by us.
+            extra_compile_args=['-w'],
             sources = SQLITE_FILES,
             define_macros = [('MODULE_NAME', '"vt_sqlite3"')],
             include_dirs = ['sqlite', SQLITE_FOLDER.format(PYVERSION)],
         ),
+        Extension('variant_tools._ucsctools',
+            # stop warning message ucsctools because it is written by us.
+            extra_compile_args=['-w'],
+            sources = [UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVERSION)],
+            include_dirs = ['.', 'ucsc/inc', 'ucsc/tabix', 'ucsc/samtools'],
+            library_dirs = ["build"],
+            define_macros =  [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
+                ('_USE_KNETFILE', None), ('BGZF_CACHE', None)],
+            libraries = ['z', 'bz2', 'ucsc'],
+        ),
+        Extension('variant_tools.cplinkio',
+            # stop warning message ucsctools because it is written by us.
+            extra_compile_args=['-w'],
+            sources = LIB_PLINKIO,
+            include_dirs = ['libplinkio'],
+        ),
         Extension('variant_tools._vt_sqlite3_ext',
-            sources = ['sqlite/vt_sqlite3_ext.cpp'] + SQLITE_GSL + LIB_STAT + LIB_UCSC_FILES + LIB_CGATOOLS + (LIB_BOOST if EMBEDED_BOOST else []),
-            include_dirs = [".", 'ucsc/inc', 'ucsc/tabix', 'ucsc/samtools', 
+            # stop warning message for sqlite because it is written by us.
+            sources = ['sqlite/vt_sqlite3_ext.cpp'],
+            include_dirs = [".", 'ucsc/inc', 'ucsc/tabix', 'ucsc/samtools',
                 'sqlite', "variant_tools", "gsl", "cgatools", "boost_1_49_0"],
-            libraries = ['z', 'bz2'] + \
-                ([] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
+            library_dirs = ["build"],
+            libraries = ['z', 'bz2', 'sqlite_gsl', 'stat', 'ucsc', 'cgatools'] + \
+                (['embeded_boost'] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
             define_macros = [
                 ('MODULE_NAME', '"vt_sqlite3"'),
                 ('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"'), ('USE_TABIX', '1'), ('USE_BAM', '1'),
-                ('_FILE_OFFSET_BITS', '64'), ('_USE_KNETFILE', None), 
+                ('_FILE_OFFSET_BITS', '64'), ('_USE_KNETFILE', None),
                 ('BGZF_CACHE', None)],
         ),
-        Extension('variant_tools._ucsctools',
-            sources = [UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVERSION)] + LIB_UCSC_FILES,
-            include_dirs = [".", 'ucsc/inc', 'ucsc/tabix', 'ucsc/samtools'],
-            libraries = ['z', 'bz2'],
-            define_macros =  [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
-                ('_USE_KNETFILE', None), ('BGZF_CACHE', None)]
-        ),
-        Extension('variant_tools.cplinkio',
-            sources = LIB_PLINKIO,
-            include_dirs = ['libplinkio'],
-        ),
         Extension('variant_tools._cgatools',
-            sources = [CGATOOLS_WRAPPER_CPP_FILE.format(PYVERSION)] + LIB_CGATOOLS
-                  + (LIB_BOOST if EMBEDED_BOOST else []),
-            libraries = ['z', 'bz2'] + \
-                ([] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
+            sources = [CGATOOLS_WRAPPER_CPP_FILE.format(PYVERSION)],
+            libraries = ['z', 'bz2', 'cgatools'] + \
+                (['embeded_boost'] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
             define_macros = [('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
-            swig_opts = ['-O', '-shadow', '-c++', '-keyword',],
+            swig_opts = ['-O', '-shadow', '-c++', '-keyword'],
             include_dirs = [".", "cgatools", "boost_1_49_0"],
+            library_dirs = ["build"],
         ),
         Extension('variant_tools._assoTests',
             sources = [ASSO_WRAPPER_CPP_FILE.format(PYVERSION)] + ASSOC_FILES
