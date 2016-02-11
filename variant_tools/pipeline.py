@@ -2659,6 +2659,8 @@ class _CaseInsensitiveDict(MutableMapping):
             val = str(value).split(' ')[0] + ' ...] ({} items)'.format(len(value))
             env.logger.debug('Pipeline variable ``{}`` is {} to ``{}``'.format(key, reset, val))
 
+    def __contains__(self, key):
+        return key.upper() in self._store
 
     def dict(self):
         return {x:y for x,y in self._store.values()}
@@ -2820,17 +2822,8 @@ class Pipeline:
         if 'cmd_output' not in self.VARS:
             self.VARS['cmd_output'] = []
         # if there is a output file, write log to .log
-        if self.VARS['cmd_output']:
-            logfile = self.VARS['cmd_output'][0] + '.log'
-            if '/' in logfile:
-                d = os.path.split(logfile)[0]
-                if not os.path.isdir(d):
-                    env.logger.info('Making directory {} for output file'.format(d))
-                    os.makedirs(d)
-            ch = logging.FileHandler(logfile.lstrip('>'), mode = 'a')
-            ch.setLevel(logging.DEBUG)
-            ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
-            env.logger.addHandler(ch)
+        if self.VARS['cmd_output'] and 'logfile' not in self.VARS:
+            self.VARS['logfile'] = self.VARS['cmd_output'][0] + '.log'
         #
         self.GLOBALS = {}
         self.GLOBALS.update(globals())
@@ -2849,6 +2842,18 @@ class Pipeline:
             if key == 'cache_dir' and val != env.cache_dir:
                 env.logger.warning('Changing cache directory to {}'.format(val))
                 env.cache_dir = val
+        #
+        if 'logfile' in self.VARS:
+            env.logger.info('Logging information is saved to {}'.format(self.VARS['logfile']))
+            if '/' in self.VARS['logfile']:
+                d = os.path.split(self.VARS['logfile'])[0]
+                if not os.path.isdir(d):
+                    env.logger.info('Making directory {} for output file'.format(d))
+                    os.makedirs(d)
+            ch = logging.FileHandler(self.VARS['logfile'].lstrip('>'), mode = 'a')
+            ch.setLevel(logging.DEBUG)
+            ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
+            env.logger.addHandler(ch)
         #
         ifiles = self.VARS['cmd_input']
         step_index = 0
