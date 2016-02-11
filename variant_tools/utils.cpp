@@ -336,7 +336,8 @@ double calculateInbreedingCoef(const std::vector<int> & gt,
 	double O = 0.0, E = 0.0, N = 0.0;
 	for (unsigned i = 0; i < maf.size(); ++i) {
 		// skip missing sites, tri-allilic sites or uninformative marker
-		if (!maf[i] > 1E-8 || gt[i] != gt[i] || gt[i] < 0) continue;
+		if (maf[i] <= 1E-8 || gt[i] != gt[i] || gt[i] < 0)
+			continue;
 		// observed homozygous locus found
 		if (gt[i] == 0 || gt[i] == 2) O++;
 		// expected value under HWE

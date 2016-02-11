@@ -1891,7 +1891,7 @@ bool WeightedGenotypeTester::apply(AssoData & d, int timeout)
 				for (size_t j = 0; j < genotype[i].size(); ++j) {
 					if (genotype[i][j] > 0.0) {
 						// internal weight
-						double gtmp = genotype[i][j] * (weights[s][j] == weights[s][j]) ? weights[s][j] : 1.0;
+						double gtmp = genotype[i][j] * ((weights[s][j] == weights[s][j]) ? weights[s][j] : 1.0);
 						// external weight
 						for (size_t w = 0; w < extern_weights.size(); ++w) {
 							gtmp *= (extern_weights[w][j] == extern_weights[w][j]) ? extern_weights[w][j] : 1.0;
