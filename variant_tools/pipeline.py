@@ -56,7 +56,7 @@ import random
 import traceback
 from multiprocessing import Process
 from collections import namedtuple, MutableMapping
-from itertools import tee, izip
+from itertools import tee, izip, combinations
 
 from .utils import env, ProgressBar, downloadFile, downloadURL, calculateMD5, delayedAction, \
     existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName, \
@@ -267,10 +267,10 @@ class EmitInput:
         sent altogether (group_by='all') to action (${INPUT} equals ${INPUT#} where
         # is the index of step, but can also be sent individually (group_by='single',
         ${INPUT} equals to a list of a single file) or in pairs 
-        (group_by='paired', e.g. filename_1.txt and filename_2.txt), or pairwise for
-        all combination of different input files. Unselected
-        files are by default passed directly as output of a step. If skip is set to
-        True, the whole step will be skipped'''
+        (group_by='paired', e.g. filename_1.txt and filename_2.txt), pairwise for
+        (a0, a1), (a1, a2), (a2, a3) ..., or combinations for all combination of
+        different input files. Unselected files are by default passed directly as
+        output of a step. If skip is set to True, the whole step will be skipped'''
         self.group_by = group_by
         if type(select) == str:
             if select not in ['fastq', 'bam', 'sam'] and not str(select).startswith('.'):
@@ -491,6 +491,8 @@ class EmitInput:
             f1, f2 = tee(selected)
             next(f2, None)
             return [list(x) for x in izip(f1, f2)], unselected
+        elif self.group_by == 'combinations':
+            return [list(x) for x in combinations(selected, 2)], unselected
 
 
 class PipelineAction:
