@@ -2724,8 +2724,48 @@ class Pipeline:
         self.verbosity = verbosity
         self.jobs = jobs
 
+    def limit_steps(self, psteps, allowed_steps):
+        '''Restrict steps of a pipeline using allowed_steps'''
+        all_steps = {int(x.index):False for x in psteps}
+        #
+        for item in allowed_steps.split(','):
+            # remove space
+            item = ''.join([x for x in item if x != ' '])
+            if item.isdigit():
+                # pipeline:100
+                all_steps[int(item)] = True
+            elif '-' in item and item.count('-') == 1:
+                l, u = item.split('-')
+                if (l and not l.isdigit()) or (u and not u.isdigit()) or \
+                    (l and u and int(l) > int(u)):
+                    raise ValueError('Invalid pipeline step item {}'.format(item))
+                # pipeline:-100, pipeline:100+ or pipeline:10-100
+                if not l:
+                    l = min(all_steps.keys())
+                if not u:
+                    u = max(all_steps.keys())
+                #
+                for key in all_steps.keys():
+                    if key >= int(l) and key <= int(u):
+                        all_steps[key] = True
+            else:
+                raise ValueError('Invalid pipeline step item {}'.format(item))
+        # 
+        # disable limited steps
+        for idx in range(len(psteps)):
+            if not all_steps[int(psteps[idx].index)]:
+                psteps[idx].options.append('skip')
+        env.logger.warning('Steps {} are skipped due to restriction {}'
+            .format(','.join([str(x) for x in all_steps.keys() if not all_steps[x]]), allowed_steps))
+
     def execute(self, pname, **kwargs):
-        if pname is None:
+        allowed_steps = None
+        if not pname:
+            pname = ''
+        else:
+            if ':' in pname:
+                pname, allowed_steps = pname.split(':', 1)
+        if not pname:
             if len(self.pipeline.pipelines) == 1:
                 pname = self.pipeline.pipelines.keys()[0]
             elif 'default' in self.pipeline.pipelines:
@@ -2735,12 +2775,14 @@ class Pipeline:
                     '{}.pipeline defines more than one pipelines without a default one. '
                     'Available pipelines are: {}.'.format(self.pipeline.name,
                     ', '.join(self.pipeline.pipelines.keys())))
-        else:
-            if pname not in self.pipeline.pipelines.keys():
-                raise ValueError('Pipeline {} is undefined in configuraiton file '
-                    '{}. Available pipelines are: {}'.format(pname,
-                    self.pipeline.name, ', '.join(self.pipeline.pipelines.keys())))
+        elif pname not in self.pipeline.pipelines.keys():
+            raise ValueError('Pipeline {} is undefined in configuraiton file '
+                '{}. Available pipelines are: {}'.format(pname,
+                self.pipeline.name, ', '.join(self.pipeline.pipelines.keys())))
+        #
         psteps = self.pipeline.pipelines[pname]
+        if allowed_steps is not None:
+            self.limit_steps(psteps, allowed_steps)
         #
         # the project will be opened when needed
         with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY'], verbosity=self.verbosity) as proj:
@@ -3096,10 +3138,16 @@ def executeArguments(parser):
             annotation databases attached by their names.''')
     parser.add_argument('pipelines', nargs='*', metavar='PIPELINES',
         help='''Name of one or more pipelines defined in SPECFILE, which can be
-            ignored if the SPECFILE only defines one pipeline. Please use 
-            command "vtools show pipeline SPECFILE" for details of available
-            pipelines in SPECFILE, including pipeline-specific parameters that
-            could be used to change the default behavior of the pipelines.''')
+            ignored if the SPECFILE only defines one pipeline. One or more steps
+            can be specified in the form of 'pipeline:5' (step_5 only),
+            'pipeline:-5' (up to step 5), 'pipeline:5-' (from step 5),
+            'pipeline:2,5' (step 2 and 5), 'pipeline:2-5' (step 2 to 5). This
+            essentially adds an option "skip" to the unselected pipeline steps and
+            it is up to the user to ensure that the pipeline is executable
+            with only a subset of steps. Please use command "vtools show pipeline
+            SPECFILE" for details of available pipelines in SPECFILE, including
+            pipeline-specific parameters that could be used to change the default
+            behavior of the pipelines.''')
     parser.add_argument('-j', '--jobs', default=1, type=int,
         help='''Execute the pipeline in parallel model if a number other than
             1 is specified. In this mode, the RunCommand action will create
