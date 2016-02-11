@@ -2518,7 +2518,7 @@ class DownloadResource(PipelineAction):
         2. The resources will be automatically decompressed if decompress=True (default). You would get both 
             FILE and FILE.gz if you downloaded FILE.gz.
     '''
-    def __init__(self, resource, dest_dir, decompress=True):
+    def __init__(self, resource, dest_dir, output=[], decompress=True):
         '''Download resources from specified URLs in ``resource``. 
 
         Parameters:
@@ -2529,11 +2529,7 @@ class DownloadResource(PipelineAction):
         if not dest_dir or type(dest_dir) != str:
             raise ValueError('Invalid resource directory {}'.format(dest_dir))
         else:
-            if os.path.isabs(os.path.expanduser(dest_dir)):
-                self.pipeline_resource = os.path.expanduser(dest_dir)
-            else:
-                self.pipeline_resource = os.path.join(os.path.expanduser(
-                    env.local_resource), 'pipeline_resource', dest_dir)
+            self.pipeline_resource = os.path.expanduser(dest_dir)
         try:
             if not os.path.isdir(self.pipeline_resource):
                 os.makedirs(self.pipeline_resource)
@@ -2541,7 +2537,8 @@ class DownloadResource(PipelineAction):
             raise RuntimeError('Failed to create pipeline resource directory '
                 .format(self.pipeline_resource))
         self.decompress=decompress
-        PipelineAction.__init__(self)
+        PipelineAction.__init__(self, cmd='Download Resource {} to {}'.format(resource, dest_dir),
+            output=output)
 
     def __call__(self, ifiles, pipeline=None):
         saved_dir = os.getcwd()
@@ -2594,7 +2591,15 @@ class DownloadResource(PipelineAction):
             #
             if filename.endswith('.tar.gz'):
                 manifest_file = RuntimeFiles(filename).manifest
-                if not os.path.isfile(manifest_file):
+                env.logger.trace('Checking manifest {}'.format(manifest_file))
+                decompress = not os.path.isfile(manifest_file)
+                if not decompress:
+                    with open(manifest_file) as mf:
+                        for item in mf:
+                            if not os.path.isfile(item.strip()):
+                                decompress = True
+                                break
+                if decompress:
                     with tarfile.open(filename, 'r:gz') as tar: 
                         s = delayedAction(env.logger.info, 'Extracting {}'.format(filename))
                         tar.extractall(self.pipeline_resource)
@@ -2613,7 +2618,16 @@ class DownloadResource(PipelineAction):
                     del s
             elif filename.endswith('.zip'):
                 manifest_file = RuntimeFiles(filename).manifest
-                if not os.path.isfile(manifest_file):
+                env.logger.trace('Checking manifest {}'.format(manifest_file))
+                decompress = not os.path.isfile(manifest_file)
+                if not decompress:
+                    with open(manifest_file) as mf:
+                        for item in mf:
+                            if not os.path.isfile(item.strip()):
+                                decompress = True
+                                break
+                if decompress:
+                    env.logger.trace('Decompressing {}'.format(filename))
                     s = delayedAction(env.logger.info,
                         'Decompressing {}'.format(filename))
                     bundle = zipfile.ZipFile(filename)
@@ -2621,13 +2635,12 @@ class DownloadResource(PipelineAction):
                     with open(manifest_file, 'w') as manifest:
                         for f in bundle.namelist():
                             manifest.write(f + '\n')
-
             #
             if filename.endswith('.md5') and os.path.isfile(filename[:-4]):
                 md5_files.append([filename[:-4], os.path.getsize(filename[:-4])])
         if skipped:
             env.logger.info('Using {} existing resource files under {}.'
-                .format(len(skipped), self.pipeline_resource))
+                .format(', '.join(skipped), self.pipeline_resource))
         return ifiles, md5_files
  
 
