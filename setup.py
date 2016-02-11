@@ -91,7 +91,7 @@ with open('variant_tools/__init__.py') as init:
             VTOOLS_VERSION = line[15:].strip().strip('"').strip("'")
             break
 
-EMBEDED_BOOST = os.path.isdir('boost_1_49_0')
+EMBEDDED_BOOST = os.path.isdir('boost_1_49_0')
 SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511', '-w-509',
     '-outdir', 'variant_tools']
 
@@ -532,7 +532,7 @@ LIB_UCSC_FILES = [
     
 LIB_STAT = ['variant_tools/fisher2.c']
 
-if not EMBEDED_BOOST:
+if not EMBEDDED_BOOST:
     def downloadProgress(count, blockSize, totalSize):
         perc = count * blockSize * 100 // totalSize
         if perc > downloadProgress.counter: 
@@ -562,7 +562,7 @@ if not EMBEDED_BOOST:
                 or h.name.startswith('boost_1_49_0/libs/system') ]
             sys.stdout.write('Extracting %d files\n' % len(files))
             tar.extractall(members=files)
-        EMBEDED_BOOST = True
+        EMBEDDED_BOOST = True
     except Exception as e:
         print(e)
         print('The boost C++ library version 1.49.0 is not found under the current directory. Will try to use the system libraries.')
@@ -622,14 +622,14 @@ else:
     libs = []
     gccargs = ['-O3', '-Wno-unused-local-typedef', '-Wno-return-type']
 
-if EMBEDED_BOOST:
+if EMBEDDED_BOOST:
     try:
         c = new_compiler()
         # -w suppress all warnings caused by the use of boost libraries
         objects = c.compile(LIB_BOOST,
             include_dirs=['boost_1_49_0'],
             output_dir='build',
-            extra_preargs = ['-w'],
+            extra_preargs = ['-w', '-fPIC'],
             macros = [('BOOST_ALL_NO_LIB', None)])
         c.create_static_lib(objects, "embeded_boost", output_dir='build')
     except Exception as e:
@@ -654,7 +654,7 @@ for files, incs, macs, libname in [
         objects = c.compile(files,
             include_dirs=incs,
             output_dir='build',
-            extra_preargs = ['-w'],
+            extra_preargs = ['-w', '-fPIC'],
             macros = macs)
         c.create_static_lib(objects, libname, output_dir='build')
     except Exception as e:
@@ -751,7 +751,7 @@ setup(name = "variant_tools",
                 'sqlite', "variant_tools", "gsl", "cgatools", "boost_1_49_0"],
             library_dirs = ["build"],
             libraries = ['z', 'bz2', 'sqlite_gsl', 'stat', 'ucsc', 'cgatools'] + \
-                (['embeded_boost'] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
+                (['embeded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
             extra_compile_args = gccargs,
             define_macros = [
                 ('MODULE_NAME', '"vt_sqlite3"'),
@@ -763,7 +763,7 @@ setup(name = "variant_tools",
         Extension('variant_tools._cgatools',
             sources = [CGATOOLS_WRAPPER_CPP_FILE.format(PYVERSION)],
             libraries = ['z', 'bz2', 'cgatools'] + \
-                (['embeded_boost'] if EMBEDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
+                (['embeded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
             define_macros = [('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
             extra_compile_args = gccargs,
