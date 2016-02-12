@@ -251,14 +251,15 @@ class SkipIf:
 
     def __call__(self, ifiles, pipeline=None):
         if self.cond:
-            return [], ifiles
+            return [], None, ifiles
         else:
-            return [ifiles], []
+            return [ifiles], None, []
 
 class EmitInput:
     '''An input emitter that emits input files individually, in pairs, or 
     altogether.'''
-    def __init__(self, group_by='all', select=True, skip=False, pass_unselected=True):
+    def __init__(self, group_by='all', select=True, skip=False, pass_unselected=True,
+            with_var=None, for_each=None):
         '''Select input files of certain types, group them, and send input files
         to action. Selection criteria can be True (all input file types, default),
         'False' (select no input file, but an empty list will still be passed to
@@ -270,8 +271,15 @@ class EmitInput:
         (group_by='paired', e.g. filename_1.txt and filename_2.txt), pairwise for
         (a0, a1), (a1, a2), (a2, a3) ..., or combinations for all combination of
         different input files. Unselected files are by default passed directly as
-        output of a step. If skip is set to True, the whole step will be skipped'''
+        output of a step. If skip is set to True, the whole step will be skipped.
+        If with_var is set to the name of a pipeline variable of type list, a variable
+        of name _${with_var} will be set for each emitted group of files. If for_ech
+        is set to the name of a pipeline variable, the output will be repeated for
+        each item of this variable, with _${for_each} set to each item.
+        '''
         self.group_by = group_by
+        self.with_var = with_var
+        self.for_each = for_each
         if type(select) == str:
             if select not in ['fastq', 'bam', 'sam'] and not str(select).startswith('.'):
                 raise ValueError("Value to option select can only be True/False, "
@@ -441,7 +449,7 @@ class EmitInput:
                     raise ValueError('All filenames match multiple names but no differentiating '
                         'index can pair filenames perfectly.') 
 
-    def __call__(self, ifiles, pipeline=None):
+    def get_groups(self, ifiles, pipeline=None):
         if self.skip:
             return [], ifiles
         selected = []
@@ -493,6 +501,30 @@ class EmitInput:
             return [list(x) for x in izip(f1, f2)], unselected
         elif self.group_by == 'combinations':
             return [list(x) for x in combinations(selected, 2)], unselected
+
+    def __call__(self, ifiles, pipeline=None):
+        selected_groups, unselected = self.get_groups(ifiles, pipeline)
+        set_vars = [{} for x in selected_groups]
+        if self.with_var:
+            with_var = pipeline.VARS[self.with_var]
+            if not isinstance(with_var, list):
+                raise ValueError('Parameter with_var should point to a pipeline variable with type list')
+            if len(with_var) != selected_groups:
+                raise ValueError('Length of variable {} should have the same length of output groups.'.format(self.with_var))
+            set_vars = [{'_' + self.with_var:x} for x in with_var]
+        if self.for_each:
+            for_each = pipeline.VARS[self.for_each]
+            if not isinstance(for_each, list):
+                raise ValueError('Parameter for_each should point to a pipeline variable with type list')
+            # expand
+            selected_groups = selected_groups * len(for_each)
+            tmp = []
+            for fe in for_each:
+                for idx in range(len(set_vars)):
+                    set_var[idx]['_' + self.for_each] = fe
+                tmp.extend(set_var)
+            set_vars = tmp
+        return selected_groups, set_vars, unselected
 
 
 class PipelineAction:
@@ -721,6 +753,42 @@ class SequentialActions(PipelineAction):
         # return the output of the last action
         return ifiles
 
+
+class IfElse(PipelineAction):
+    '''Define an action that runs an action with a given condition.
+
+    '''
+    def __init__(self, cond, if_action=None, else_action=None):
+        '''
+        Parameters:
+            cond:
+                a condition, with True, 'True' as true, empty string,
+                False or 'False' as false.
+
+            if_action:
+                action if condition is met
+
+            else_action:
+                action if condition is not met
+        '''
+        self.if_action = if_action
+        self.else_action = else_action
+        self.cond = cond
+
+    def __call__(self, ifiles, pipeline=None):
+        '''
+        Pass ifiles to the first action, take its output and pass it to
+        the second action, and so on. Return the output from the last
+        action as the result of this ``SequentialAction``.
+        '''
+        if self.cond in [false, 'False', '']:
+            if self.else_action is not None:
+                return self.else_condition(ifiles, pipeline)
+        else:
+            if self.if_action is not None:
+                return self.if_condition(ifiles, pipeline)
+        # return the output of the last action
+        return ifiles
 
 class CheckVariantToolsVersion(PipelineAction):
     '''Check the version of variant tools and determine if it is
@@ -1308,12 +1376,12 @@ class RunCommand(PipelineAction):
         # multiple commands, change working directory
         # check output
         action=RunCommand([
-        	'update_blastdb.pl human_genomic --decompress || true',
-        	'update_blastdb.pl nt --decompress || true',
-        	],
+            'update_blastdb.pl human_genomic --decompress || true',
+            'update_blastdb.pl nt --decompress || true',
+            ],
             working_dir='${NCBI_RESOURCE_DIR}/blast/db',
-        	output=['${NCBI_RESOURCE_DIR}/blast/db/human_genomic.nal',
-		        '${NCBI_RESOURCE_DIR}/blast/db/nt.nal']
+            output=['${NCBI_RESOURCE_DIR}/blast/db/human_genomic.nal',
+                '${NCBI_RESOURCE_DIR}/blast/db/nt.nal']
             )
         
         # run command in background, with pipes
@@ -2990,14 +3058,17 @@ class Pipeline:
                     raise RuntimeError('Failed to group input files: {}'
                         .format(e))
             # pass Pipeline itself to emitter
-            igroups, step_output = emitter(step_input, self)
+            igroups, ivars, step_output = emitter(step_input, self)
             try:
-                for ig in igroups:
+                for ig, iv in zip(igroups, ivars):
                     if ig != self.VARS['input']:
                         self.VARS['input'] = ig
                     if not ig and float(self.pipeline.pipeline_format) <= 1.0:
                         env.logger.trace('Step skipped due to no input file (for pipeline format < 1.0 only)')
                         continue
+                    if iv:
+                        for key, val in iv.items:
+                            self.VARS[key] = substituteVars(val, self.VARS, self.GLOVALS, asString=False)
                     # pre action variables are evaluated for each ig because they might involve
                     # changing ${input}
                     for key, val in command.pre_action_vars:
