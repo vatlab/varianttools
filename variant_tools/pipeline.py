@@ -2667,7 +2667,9 @@ class _CaseInsensitiveDict(MutableMapping):
             raise ValueError('Only string or list of strings are allowed for pipeline variables: {} for key {}'.format(value, key))
         self._store[key.upper()] = (key, value)
         if isinstance(value, str) or len(value) <= 2 or len(str(value)) < 50:
-            env.logger.debug('Pipeline variable ``{}`` is {} to ``{}``'.format(key, reset, str(value)))
+            # if not inputXXX, outputXXX ... (these variables are not recommended to use)
+            if re.match('^(input|INPUT|output|OUTPUT)\d+$', key) is None:
+                env.logger.debug('Pipeline variable ``{}`` is {} to ``{}``'.format(key, reset, str(value)))
         else: # should be a list or tuple
             val = str(value).split(' ')[0] + ' ...] ({} items)'.format(len(value))
             # if not inputXXX, outputXXX ... (these variables are not recommended to use)
