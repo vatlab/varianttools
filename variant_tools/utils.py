@@ -3662,6 +3662,8 @@ class VariableSubstitutor:
                 KEY = piece[2:-1].lower()
                 # if the KEY is in the format of ${VAR}
                 if re.match('^\s*[\w\d_]+\s*$', KEY):
+                    if re.match('^(input|INPUT|output|OUTPUT)\d+$', KEY):
+                        env.logger.warning('Use of variable {} is not recommended and will be deprecated soon.'.format(KEY))
                     if KEY.strip() in PipelineVars:
                         pieces[idx] = self.var_expr(PipelineVars[KEY.strip()])
                     else:
@@ -3675,6 +3677,8 @@ class VariableSubstitutor:
                     KEY_name = match.group(1)
                     KEY_index = match.group(2)
                     if KEY_name in PipelineVars:
+                        if re.match('^(input|INPUT|output|OUTPUT)\d+$', KEY_name):
+                            env.logger.warning('Use of variable {} is not recommended and will be deprecated soon.'.format(KEY_name))
                         VAL = PipelineVars[KEY_name]
                         # handle index
                         #
@@ -3724,6 +3728,8 @@ class VariableSubstitutor:
                             # if there is no KEY, this is a lamba function without parameter
                             pieces[idx] = self.var_expr(FUNC())
                         elif ',' not in KEY:
+                            if re.match('^(input|INPUT|output|OUTPUT)\d+$', KEY):
+                                env.logger.warning('Use of variable {} is not recommended and will be deprecated soon.'.format(KEY))
                             # single varialbe
                             if KEY in PipelineVars:
                                 VAL = PipelineVars[KEY]
@@ -3737,6 +3743,8 @@ class VariableSubstitutor:
                             KEYS = KEY.split(',')
                             VAL = []
                             for KEY in KEYS:
+                                if re.match('^(input|INPUT|output|OUTPUT)\d+$', KEY):
+                                    env.logger.warning('Use of variable {} is not recommended and will be deprecated soon.'.format(KEY))
                                 # single varialbe
                                 if KEY in PipelineVars:
                                     VAL.append(PipelineVars[KEY])

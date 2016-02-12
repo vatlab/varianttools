@@ -2691,10 +2691,6 @@ class _CaseInsensitiveDict(MutableMapping):
 
     def __getitem__(self, key):
         try:
-            if re.match('^(input|INPUT|output|OUTPUT)\d+$', key):
-                env.logger.warning('Use of variables inputXXX and outputXXX will be deprecated soon.'
-                    'Please use output_alias or input_alias to explicit set an alias for these variables.')
-
             return self._store[key.upper()][1]
         except:
             env.logger.warning('Pipeline variable "{}" does not exist. A blank string is returned.'.format(key))
