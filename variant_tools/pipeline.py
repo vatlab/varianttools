@@ -596,7 +596,7 @@ class PipelineAction:
                 if not os.path.isfile(f):
                     raise RuntimeError('Output file {} does not exist after completion of the job.'.format(f))
                 # for performance considerations, use partial MD5
-                exe_info.write('{}\t{}\t{}\n'.format(self._useVars(f, pipeline.VARS), os.path.getsize(f),
+                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
                     calculateMD5(f, partial=True)))
             # write standard output to exe_info
             exe_info.write('\n\nSTDOUT\n\n')
@@ -685,11 +685,11 @@ class PipelineAction:
         #
         if self.output:
             with open(self.runtime.proc_info, 'w') as exe_info:
-                exe_info.write('{}\n'.format(self._useVars('; '.join(self.cmd), pipeline.VARS)))
+                exe_info.write('{}\n'.format('; '.join(self.cmd)))
                 exe_info.write('#Start: {}\n'.format(time.asctime(time.localtime())))
                 for f in ifiles + pipeline.step_dependent_files:
                     # for performance considerations, use partial MD5
-                    exe_info.write('{}\t{}\t{}\n'.format(self._useVars(f, pipeline.VARS), os.path.getsize(f),
+                    exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
                         calculateMD5(f, partial=True)))
         # now, run the job, write info if it is successfully finished.
         # Otherwise the job might be forked and it will record the signature by itself.
