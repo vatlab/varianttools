@@ -259,7 +259,7 @@ class EmitInput:
     '''An input emitter that emits input files individually, in pairs, or 
     altogether.'''
     def __init__(self, group_by='all', select=True, skip=False, pass_unselected=True,
-            with_vars=None, for_each=None, each_with=None):
+            labels=None, for_each=None, loop_labels=None):
         '''Select input files of certain types, group them, and send input files
         to action. Selection criteria can be True (all input file types, default),
         'False' (select no input file, but an empty list will still be passed to
@@ -272,23 +272,25 @@ class EmitInput:
         (a0, a1), (a1, a2), (a2, a3) ..., or combinations for all combination of
         different input files. Unselected files are by default passed directly as
         output of a step. If skip is set to True, the whole step will be skipped.
-        If with_vars is set to the name of one or more pipeline variable of type list,
-        variables of name _${with_vars} will be set for each emitted group of files. 
-        If for_ech is set to the name of one or more pipeline variables, the output will be 
+        If labels is set to the name of one or more pipeline variable of type list,
+        values of these variables will be matched to each input file name, and
+        variables of name _${labels} will be set for each emitted group of files
+        (so that they are always list with the same length as ${input}.
+        If for_each is set to the name of one or more pipeline variables, the output will be 
         repeated for each item of this variable, with _${for_each} set to each item.
-        If one or more variables for each_with is set, values with these variables will
-        be set for each values of for_each.
+        for_each='A,B' is equivalent to for _A,_B in zip(VARS[A], VARS[B]), and
+        for_each=['A', 'B'] is equivalent to nested loop of _A in VARS[A] and _B in VARS[B].
         '''
         self.group_by = group_by
         #
-        if with_vars is None or not with_vars:
-            self.with_vars = []
-        elif isinstance(with_vars, str):
-            self.with_vars = [with_vars]
-        elif isinstance(with_vars, list):
-            self.with_vars = with_vars
+        if labels is None or not labels:
+            self.labels = []
+        elif isinstance(labels, str):
+            self.labels = [labels]
+        elif isinstance(labels, list):
+            self.labels = labels
         else:
-            raise ValueError('Unacceptable value for parameter with_vars: {}'.format(with_vars))
+            raise ValueError('Unacceptable value for parameter labels: {}'.format(labels))
         #
         if for_each is None or not for_each:
             self.for_each = []
@@ -299,14 +301,14 @@ class EmitInput:
         else:
             raise ValueError('Unacceptable value for parameter for_each: {}'.format(for_each))
         #
-        if each_with is None or not each_with:
-            self.each_with = []
-        elif isinstance(each_with, str):
-            self.each_with = [each_with]
-        elif isinstance(each_with, list):
-            self.each_with = each_with
+        if loop_labels is None or not loop_labels:
+            self.loop_labels = []
+        elif isinstance(loop_labels, str):
+            self.loop_labels = [loop_labels]
+        elif isinstance(loop_labels, list):
+            self.loop_labels = loop_labels
         else:
-            raise ValueError('Unacceptable value for parameter each_with: {}'.format(each_with))
+            raise ValueError('Unacceptable value for parameter loop_labels: {}'.format(loop_labels))
         #
         if type(select) == str:
             if select not in ['fastq', 'bam', 'sam'] and not str(select).startswith('.'):
@@ -533,37 +535,35 @@ class EmitInput:
     def __call__(self, ifiles, pipeline=None):
         selected_groups, unselected = self.get_groups(ifiles, pipeline)
         set_vars = [{} for x in selected_groups]
-        for wv in self.with_vars:
+        for wv in self.labels:
             values = pipeline.VARS[wv]
             if not isinstance(values, list):
-                raise ValueError('Parameter for_each should point to a pipeline variable with type list')
-            if len(values) != len(selected_groups):
-                raise ValueError('Length of variable {} (length {}) should have the same length of output groups (length {}).'
-                    .format(wv, len(values), len(selected_groups)))
+                raise ValueError('with_var variable {} is not a list ("{}")'.format(wv, values))
+            if len(values) != len(ifiles):
+                raise ValueError('Length of variable {} (length {}) should match the number of input files (length {}).'
+                    .format(wv, len(values), len(ifiles)))
+            file_map = {x:y for x,y in zip(ifiles, values)}
             for idx,val in enumerate(values):
-                set_vars[idx]['_' + wv] = val
-        for fe in self.for_each:
-            values = pipeline.VARS[fe]
-            if not isinstance(values, list):
-                raise ValueError('Parameter values should point to a pipeline variable with type list')
-            for ew in self.each_with:
-                ew_values = pipeline.VARS[ew]
-                if not isinstance(ew_values, list):
-                    raise ValueError('Parameter each_with should point to a pipeline variable with type list')
-                if len(ew_values) != len(values):
-                    raise ValueError('Length of variable {} (length {}) should have the same length of variable {} (length {}).'
-                        .format(ew, len(ew), fe, len(values)))
+                set_vars[idx]['_' + wv] = [file_map[x] for x in selected_groups[idx]]
+        for fe_all in self.for_each:
+            loop_size = None
+            for fe in fe_all.split(','):
+                values = pipeline.VARS[fe]
+                if not isinstance(values, list):
+                    raise ValueError('for_each variable {} is not a list ("{}")'.format(fe, values))
+                if loop_size is None:
+                    loop_size = len(values)
+                elif loop_size != len(values):
+                    raise ValueError('Length of variable {} (length {}) should match the length of variable {} (length {}).'
+                        .format(fe, len(values), fe_all.split(',')[0], loop_size))
             # expand
             selected_groups = selected_groups * len(values)
             tmp = []
-            for vidx, value in enumerate(values):
+            for vidx in range(loop_size):
                 for idx in range(len(set_vars)):
-                    set_var[idx]['_' + fe] = value
-                for ew in self.each_with:
-                    ew_values = pipeline.VARS[ew]
-                    for idx in range(len(set_vars)):
-                        set_var[idx]['_' + ew] = ew_values[vidx]
-                tmp.extend(set_var)
+                    for fe in fe_all.split(','):
+                        set_vars[idx]['_' + fe] = pipeline.VARS[fe][vidx]
+                tmp.extend(set_vars)
             set_vars = tmp
         #env.logger.trace('SELECTED GROUPS {}\nVARS {}\nUNSELECTED {}'
         #    .format( selected_groups, set_vars, unselected))
@@ -3161,6 +3161,7 @@ class Pipeline:
                         step_output.extend(ofiles)
                 # wait for all pending jobs to finish
                 self.VARS['output{}'.format(command.index)] = step_output
+                self.VARS['output'.format(command.index)] = step_output
                 for opt in command.options:
                     matched = re.match('^output_alias\s*=\s*([\w\d_]+)$', opt)
                     if matched:
