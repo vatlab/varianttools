@@ -2803,11 +2803,7 @@ class _CaseInsensitiveDict(MutableMapping):
         return self.__getitem__(key)
 
     def __getitem__(self, key):
-        try:
-            return self._store[key.upper()][1]
-        except:
-            env.logger.warning('Pipeline variable "{}" does not exist. A blank string is returned.'.format(key))
-            return ''
+        return self._store[key.upper()][1]
 
     def __delitem__(self, key):
         del self._store[key.upper()]

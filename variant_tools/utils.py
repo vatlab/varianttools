@@ -3659,108 +3659,20 @@ class VariableSubstitutor:
         pieces = re.split('(\${(?:[^{}]|{[^{}]*{[^}]*}[^{}]*}|{[^}]*})*})', text)
         for idx, piece in enumerate(pieces):
             if piece.startswith('${') and piece.endswith('}'):
-                KEY = piece[2:-1].lower()
-                # if the KEY is in the format of ${VAR}
-                if re.match('^\s*[\w\d_]+\s*$', KEY):
-                    if re.match('^(input|INPUT|output|OUTPUT)\d+$', KEY):
-                        env.logger.warning('Use of variable {} is not recommended and will be deprecated soon.'.format(KEY))
-                    if KEY.strip() in PipelineVars:
-                        pieces[idx] = self.var_expr(PipelineVars[KEY.strip()])
-                    else:
-                        env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
-                            .format(piece, KEY))
-                    continue
+                expr = piece[2:-1].strip()
+                # remove the "name:" part for the old lambda expression syntax
+                has_name_piece = re.match('^([\w\d_, ]*:).*', expr)
+                if has_name_piece:
+                    expr = expr[len(has_name_piece.group(1)):].strip()
                 #
-                # if the KEY is in the format of ${VAR[0]} or ${VAR[2:]}
-                match = re.match('^([\w\d_]+)\s*((\[[\s\d:-]+\])+)$', KEY)
-                if match:
-                    KEY_name = match.group(1)
-                    KEY_index = match.group(2)
-                    if KEY_name in PipelineVars:
-                        if re.match('^(input|INPUT|output|OUTPUT)\d+$', KEY_name):
-                            env.logger.warning('Use of variable {} is not recommended and will be deprecated soon.'.format(KEY_name))
-                        VAL = PipelineVars[KEY_name]
-                        # handle index
-                        #
-                        # split index by [][]
-                        for sub_index in re.split('\]\s*\[', KEY_index):
-                            try:
-                                sub_index = sub_index.strip().lstrip('[').rstrip(']')
-                                if sub_index.count(':') == 0:
-                                    VAL = VAL[int(sub_index)]
-                                elif sub_index.count(':') == 1:
-                                    idx1, idx2 = sub_index.split(':')
-                                    idx1 = int(idx1) if idx1.strip() else None
-                                    idx2 = int(idx2) if idx2.strip() else None
-                                    VAL = VAL[idx1:idx2]
-                                elif sub_index.count(':') == 2:
-                                    idx1, idx2, idx3 = sub_index.split(':')
-                                    idx1 = int(idx1) if idx1.strip() else None
-                                    idx2 = int(idx2) if idx2.strip() else None
-                                    idx3 = int(idx3) if idx3.strip() else None
-                                    VAL = VAL[idx1:idx2:idx3]
-                                else:
-                                    raise ValueError('Invalid index string {}'.format(KEY_index))
-                            except Exception as e:
-                                env.logger.warning("Failed to interpret {} as a pipeline varialbe: {}"
-                                    .format(piece, e))
-                        pieces[idx] = self.var_expr(VAL)
-                    else:
-                        env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
-                            .format(piece, KEY))
-                    continue
-                #
-                # now, the lambda function form
-                #
-                if ':' in KEY:
-                    # a lambda function?
-                    try:
-                        FUNC = eval('lambda {}'.format(piece[2:-1].replace('\\\n', '').replace('\n', ' ')))
-                    except Exception as e:
-                        env.logger.warning('Failed to interpret {} as a pipeline variable: {}'
-                            .format(piece, e))
-                        continue
-                    KEY = KEY.split(':', 1)[0].strip()
-                    try:
-                        # allow the use of user defined functions in expressions
-                        globals().update(PipelineGlobals)
-                        if not KEY:
-                            # if there is no KEY, this is a lamba function without parameter
-                            pieces[idx] = self.var_expr(FUNC())
-                        elif ',' not in KEY:
-                            if re.match('^(input|INPUT|output|OUTPUT)\d+$', KEY):
-                                env.logger.warning('Use of variable {} is not recommended and will be deprecated soon.'.format(KEY))
-                            # single varialbe
-                            if KEY in PipelineVars:
-                                VAL = PipelineVars[KEY]
-                            else:
-                                env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
-                                    .format(piece, KEY))
-                                continue
-                            pieces[idx] = self.var_expr(FUNC(VAL))
-                        else:
-                            # several parameters
-                            KEYS = KEY.split(',')
-                            VAL = []
-                            for KEY in KEYS:
-                                if re.match('^(input|INPUT|output|OUTPUT)\d+$', KEY):
-                                    env.logger.warning('Use of variable {} is not recommended and will be deprecated soon.'.format(KEY))
-                                # single varialbe
-                                if KEY in PipelineVars:
-                                    VAL.append(PipelineVars[KEY])
-                                else:
-                                    env.logger.warning('Failed to interpret {} as a pipeline variable: key "{}" not found'
-                                        .format(piece, KEY))
-                                    continue
-                            pieces[idx] = self.var_expr(FUNC(*VAL))
-                    except Exception as e:
-                        env.logger.warning('Failed to interpret {} as a pipeline variable: {}'
-                            .format(piece, e))
-                        continue
-                else:
-                    env.logger.warning('Failed to interpret {} as a pipeline variable'
-                            .format(piece))
-                    continue
+                # evaluate the expression in the dictionary of VARS and GLOBAL
+                try:
+                    # FIXME: # we should try not to contaminating globals()
+                    globals().update(PipelineGlobals)
+                    ret_value = eval(expr, globals(), PipelineVars)
+                    pieces[idx] = self.var_expr(ret_value)
+                except Exception as e:
+                    env.logger.warning('Failed to evaluate expression "{}": {}'.format(expr, e))
         #
         if self.asString:
             if float(PipelineVars['pipeline_format']) <= 1.0:
