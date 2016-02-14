@@ -625,15 +625,16 @@ else:
 if EMBEDDED_BOOST:
     try:
         c = new_compiler()
-        # -w suppress all warnings caused by the use of boost libraries
-        objects = c.compile(LIB_BOOST,
-            include_dirs=['boost_1_49_0'],
-            output_dir='build',
-            extra_preargs = ['-w', '-fPIC'],
-            macros = [('BOOST_ALL_NO_LIB', None)])
-        c.create_static_lib(objects, "embeded_boost", output_dir='build')
+        if not os.path.isfile(os.path.join('build', c.static_lib_format % ('embedded_boost', c.static_lib_extension))):
+            # -w suppress all warnings caused by the use of boost libraries
+            objects = c.compile(LIB_BOOST,
+                include_dirs=['boost_1_49_0'],
+                output_dir='build',
+                extra_preargs = ['-w', '-fPIC'],
+                macros = [('BOOST_ALL_NO_LIB', None)])
+            c.create_static_lib(objects, "embedded_boost", output_dir='build')
     except Exception as e:
-        sys.exit("Failed to build embeded boost library: {}".format(e))
+        sys.exit("Failed to build embedded boost library: {}".format(e))
 
 # building other libraries
 for files, incs, macs, libname in [
@@ -647,8 +648,10 @@ for files, incs, macs, libname in [
         [('CGA_TOOLS_IS_PIPELINE', 0), ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
         'cgatools'),
     (LIB_GSL, ['.', 'gsl'], [], 'gsl')]:
+    if os.path.isfile(os.path.join('build', c.static_lib_format % (libname, c.static_lib_extension))):
+        continue
     try:
-        print('Building embeded library {}'.format(libname))
+        print('Building embedded library {}'.format(libname))
         c = new_compiler()
         # -w suppress all warnings caused by the use of boost libraries
         objects = c.compile(files,
@@ -658,7 +661,7 @@ for files, incs, macs, libname in [
             macros = macs)
         c.create_static_lib(objects, libname, output_dir='build')
     except Exception as e:
-        sys.exit("Failed to build embeded {} library: {}".format(libname, e))
+        sys.exit("Failed to build embedded {} library: {}".format(libname, e))
 
 
 
@@ -751,7 +754,7 @@ setup(name = "variant_tools",
                 'sqlite', "variant_tools", "gsl", "cgatools", "boost_1_49_0"],
             library_dirs = ["build"],
             libraries = ['z', 'bz2', 'sqlite_gsl', 'stat', 'ucsc', 'cgatools'] + \
-                (['embeded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
+                (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
             extra_compile_args = gccargs,
             define_macros = [
                 ('MODULE_NAME', '"vt_sqlite3"'),
@@ -763,7 +766,7 @@ setup(name = "variant_tools",
         Extension('variant_tools._cgatools',
             sources = [CGATOOLS_WRAPPER_CPP_FILE.format(PYVERSION)],
             libraries = ['z', 'bz2', 'cgatools'] + \
-                (['embeded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
+                (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
             define_macros = [('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
             extra_compile_args = gccargs,
