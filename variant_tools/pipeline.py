@@ -35,6 +35,7 @@ from multiprocessing import Process
 import threading
 import pipes
 import pprint
+import copy
 #
 import glob
 import hashlib
@@ -543,6 +544,7 @@ class EmitInput:
                 raise ValueError('Length of variable {} (length {}) should match the number of input files (length {}).'
                     .format(wv, len(values), len(ifiles)))
             file_map = {x:y for x,y in zip(ifiles, values)}
+            #env.logger.error('Paring {}'.format(file_map))
             for idx,val in enumerate(values):
                 set_vars[idx]['_' + wv] = [file_map[x] for x in selected_groups[idx]]
         for fe_all in self.for_each:
@@ -557,13 +559,13 @@ class EmitInput:
                     raise ValueError('Length of variable {} (length {}) should match the length of variable {} (length {}).'
                         .format(fe, len(values), fe_all.split(',')[0], loop_size))
             # expand
-            selected_groups = selected_groups * len(values)
+            selected_groups = selected_groups * loop_size
             tmp = []
             for vidx in range(loop_size):
                 for idx in range(len(set_vars)):
                     for fe in fe_all.split(','):
                         set_vars[idx]['_' + fe] = pipeline.VARS[fe][vidx]
-                tmp.extend(set_vars)
+                tmp.extend(copy.deepcopy(set_vars))
             set_vars = tmp
         #env.logger.trace('SELECTED GROUPS {}\nVARS {}\nUNSELECTED {}'
         #    .format( selected_groups, set_vars, unselected))

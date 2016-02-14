@@ -2547,7 +2547,7 @@ def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
                 env.logger.error('Input or dependent file {} is not recorded in exe_info file.'.format(', '.join([x for x,y in ifiles_checked.items() if not y])))
                 return False
         if len(nFiles) != 2 or nFiles[1] == 0:
-            env.logger.warning('Corrupted exe_info file {}'.format(md5file))
+            env.logger.warning('Incomplete runtime information for output file {} due to interrupted execution.'.format(os.path.basename(md5file).rsplit('.',1)[0]))
             return False    
     #
     def samefile(x,y):
