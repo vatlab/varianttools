@@ -169,6 +169,89 @@ try:
 except ImportError as e:
     pass
 
+
+class ColoredFormatter(logging.Formatter):
+    ''' A logging formatter that uses color to differntiate logging messages
+    and emphasize texts. Texts that would be empahsized are quoted with
+    double backslashes (`` ``).
+    '''
+    def __init__(self, msg):
+        logging.Formatter.__init__(self, msg)
+        #
+        # color for different logging levels. The current terminal color
+        # is used for INFO
+        self.LEVEL_COLOR = {
+            'TRACE': 'DARK_CYAN',
+            'DEBUG': 'BLUE',
+            'WARNING': 'PURPLE',
+            'ERROR': 'RED',
+            'CRITICAL': 'RED_BG',
+        }
+        self.COLOR_CODE={
+            'ENDC':0,  # RESET COLOR
+            'BOLD':1,
+            'UNDERLINE':4,
+            'BLINK':5,
+            'INVERT':7,
+            'CONCEALD':8,
+            'STRIKE':9,
+            'GREY30':90,
+            'GREY40':2,
+            'GREY65':37,
+            'GREY70':97,
+            'GREY20_BG':40,
+            'GREY33_BG':100,
+            'GREY80_BG':47,
+            'GREY93_BG':107,
+            'DARK_RED':31,
+            'RED':91,
+            'RED_BG':41,
+            'LIGHT_RED_BG':101,
+            'DARK_YELLOW':33,
+            'YELLOW':93,
+            'YELLOW_BG':43,
+            'LIGHT_YELLOW_BG':103,
+            'DARK_BLUE':34,
+            'BLUE':94,
+            'BLUE_BG':44,
+            'LIGHT_BLUE_BG':104,
+            'DARK_MAGENTA':35,
+            'PURPLE':95,
+            'MAGENTA_BG':45,
+            'LIGHT_PURPLE_BG':105,
+            'DARK_CYAN':36,
+            'AUQA':96,
+            'CYAN_BG':46,
+            'LIGHT_AUQA_BG':106,
+            'DARK_GREEN':32,
+            'GREEN':92,
+            'GREEN_BG':42,
+            'LIGHT_GREEN_BG':102,
+            'BLACK':30,
+        }
+
+    def colorstr(self, astr, color):
+        return '\033[{}m{}\033[{}m'.format(color, astr,
+            self.COLOR_CODE['ENDC'])
+
+    def emphasize(self, msg, level_color=0):
+        # display text within `` and `` in green
+        return re.sub(r'``([^`]*)``', '\033[32m\\1\033[{}m'.format(level_color), str(msg))
+
+    def format(self, record):
+        level_name = record.levelname
+        if level_name in self.LEVEL_COLOR:
+            level_color = self.COLOR_CODE[self.LEVEL_COLOR[level_name]]
+            record.color_levelname = self.colorstr(level_name, level_color)
+            record.color_name = self.colorstr(record.name, self.COLOR_CODE['BOLD'])
+            record.color_msg = self.colorstr(self.emphasize(record.msg, level_color), level_color)
+        else:
+            # for INFO, use default color
+            record.color_levelname = record.levelname
+            record.color_msg = self.emphasize(record.msg)
+        return logging.Formatter.format(self, record)
+
+
 class RuntimeEnvironments(object):
     # the following make RuntimeEnvironments a singleton class
     _instance = None
@@ -519,85 +602,6 @@ class RuntimeEnvironments(object):
     #
     #
     # attribute logger
-    class ColoredFormatter(logging.Formatter):
-        # A variant of code found at http://stackoverflow.com/questions/384076/how-can-i-make-the-python-logging-output-to-be-colored
-        def __init__(self, msg):
-            logging.Formatter.__init__(self, msg)
-            self.LEVEL_COLOR = {
-                'TRACE': 'DARK_CYAN',
-                'DEBUG': 'BLUE',
-                'WARNING': 'PURPLE',
-                'ERROR': 'RED',
-                'CRITICAL': 'RED_BG',
-                }
-            self.COLOR_CODE={
-                'ENDC':0,  # RESET COLOR
-                'BOLD':1,
-                'UNDERLINE':4,
-                'BLINK':5,
-                'INVERT':7,
-                'CONCEALD':8,
-                'STRIKE':9,
-                'GREY30':90,
-                'GREY40':2,
-                'GREY65':37,
-                'GREY70':97,
-                'GREY20_BG':40,
-                'GREY33_BG':100,
-                'GREY80_BG':47,
-                'GREY93_BG':107,
-                'DARK_RED':31,
-                'RED':91,
-                'RED_BG':41,
-                'LIGHT_RED_BG':101,
-                'DARK_YELLOW':33,
-                'YELLOW':93,
-                'YELLOW_BG':43,
-                'LIGHT_YELLOW_BG':103,
-                'DARK_BLUE':34,
-                'BLUE':94,
-                'BLUE_BG':44,
-                'LIGHT_BLUE_BG':104,
-                'DARK_MAGENTA':35,
-                'PURPLE':95,
-                'MAGENTA_BG':45,
-                'LIGHT_PURPLE_BG':105,
-                'DARK_CYAN':36,
-                'AUQA':96,
-                'CYAN_BG':46,
-                'LIGHT_AUQA_BG':106,
-                'DARK_GREEN':32,
-                'GREEN':92,
-                'GREEN_BG':42,
-                'LIGHT_GREEN_BG':102,
-                'BLACK':30,
-            }
-
-        def colorstr(self, astr, color):
-            return '\033[{}m{}\033[{}m'.format(self.COLOR_CODE[color], astr,
-                self.COLOR_CODE['ENDC'])
-
-        def emphasize(self, msg, in_color):
-            # display text within `` and `` in green
-            # This is done for levelname not in self.LEVEL_COLOR, e.g.
-            # for info that uses native color. The text will not be 
-            # visible if someone is using a green background
-            if in_color == 0:
-                return re.sub(r'``([^`]*)``', '\033[32m\\1\033[0m', str(msg))
-            else:
-                return re.sub(r'``([^`]*)``', '\033[32m\\1\033[{}m'.format(self.COLOR_CODE[in_color]), str(msg))
-
-        def format(self, record):
-            record = copy.copy(record)
-            levelname = record.levelname
-            if levelname in self.LEVEL_COLOR:
-                record.levelname = self.colorstr(levelname, self.LEVEL_COLOR[levelname])
-                record.name = self.colorstr(record.name, 'BOLD')
-                record.msg = self.colorstr(self.emphasize(record.msg,
-                    self.LEVEL_COLOR[levelname]), self.LEVEL_COLOR[levelname])
-            else:
-                record.msg = self.emphasize(record.msg, 0)
-            return logging.Formatter.format(self, record)
 
     def _set_logger(self, logfile=None):
         # create a logger, but shutdown the previous one
@@ -620,12 +624,12 @@ class RuntimeEnvironments(object):
         }
         #
         cout.setLevel(levels[self._verbosity])
-        cout.setFormatter(self.ColoredFormatter('%(levelname)s: %(message)s'))
+        cout.setFormatter(ColoredFormatter('%(color_levelname)s: %(color_msg)s'))
         self._logger.addHandler(cout)
         self._logger.trace = lambda msg, *args: self._logger._log(logging.TRACE, msg, args)
         # output to a log file
         if logfile is not None:
-            ch = logging.FileHandler(logfile.lstrip('>'), mode = ('a' if logfile.startswith('>>') else 'w'))
+            ch = logging.FileHandler(logfile, mode = 'a')
             # NOTE: debug informaiton is always written to the log file
             ch.setLevel(levels[self._logfile_verbosity])
             ch.setFormatter(logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))

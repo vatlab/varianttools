@@ -1631,7 +1631,9 @@ class Project:
         # set global verbosity level and temporary directory
         env.verbosity = verbosity
         # env.verbosity will affect the creation of logger
-        env.logger = '{}{}.log'.format('>' if 'NEW_PROJ' in self.mode else '>>', self.name)
+        if 'NEW_PROJ' in self.mode and os.path.isfile(self.name + '.log'):
+            os.remove(self.name + '.log')
+        env.logger = '{}.log'.format(self.name)
         env.logger.debug('')
         env.logger.debug(env.command_line)
         # if option temp_dir is set, the path will be used
