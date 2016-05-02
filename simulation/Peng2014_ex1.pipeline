@@ -118,9 +118,9 @@ action=EvolvePopulation(
 	mutator=RefGenomeMutator(regions='%(regions)s', model='JC69', rate=[1.8e-8 * %(scale)s * 4. / 3.]),
 	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
 	demoModel=MultiStageModel([
-        InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
-			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
-        ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
+        InstantChangeModel(T=81000 // %(scale)s, N0=8100 // %(scale)s,
+			G=[70000 // %(scale)s, 71000 // %(scale)s], NG=[7900 // %(scale)s, 8100 // %(scale)s]),
+        ExponentialGrowthModel(T=370 // %(scale)s, NT=900000 // %(scale)s)
      ]))
 comment=Evolve and expand the population using a JC69 mutation model
 	and a demographic model that evolves a population of size 8100 for
@@ -164,9 +164,9 @@ action=EvolvePopulation(
 		s_stoploss=0.02 * %(scale)s, s_stopgain=0.1 * %(scale)s),
 	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
 	demoModel = MultiStageModel([
-        InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
-			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
-        ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
+        InstantChangeModel(T=81000 // %(scale)s, N0=8100 // %(scale)s,
+			G=[70000 // %(scale)s, 71000 // %(scale)s], NG=[7900 // %(scale)s, 8100 // %(scale)s]),
+        ExponentialGrowthModel(T=370 // %(scale)s, NT=900000 // %(scale)s)
      ]))
 comment=Evolve and expand the population using a JC69 mutation model
 	and a demographic model that evolves a population of size 8100 for
@@ -222,8 +222,8 @@ action=EvolvePopulation(
 	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
 		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
 	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
-	demoModel=ExponentialGrowthModel(T=10 / %(scale)s,
-		NT=10000 / %(scale)s)
+	demoModel=ExponentialGrowthModel(T=10 // %(scale)s,
+		NT=10000 // %(scale)s)
     )
 comment=Expand the population exponentially to reach a large population
 	in 10 generations. Mutations and recombinations are allowed and
