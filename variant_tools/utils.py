@@ -1397,7 +1397,7 @@ class GenomicRegions(object):
 
     def field_region(self, region):
         if self.proj is None:
-            from .project import Project
+            from variant_tools.project import Project
             self.proj = Project() 
         # if the regions have been probed before
         regions = self.proj.loadProperty('__region_{}'.format(region), None)
@@ -1421,7 +1421,7 @@ class GenomicRegions(object):
             except Exception as e:
                 raise RuntimeError('Failed to link to annotation database {}: {}'.format(annoName, e))
             #
-            from .project import Project
+            from variant_tools.project import Project
             self.proj = Project()
         # now we have annotation database
         try:
@@ -3935,7 +3935,7 @@ def genesInRegions(regions, proj):
         except Exception as e:
             raise RuntimeError('Failed to link to annotation database refGene: {}'.format(e))
         #
-        from .project import Project
+        from variant_tools.project import Project
         proj = Project()
     #
     cur = proj.db.cursor()
@@ -3965,7 +3965,7 @@ def dissectGene(gene, proj):
         except Exception as e:
             raise RuntimeError('Failed to link to annotation database refGene: {}'.format(e))
         #
-        from .project import Project
+        from variant_tools.project import Project
         proj = Project()
     cur = proj.db.cursor()
     try:

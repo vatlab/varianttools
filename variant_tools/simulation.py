@@ -681,13 +681,15 @@ class ExtractVCF(PipelineAction):
         Results:
             Return the resulting vcf file as output.
         '''
-        tabixFetch(self.sourceURL[0], [], self.output[0], True)
-        for r in expandRegions(self.regions):
-            region = '{}:{}-{}'.format(r[0], r[1], r[2])
-            env.logger.info('Retriving genotype for region chr{}{}'.format(region,
-                ' ({})'.format(r[3] if r[3] else '')))
-            for URL in self.sourceURL:
-                tabixFetch(URL, [region], self.output[0], False)
+        with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY'], verbosity=pipeline.verbosity) as proj:
+            proj.setRefGenome('hg19')
+            tabixFetch(self.sourceURL[0], [], self.output[0], True)
+            for r in expandRegions(self.regions):
+                region = '{}:{}-{}'.format(r[0], r[1], r[2])
+                env.logger.info('Retriving genotype for region chr{}{}'.format(region,
+                    ' ({})'.format(r[3] if r[3] else '')))
+                for URL in self.sourceURL:
+                    tabixFetch(URL, [region], self.output[0], False)
         return True
 
 
