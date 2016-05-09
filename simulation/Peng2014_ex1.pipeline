@@ -52,7 +52,7 @@ comment=Check the version of variant tools. Version 2.3.1 or higher is required
 	for the execution of this simulation.
 
 [*_1]
-action=ImportModules('simuPOP.demography')
+action=ImportModules(['variant_tools.simulation', 'simuPOP.demography'])
 comment=Import required modules.
 
 [ms_5]
