@@ -208,16 +208,25 @@ class AssociationTestManager:
     def getInfo(self, methods, var_info, geno_info):
         '''automatically update var_info or geno_info if input extern weights found in either'''
         for m in methods:
-            if not "--extern_weight" in m:
+            if not ("--extern_weight" in m or "--extern_weight" in sys.argv):
                 continue
+            if "--extern_weight" in m:
+                target = m
+            else:
+                target = ' '.join(sys.argv)
             extern_weight = []
-            for item in re.match(r'.*?--extern_weight(.*?)-|.*?--extern_weight(.*?)$', m).groups():
+            for item in re.match(r'.*?--extern_weight(.*?)-|.*?--extern_weight(.*?)$', target).groups():
                 if item is not None:
                     extern_weight.extend(item.strip().split())
+            fields = flatten([[x.name for x in db.fields] for db in self.proj.annoDB]) + \
+                     flatten([['{}.{}'.format(db.name, x.name) for x in db.fields] for db in self.proj.annoDB])
+            fields += [field for field in self.proj.db.getHeaders(self.table) \
+                       if field not in ('variant_id', 'bin', 'alt_bin')]
+            print(fields)
             for item in extern_weight:
                 if not item in geno_info + var_info:
                     # Is extern_weight in var_info?
-                    if item in [field for field in self.proj.db.getHeaders(self.table) if field not in ('variant_id', 'bin', 'alt_bin')] + flatten([[x.name for x in db.fields] for db in self.proj.annoDB]):
+                    if item in fields:
                         var_info.append(item)
                         env.logger.info('Loading variant / annotation field "{0}" for association analysis.'.\
                                         format(item))
