@@ -399,13 +399,18 @@ def sequenceArguments(parser):
         help='''If set, also try to mark the reverse sequence of the specified sequence.
             If both mark_complemnt and mark_reverse are set, four different sequences
             will be searched.''')
-    parser.add_argument('--marked_region', nargs='*', default=None, type=int,
+    parser.add_argument('--first-transcript', action='store_true',
+        help='''If set, only display the first transcript of RNA or Protein sequence''')
+    parser.add_argument('--marked-region', nargs='*', default=None, type=int,
         help='''If set to a number or pair of number, print only n bp to the left and 
             m (m=n if only one number is specified) of the marked region. The sequence
             itself is no longer marked. This option is not yet supported in all
             combinations of options. ''')
     parser.add_argument('--hide_unmatched', default=False, action='store_true',
         help='''If set, only display regions with marked variants or sequences''')
+    parser.add_argument('--zero-based', default=False, action='store_true',
+        help='''If set, user input is zero based and will be translated to 1-based
+            coordinates before query. The output is always 1-based''')
 
 complement_table = {
         'A': 'T',
@@ -428,12 +433,14 @@ def sequence(args):
         if args.build is None:
             args.build = proj.build
         #
-        regions = expandRegions(';'.join(args.regions), proj, mergeRegions=False)
+        regions = expandRegions(';'.join(args.regions), proj, mergeRegions=False,
+            zeroBased=args.zero_based)
         # if a region is specified
         args.mark_sequence = ''
         if args.mark:
             if len(args.mark) == 1 and ':' in args.mark[0]:
-                regs = expandRegions(args.mark[0], proj, mergeRegions=True)
+                regs = expandRegions(args.mark[0], proj, mergeRegions=True,
+                    zeroBased=args.zero_based)
                 args.mark = []
                 for r in regs:
                     args.mark.extend([r[0],x] for x in range(r[1], r[2]+1))
@@ -507,9 +514,10 @@ def printDNASequence(args, regions):
                 comprev = ''.join([complement_table[x] for x in args.mark_sequence][::-1])
                 seq = seq.replace(comprev.upper(), comprev.lower())
         unmatched = not any([x.islower() for x in seq])
-        print('>ref|{}|{}:{}-{} {} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr,
-            start, end, '({})'.format(comment) if comment else '',
-            'unmatched' if unmatched and args.hide_unmatched else ''))
+        if args.verbosity is None or int(args.verbosity) > 1:
+            print('>ref|{}|{}:{}-{} {} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr,
+                start, end, '({})'.format(comment) if comment else '',
+                'unmatched' if unmatched and args.hide_unmatched else ''))
         if unmatched and args.hide_unmatched:
             continue
         # break into pieces of 70 bp
@@ -533,6 +541,25 @@ def printDNASequence(args, regions):
                     ((' ' * residue + fmt.format(start if reversed_seq else end)) if i == last_line \
                         else fmt.format(end - i - char_per_line + 1 if reversed_seq else start + i + char_per_line - 1)) \
                     for i in range(0, len(seq), char_per_line)]))
+        elif args.marked_region is not None:
+            # find marked regions
+            if len(args.marked_region) == 0:
+                l = r = 0
+            elif len(args.marked_region) == 1:
+                l = r = int(args.marked_region[0])
+            elif len(args.marked_region) == 2:
+                l, r = map(int, args.marked_region)
+            else:
+                raise ValueError('Value of option marked_region should be an integer or a pair of integers')
+            import re
+            # find marked regions
+            pieces = re.split('([a-z]+)', seq)
+            if len(pieces) == 1:
+                print()
+            elif len(pieces) == 3:
+                print(('' if l == 0 else pieces[0][-l:]) + pieces[1].upper() + pieces[2][:r])
+            else:
+                raise ValueError('More than one marked region')
         else:
             char_per_line = 70 if args.char_per_line is None else args.char_per_line
             print('\n'.join([markSequence(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)]))
@@ -616,12 +643,17 @@ def printRNASequence(args, regions):
                 import re
                 # find marked regions
                 pieces = re.split('([a-z]+)', seq)
-                if len(pieces) != 3:
-                    raise ValueError('sequence command currently can only print one marked region')
-                print(('' if l == 0 else pieces[0][-l:]) + pieces[1].upper() + pieces[2][:r])
+                if len(pieces) == 1:
+                    print('No marked region')
+                elif len(pieces) == 3:
+                    print(('' if l == 0 else pieces[0][-l:]) + pieces[1].upper() + pieces[2][:r])
+                else:
+                    raise ValueError('More than one marked region')
             else:
                 char_per_line = 70 if args.char_per_line is None else args.char_per_line
                 print('\n'.join([markSequence(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)]))
+            if args.first_transcript:
+                break
 
 
 def printProteinSequence(args, regions):
@@ -680,6 +712,8 @@ def printProteinSequence(args, regions):
             else:
                 char_per_line = 70 if args.char_per_line is None else args.char_per_line
                 print('\n'.join([markSequence(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)]))
+            if args.first_transcript:
+                break
 
 
 

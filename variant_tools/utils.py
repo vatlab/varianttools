@@ -1375,11 +1375,12 @@ class GenomicRegions(object):
     chr:start-end,start1-end1, annoDB.field:value1,value2, and their
     union (|), intersection (&), difference(-), and symmetric_difference (^)
     '''
-    def __init__(self, regions):
+    def __init__(self, regions, zeroBased=False):
         self.raw_regions = regions
         if not self.raw_regions:
             raise ValueError('Empty region is specified.')
         self.proj = None
+        self.zeroBased = zeroBased
 
     def chr_pos_region(self, region):
         # first seprate by ,
@@ -1387,6 +1388,9 @@ class GenomicRegions(object):
         start, end = location.split('-')
         start = int(start.replace(',', ''))
         end = int(end.replace(',', ''))
+        if self.zeroBased:
+            start += 1
+            end += 1
         if start == 0 or end == 0:
             raise ValueError('0 is not allowed as starting or ending position')
         # start might be after end
@@ -1558,8 +1562,8 @@ class GenomicRegions(object):
         #    ','.join(['{}:{}-{}'.format(x[0], x[1], x[2]) for x in regions])))
         return regions
 
-def expandRegions(regions, proj=None, mergeRegions=True):
-    return GenomicRegions(regions).expand(proj, mergeRegions)
+def expandRegions(regions, proj=None, mergeRegions=True, zeroBased=False):
+    return GenomicRegions(regions, zeroBased).expand(proj, mergeRegions)
     
     
 class ShelfDB:
