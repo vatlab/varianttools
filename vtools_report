@@ -399,6 +399,11 @@ def sequenceArguments(parser):
         help='''If set, also try to mark the reverse sequence of the specified sequence.
             If both mark_complemnt and mark_reverse are set, four different sequences
             will be searched.''')
+    parser.add_argument('--marked_region', nargs='*', default=None, type=int,
+        help='''If set to a number or pair of number, print only n bp to the left and 
+            m (m=n if only one number is specified) of the marked region. The sequence
+            itself is no longer marked. This option is not yet supported in all
+            combinations of options. ''')
     parser.add_argument('--hide_unmatched', default=False, action='store_true',
         help='''If set, only display regions with marked variants or sequences''')
 
@@ -510,7 +515,7 @@ def printDNASequence(args, regions):
         # break into pieces of 70 bp
         if args.numbered:
             char_per_line = 60 if args.char_per_line is None else args.char_per_line
-            block_per_line = char_per_line / 10
+            block_per_line = char_per_line // 10
             if block_per_line * 10 != char_per_line:
                 raise ValueError('char_per_line should be a multiple of 10 in numbered format')
             if args.numbered == 'left':
@@ -521,7 +526,7 @@ def printDNASequence(args, regions):
                     for i in range(0, len(seq), char_per_line)]))
             else:
                 fmt = ' {{:>{0}}}'.format(len(str(end)))
-                last_line = len(seq) / char_per_line * char_per_line
+                last_line = len(seq) // char_per_line * char_per_line
                 residue = last_line + char_per_line - len(seq)
                 print('\n'.join([
                     ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) + 
@@ -544,7 +549,8 @@ def printRNASequence(args, regions):
             strand = structure['strand']
             coding = structure['coding']
             if not coding:
-                print('>mRNA|{}|Non-coding'.format(gene))
+                if args.verbosity is None or int(args.verbosity) > 0:
+                    print('>mRNA|{}|Non-coding'.format(gene))
                 continue
             else:
                 chr = coding[0][0]
@@ -562,24 +568,25 @@ def printRNASequence(args, regions):
                     comprev = ''.join([complement_table[x] for x in args.mark_sequence][::-1])
                     seq = seq.replace(comprev.upper().replace('T', 'U'), comprev.lower().replace('t', 'u'))
             unmatch = not any([x.islower() for x in seq])
-            if strand == '+':
-                print('>mRNA|{}|{}:{} ({} bp) {}'.format(gene,
-                    chr if chr.startswith('chr') else 'chr' + chr,
-                    ','.join(['{}-{}'.format(x,y) for ch,x,y in coding]),
-                    sum([y-x+1 for ch,x,y in coding]),
-                    'unmatch' if unmatch and args.hide_unmatched else ''))
-            else:
-                print('>mRNA|{}|{}:{} ({} bp on reverse strand) {}'.format(gene,
-                    chr if chr.startswith('chr') else 'chr' + chr,
-                    ','.join(['{}-{}'.format(y,x) for ch,x,y in coding[::-1]]),
-                    sum([y-x+1 for ch,x,y in coding]),
-                    'unmatch' if unmatch and args.hide_unmatched else ''))
+            if args.verbosity is None or int(args.verbosity) > 0:
+                if strand == '+':
+                    print('>mRNA|{}|{}:{} ({} bp) {}'.format(gene,
+                        chr if chr.startswith('chr') else 'chr' + chr,
+                        ','.join(['{}-{}'.format(x,y) for ch,x,y in coding]),
+                        sum([y-x+1 for ch,x,y in coding]),
+                        'unmatch' if unmatch and args.hide_unmatched else ''))
+                else:
+                    print('>mRNA|{}|{}:{} ({} bp on reverse strand) {}'.format(gene,
+                        chr if chr.startswith('chr') else 'chr' + chr,
+                        ','.join(['{}-{}'.format(y,x) for ch,x,y in coding[::-1]]),
+                        sum([y-x+1 for ch,x,y in coding]),
+                        'unmatch' if unmatch and args.hide_unmatched else ''))
             if unmatch and args.hide_unmatched:
                 continue
             # break into pieces of 70 bp
             if args.numbered:
                 char_per_line = 60 if args.char_per_line is None else args.char_per_line
-                block_per_line = char_per_line / 10
+                block_per_line = char_per_line // 10
                 if block_per_line * 10 != char_per_line:
                     raise ValueError('char_per_line should be a multiple of 10 in numbered format')
                 if args.numbered == 'left':
@@ -589,13 +596,29 @@ def printRNASequence(args, regions):
                         for i in range(0, len(seq), char_per_line)]))
                 else:
                     fmt = ' {{:>{0}}}'.format(len(str(len(seq))))
-                    last_line = len(seq) / char_per_line * char_per_line
+                    last_line = len(seq) // char_per_line * char_per_line
                     residue = last_line + char_per_line - len(seq)
                     print('\n'.join([
                         ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) + 
                         ((' ' * residue + fmt.format(len(seq))) if i == last_line \
                             else fmt.format(i + char_per_line)) \
                         for i in range(0, len(seq), char_per_line)]))
+            elif args.marked_region is not None:
+                # find marked regions
+                if len(args.marked_region) == 0:
+                    l = r = 0
+                elif len(args.marked_region) == 1:
+                    l = r = int(args.marked_region[0])
+                elif len(args.marked_region) == 2:
+                    l, r = map(int, args.marked_region)
+                else:
+                    raise ValueError('Value of option marked_region should be an integer or a pair of integers')
+                import re
+                # find marked regions
+                pieces = re.split('([a-z]+)', seq)
+                if len(pieces) != 3:
+                    raise ValueError('sequence command currently can only print one marked region')
+                print(('' if l == 0 else pieces[0][-l:]) + pieces[1].upper() + pieces[2][:r])
             else:
                 char_per_line = 70 if args.char_per_line is None else args.char_per_line
                 print('\n'.join([markSequence(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)]))
@@ -637,7 +660,7 @@ def printProteinSequence(args, regions):
             # break into pieces of 70 bp
             if args.numbered:
                 char_per_line = 60 if args.char_per_line is None else args.char_per_line
-                block_per_line = char_per_line / 10
+                block_per_line = char_per_line // 10
                 if block_per_line * 10 != char_per_line:
                     raise ValueError('char_per_line should be a multiple of 10 in numbered format')
                 if args.numbered == 'left':
@@ -647,7 +670,7 @@ def printProteinSequence(args, regions):
                         for i in range(0, len(seq), char_per_line)]))
                 else:
                     fmt = ' {{:>{0}}}'.format(len(str(len(seq))))
-                    last_line = len(seq) / char_per_line * char_per_line
+                    last_line = len(seq) // char_per_line * char_per_line
                     residue = last_line + char_per_line - len(seq)
                     print('\n'.join([
                         ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) + 

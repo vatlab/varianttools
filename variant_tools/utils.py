@@ -4037,6 +4037,8 @@ def getRNASequence(structure, mutants=[]):
                         env.logger.warning('Reference alleles mismatch (chr {}, pos {}, ref {}, mutant ref {})'
                             .format(m[0], m[1], seq[idx], m[2]))
                     seq = seq[:idx] + m[3].lower() + seq[idx+1:]
+                else:
+                    seq = seq[:idx] + seq[idx].lower() + seq[idx+1:]
             #else:
             #    env.logger.debug('Failed to mark mutant {}'.format(loc))
     #
