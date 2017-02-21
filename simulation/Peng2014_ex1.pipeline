@@ -52,7 +52,7 @@ comment=Check the version of variant tools. Version 2.3.1 or higher is required
 	for the execution of this simulation.
 
 [*_1]
-action=ImportModules('simuPOP.demography')
+action=ImportModules(['variant_tools.simulation', 'simuPOP.demography'])
 comment=Import required modules.
 
 [ms_5]
@@ -118,9 +118,9 @@ action=EvolvePopulation(
 	mutator=RefGenomeMutator(regions='%(regions)s', model='JC69', rate=[1.8e-8 * %(scale)s * 4. / 3.]),
 	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
 	demoModel=MultiStageModel([
-        InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
-			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
-        ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
+        InstantChangeModel(T=81000 // %(scale)s, N0=8100 // %(scale)s,
+			G=[70000 // %(scale)s, 71000 // %(scale)s], NG=[7900 // %(scale)s, 8100 // %(scale)s]),
+        ExponentialGrowthModel(T=370 // %(scale)s, NT=900000 // %(scale)s)
      ]))
 comment=Evolve and expand the population using a JC69 mutation model
 	and a demographic model that evolves a population of size 8100 for
@@ -164,9 +164,9 @@ action=EvolvePopulation(
 		s_stoploss=0.02 * %(scale)s, s_stopgain=0.1 * %(scale)s),
 	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
 	demoModel = MultiStageModel([
-        InstantChangeModel(T=81000 / %(scale)s, N0=8100 / %(scale)s,
-			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
-        ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
+        InstantChangeModel(T=81000 // %(scale)s, N0=8100 // %(scale)s,
+			G=[70000 // %(scale)s, 71000 // %(scale)s], NG=[7900 // %(scale)s, 8100 // %(scale)s]),
+        ExponentialGrowthModel(T=370 // %(scale)s, NT=900000 // %(scale)s)
      ]))
 comment=Evolve and expand the population using a JC69 mutation model
 	and a demographic model that evolves a population of size 8100 for
@@ -185,7 +185,7 @@ comment=Remove intermediate populations to save diskspace.
 
 [resample_10]
 input_emitter=EmitInput(select=${:not glob.glob('*.proj')})
-action=RunCommand('vtools init Peng2014_ex1')
+action=RunCommand('vtools init Peng2014_ex1 --build hg19 -f')
 comment=Create a new project if there is no existing project under the current
 	directory.
 
@@ -196,9 +196,8 @@ comment=Link the refGene database to the project. This database is required
 
 
 [resample_25]
-#sourceURL='ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20100804/ALL.2of4intersection.20100804.genotypes.vcf.gz',
 action=ExtractVCF(
-	sourceURL=['ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/ALL.chr{}.phase3_shapeit2_mvncall_integrated_v2.20130502.genotypes.vcf.gz'.format(x) for x in range(1, 23)],
+	sourceURL=['ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/ALL.chr{}.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz'.format(x) for x in range(1, 23)],
 	regions='%(regions)s',
 	output='%(extracted_vcf)s')
 input_emitter=EmitInput(select=${:not os.path.isfile('%(extracted_vcf)s')})
@@ -223,8 +222,8 @@ action=EvolvePopulation(
 	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
 		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
 	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
-	demoModel=ExponentialGrowthModel(T=10 / %(scale)s,
-		NT=10000 / %(scale)s)
+	demoModel=ExponentialGrowthModel(T=10 // %(scale)s,
+		NT=10000 // %(scale)s)
     )
 comment=Expand the population exponentially to reach a large population
 	in 10 generations. Mutations and recombinations are allowed and

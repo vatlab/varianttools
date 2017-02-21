@@ -752,12 +752,6 @@ class PipelineAction:
 # for backward compatibility
 SkiptableAction=PipelineAction
 
-try:
-    from simulation import *
-    hasSimuPOP = True
-except ImportError as e:
-    hasSimuPOP = False
-
 class SequentialActions(PipelineAction):
     '''Define an action that calls a list of actions, specified by Action1,
     Action2 etc. This allows the specification of multiple small tasks in
@@ -3422,8 +3416,6 @@ def simulate_replicate(args, rep):
         sys.exit(1)
 
 def simulate(args):
-    if not hasSimuPOP:
-        raise RuntimeError('Please install simuPOP before running any simulation using Variant Simulation Tools.')
     #
     try:
         ret = 0
