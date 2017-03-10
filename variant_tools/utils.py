@@ -4011,7 +4011,7 @@ def dissectGene(gene, proj):
         'coding': coding, 'upstream': upstream, 'downstream': downstream,
         'build': proj.build}
 
-def getRNASequence(structure, mutants=[]):
+def getRNASequence(structure, mutants=[], TtoU=True):
     '''Get protein sequence, mark locations of mutants if a list of variants
     are given (as a list of (chr, pos, ref, alt))'''
     ref = RefGenome(structure['build'])
@@ -4051,7 +4051,7 @@ def getRNASequence(structure, mutants=[]):
     if structure['strand'] == '-':
         # if len(seq) == 9, range(0, 9, 3) ==> 0, 3, 6
         seq = [complement_table[x] for x in reversed(seq)]
-    TtoU = {
+    TtoU_map = {
         'a': 'a',
         'A': 'A',
         'c': 'c',
@@ -4061,7 +4061,10 @@ def getRNASequence(structure, mutants=[]):
         't': 'u',
         'T': 'U'
     }
-    return ''.join([TtoU[x] for x in seq])
+    if TtoU:
+        return ''.join([TtoU_map[x] for x in seq])
+    else:
+        return ''.join(seq)
 
 
 def getProteinSequence(structure, mutants=[]):

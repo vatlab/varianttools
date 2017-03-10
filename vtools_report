@@ -450,6 +450,8 @@ def sequenceArguments(parser):
             discard introns, and complement if on reverse strand). The complete mRNA sequence
             will be printed regardless of the bounaries of specified regions. If one or more
             names (refGene.name) are specified, only specified genes will be translated.''')
+    parser.add_argument('--TtoU', action='store_true',
+        help='''Print U for T for RNA sequence. Otherwise use T.''')
     parser.add_argument('--translate', nargs='*', metavar='GENE',
         help='''Translate DNA sequence into protein sequence. variant tools will look
             in the refGene database, find all genes that overlap with the region, locate
@@ -470,6 +472,8 @@ def sequenceArguments(parser):
             will be searched.''')
     parser.add_argument('--first-transcript', action='store_true',
         help='''If set, only display the first transcript of RNA or Protein sequence''')
+    parser.add_argument('--show-transcript', action='store_true',
+        help='''Put transcript name before transcript''')
     parser.add_argument('--marked-region', nargs='*', default=None, type=int,
         help='''If set to a number or pair of number, print only n bp to the left and 
             m (m=n if only one number is specified) of the marked region. The sequence
@@ -650,7 +654,7 @@ def printRNASequence(args, regions):
                 continue
             else:
                 chr = coding[0][0]
-            seq = getRNASequence(structure, mutants=args.mark)
+            seq = getRNASequence(structure, mutants=args.mark, TtoU=args.TtoU)
             if args.mark_sequence:
                 seq = seq.replace(args.mark_sequence.upper().replace('T', 'U'),
                     args.mark_sequence.lower().replace('t', 'u'))
@@ -713,9 +717,10 @@ def printRNASequence(args, regions):
                 # find marked regions
                 pieces = re.split('([a-z]+)', seq)
                 if len(pieces) == 1:
-                    print('No marked region')
+                    if args.show_transcript:
+                        print('No marked region')
                 elif len(pieces) == 3:
-                    print(('' if l == 0 else pieces[0][-l:]) + pieces[1].upper() + pieces[2][:r])
+                    print((gene.ljust(15) if args.show_transcript else '') + ('' if l == 0 else pieces[0][-l:]) + pieces[1].upper() + pieces[2][:r])
                 else:
                     raise ValueError('More than one marked region')
             else:
