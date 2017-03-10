@@ -353,6 +353,75 @@ def discordanceRate(args):
             print('\t'.join(output_items))
 
 #
+# command transcript
+#
+
+def transcriptArguments(parser):
+    parser.add_argument('regions', nargs='+', help=''''One or more chromosome regions in
+        the format of chr:start-end (e.g. chr21:33,031,597-33,041,570), Field:Value
+        from a region-based annotation database (e.g. refGene.name2:TRIM2 or
+        refGene_exon.name:NM_000947), or set options of several regions (&, |, -, 
+        and ^ for intersection, union, difference, and symmetric difference).''')
+    parser.add_argument('--build', nargs='?', 
+        help='''Output sequence at specified build of reference genome. The primary
+            reference genome of the project will be used if by default.''')
+    parser.add_argument('--strand-only', action='store_true', 
+        help='''Only output strand of genes that covers the region.''')
+    parser.add_argument('--first-transcript', action='store_true',
+        help='''If set, only display the first transcript of RNA or Protein sequence''')
+    parser.add_argument('--zero-based', default=False, action='store_true',
+        help='''If set, user input is zero based and will be translated to 1-based
+            coordinates before query. The output is always 1-based''')
+
+
+def transcript(args):
+    #
+    with Project(verbosity=0) as proj:
+        if args.build is None:
+            args.build = proj.build
+        #
+        regions = expandRegions(';'.join(args.regions), proj, mergeRegions=False,
+            zeroBased=args.zero_based)
+        # if a region is specified
+        printRNAInfo(args, regions)
+
+
+def printRNAInfo(args, regions):
+    # get chromosomal region
+    with Project(verbosity=0) as proj:
+        genes = genesInRegions(regions, proj)
+        for gene in genes:
+            structure = dissectGene(gene, proj)
+            strand = structure['strand']
+            if args.strand_only:
+                if args.verbosity == '0':
+                    print(strand)
+                else:
+                    print('{}\t{}'.format(gene, strand))
+            else:
+                coding = structure['coding']
+                if not coding:
+                    if args.verbosity is None or int(args.verbosity) > 0:
+                        print('>mRNA|{}|Non-coding'.format(gene))
+                    continue
+                else:
+                    chr = coding[0][0]
+                if args.verbosity is None or int(args.verbosity) > 0:
+                    if strand == '+':
+                        print('>mRNA|{}|{}:{} ({} bp)'.format(gene,
+                            chr if chr.startswith('chr') else 'chr' + chr,
+                            ','.join(['{}-{}'.format(x,y) for ch,x,y in coding]),
+                            sum([y-x+1 for ch,x,y in coding])))
+                    else:
+                        print('>mRNA|{}|{}:{} ({} bp on reverse strand)'.format(gene,
+                            chr if chr.startswith('chr') else 'chr' + chr,
+                            ','.join(['{}-{}'.format(y,x) for ch,x,y in coding[::-1]]),
+                            sum([y-x+1 for ch,x,y in coding])))
+            if args.first_transcript:
+                break
+
+
+#
 # command sequence
 #
 def sequenceArguments(parser):
@@ -1312,6 +1381,13 @@ if __name__ == '__main__':
     inbreedingCoefArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=inbreedingCoef)
+    #
+    # command transcript
+    parser = subparsers.add_parser('transcript',
+        help = '''Obtain tramscripts that covers specified region''')
+    transcriptArguments(parser)
+    addCommonArgs(parser)
+    parser.set_defaults(func=transcript)
     #
     # command sequence
     parser = subparsers.add_parser('sequence',
