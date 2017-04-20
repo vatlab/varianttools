@@ -36,10 +36,7 @@ from .phenotype import Sample
 from .tester import *
 from .rtester import RTest, SKAT
 
-if sys.version_info.major == 2:
-    from vt_sqlite3_py2 import OperationalError
-else:
-    from variant_tools.vt_sqlite3_py3 import OperationalError
+from variant_tools.vt_sqlite3 import OperationalError
 import argparse
 
 def associateArguments(parser):
