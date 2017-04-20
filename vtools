@@ -241,14 +241,8 @@ if __name__ == '__main__':
     #
     # command execute
     parser = subparsers.add_parser('execute',
-        help='Execute a pipeline or a SQL query',
-        description='''Execute a pipeline that uses external commands to
-            process input files, usually to align raw reads to a reference
-            genome and call variants from aligned reads. The pipelines are
-            controlled by pipeline description files. This command can also be
-            used to execute arbitrary SQL query against the project database.
-            Additional parameters will be passed to pipelines as pipeline 
-            parameters. ''')
+        help='Execute a SQL query',
+        description='''Execute arbitrary SQL query against the project database.''')
     pipeline.executeArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=pipeline.execute)
