@@ -144,20 +144,12 @@ except:
     bz2_support = False
 
 try:
-    if sys.version_info.major == 2:
-        from cStringIO import StringIO
-        import urlparse
-        import cPickle as pickle
-        import vt_sqlite3_py2 as sqlite3
-        from cgatools_py2 import CrrFile, Location, Range
-        from vt_sqlite3_py2 import OperationalError
-    else:
-        import pickle
-        from io import StringIO
-        import urllib.parse as urlparse
-        import variant_tools.vt_sqlite3_py3 as sqlite3
-        from variant_tools.cgatools_py3 import CrrFile, Location, Range
-        from variant_tools.vt_sqlite3_py3 import OperationalError
+    import pickle
+    from io import StringIO
+    import urllib.parse as urlparse
+    import variant_tools.vt_sqlite3 as sqlite3
+    from variant_tools.cgatools import CrrFile, Location, Range
+    from variant_tools.vt_sqlite3 import OperationalError
 except ImportError as e:
     sys.exit('Failed to import module ({})\n'
         'Please verify if you have installed variant tools successfully (using command '

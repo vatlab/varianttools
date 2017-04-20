@@ -43,16 +43,10 @@ import urllib
 import inspect
 import pydoc
 
-if sys.version_info.major == 2:
-    from ucsctools_py2 import showTrack
-    from cgatools_py2 import fasta2crr
-    from ConfigParser import SafeConfigParser, RawConfigParser
-    from StringIO import StringIO
-else:
-    from ucsctools_py3 import showTrack
-    from cgatools_py3 import fasta2crr
-    from configparser import ConfigParser, RawConfigParser
-    from io import StringIO
+from ucsctools import showTrack
+from cgatools import fasta2crr
+from configparser import ConfigParser, RawConfigParser
+from io import StringIO
 
 from multiprocessing import Process
 from subprocess import Popen, PIPE
@@ -68,10 +62,7 @@ from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
 
 
 try:
-    if sys.version_info.major == 2:
-        from cgatools_py2 import normalize_variant
-    else:
-        from variant_tools.cgatools_py3 import normalize_variant
+    from cgatools import normalize_variant
 except ImportError as e:
     sys.exit('Failed to import module ({})\n'
         'Please verify if you have installed variant tools successfully (using command '

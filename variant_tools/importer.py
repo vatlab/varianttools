@@ -45,10 +45,7 @@ from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
 
 
 try:
-    if sys.version_info.major == 2:
-        from cgatools_py2 import normalize_variant
-    else:
-        from variant_tools.cgatools_py3 import normalize_variant
+    from variant_tools.cgatools import normalize_variant
 except ImportError as e:
     sys.exit('Failed to import module ({})\n'
         'Please verify if you have installed variant tools successfully (using command '

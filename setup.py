@@ -93,24 +93,19 @@ with open('variant_tools/__init__.py') as init:
 
 EMBEDDED_BOOST = os.path.isdir('boost_1_49_0')
 SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511', '-w-509',
-    '-outdir', 'variant_tools']
+    '-outdir', 'variant_tools', '-py3']
 
-if sys.version_info.major == 2:
-    PYVERSION = 'py2'
-else:
-    PYVERSION = 'py3'
-
-SQLITE_FOLDER = 'sqlite/{}'
-ASSO_WRAPPER_CPP_FILE = 'variant_tools/assoTests_wrap_{}.cpp'
-ASSO_WRAPPER_PY_FILE = 'variant_tools/assoTests_{}.py'
+SQLITE_FOLDER = 'sqlite/py3'
+ASSO_WRAPPER_CPP_FILE = 'variant_tools/assoTests_wrap.cpp'
+ASSO_WRAPPER_PY_FILE = 'variant_tools/assoTests.py'
 ASSO_INTERFACE_FILE = 'variant_tools/assoTests.i'
-CGATOOLS_WRAPPER_CPP_FILE = 'variant_tools/cgatools_wrap_{}.cpp'
-CGATOOLS_WRAPPER_PY_FILE = 'variant_tools/cgatools_{}.py'
+CGATOOLS_WRAPPER_CPP_FILE = 'variant_tools/cgatools_wrap.cpp'
+CGATOOLS_WRAPPER_PY_FILE = 'variant_tools/cgatools.py'
 CGATOOLS_INTERFACE_FILE = 'variant_tools/cgatools.i'
-UCSCTOOLS_WRAPPER_CPP_FILE = 'variant_tools/ucsctools_wrap_{}.cpp'
-UCSCTOOLS_WRAPPER_PY_FILE = 'variant_tools/ucsctools_{}.py'
+UCSCTOOLS_WRAPPER_CPP_FILE = 'variant_tools/ucsctools_wrap.cpp'
+UCSCTOOLS_WRAPPER_PY_FILE = 'variant_tools/ucsctools.py'
 UCSCTOOLS_INTERFACE_FILE = 'variant_tools/ucsctools.i'
-SQLITE_PY_FILE = 'variant_tools/vt_sqlite3_{}.py'
+SQLITE_PY_FILE = 'variant_tools/vt_sqlite3.py'
 
 
 ASSOC_HEADER = [
@@ -129,7 +124,7 @@ ASSOC_FILES = [
     'variant_tools/lm.cpp'
 ]
 
-SQLITE_FILES = [os.path.join(SQLITE_FOLDER.format(PYVERSION), x) for x in [
+SQLITE_FILES = [os.path.join(SQLITE_FOLDER, x) for x in [
         'cache.c',
         'connection.c',
         'cursor.c',
@@ -582,34 +577,31 @@ if not os.path.isfile('variant_tools/swigpyrun.h'):
 # generate wrapper files for both versions of python. This will make sure sdist gets
 # all files needed for the source package
 #
-for PYVER, PYVEROPT in zip(['py2', 'py3'], ['', '-py3']):
-    # we re-generate wrapper files for all versions of python only for
-    # source distribution
-    if (not SDIST) and (not PYVER.endswith(str(sys.version_info.major))):
-        continue
-    if (not os.path.isfile(ASSO_WRAPPER_PY_FILE.format(PYVER)) or not os.path.isfile(ASSO_WRAPPER_CPP_FILE.format(PYVER)) \
-      or os.path.getmtime(ASSO_WRAPPER_CPP_FILE.format(PYVER)) < max([os.path.getmtime(x) for x in ASSOC_HEADER + ASSOC_FILES])):
-        print('Generating {}'.format(ASSO_WRAPPER_CPP_FILE.format(PYVER)))
-        ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', ASSO_WRAPPER_CPP_FILE.format(PYVER), ASSO_INTERFACE_FILE]), shell=True)
-        if ret != 0:
-            sys.exit('Failed to generate wrapper file for association module.')
-        os.rename('variant_tools/assoTests.py', ASSO_WRAPPER_PY_FILE.format(PYVER))
-    #
-    if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE.format(PYVER))) or (not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER))) \
-      or os.path.getmtime(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER)) < os.path.getmtime(CGATOOLS_INTERFACE_FILE):
-        print('Generating {}'.format(CGATOOLS_WRAPPER_CPP_FILE.format(PYVER)))
-        ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', CGATOOLS_WRAPPER_CPP_FILE.format(PYVER), CGATOOLS_INTERFACE_FILE]), shell=True)
-        if ret != 0:
-            sys.exit('Failed to generate wrapper file for cgatools.')
-        os.rename('variant_tools/cgatools.py', CGATOOLS_WRAPPER_PY_FILE.format(PYVER))
-    #
-    if (not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER))) or (not os.path.isfile(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER))) \
-      or os.path.getmtime(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER)) < os.path.getmtime(UCSCTOOLS_INTERFACE_FILE):
-        print('Generating {}'.format(UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER)))
-        ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + [PYVEROPT, '-o', UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVER), UCSCTOOLS_INTERFACE_FILE]), shell=True)
-        if ret != 0:
-            sys.exit('Failed to generate wrapper file for ucsctools.')
-        os.rename('variant_tools/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE.format(PYVER))
+# we re-generate wrapper files for all versions of python only for
+# source distribution
+if (not os.path.isfile(ASSO_WRAPPER_PY_FILE) or not os.path.isfile(ASSO_WRAPPER_CPP_FILE) \
+  or os.path.getmtime(ASSO_WRAPPER_CPP_FILE) < max([os.path.getmtime(x) for x in ASSOC_HEADER + ASSOC_FILES])):
+    print('Generating {}'.format(ASSO_WRAPPER_CPP_FILE))
+    ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', ASSO_WRAPPER_CPP_FILE, ASSO_INTERFACE_FILE]), shell=True)
+    if ret != 0:
+        sys.exit('Failed to generate wrapper file for association module.')
+    os.rename('variant_tools/assoTests.py', ASSO_WRAPPER_PY_FILE)
+#
+if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE)) or (not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE)) \
+  or os.path.getmtime(CGATOOLS_WRAPPER_CPP_FILE) < os.path.getmtime(CGATOOLS_INTERFACE_FILE):
+    print('Generating {}'.format(CGATOOLS_WRAPPER_CPP_FILE))
+    ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', CGATOOLS_WRAPPER_CPP_FILE, CGATOOLS_INTERFACE_FILE]), shell=True)
+    if ret != 0:
+        sys.exit('Failed to generate wrapper file for cgatools.')
+    os.rename('variant_tools/cgatools.py', CGATOOLS_WRAPPER_PY_FILE)
+#
+if (not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE)) or (not os.path.isfile(UCSCTOOLS_WRAPPER_CPP_FILE)) \
+  or os.path.getmtime(UCSCTOOLS_WRAPPER_CPP_FILE) < os.path.getmtime(UCSCTOOLS_INTERFACE_FILE):
+    print('Generating {}'.format(UCSCTOOLS_WRAPPER_CPP_FILE))
+    ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', UCSCTOOLS_WRAPPER_CPP_FILE, UCSCTOOLS_INTERFACE_FILE]), shell=True)
+    if ret != 0:
+        sys.exit('Failed to generate wrapper file for ucsctools.')
+    os.rename('variant_tools/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE)
          
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.
 if sys.platform in 'linux2':
@@ -700,8 +692,8 @@ setup(name = "variant_tools",
         # __init__ is automatically installed
         'variant_tools.annotation',
         'variant_tools.association',
-        'variant_tools.assoTests_' + PYVERSION,
-        'variant_tools.cgatools_' + PYVERSION,
+        'variant_tools.assoTests',
+        'variant_tools.cgatools',
         'variant_tools.compare',
         'variant_tools.exporter',
         'variant_tools.importer',
@@ -717,11 +709,11 @@ setup(name = "variant_tools",
         'variant_tools.simulation',
         'variant_tools.site_options',
         'variant_tools.tester',
-        'variant_tools.ucsctools_' + PYVERSION,
+        'variant_tools.ucsctools',
         'variant_tools.update',
         'variant_tools.utils',
         'variant_tools.variant',
-        'variant_tools.vt_sqlite3_' + PYVERSION,
+        'variant_tools.vt_sqlite3',
         ],
     ext_modules = [
         Extension('variant_tools._vt_sqlite3',
@@ -729,12 +721,12 @@ setup(name = "variant_tools",
             extra_compile_args=['-w'],
             sources = SQLITE_FILES,
             define_macros = [('MODULE_NAME', '"vt_sqlite3"')],
-            include_dirs = ['sqlite', SQLITE_FOLDER.format(PYVERSION)],
+            include_dirs = ['sqlite', SQLITE_FOLDER],
         ),
         Extension('variant_tools._ucsctools',
             # stop warning message ucsctools because it is written by us.
             extra_compile_args=['-w'],
-            sources = [UCSCTOOLS_WRAPPER_CPP_FILE.format(PYVERSION)],
+            sources = [UCSCTOOLS_WRAPPER_CPP_FILE],
             include_dirs = ['.', 'ucsc/inc', 'ucsc/tabix', 'ucsc/samtools'],
             library_dirs = ["build"],
             define_macros =  [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
@@ -764,8 +756,8 @@ setup(name = "variant_tools",
                 ('BGZF_CACHE', None)],
         ),
         Extension('variant_tools._cgatools',
-            sources = [CGATOOLS_WRAPPER_CPP_FILE.format(PYVERSION)],
-            libraries = ['z', 'bz2', 'cgatools'] + \
+            sources = [CGATOOLS_WRAPPER_CPP_FILE],
+            libraries = ['cgatools', 'z', 'bz2'] + \
                 (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
             define_macros = [('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
@@ -775,7 +767,7 @@ setup(name = "variant_tools",
             library_dirs = ["build"],
         ),
         Extension('variant_tools._assoTests',
-            sources = [ASSO_WRAPPER_CPP_FILE.format(PYVERSION)] + ASSOC_FILES,
+            sources = [ASSO_WRAPPER_CPP_FILE] + ASSOC_FILES,
             extra_compile_args = gccargs,
             libraries = libs + ['gsl', 'stat'],
             library_dirs = ["build"],

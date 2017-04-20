@@ -48,10 +48,7 @@ from collections import defaultdict
 from .pipeline import PipelineAction
 from .project import Project
 
-if sys.version_info.major == 2:
-    from ucsctools_py2 import tabixFetch
-else:
-    from ucsctools_py3 import tabixFetch
+from ucsctools import tabixFetch
 
 
 def FineScaleRecombinator(regions=None, scale=1, defaultRate=1e-8, output=None):
