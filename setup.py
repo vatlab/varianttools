@@ -731,7 +731,7 @@ setup(name = "variant_tools",
             library_dirs = ["build"],
             define_macros =  [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
                 ('_USE_KNETFILE', None), ('BGZF_CACHE', None)],
-            libraries = ['z', 'bz2', 'ucsc'],
+            libraries = ['ucsc', 'z', 'bz2'],
         ),
         Extension('variant_tools.cplinkio',
             # stop warning message ucsctools because it is written by us.
@@ -745,8 +745,9 @@ setup(name = "variant_tools",
             include_dirs = [".", 'ucsc/inc', 'ucsc/tabix', 'ucsc/samtools',
                 'sqlite', "variant_tools", "gsl", "cgatools", "boost_1_49_0"],
             library_dirs = ["build"],
-            libraries = ['z', 'bz2', 'sqlite_gsl', 'stat', 'ucsc', 'cgatools'] + \
-                (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
+            libraries = ['sqlite_gsl', 'stat', 'ucsc', 'cgatools'] + \
+                (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem'] + \
+                ['z', 'bz2']),
             extra_compile_args = gccargs,
             define_macros = [
                 ('MODULE_NAME', '"vt_sqlite3"'),
