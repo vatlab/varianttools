@@ -757,8 +757,9 @@ setup(name = "variant_tools",
         ),
         Extension('variant_tools._cgatools',
             sources = [CGATOOLS_WRAPPER_CPP_FILE],
-            libraries = ['cgatools', 'z', 'bz2'] + \
-                (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']),
+            libraries = ['cgatools'] + \
+                (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']) + \
+                ['z', 'bz2'],
             define_macros = [('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
             extra_compile_args = gccargs,
