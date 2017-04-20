@@ -12,7 +12,7 @@ before_install:
 install: "python setup.py install"
 before_script: cd test
 script:
-    - ./run_tests 
+    - python run_tests.py
 notifications:
     email:
         recipients:
