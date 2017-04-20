@@ -29,10 +29,7 @@ import zipfile
 import platform
 import argparse
 import stat
-if sys.version_info.major == 2:
-    import assoTests_py2 as t
-else:
-    import assoTests_py3 as t
+import assoTests as t
 from .project import Field
 from .utils import env, downloadFile, hasCommand, runCommand
 
