@@ -17,6 +17,6 @@ notifications:
     email:
         recipients:
             - ben.bob@gmail.com
-            - JMa7@mdanderson.org
+            - junmahouston@gmail.com
         on_success: never
         on_failure: always
