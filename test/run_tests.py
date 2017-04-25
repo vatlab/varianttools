@@ -27,6 +27,7 @@
 import os
 import re
 import unittest
+import sys
 
 def importTests():
     tests = unittest.TestSuite()
