@@ -46,13 +46,14 @@ import signal
 import random
 import shutil
 import hashlib
-import ConfigParser
-from HTMLParser import HTMLParser
+import configparser
+from html.parser import HTMLParser
 import tarfile
 import binascii
 from collections import namedtuple
 from itertools import chain
-import site_options
+# import site_options
+from . import site_options
 
 default_user_options = [
     ('sqlite_pragma', '', '''

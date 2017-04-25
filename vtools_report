@@ -31,10 +31,11 @@ from variant_tools.utils import RefGenome, env, OS_ENV, PrettyPrinter, \
      convertDoubleQuote, withinPseudoAutoRegion, encodeTableName, expandRegions, \
      genesInRegions, dissectGene, getRNASequence, getProteinSequence
 from variant_tools.project import Project
-if sys.version_info.major == 2:
-    from variant_tools.assoTests_py2 import calculateInbreedingCoef
-else:
-    from variant_tools.assoTests_py3 import calculateInbreedingCoef
+# if sys.version_info.major == 2:
+#     from variant_tools.assoTests_py2 import calculateInbreedingCoef
+# else:
+#     from variant_tools.assoTests_py3 import calculateInbreedingCoef
+from variant_tools.assoTests import calculateInbreedingCoef
 from variant_tools.plot import CTHEME, plotAssociation, rhist, rdot, rbox, \
      resolvePlotFilename
 
