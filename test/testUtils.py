@@ -116,9 +116,9 @@ class ProcessTestCase(unittest.TestCase):
         with open(self.test_command + '.log', 'a') as fcmd:
             fcmd.write(cmd + '\n')
         if ret == 'string':
-            return subprocess.check_output(cmd, stderr=subprocess.DEVNULL, shell=True, env=test_env).decode()
+            return subprocess.check_output(cmd, shell=True, env=test_env).decode()
         elif ret == 'list':
-            return subprocess.check_output(cmd, stderr=subprocess.DEVNULL, shell=True, env=test_env).decode().strip().split('\n')
+            return subprocess.check_output(cmd, shell=True, env=test_env).decode().strip().split('\n')
         else:
             raise ValueError('Unrecognized return type for command runCmd {}'.format(ret))
 
