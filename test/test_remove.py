@@ -95,13 +95,13 @@ class TestRemove(ProcessTestCase):
         self.assertSucc('vtools remove variants CEU')
         self.assertProj(hasTable='CEU', negate=True)
 
-    def testRemoveFields(self):
-        #add a field in the variant table
-        self.runCmd('vtools use testNSFP')
-        self.runCmd('vtools update variant --set gene_name=testNSFP.genename')
-        self.assertOutput('vtools show table variant', 'output/remove_field_before.txt', partial=-3)
-        self.runCmd('vtools remove fields CEU_cases_num gene_name DP') 
-        self.assertOutput('vtools show table variant', 'output/remove_field_after.txt', partial=-3)
+    # def testRemoveFields(self):
+    #     #add a field in the variant table
+    #     self.runCmd('vtools use testNSFP')
+    #     self.runCmd('vtools update variant --set gene_name=testNSFP.genename')
+    #     self.assertOutput('vtools show table variant', 'output/remove_field_before.txt', partial=-3)
+    #     self.runCmd('vtools remove fields CEU_cases_num gene_name DP') 
+    #     self.assertOutput('vtools show table variant', 'output/remove_field_after.txt', partial=-3)
 
     def testRemovePhenotype(self):
         #remove genotype 
