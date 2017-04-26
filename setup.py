@@ -746,8 +746,8 @@ setup(name = "variant_tools",
                 'sqlite', "variant_tools", "gsl", "cgatools", "boost_1_49_0"],
             library_dirs = ["build"],
             libraries = ['sqlite_gsl', 'stat', 'ucsc', 'cgatools'] + \
-                (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem'] + \
-                ['z', 'bz2']),
+                (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']) + \
+                ['z', 'bz2'],
             extra_compile_args = gccargs,
             define_macros = [
                 ('MODULE_NAME', '"vt_sqlite3"'),
