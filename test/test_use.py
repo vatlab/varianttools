@@ -32,16 +32,16 @@ from testUtils import ProcessTestCase
 
 class TestUse(ProcessTestCase):
 
-    # def testUse(self):
-    #     'Test command vtools use'
-    #     self.assertFail('vtools use')
-    #     self.assertSucc('vtools use -h')
-    #     self.assertFail('vtools use non_existing_file.ann')
-    #     self.assertSucc('vtools use ann/testNSFP.ann')
-    #     self.assertSucc('vtools use ann/testNSFP.ann --files ann/testNSFP.zip')
-    #     self.assertSucc('vtools use ann/testNSFP.ann --files ann/testNSFP.zip --rebuild')
-    #     self.assertFail('vtools use ann/testNSFP.ann --files ann/non_existing_file.zip')
-    #     self.assertSucc('vtools use ann/testNSFP.DB.gz')
+    def testUse(self):
+        'Test command vtools use'
+        self.assertFail('vtools use')
+        self.assertSucc('vtools use -h')
+        self.assertFail('vtools use non_existing_file.ann')
+        self.assertSucc('vtools use ann/testNSFP.ann')
+        self.assertSucc('vtools use ann/testNSFP.ann --files ann/testNSFP.zip')
+        self.assertSucc('vtools use ann/testNSFP.ann --files ann/testNSFP.zip --rebuild')
+        self.assertFail('vtools use ann/testNSFP.ann --files ann/non_existing_file.zip')
+        self.assertSucc('vtools use ann/testNSFP.DB.gz')
 
     # def testThousandGenomes(self):
     #     'Test variants in thousand genomes'
