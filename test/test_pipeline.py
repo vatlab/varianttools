@@ -46,29 +46,29 @@ class TestPipeline(ProcessTestCase):
         self.assertSucc('vtools execute test_pipeline.pipeline runcommand')
         self.assertFail('vtools execute test_pipeline.pipeline runcommand_fail')
 
-    def testCreatePopulation(self):
-        self.assertSucc('vtools execute test_pipeline.pipeline createpop')
+    # def testCreatePopulation(self):
+    #     self.assertSucc('vtools execute test_pipeline.pipeline createpop')
 
-    def testEvolvePopulation(self):
-        self.assertFail('vtools execute test_pipeline.pipeline evolvepop_fail')
-        self.assertSucc('vtools execute test_pipeline.pipeline evolvepop1')
-        self.assertSucc('vtools simulate test_pipeline.pipeline evolvepop1')
-        self.assertSucc('vtools simulate test_pipeline.pipeline evolvepop3')
-        self.assertSucc('vtools simulate test_pipeline.pipeline evolvepop4')
+    # def testEvolvePopulation(self):
+    #     self.assertFail('vtools execute test_pipeline.pipeline evolvepop_fail')
+    #     self.assertSucc('vtools execute test_pipeline.pipeline evolvepop1')
+    #     self.assertSucc('vtools simulate test_pipeline.pipeline evolvepop1')
+    #     self.assertSucc('vtools simulate test_pipeline.pipeline evolvepop3')
+    #     self.assertSucc('vtools simulate test_pipeline.pipeline evolvepop4')
 
-    def testDrawCaseCtrlSample(self):
-        self.assertSucc('vtools simulate test_pipeline.pipeline casectrl1')
-        self.assertTrue(os.path.isfile('cache/casectrl_sample_12345.pop'))
-        self.assertSucc('vtools simulate test_pipeline.pipeline casectrl2')
-        self.assertTrue(os.path.isfile('cache/casectrl_sample_12345_21.pop'))
-        self.assertTrue(os.path.isfile('cache/casectrl_sample_12345_22.pop'))
+    # def testDrawCaseCtrlSample(self):
+    #     self.assertSucc('vtools simulate test_pipeline.pipeline casectrl1')
+    #     self.assertTrue(os.path.isfile('cache/casectrl_sample_12345.pop'))
+    #     self.assertSucc('vtools simulate test_pipeline.pipeline casectrl2')
+    #     self.assertTrue(os.path.isfile('cache/casectrl_sample_12345_21.pop'))
+    #     self.assertTrue(os.path.isfile('cache/casectrl_sample_12345_22.pop'))
         
-    def testDrawRandomSample(self):
-        self.assertSucc('vtools simulate test_pipeline.pipeline random1')
-        self.assertTrue(os.path.isfile('cache/random_sample_12345.pop'))
-        self.assertSucc('vtools simulate test_pipeline.pipeline random2')
-        self.assertTrue(os.path.isfile('cache/random_sample_12345_21.pop'))
-        self.assertTrue(os.path.isfile('cache/random_sample_12345_22.pop'))
+    # def testDrawRandomSample(self):
+    #     self.assertSucc('vtools simulate test_pipeline.pipeline random1')
+    #     self.assertTrue(os.path.isfile('cache/random_sample_12345.pop'))
+    #     self.assertSucc('vtools simulate test_pipeline.pipeline random2')
+    #     self.assertTrue(os.path.isfile('cache/random_sample_12345_21.pop'))
+    #     self.assertTrue(os.path.isfile('cache/random_sample_12345_22.pop'))
 
 
 if __name__ == '__main__':
