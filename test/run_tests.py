@@ -42,7 +42,7 @@ def importTests():
 
 if __name__ == '__main__':
     test_runner = unittest.TextTestRunner(verbosity=2)
-    test_runner.run(importTests())
-    #ret = test_runner.run(importTests())
-    #if ret.errors or ret.failures:
-        #sys.exit('test fail')
+    #test_runner.run(importTests())
+    ret = test_runner.run(importTests())
+    if ret.errors or ret.failures:
+        sys.exit('test fail')
