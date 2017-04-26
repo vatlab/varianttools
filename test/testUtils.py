@@ -115,13 +115,12 @@ class ProcessTestCase(unittest.TestCase):
         'Run a command in shell process. Does not check its output or return value.'
         with open(self.test_command + '.log', 'a') as fcmd:
             fcmd.write(cmd + '\n')
-        with open(os.devnull, 'w') as fnull:
-            if ret == 'string':
-                return subprocess.check_output(cmd, stderr=fnull, shell=True, env=test_env).decode()
-            elif ret == 'list':
-                return subprocess.check_output(cmd, stderr=fnull, shell=True, env=test_env).decode().strip().split('\n')
-            else:
-                raise ValueError('Unrecognized return type for command runCmd {}'.format(ret))
+        if ret == 'string':
+            return subprocess.check_output(cmd, stderr=subprocess.DEVNULL, shell=True, env=test_env).decode()
+        elif ret == 'list':
+            return subprocess.check_output(cmd, stderr=subprocess.DEVNULL, shell=True, env=test_env).decode().strip().split('\n')
+        else:
+            raise ValueError('Unrecognized return type for command runCmd {}'.format(ret))
 
     def assertSucc(self, cmd):
         'Execute cmd and assert its success'
