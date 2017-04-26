@@ -57,18 +57,18 @@ class TestOutput(ProcessTestCase):
         self.assertSucc('vtools output "08#x" chr pos ref alt -l -1')
 
 
-    def testAllOutput(self):
-        'Test option --all of command output'
-        self.runCmd('vtools use refGene-hg18_20110909')
-        out0 = self.runCmd('vtools output variant chr ref', ret='list')
-        out1 = self.runCmd('vtools output variant chr ref refGene.name', ret='list')
-        out2 = self.runCmd('vtools output variant chr ref refGene.name --all', ret='list')
-        self.assertEqual(len(set(out0)), 4)
-        self.assertEqual(len(set(out1)), 8)
-        self.assertEqual(len(set(out2)), 12)
-        self.assertEqual(len(out0), 1446)
-        self.assertEqual(len(out1), 1446)
-        self.assertEqual(len(out2), 2873)
+    # def testAllOutput(self):
+    #     'Test option --all of command output'
+    #     self.runCmd('vtools use refGene-hg18_20110909')
+    #     out0 = self.runCmd('vtools output variant chr ref', ret='list')
+    #     out1 = self.runCmd('vtools output variant chr ref refGene.name', ret='list')
+    #     out2 = self.runCmd('vtools output variant chr ref refGene.name --all', ret='list')
+    #     self.assertEqual(len(set(out0)), 4)
+    #     self.assertEqual(len(set(out1)), 8)
+    #     self.assertEqual(len(set(out2)), 12)
+    #     self.assertEqual(len(out0), 1446)
+    #     self.assertEqual(len(out1), 1446)
+    #     self.assertEqual(len(out2), 2873)
         
     def testOutputExpression(self):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')

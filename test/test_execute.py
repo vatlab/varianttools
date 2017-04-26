@@ -50,17 +50,17 @@ class TestExecute(ProcessTestCase):
         self.assertSucc('vtools execute \'delete FROM variant where ref="T"\' -v2')
         self.assertSucc('vtools execute \'delete FROM sample where aff=2\' -v2')
     
-    def testExeAnno(self):
-        self.runCmd('vtools init test -f')
-        self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')
-        self.runCmd('vtools import vcf/SAMP2.vcf')
-        self.runCmd('vtools use refGene')
-        self.runCmd('vtools update variant --set ref_name=refGene.name')
-        self.assertSucc('''vtools execute 'select chr,txStart,txEnd,name from refGene where name is not null' ''')
-        self.assertOutput('''vtools execute 'select chr,txStart,txEnd,name from refGene where name="NR_024321"' ''',
-            '1\t761586\t762902\tNR_024321\n')
-        self.assertOutput('''vtools execute 'select pos from variant where ref_name = "NR_024321"' ''',
-            'output/exclude_anno1.txt')
+    # def testExeAnno(self):
+    #     self.runCmd('vtools init test -f')
+    #     self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')
+    #     self.runCmd('vtools import vcf/SAMP2.vcf')
+    #     self.runCmd('vtools use refGene')
+    #     self.runCmd('vtools update variant --set ref_name=refGene.name')
+    #     self.assertSucc('''vtools execute 'select chr,txStart,txEnd,name from refGene where name is not null' ''')
+    #     self.assertOutput('''vtools execute 'select chr,txStart,txEnd,name from refGene where name="NR_024321"' ''',
+    #         '1\t761586\t762902\tNR_024321\n')
+    #     self.assertOutput('''vtools execute 'select pos from variant where ref_name = "NR_024321"' ''',
+    #         'output/exclude_anno1.txt')
 
 if __name__ == '__main__':
     unittest.main()

@@ -78,12 +78,12 @@ class TestUse(ProcessTestCase):
         self.assertOutput('vtools select variant -c', '145')
         self.assertOutput('vtools select variant "testThousandGenomes.chr is not NULL" -c', '145')
 
-    def testESP(self):
-        self.runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
-        self.assertSucc('vtools use ESP')
-        self.assertSucc('vtools show annotation ESP')
-        self.assertOutput('vtools execute "select sample_name from sample"', 'WHISP:D967-33\nWHISP:D226958-47\nWHISP:D264508-52\nWHISP:D7476-42\n')
-        self.assertOutput('vtools output variant variant_id ref alt DP MQ ANNO SVM --header id ref alt DP MQ ANNO SVM -d"\t"', 'output/evsVariantTest.txt')
+    # def testESP(self):
+    #     self.runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
+    #     self.assertSucc('vtools use ESP')
+    #     self.assertSucc('vtools show annotation ESP')
+    #     self.assertOutput('vtools execute "select sample_name from sample"', 'WHISP:D967-33\nWHISP:D226958-47\nWHISP:D264508-52\nWHISP:D7476-42\n')
+    #     self.assertOutput('vtools output variant variant_id ref alt DP MQ ANNO SVM --header id ref alt DP MQ ANNO SVM -d"\t"', 'output/evsVariantTest.txt')
 
     def testNSFP(self):
         'Test variants in dbNSFP'
@@ -174,18 +174,18 @@ class TestUse(ProcessTestCase):
         self.assertOutput('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', 'output/use_field.txt')
         
         
-    def testUseVariant(self):
-        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
-        #this is the default method. the linked_fields have to be in the order in the test below.
-        self.assertSucc('vtools use ESP --anno_type variant --linked_fields chr pos ref alt')
-        #it is same with
-        self.assertSucc('vtools use ESP')
-        # --linked_by option will be ignored if you use the option of --anno_type variant
-        self.assertFail('vtools use ESP --anno_type variant --linked_fields chr')
-        self.assertFail('vtools use ESP --anno_type variant --linked_fields chr pos')
-        self.assertFail('vtools use ESP --anno_type variant --linked_fields chr pos ref')
-        # because all values are NULL
-        self.assertFail('vtools update variant --set gene_name=evs.Genes')
+    # def testUseVariant(self):
+    #     self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+    #     #this is the default method. the linked_fields have to be in the order in the test below.
+    #     self.assertSucc('vtools use ESP --anno_type variant --linked_fields chr pos ref alt')
+    #     #it is same with
+    #     self.assertSucc('vtools use ESP')
+    #     # --linked_by option will be ignored if you use the option of --anno_type variant
+    #     self.assertFail('vtools use ESP --anno_type variant --linked_fields chr')
+    #     self.assertFail('vtools use ESP --anno_type variant --linked_fields chr pos')
+    #     self.assertFail('vtools use ESP --anno_type variant --linked_fields chr pos ref')
+    #     # because all values are NULL
+    #     self.assertFail('vtools update variant --set gene_name=evs.Genes')
         #self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
 
     def testUsePosition(self):
@@ -208,17 +208,17 @@ class TestUse(ProcessTestCase):
         self.assertOutput('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', 'output/use_position.txt')
     
     
-    def testUseAs(self):
-        '''Testing the --as option of command vtools use'''
-        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
-        #this is the default method. the linked_fields have to be in the order in the test below.
-        self.assertSucc('vtools use ESP --anno_type variant --linked_fields chr pos ref alt')
-        #it is same with
-        self.assertSucc('vtools use ESP --as e')
-        self.assertSucc('vtools use ESP --as e1')
-        self.assertSucc('vtools show annotation e')
-        self.assertSucc('vtools output variant chr pos e.chr e1.chr')
-        self.assertSucc('vtools select variant "e.chr is not Null" "e1.chr is not Null" --output chr pos e.chr e1.chr')
+    # def testUseAs(self):
+    #     '''Testing the --as option of command vtools use'''
+    #     self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+    #     #this is the default method. the linked_fields have to be in the order in the test below.
+    #     self.assertSucc('vtools use ESP --anno_type variant --linked_fields chr pos ref alt')
+    #     #it is same with
+    #     self.assertSucc('vtools use ESP --as e')
+    #     self.assertSucc('vtools use ESP --as e1')
+    #     self.assertSucc('vtools show annotation e')
+    #     self.assertSucc('vtools output variant chr pos e.chr e1.chr')
+    #     self.assertSucc('vtools select variant "e.chr is not Null" "e1.chr is not Null" --output chr pos e.chr e1.chr')
 
         
 if __name__ == '__main__':
