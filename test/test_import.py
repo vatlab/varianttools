@@ -44,19 +44,19 @@ class TestImport(ProcessTestCase):
         # no format information, fail
         self.assertFail('vtools import txt/input.tsv --build hg18')
 
-    # def testImportTXT(self):
-    #     # help information
-    #     self.assertSucc('vtools import -h')
-    #     # no build information, fail
-    #     self.assertFail('vtools import --format fmt/basic_hg18 txt/input.tsv')
-    #     # no sample name, a sample with NULL name is created
-    #     self.assertSucc('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv')
-    #     self.assertProj(numOfSamples= 0, numOfVariants=1446)
-    #     self.assertFail('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant chr pos ref not_defined_field --force')
-    #     self.assertFail('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant chr pos --force')
-    #     self.assertOutput('vtools output variant chr pos ref alt -d"\t"', 'output/import_txt_1.txt')
-    #     # test downloading fmt file from the website
-    #     self.assertFail('vtools import --build hg18 --format non_existing_fmt txt/input.tsv')
+    def testImportTXT(self):
+        # help information
+        self.assertSucc('vtools import -h')
+        # no build information, fail
+        self.assertFail('vtools import --format fmt/basic_hg18 txt/input.tsv')
+        # no sample name, a sample with NULL name is created
+        self.assertSucc('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv')
+        self.assertProj(numOfSamples= 0, numOfVariants=1446)
+        self.assertFail('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant chr pos ref not_defined_field --force')
+        self.assertFail('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv --variant chr pos --force')
+        self.assertOutput('vtools output variant chr pos ref alt -d"\t"', 'output/import_txt_1.txt')
+        # test downloading fmt file from the website
+        self.assertFail('vtools import --build hg18 --format non_existing_fmt txt/input.tsv')
     
     # def testGenotypes(self):
     #     'Test the import of genotypes'
