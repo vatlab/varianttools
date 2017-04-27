@@ -156,12 +156,12 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools output variant DP')
         self.assertProj(numOfSamples= 60, numOfVariants=288, numOfColumns={'genotype_1': 3})
 
-    # def testImportVCFIndel(self):
-    #     'Test importing Indel from VCF files'
-    #     self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-    #     self.assertProj(numOfSamples= 0, numOfVariants=134)
-    #     self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno_info')
-    #     self.assertProj(numOfSamples= 0, numOfVariants=11877)
+    def testImportVCFIndel(self):
+        'Test importing Indel from VCF files'
+        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
+        self.assertProj(numOfSamples= 0, numOfVariants=134)
+        self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno_info')
+        self.assertProj(numOfSamples= 0, numOfVariants=11877)
         
     # def testMPImport(self):
     #     'Test multi-processing import'
@@ -268,75 +268,75 @@ class TestImport(ProcessTestCase):
         self.assertOutput('''vtools select variant 'alt="-"' --output chr pos ref alt''', 'output/import_vcf_alt.txt')
         self.assertOutput('''vtools select variant 'alt="-"' --count''', '53\n') 
 
-    # def testSampleName_single(self):
-    #     'Testing the import of sample names'
-    #     #Testing one sample per file with the default setting in vtools import
-    #     #sample name is given in file
-    #     self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18')
-    #     self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18')
-    #     self.assertProj(numOfSamples= 2, numOfVariants=289 + 121)
-    #     self.assertOutput('vtools show genotypes', 'output/vcf_single_sampleName_genotype.txt')
+    def testSampleName_single(self):
+        'Testing the import of sample names'
+        #Testing one sample per file with the default setting in vtools import
+        #sample name is given in file
+        self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18')
+        self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18')
+        self.assertProj(numOfSamples= 2, numOfVariants=289 + 121)
+        self.assertOutput('vtools show genotypes', 'output/vcf_single_sampleName_genotype.txt')
 
-    # def testNo_SampleName(self):
-    #     #Testing one sample per file with the default setting(NO sample name)
-    #     #sample name was not given in file, then there is no information about sample name and genotypes except you assign one for it.
-    #     self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-    #     self.assertProj(numOfSamples= 0, numOfVariants=134)
+    def testNo_SampleName(self):
+        #Testing one sample per file with the default setting(NO sample name)
+        #sample name was not given in file, then there is no information about sample name and genotypes except you assign one for it.
+        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
+        self.assertProj(numOfSamples= 0, numOfVariants=134)
     
-    # def testNo_SampleName_assign(self):
-    #     #Assign a sample name if the sample name is not in file
-    #     self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19 --sample_name vcf_test3')
-    #     self.assertProj(numOfSamples= 1, numOfVariants=134, sampleNames=['vcf_test3'])
+    def testNo_SampleName_assign(self):
+        #Assign a sample name if the sample name is not in file
+        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19 --sample_name vcf_test3')
+        self.assertProj(numOfSamples= 1, numOfVariants=134, sampleNames=['vcf_test3'])
         
-    # def testSampleName_single_assign(self):
-    #     #Testing one sample per file with the --sample_name option
-    #     self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18 --sample_name samp_vcf1')
-    #     self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18 --sample_name samp_vcf2')
-    #     self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18 --sample_name samp_vcf3')
-    #     self.assertProj(numOfSamples= 3, numOfVariants=545)
-    #     self.assertOutput('vtools show genotypes', 'output/vcf_assigned_sample_name_genotype.txt')
+    def testSampleName_single_assign(self):
+        #Testing one sample per file with the --sample_name option
+        self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18 --sample_name samp_vcf1')
+        self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18 --sample_name samp_vcf2')
+        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18 --sample_name samp_vcf3')
+        self.assertProj(numOfSamples= 3, numOfVariants=545)
+        self.assertOutput('vtools show genotypes', 'output/vcf_assigned_sample_name_genotype.txt')
         
-    # def testSampleName_multiple(self):
-    #     #Testing multiple samples in ONE vcf file with default setting
-    #     self.assertSucc('vtools import vcf/500SAMP.vcf --build hg18')
-    #     self.assertProj(numOfSamples= 501, numOfVariants=5)
-    #     self.assertOutput('vtools show genotypes', 'output/vcf_multiple_samples_genotypes.txt')
+    def testSampleName_multiple(self):
+        #Testing multiple samples in ONE vcf file with default setting
+        self.assertSucc('vtools import vcf/500SAMP.vcf --build hg18')
+        self.assertProj(numOfSamples= 501, numOfVariants=5)
+        self.assertOutput('vtools show genotypes', 'output/vcf_multiple_samples_genotypes.txt')
        
-    # def testSampleName_multiple_assign(self):
-    #     #Testing multiple samples in ONE vcf file with --sample_name option
-    #     #Only one sample was generated, no genotype information were imported
-    #     self.assertFail('vtools import vcf/500SAMP.vcf --build hg18 --sample_name output/vcf_multiple_sample_name.txt')
-    #     self.assertFail('vtools import vcf/500SAMP.vcf --build hg18 --sample_name n1 n2 n3 n4 n5')
-    #     self.assertFail('vtools import vcf/SAMP1.vcf --build hg18 --sample_name samp_vcf1 samp_vcf2 samp_vcf3')
-    #     #you can assign sample names as blow
-    #     with open('output/vcf_multiple_sample_name.txt') as inputfile:
-    #           input = [x.strip() for x in inputfile.readlines()]
-    #     self.assertSucc("vtools import vcf/500SAMP.vcf --build hg19 --sample_name {}".format(' '.join(input[1:])))
+    def testSampleName_multiple_assign(self):
+        #Testing multiple samples in ONE vcf file with --sample_name option
+        #Only one sample was generated, no genotype information were imported
+        self.assertFail('vtools import vcf/500SAMP.vcf --build hg18 --sample_name output/vcf_multiple_sample_name.txt')
+        self.assertFail('vtools import vcf/500SAMP.vcf --build hg18 --sample_name n1 n2 n3 n4 n5')
+        self.assertFail('vtools import vcf/SAMP1.vcf --build hg18 --sample_name samp_vcf1 samp_vcf2 samp_vcf3')
+        #you can assign sample names as blow
+        with open('output/vcf_multiple_sample_name.txt') as inputfile:
+              input = [x.strip() for x in inputfile.readlines()]
+        self.assertSucc("vtools import vcf/500SAMP.vcf --build hg19 --sample_name {}".format(' '.join(input[1:])))
 
-    # def testCsvImport1(self):
-    #     self.assertSucc('vtools import txt/test.csv --format ../format/csv.fmt --build hg19 --sample_name samp_csv')
-    #     self.assertProj(numOfSamples=1, numOfVariants=687)
-    #     self.assertOutput('vtools output variant chr pos ref alt', 'output/import_csv.txt')
+    def testCsvImport1(self):
+        self.assertSucc('vtools import txt/test.csv --format ../format/csv.fmt --build hg19 --sample_name samp_csv')
+        self.assertProj(numOfSamples=1, numOfVariants=687)
+        self.assertOutput('vtools output variant chr pos ref alt', 'output/import_csv.txt')
 
-    # def testCGAImport(self):
-    #     self.assertSucc('vtools import txt/CGA.tsv.bz2 --format ../format/CGA.fmt --build hg19 --sample_name samp_csv')
-    #     self.assertProj(numOfSamples=1, numOfVariants=95)
-    #     self.assertOutput('vtools output variant chr pos ref alt', 'output/import_cga.txt') 
-    #     self.assertOutput('vtools show genotypes', 'output/import_cga_phenotype.txt')
+    def testCGAImport(self):
+        self.assertSucc('vtools import txt/CGA.tsv.bz2 --format ../format/CGA.fmt --build hg19 --sample_name samp_csv')
+        self.assertProj(numOfSamples=1, numOfVariants=95)
+        self.assertOutput('vtools output variant chr pos ref alt', 'output/import_cga.txt') 
+        self.assertOutput('vtools show genotypes', 'output/import_cga_phenotype.txt')
 
-    # def testMultiSamples_1(self):
-    #     #the files are coming from one custmer
-    #     self.assertSucc('vtools import --format fmt/multi_index.fmt txt/sample_chr22.txt  --build hg19')
-    #     self.assertProj(numOfSamples=3)
-    #     self.assertOutput('vtools show table variant', 'output/import_multi_sample_variant.txt', -4)
-    #     self.assertOutput('vtools show samples', 'output/import_multi_sample_samples.txt')
+    def testMultiSamples_1(self):
+        #the files are coming from one custmer
+        self.assertSucc('vtools import --format fmt/multi_index.fmt txt/sample_chr22.txt  --build hg19')
+        self.assertProj(numOfSamples=3)
+        self.assertOutput('vtools show table variant', 'output/import_multi_sample_variant.txt', -4)
+        self.assertOutput('vtools show samples', 'output/import_multi_sample_samples.txt')
 
-    # def testMultiSamples_2(self):
-    #     #the files are coming from one custmer
-    #     self.assertSucc('vtools import --format fmt/multi_index.fmt txt/sample_1_chr22.txt  --build hg19')
-    #     self.assertProj(numOfSamples=3)
-    #     self.assertOutput('vtools show table variant', 'output/import_multi_sample2_variant.txt', -4)
-    #     self.assertOutput('vtools show samples', 'output/import_multi_sample2_samples.txt')
+    def testMultiSamples_2(self):
+        #the files are coming from one custmer
+        self.assertSucc('vtools import --format fmt/multi_index.fmt txt/sample_1_chr22.txt  --build hg19')
+        self.assertProj(numOfSamples=3)
+        self.assertOutput('vtools show table variant', 'output/import_multi_sample2_variant.txt', -4)
+        self.assertOutput('vtools show samples', 'output/import_multi_sample2_samples.txt')
      
 
 if __name__ == '__main__':
