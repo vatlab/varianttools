@@ -72,12 +72,12 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import vcf/dup_geno.vcf --sample_name DUP --build hg18')
         self.assertOutput('vtools show genotypes', 'output/import_genotype_2.txt')
 
-    # def testDupGenotype1(self):
-    #     self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18')
-    #     self.assertProj(numOfVariants=288)
-    #     self.runCmd('vtools init test -f')
-    #     self.assertSucc('vtools import vcf/CEU_dup.vcf.gz --build hg18')
-    #     self.assertProj(numOfVariants=288)
+    def testDupGenotype1(self):
+        self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18')
+        self.assertProj(numOfVariants=288)
+        self.runCmd('vtools init test -f')
+        self.assertSucc('vtools import vcf/CEU_dup.vcf.gz --build hg18')
+        self.assertProj(numOfVariants=288)
 
 
     # def testANNOVAR(self):
