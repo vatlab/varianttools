@@ -163,110 +163,110 @@ class TestImport(ProcessTestCase):
     #     self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno_info')
     #     self.assertProj(numOfSamples= 0, numOfVariants=11877)
         
-    def testMPImport(self):
-        'Test multi-processing import'
-        self.runCmd('vtools init test -f')
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j1')
-        self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
-        self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
-        self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
-                'output/import_mpi_genotype.txt')
-        #
-        # compare results with -j3
-        #
-        self.runCmd('vtools init test -f')
-        # if more than one reader is used, the order of mutants in some cases will be changed, leading
-        # to different variant ids.
-        self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j3')
-        self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
-        self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
-        self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
-                'output/import_mpi_genotype.txt')
-        #
-        # compare results with -j10
-        #
-        self.runCmd('vtools init test -f')
-        self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j10')
-        self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
-        self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
-        self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
-                'output/import_mpi_genotype.txt')
-    
-    def testMPImportMultiFiles(self):
-        self.runCmd('vtools init test -f')
-        self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j1')
-        self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
-        self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_multi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
-        self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(3)],
-                'output/import_mpi_multi_genotype.txt')
-        #
-        # compare results with -j3
-        #
-        self.runCmd('vtools init test -f')
-        self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
-        self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j4')
-        self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
-        self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_multi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
-        self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(3)],
-                'output/import_mpi_multi_genotype.txt')
- 
-    # def testMixedBuild(self):
-    #     'Test importing vcf files with different reference genomes'
-    #     self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18')
-    #     self.assertProj(numOfSamples= 1, numOfVariants=289)
-    #     # 104 records in SAMP1.vcf failed to map to hg19
-    #     self.assertSucc('vtools import vcf/var_format.vcf --geno safe_GT --build hg19')
-    #     # all records in var_format.vcf are mapped to hg18
-    #     self.assertProj(numOfSamples= 1+1, numOfVariants=289 + 98)
-    #     # 19 out of 121 records failed to map.
-    #     self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18')
-    #     self.assertProj(numOfSamples= 3, numOfVariants=289 + 98 + 121)
+    # def testMPImport(self):
+    #     'Test multi-processing import'
+    #     self.runCmd('vtools init test -f')
+    #     self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j1')
+    #     self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
+    #     self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
+    #     self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
+    #     self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
+    #             'output/import_mpi_genotype.txt')
     #     #
-    #     # this is a difficult test to pass, basically, we will create another project
-    #     # in reverse order of reference genomes, using reversed liftover, and see
-    #     # it the output is the same
-    #     self.assertOutput('vtools output variant bin chr pos alt_bin alt_chr alt_pos -d "\t"', 'output/import_mixed_build.txt')
-    #     self.assertSucc('vtools init test -f')
-    #     self.assertSucc('vtools import vcf/var_format.vcf --geno safe_GT --build hg19')
-    #     self.assertProj(numOfVariants=98, numOfSamples= 1)
-    #     self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18')
-    #     # 101 cannot be mapped. damn.
-    #     self.assertProj(numOfSamples= 2, numOfVariants=98 + 289)
-    #     self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18')
-    #     # 19 out of 121 records failed to map.
-    #     self.assertProj(numOfSamples= 3, numOfVariants=98 + 289 + 121)
-    #     self.assertOutput('vtools output variant alt_bin alt_chr alt_pos bin chr pos -d "\t"', 'output/import_mixed_build.txt', 
-    #         # compare common variants (without NA) and in sorted order
-    #         lambda x: sorted([i for i in x if 'NA' not in i]))
+    #     # compare results with -j3
+    #     #
+    #     self.runCmd('vtools init test -f')
+    #     # if more than one reader is used, the order of mutants in some cases will be changed, leading
+    #     # to different variant ids.
+    #     self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
+    #     self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j3')
+    #     self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
+    #     self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
+    #     self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
+    #     self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
+    #             'output/import_mpi_genotype.txt')
+    #     #
+    #     # compare results with -j10
+    #     #
+    #     self.runCmd('vtools init test -f')
+    #     self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
+    #     self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j10')
+    #     self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
+    #     self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
+    #     self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
+    #     self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
+    #             'output/import_mpi_genotype.txt')
     
-    # def testImportMyVCF(self):
-    #     'Test a customized vcf import'
-    #     self.assertSucc('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
-    #     # test importing self defined var_info
-    #     self.assertOutput('vtools output variant DP MQ NS AN AC AF AB LBS_A1 LBS_A2 LBS_C1 LBS_C2 LBS_G1 LBS_G2 LBS_T1 LBS_T2 OBS_A1 \
-    #         OBS_A2 OBS_C1 OBS_C2 OBS_G1 OBS_G2 OBS_T1 OBS_T2 STR STZ CBR CBZ QBR QBZ MBR MSR MBZ IOR IOZ IOH IOD AOI AOZ ABE ABZ BCS \
-    #         FIC LQR MQ0 MQ10 MQ20 MQ30 ANNO SVM', 'output/import_customized.txt')
-    #     # test importing self-defined genotypes with VcfGenotype(default=('0',))
-    #     # code missing genotypes as None and wild-type as '0'
-    #     self.assertProj(genotype={1: ['-1', '-1'], 2: ['0', '2'], 3: ['0', '-1', '-1'], 4: ['0', '-1', '-1']},
-    #         genoInfo={(1, 'GT'): ['-1', '-1'], (1, 'GQ'): ['3', '3'], (1, 'GD'): ['1', '1'], 
-    #             (1, 'PL_1'): ['None', 'None'], (1, 'PL_2'): ['None', 'None'], (1, 'PL3_1'): ['0', '3']})
+    # def testMPImportMultiFiles(self):
+    #     self.runCmd('vtools init test -f')
+    #     self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j1')
+    #     self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
+    #     self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_multi_genotypes.txt')
+    #     self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
+    #     self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(3)],
+    #             'output/import_mpi_multi_genotype.txt')
+    #     #
+    #     # compare results with -j3
+    #     #
+    #     self.runCmd('vtools init test -f')
+    #     self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
+    #     self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j4')
+    #     self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
+    #     self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_multi_genotypes.txt')
+    #     self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
+    #     self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(3)],
+    #             'output/import_mpi_multi_genotype.txt')
+ 
+    def testMixedBuild(self):
+        'Test importing vcf files with different reference genomes'
+        self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18')
+        self.assertProj(numOfSamples= 1, numOfVariants=289)
+        # 104 records in SAMP1.vcf failed to map to hg19
+        self.assertSucc('vtools import vcf/var_format.vcf --geno safe_GT --build hg19')
+        # all records in var_format.vcf are mapped to hg18
+        self.assertProj(numOfSamples= 1+1, numOfVariants=289 + 98)
+        # 19 out of 121 records failed to map.
+        self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18')
+        self.assertProj(numOfSamples= 3, numOfVariants=289 + 98 + 121)
+        #
+        # this is a difficult test to pass, basically, we will create another project
+        # in reverse order of reference genomes, using reversed liftover, and see
+        # it the output is the same
+        self.assertOutput('vtools output variant bin chr pos alt_bin alt_chr alt_pos -d "\t"', 'output/import_mixed_build.txt')
+        self.assertSucc('vtools init test -f')
+        self.assertSucc('vtools import vcf/var_format.vcf --geno safe_GT --build hg19')
+        self.assertProj(numOfVariants=98, numOfSamples= 1)
+        self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18')
+        # 101 cannot be mapped. damn.
+        self.assertProj(numOfSamples= 2, numOfVariants=98 + 289)
+        self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18')
+        # 19 out of 121 records failed to map.
+        self.assertProj(numOfSamples= 3, numOfVariants=98 + 289 + 121)
+        self.assertOutput('vtools output variant alt_bin alt_chr alt_pos bin chr pos -d "\t"', 'output/import_mixed_build.txt', 
+            # compare common variants (without NA) and in sorted order
+            lambda x: sorted([i for i in x if 'NA' not in i]))
+    
+    def testImportMyVCF(self):
+        'Test a customized vcf import'
+        self.assertSucc('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
+        # test importing self defined var_info
+        self.assertOutput('vtools output variant DP MQ NS AN AC AF AB LBS_A1 LBS_A2 LBS_C1 LBS_C2 LBS_G1 LBS_G2 LBS_T1 LBS_T2 OBS_A1 \
+            OBS_A2 OBS_C1 OBS_C2 OBS_G1 OBS_G2 OBS_T1 OBS_T2 STR STZ CBR CBZ QBR QBZ MBR MSR MBZ IOR IOZ IOH IOD AOI AOZ ABE ABZ BCS \
+            FIC LQR MQ0 MQ10 MQ20 MQ30 ANNO SVM', 'output/import_customized.txt')
+        # test importing self-defined genotypes with VcfGenotype(default=('0',))
+        # code missing genotypes as None and wild-type as '0'
+        self.assertProj(genotype={1: ['-1', '-1'], 2: ['0', '2'], 3: ['0', '-1', '-1'], 4: ['0', '-1', '-1']},
+            genoInfo={(1, 'GT'): ['-1', '-1'], (1, 'GQ'): ['3', '3'], (1, 'GD'): ['1', '1'], 
+                (1, 'PL_1'): ['None', 'None'], (1, 'PL_2'): ['None', 'None'], (1, 'PL3_1'): ['0', '3']})
 
-    # def testInsertDelete(self):
-    #     'Testing the number of insertions and deletions'
-    #     self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-    #     self.assertOutput('''vtools select variant 'ref="-"' --output chr pos ref alt''', 'output/import_vcf_ref.txt')
-    #     self.assertProj(numOfVariants=134)
-    #     self.assertOutput('''vtools select variant 'ref="-"' --count''', '73\n') 
-    #     self.assertOutput('''vtools select variant 'alt="-"' --output chr pos ref alt''', 'output/import_vcf_alt.txt')
-    #     self.assertOutput('''vtools select variant 'alt="-"' --count''', '53\n') 
+    def testInsertDelete(self):
+        'Testing the number of insertions and deletions'
+        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
+        self.assertOutput('''vtools select variant 'ref="-"' --output chr pos ref alt''', 'output/import_vcf_ref.txt')
+        self.assertProj(numOfVariants=134)
+        self.assertOutput('''vtools select variant 'ref="-"' --count''', '73\n') 
+        self.assertOutput('''vtools select variant 'alt="-"' --output chr pos ref alt''', 'output/import_vcf_alt.txt')
+        self.assertOutput('''vtools select variant 'alt="-"' --count''', '53\n') 
 
     # def testSampleName_single(self):
     #     'Testing the import of sample names'
