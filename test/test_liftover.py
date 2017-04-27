@@ -43,7 +43,7 @@ class TestLiftover(ProcessTestCase):
         # non_existing_build
         self.assertFail('vtools liftover non_existing_build')
         # # from hg18 to hg19
-        self.assertSucc('vtools liftover hg19')
+        # self.assertSucc('vtools liftover hg19')
         # self.assertOutput('vtools output variant bin chr pos alt_bin alt_chr alt_pos -d"\t"',
         #     'output/liftover_cmp.txt')
         #

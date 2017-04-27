@@ -31,18 +31,18 @@ import subprocess
 from testUtils import ProcessTestCase 
 
 class TestImport(ProcessTestCase):
-    def testInvalidVariant(self):
-        'Test importing invalid variants (<DEL>)'
-        self.assertSucc('vtools import --build hg18 --format fmt/basic_hg18 txt/invalid.tsv')
-        self.assertProj(numOfSamples= 0, numOfVariants=10)
+    # def testInvalidVariant(self):
+    #     'Test importing invalid variants (<DEL>)'
+    #     self.assertSucc('vtools import --build hg18 --format fmt/basic_hg18 txt/invalid.tsv')
+    #     self.assertProj(numOfSamples= 0, numOfVariants=10)
 
-    # def testImportCommand(self):
-    #     'Test command import'
-    #     self.assertFail('vtools import')
-    #     # Cannot guess input file type from filename
-    #     self.assertFail('vtools import txt/input.tsv')
-    #     # no format information, fail
-    #     self.assertFail('vtools import txt/input.tsv --build hg18')
+    def testImportCommand(self):
+        'Test command import'
+        self.assertFail('vtools import')
+        # Cannot guess input file type from filename
+        self.assertFail('vtools import txt/input.tsv')
+        # no format information, fail
+        self.assertFail('vtools import txt/input.tsv --build hg18')
 
     # def testImportTXT(self):
     #     # help information
