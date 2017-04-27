@@ -246,27 +246,27 @@ class TestImport(ProcessTestCase):
             # compare common variants (without NA) and in sorted order
             lambda x: sorted([i for i in x if 'NA' not in i]))
     
-    def testImportMyVCF(self):
-        'Test a customized vcf import'
-        self.assertSucc('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
-        # test importing self defined var_info
-        self.assertOutput('vtools output variant DP MQ NS AN AC AF AB LBS_A1 LBS_A2 LBS_C1 LBS_C2 LBS_G1 LBS_G2 LBS_T1 LBS_T2 OBS_A1 \
-            OBS_A2 OBS_C1 OBS_C2 OBS_G1 OBS_G2 OBS_T1 OBS_T2 STR STZ CBR CBZ QBR QBZ MBR MSR MBZ IOR IOZ IOH IOD AOI AOZ ABE ABZ BCS \
-            FIC LQR MQ0 MQ10 MQ20 MQ30 ANNO SVM', 'output/import_customized.txt')
-        # test importing self-defined genotypes with VcfGenotype(default=('0',))
-        # code missing genotypes as None and wild-type as '0'
-        self.assertProj(genotype={1: ['-1', '-1'], 2: ['0', '2'], 3: ['0', '-1', '-1'], 4: ['0', '-1', '-1']},
-            genoInfo={(1, 'GT'): ['-1', '-1'], (1, 'GQ'): ['3', '3'], (1, 'GD'): ['1', '1'], 
-                (1, 'PL_1'): ['None', 'None'], (1, 'PL_2'): ['None', 'None'], (1, 'PL3_1'): ['0', '3']})
+    # def testImportMyVCF(self):
+    #     'Test a customized vcf import'
+    #     self.assertSucc('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
+    #     # test importing self defined var_info
+    #     self.assertOutput('vtools output variant DP MQ NS AN AC AF AB LBS_A1 LBS_A2 LBS_C1 LBS_C2 LBS_G1 LBS_G2 LBS_T1 LBS_T2 OBS_A1 \
+    #         OBS_A2 OBS_C1 OBS_C2 OBS_G1 OBS_G2 OBS_T1 OBS_T2 STR STZ CBR CBZ QBR QBZ MBR MSR MBZ IOR IOZ IOH IOD AOI AOZ ABE ABZ BCS \
+    #         FIC LQR MQ0 MQ10 MQ20 MQ30 ANNO SVM', 'output/import_customized.txt')
+    #     # test importing self-defined genotypes with VcfGenotype(default=('0',))
+    #     # code missing genotypes as None and wild-type as '0'
+    #     self.assertProj(genotype={1: ['-1', '-1'], 2: ['0', '2'], 3: ['0', '-1', '-1'], 4: ['0', '-1', '-1']},
+    #         genoInfo={(1, 'GT'): ['-1', '-1'], (1, 'GQ'): ['3', '3'], (1, 'GD'): ['1', '1'], 
+    #             (1, 'PL_1'): ['None', 'None'], (1, 'PL_2'): ['None', 'None'], (1, 'PL3_1'): ['0', '3']})
 
-    def testInsertDelete(self):
-        'Testing the number of insertions and deletions'
-        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-        self.assertOutput('''vtools select variant 'ref="-"' --output chr pos ref alt''', 'output/import_vcf_ref.txt')
-        self.assertProj(numOfVariants=134)
-        self.assertOutput('''vtools select variant 'ref="-"' --count''', '73\n') 
-        self.assertOutput('''vtools select variant 'alt="-"' --output chr pos ref alt''', 'output/import_vcf_alt.txt')
-        self.assertOutput('''vtools select variant 'alt="-"' --count''', '53\n') 
+    # def testInsertDelete(self):
+    #     'Testing the number of insertions and deletions'
+    #     self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
+    #     self.assertOutput('''vtools select variant 'ref="-"' --output chr pos ref alt''', 'output/import_vcf_ref.txt')
+    #     self.assertProj(numOfVariants=134)
+    #     self.assertOutput('''vtools select variant 'ref="-"' --count''', '73\n') 
+    #     self.assertOutput('''vtools select variant 'alt="-"' --output chr pos ref alt''', 'output/import_vcf_alt.txt')
+    #     self.assertOutput('''vtools select variant 'alt="-"' --count''', '53\n') 
 
     def testSampleName_single(self):
         'Testing the import of sample names'
