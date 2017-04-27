@@ -127,9 +127,9 @@ class TestImport(ProcessTestCase):
     #     self.assertProj(numOfSamples= 1, numOfVariants=30, sampleNames=[''],
     #         genotype={1: '212111111111121111121121111111'})
     
-    def testImportEmpty(self):
-        'Test import file without variant'
-        self.assertSucc('vtools import vcf/EMPTY.vcf --build hg19')
+    # def testImportEmpty(self):
+    #     'Test import file without variant'
+    #     self.assertSucc('vtools import vcf/EMPTY.vcf --build hg19')
 
     # def testImportVCF(self):
     #     'Test command vtools import *.vcf'
@@ -163,59 +163,59 @@ class TestImport(ProcessTestCase):
     #     self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno_info')
     #     self.assertProj(numOfSamples= 0, numOfVariants=11877)
         
-    def testMPImport(self):
-        'Test multi-processing import'
-        self.runCmd('vtools init test -f')
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j1')
-        self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
-        self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
-        self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
-                'output/import_mpi_genotype.txt')
-        #
-        # compare results with -j3
-        #
-        self.runCmd('vtools init test -f')
-        # if more than one reader is used, the order of mutants in some cases will be changed, leading
-        # to different variant ids.
-        self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j3')
-        self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
-        self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
-        self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
-                'output/import_mpi_genotype.txt')
-        #
-        # compare results with -j10
-        #
-        self.runCmd('vtools init test -f')
-        self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j10')
-        self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
-        self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
-        self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
-                'output/import_mpi_genotype.txt')
+    # def testMPImport(self):
+    #     'Test multi-processing import'
+    #     self.runCmd('vtools init test -f')
+    #     self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j1')
+    #     self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
+    #     self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
+    #     self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
+    #     self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
+    #             'output/import_mpi_genotype.txt')
+    #     #
+    #     # compare results with -j3
+    #     #
+    #     self.runCmd('vtools init test -f')
+    #     # if more than one reader is used, the order of mutants in some cases will be changed, leading
+    #     # to different variant ids.
+    #     self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
+    #     self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j3')
+    #     self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
+    #     self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
+    #     self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
+    #     self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
+    #             'output/import_mpi_genotype.txt')
+    #     #
+    #     # compare results with -j10
+    #     #
+    #     self.runCmd('vtools init test -f')
+    #     self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
+    #     self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j10')
+    #     self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
+    #     self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
+    #     self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
+    #     self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
+    #             'output/import_mpi_genotype.txt')
     
-    def testMPImportMultiFiles(self):
-        self.runCmd('vtools init test -f')
-        self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j1')
-        self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
-        self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_multi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
-        self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(3)],
-                'output/import_mpi_multi_genotype.txt')
-        #
-        # compare results with -j3
-        #
-        self.runCmd('vtools init test -f')
-        self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
-        self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j4')
-        self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
-        self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_multi_genotypes.txt')
-        self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
-        self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(3)],
-                'output/import_mpi_multi_genotype.txt')
+    # def testMPImportMultiFiles(self):
+    #     self.runCmd('vtools init test -f')
+    #     self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j1')
+    #     self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
+    #     self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_multi_genotypes.txt')
+    #     self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
+    #     self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(3)],
+    #             'output/import_mpi_multi_genotype.txt')
+    #     #
+    #     # compare results with -j3
+    #     #
+    #     self.runCmd('vtools init test -f')
+    #     self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
+    #     self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j4')
+    #     self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
+    #     self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_multi_genotypes.txt')
+    #     self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
+    #     self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(3)],
+    #             'output/import_mpi_multi_genotype.txt')
  
     # def testMixedBuild(self):
     #     'Test importing vcf files with different reference genomes'
