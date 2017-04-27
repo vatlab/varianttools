@@ -80,20 +80,20 @@ class TestImport(ProcessTestCase):
         self.assertProj(numOfVariants=288)
 
 
-    # def testANNOVAR(self):
-    #     'Testing the annovar input format'
-    #     self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR txt/ANNOVAR.txt')
-    #     # one of the variant cannot be imported.
-    #     self.assertProj(numOfSamples= 0, numOfVariants=11)
-    #     self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR txt/ANNOVAR.txt --force --sample_name kaiw' )
-    #     self.assertProj(numOfSamples= 1, numOfVariants=11)
-    #     self.assertOutput('vtools execute "select sample_name from sample"', 'kaiw\n')
-    #     self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function' )
-    #     self.assertSucc('vtools output variant mut_type')
-    #     # test for importing user specified var_info
-    #     self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function --var_info function --force' )
-    #     self.assertSucc('vtools select variant "function is not NULL" -t function')
-    #     self.assertProj(numOfVariants={'function': 78})
+    def testANNOVAR(self):
+        'Testing the annovar input format'
+        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR txt/ANNOVAR.txt')
+        # one of the variant cannot be imported.
+        self.assertProj(numOfSamples= 0, numOfVariants=11)
+        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR txt/ANNOVAR.txt --force --sample_name kaiw' )
+        self.assertProj(numOfSamples= 1, numOfVariants=11)
+        self.assertOutput('vtools execute "select sample_name from sample"', 'kaiw\n')
+        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function' )
+        self.assertSucc('vtools output variant mut_type')
+        # test for importing user specified var_info
+        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function --var_info function --force' )
+        self.assertSucc('vtools select variant "function is not NULL" -t function')
+        self.assertProj(numOfVariants={'function': 78})
         
     # def testCASAVA18_SNP(self):
     #     'Testing the CASAVA SNP input format'
