@@ -127,34 +127,34 @@ class TestImport(ProcessTestCase):
         self.assertProj(numOfSamples= 1, numOfVariants=30, sampleNames=[''],
             genotype={1: '212111111111121111121121111111'})
     
-    # def testImportEmpty(self):
-    #     'Test import file without variant'
-    #     self.assertSucc('vtools import vcf/EMPTY.vcf --build hg19')
+    def testImportEmpty(self):
+        'Test import file without variant'
+        self.assertSucc('vtools import vcf/EMPTY.vcf --build hg19')
 
-    # def testImportVCF(self):
-    #     'Test command vtools import *.vcf'
-    #     # no build information. Fail
-    #     self.assertFail('vtools import vcf/SAMP1.vcf')
-    #     # use the default vcf format
-    #     self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18')
-    #     self.assertProj(numOfSamples= 1, numOfVariants=289, sampleNames=['SAMP1'])
-    #     self.assertSucc('vtools import vcf/SAMP2.vcf')
-    #     self.assertProj(numOfSamples= 2, numOfVariants=289+121, sampleNames=['SAMP1', 'SAMP2'])
-    #     # geno is empty, i.e, no sample is imported
-    #     self.assertSucc('vtools import vcf/CEU.vcf.gz --geno')
-    #     self.assertProj(numOfSamples= 2, numOfVariants=698)
-    #     # file will be ignored if re-imported
-    #     self.assertFail('vtools import vcf/SAMP1.vcf')
-    #     self.assertProj(numOfSamples= 2)
-    #     # force re-import the same file with samples
-    #     self.assertSucc('vtools import vcf/CEU.vcf.gz -f')
-    #     self.assertProj(numOfSamples= 62, numOfVariants=698)
-    #     # import additional information on variants and on genotypes.
-    #     # DP and DP_geno are fields provided in the default vcf.fmt
-    #     self.runCmd('vtools init test -f')
-    #     self.assertSucc('vtools import vcf/CEU.vcf.gz --var_info DP --geno_info DP_geno --build hg18')
-    #     self.assertSucc('vtools output variant DP')
-    #     self.assertProj(numOfSamples= 60, numOfVariants=288, numOfColumns={'genotype_1': 3})
+    def testImportVCF(self):
+        'Test command vtools import *.vcf'
+        # no build information. Fail
+        self.assertFail('vtools import vcf/SAMP1.vcf')
+        # use the default vcf format
+        self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18')
+        self.assertProj(numOfSamples= 1, numOfVariants=289, sampleNames=['SAMP1'])
+        self.assertSucc('vtools import vcf/SAMP2.vcf')
+        self.assertProj(numOfSamples= 2, numOfVariants=289+121, sampleNames=['SAMP1', 'SAMP2'])
+        # geno is empty, i.e, no sample is imported
+        self.assertSucc('vtools import vcf/CEU.vcf.gz --geno')
+        self.assertProj(numOfSamples= 2, numOfVariants=698)
+        # file will be ignored if re-imported
+        self.assertFail('vtools import vcf/SAMP1.vcf')
+        self.assertProj(numOfSamples= 2)
+        # force re-import the same file with samples
+        self.assertSucc('vtools import vcf/CEU.vcf.gz -f')
+        self.assertProj(numOfSamples= 62, numOfVariants=698)
+        # import additional information on variants and on genotypes.
+        # DP and DP_geno are fields provided in the default vcf.fmt
+        self.runCmd('vtools init test -f')
+        self.assertSucc('vtools import vcf/CEU.vcf.gz --var_info DP --geno_info DP_geno --build hg18')
+        self.assertSucc('vtools output variant DP')
+        self.assertProj(numOfSamples= 60, numOfVariants=288, numOfColumns={'genotype_1': 3})
 
     # def testImportVCFIndel(self):
     #     'Test importing Indel from VCF files'
