@@ -95,24 +95,24 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools select variant "function is not NULL" -t function')
         self.assertProj(numOfVariants={'function': 78})
         
-    # def testCASAVA18_SNP(self):
-    #     'Testing the CASAVA SNP input format'
-    #     self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt')
-    #     # 20 new, SNVs, 5 invalid
-    #     self.assertProj(numOfSamples= 1, numOfVariants=21)
-    #     # sample name should have been scanned from the last line starting with "#"
-    #     self.assertProj(sampleNames=['max_gt'])
-    #     # test for re-naming the sample
-    #     self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --force --sample_name casavasnp')
-    #     # both samples exist
-    #     self.assertProj(numOfSamples= 2, numOfVariants=21, sampleNames=['max_gt', 'casavasnp'])
-    #     self.runCmd('vtools init test -f')
-    #     # test for using user specified genotype information. Have to init a test because of efficiency problem using --force
-    #     self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --geno max_gt --geno_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
-    #     # now we have 1 genotype field and 3 info field, plus the variant ID: 5 fields in the genotype_x table
-    #     self.assertProj(numOfColumns={'genotype_1': 5})
-    #     # only 1 sample here. Set num=1
-    #     self.assertProj(genotype={1: ['1']*10 + ['2'] + ['1']*10})
+    def testCASAVA18_SNP(self):
+        'Testing the CASAVA SNP input format'
+        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt')
+        # 20 new, SNVs, 5 invalid
+        self.assertProj(numOfSamples= 1, numOfVariants=21)
+        # sample name should have been scanned from the last line starting with "#"
+        self.assertProj(sampleNames=['max_gt'])
+        # test for re-naming the sample
+        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --force --sample_name casavasnp')
+        # both samples exist
+        self.assertProj(numOfSamples= 2, numOfVariants=21, sampleNames=['max_gt', 'casavasnp'])
+        self.runCmd('vtools init test -f')
+        # test for using user specified genotype information. Have to init a test because of efficiency problem using --force
+        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --geno max_gt --geno_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
+        # now we have 1 genotype field and 3 info field, plus the variant ID: 5 fields in the genotype_x table
+        self.assertProj(numOfColumns={'genotype_1': 5})
+        # only 1 sample here. Set num=1
+        self.assertProj(genotype={1: ['1']*10 + ['2'] + ['1']*10})
         
     # def testCASAVA18_INDEL(self):
     #     'Testing the CASAVA INDEL input format'
