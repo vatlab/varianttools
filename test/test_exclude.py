@@ -40,9 +40,9 @@ class TestExclude(ProcessTestCase):
         self.runCmd('vtools use ann/testNSFP.ann')
         self.runCmd('vtools select variant \'testNSFP.chr is not null\' -t ns')
         
-    def testExclude(self):
-        'Test command vtools exclude'
-        self.assertFail('vtools exclude')
+    # def testExclude(self):
+    #     'Test command vtools exclude'
+    #     self.assertFail('vtools exclude')
         # self.assertSucc('vtools exclude -h')
         # # Variant table non_existing_table does not exist.
         # self.assertFail('vtools exclude non_existing_table "aff=\'1\'" -t aff')
