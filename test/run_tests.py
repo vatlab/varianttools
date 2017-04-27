@@ -33,7 +33,7 @@ def importTests():
     tests = unittest.TestSuite()
     for file in os.listdir('.'):
         # match = re.match("^(test_(.*))\\.py$", file)
-        match = re.match("^(test_admin(.*))\\.py$", file)
+        match = re.match("^(test_a(.*))\\.py$", file)
         if match:
             m = match.group(1)
             print("Adding test cases in %s" % m)
