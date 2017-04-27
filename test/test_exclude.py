@@ -31,14 +31,14 @@ import subprocess
 from testUtils import ProcessTestCase
 
 class TestExclude(ProcessTestCase):
-    def setUp(self):
-        'Create a project'
-        ProcessTestCase.setUp(self)
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
-        self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
-        self.runCmd('vtools use ann/testNSFP.ann')
-        self.runCmd('vtools select variant \'testNSFP.chr is not null\' -t ns')
+    # def setUp(self):
+    #     'Create a project'
+    #     ProcessTestCase.setUp(self)
+    #     self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+    #     self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+    #     self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
+    #     self.runCmd('vtools use ann/testNSFP.ann')
+    #     self.runCmd('vtools select variant \'testNSFP.chr is not null\' -t ns')
         
     def testExclude(self):
         'Test command vtools exclude'
