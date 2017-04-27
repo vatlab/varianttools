@@ -114,18 +114,18 @@ class TestImport(ProcessTestCase):
         # only 1 sample here. Set num=1
         self.assertProj(genotype={1: ['1']*10 + ['2'] + ['1']*10})
         
-    # def testCASAVA18_INDEL(self):
-    #     'Testing the CASAVA INDEL input format'
-    #     self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_indels txt/CASAVA18_INDEL.txt')
-    #     # (25 new, 7 insertions, 18 deletions)
-    #     self.assertProj(numOfSamples= 1, numOfVariants=25, sampleNames=['max_gtype'],
-    #         genotype={1: '1111111111111111121111211'})
+    def testCASAVA18_INDEL(self):
+        'Testing the CASAVA INDEL input format'
+        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_indels txt/CASAVA18_INDEL.txt')
+        # (25 new, 7 insertions, 18 deletions)
+        self.assertProj(numOfSamples= 1, numOfVariants=25, sampleNames=['max_gtype'],
+            genotype={1: '1111111111111111121111211'})
         
-    # def testPileup_INDEL(self):
-    #     # this file has one genotype but we do not provide a sample name. Named as "None" when no sample name is specified anywhere
-    #     self.assertSucc('vtools import --build hg18 --format ../format/pileup_indel txt/pileup.indel')
-    #     self.assertProj(numOfSamples= 1, numOfVariants=30, sampleNames=[''],
-    #         genotype={1: '212111111111121111121121111111'})
+    def testPileup_INDEL(self):
+        # this file has one genotype but we do not provide a sample name. Named as "None" when no sample name is specified anywhere
+        self.assertSucc('vtools import --build hg18 --format ../format/pileup_indel txt/pileup.indel')
+        self.assertProj(numOfSamples= 1, numOfVariants=30, sampleNames=[''],
+            genotype={1: '212111111111121111121121111111'})
     
     # def testImportEmpty(self):
     #     'Test import file without variant'
