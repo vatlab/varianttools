@@ -103,30 +103,30 @@ class TestRemove(ProcessTestCase):
     #     self.runCmd('vtools remove fields CEU_cases_num gene_name DP') 
     #     self.assertOutput('vtools show table variant', 'output/remove_field_after.txt', partial=-3)
 
-    def testRemovePhenotype(self):
-        #remove genotype 
-        self.assertFail('vtools remove phenotype')
-        self.assertFail('vtools remove phenotypes')
-        # return 0 even with incorrect phenotype
-        self.assertSucc('vtools remove phenotypes sample_name')
-        self.assertSucc('vtools remove phenotypes filename')
-        self.assertSucc('vtools remove phenotypes "sex = "F""')
-        self.assertSucc('vtools remove phenotypes sex')
-        # removing non-existing phenotype should yield just a warning
-        self.assertSucc('vtools remove phenotypes non_existing')
-        self.assertOutput('vtools show samples', 'output/remove_phenotype.txt')
+    # def testRemovePhenotype(self):
+    #     #remove genotype 
+    #     self.assertFail('vtools remove phenotype')
+    #     self.assertFail('vtools remove phenotypes')
+    #     # return 0 even with incorrect phenotype
+    #     self.assertSucc('vtools remove phenotypes sample_name')
+    #     self.assertSucc('vtools remove phenotypes filename')
+    #     self.assertSucc('vtools remove phenotypes "sex = "F""')
+    #     self.assertSucc('vtools remove phenotypes sex')
+    #     # removing non-existing phenotype should yield just a warning
+    #     self.assertSucc('vtools remove phenotypes non_existing')
+    #     self.assertOutput('vtools show samples', 'output/remove_phenotype.txt')
     
-    def testRemoveGenoField(self):
-        #runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP--build hg18')
-        self.maxDiff=None
-        self.assertOutput('vtools show genotypes', 'output/remove_genofield_before.txt')
-        self.assertFail('vtools remove geno_fields')
-        self.assertFail('vtools remove geno_fields variant_id')
-        self.assertFail('vtools remove geno_fields gt')
-        self.assertSucc('vtools remove geno_fields DP_geno')
-        self.assertOutput('vtools show genotypes', 'output/remove_genofield_after.txt')
-        self.assertFail('vtools remove projects')
-        self.assertSucc('vtools remove project')
+    # def testRemoveGenoField(self):
+    #     #runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP--build hg18')
+    #     self.maxDiff=None
+    #     self.assertOutput('vtools show genotypes', 'output/remove_genofield_before.txt')
+    #     self.assertFail('vtools remove geno_fields')
+    #     self.assertFail('vtools remove geno_fields variant_id')
+    #     self.assertFail('vtools remove geno_fields gt')
+    #     self.assertSucc('vtools remove geno_fields DP_geno')
+    #     self.assertOutput('vtools show genotypes', 'output/remove_genofield_after.txt')
+    #     self.assertFail('vtools remove projects')
+    #     self.assertSucc('vtools remove project')
 
 if __name__ == '__main__':
     unittest.main()
