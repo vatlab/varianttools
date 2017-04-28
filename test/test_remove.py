@@ -60,20 +60,20 @@ class TestRemove(ProcessTestCase):
         self.assertFail('vtools show table unaffected')
         #
         # remove table with strange names
-        self.runCmd('vtools select variant -t "NAME WITH #$%"')
-        self.assertOutput('vtools show tables', 'NAME WITH #$%', partial=True)
-        self.assertSucc('vtools remove tables "NAME WITH #$%"')
-        # Removing field CEU_num from variant table CEU
-        count1 = len(self.runCmd('vtools show fields -v0', ret='list'))
-        self.assertSucc('vtools remove fields CEU_cases_num')
-        count2 = len(self.runCmd('vtools show fields -v0', ret='list'))
-        self.assertEqual(count1-count2, 1)
+        # self.runCmd('vtools select variant -t "NAME WITH #$%"')
+        # self.assertOutput('vtools show tables', 'NAME WITH #$%', partial=True)
+        # self.assertSucc('vtools remove tables "NAME WITH #$%"')
+        # # Removing field CEU_num from variant table CEU
+        # count1 = len(self.runCmd('vtools show fields -v0', ret='list'))
+        # self.assertSucc('vtools remove fields CEU_cases_num')
+        # count2 = len(self.runCmd('vtools show fields -v0', ret='list'))
+        # self.assertEqual(count1-count2, 1)
 
-        #remove annotation
-        self.assertFail('vtools remove annotation')
-        self.assertFail('vtools remove annotations')
-        self.assertSucc('vtools remove annotations testNSFP')
-        self.assertFail('vtools show annotation testNSFP')
+        # #remove annotation
+        # self.assertFail('vtools remove annotation')
+        # self.assertFail('vtools remove annotations')
+        # self.assertSucc('vtools remove annotations testNSFP')
+        # self.assertFail('vtools show annotation testNSFP')
 
     # def testRemoveSample(self):
     #     #remove samples
