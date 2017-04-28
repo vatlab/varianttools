@@ -48,16 +48,16 @@ class TestRemove(ProcessTestCase):
             self.runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP --build hg18')
             self.runCmd('vtools admin --save_snapshot TestRemove.tar.gz "Snapshot for testing command remove"')
 
-    def testRemove(self):
-        'Test command vtools remove'
-        self.assertFail('vtools remove')
-        self.assertSucc('vtools remove -h')
+    # def testRemove(self):
+    #     'Test command vtools remove'
+    #     self.assertFail('vtools remove')
+    #     self.assertSucc('vtools remove -h')
 
-        #remove tables
-        self.assertFail('vtools remove table')
-        self.assertFail('vtools remove tables')
-        self.assertSucc('vtools remove tables unaffected')
-        self.assertFail('vtools show table unaffected')
+    #     #remove tables
+    #     self.assertFail('vtools remove table')
+    #     self.assertFail('vtools remove tables')
+    #     self.assertSucc('vtools remove tables unaffected')
+    #     self.assertFail('vtools show table unaffected')
         #
         # remove table with strange names
         # self.runCmd('vtools select variant -t "NAME WITH #$%"')
