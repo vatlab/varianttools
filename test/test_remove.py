@@ -75,25 +75,25 @@ class TestRemove(ProcessTestCase):
         self.assertSucc('vtools remove annotations testNSFP')
         self.assertFail('vtools show annotation testNSFP')
 
-    def testRemoveSample(self):
-        #remove samples
-        self.assertFail('vtools remove sample')
-        self.assertFail('vtools remove samples')
-        self.assertProj(numOfSamples= 63)
-        self.assertSucc('vtools remove samples "sample_name like \'NA070%\'"')
-        self.assertProj(numOfSamples= 60) 
-        self.assertSucc('vtools remove samples "BMI > 20"')
-        # note that the sample with missing BMI is still there
-        self.assertProj(numOfSamples= 28) 
-        self.assertSucc('vtools remove samples "BMI is NULL"')
-        self.assertProj(numOfSamples= 25) 
+    # def testRemoveSample(self):
+    #     #remove samples
+    #     self.assertFail('vtools remove sample')
+    #     self.assertFail('vtools remove samples')
+    #     self.assertProj(numOfSamples= 63)
+    #     self.assertSucc('vtools remove samples "sample_name like \'NA070%\'"')
+    #     self.assertProj(numOfSamples= 60) 
+    #     self.assertSucc('vtools remove samples "BMI > 20"')
+    #     # note that the sample with missing BMI is still there
+    #     self.assertProj(numOfSamples= 28) 
+    #     self.assertSucc('vtools remove samples "BMI is NULL"')
+    #     self.assertProj(numOfSamples= 25) 
 
-        #remove variant
-    def testRemoveVar(self):
-        self.assertFail('vtools remove variant')
-        self.assertFail('vtools remove variants')
-        self.assertSucc('vtools remove variants CEU')
-        self.assertProj(hasTable='CEU', negate=True)
+    #     #remove variant
+    # def testRemoveVar(self):
+    #     self.assertFail('vtools remove variant')
+    #     self.assertFail('vtools remove variants')
+    #     self.assertSucc('vtools remove variants CEU')
+    #     self.assertProj(hasTable='CEU', negate=True)
 
     # def testRemoveFields(self):
     #     #add a field in the variant table
