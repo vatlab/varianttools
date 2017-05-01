@@ -41,11 +41,11 @@ class TestSelect(ProcessTestCase):
             self.runCmd('vtools import txt/input.tsv --format fmt/basic_hg18.fmt --sample_name input.tsv')
             self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
             self.runCmd('vtools use ann/testNSFP.ann')
-            self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
-            self.runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
-            self.runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_het=#(het)"')
-            # save a snapshot, which will make the test run much faster
-            self.runCmd('vtools admin --save_snapshot TestSelect.tar.gz "initial population for testing of command select"')
+            # self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
+            # self.runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
+            # self.runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_het=#(het)"')
+            # # save a snapshot, which will make the test run much faster
+            # self.runCmd('vtools admin --save_snapshot TestSelect.tar.gz "initial population for testing of command select"')
 
     # def testSelect(self):
     #     'Test command vtools select'
@@ -122,15 +122,15 @@ class TestSelect(ProcessTestCase):
     #     self.assertOutput("vtools execute 'select count(*) from sample where sample_name like \"NA0%\"'", '9\n')
     #     self.assertSucc('vtools select CEU -s "BMI<18.5" -t Underweight')
 
-    def testSelectSampleWithWildtypeGenotype(self):
-        self.runCmd('vtools import vcf/with_wildtype.vcf --sample_name WT')
-        # original 989 variants but some of them have only wildtype genotype
-        self.assertOutput('''vtools select variant --samples "sample_name='WT'" -c''', "934\n")
+    # def testSelectSampleWithWildtypeGenotype(self):
+    #     self.runCmd('vtools import vcf/with_wildtype.vcf --sample_name WT')
+    #     # original 989 variants but some of them have only wildtype genotype
+    #     self.assertOutput('''vtools select variant --samples "sample_name='WT'" -c''', "934\n")
 
 
-    def testSelectLargeSample(self):
-        self.runCmd('vtools import vcf/500SAMP.vcf')
-        self.assertSucc('vtools select variant --samples "sample_name like \'SAM%\'" -c')
+    # def testSelectLargeSample(self):
+    #     self.runCmd('vtools import vcf/500SAMP.vcf')
+    #     self.assertSucc('vtools select variant --samples "sample_name like \'SAM%\'" -c')
 
 
     # def testFunctionLeast(self):
