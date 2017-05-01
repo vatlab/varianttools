@@ -60,28 +60,28 @@ class TestUpdate(ProcessTestCase):
         self.assertOutput("vtools select variant alt_pos=753405 -o chr pos mut_type_dbSNP validation -d'\t'",
             "1\t743268\tuntranslated-5\tby-cluster,by-1000genomes\n")
         
-    # def testSampleStat(self):
-    #     'Test command vtools update'
-    #     self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-    #     self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
-    #     self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
-    #     self.assertFail('vtools update')
-    #     self.assertSucc('vtools update -h')
-    #     self.assertFail('vtools update "num=#(alt)"')
-    #     self.assertSucc('vtools update variant --from_stat "cnt=#(GT)" "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
-    #     total = self.runCmd("vtools execute 'select sum(num) from variant'")
-    #     hom = self.runCmd("vtools execute 'select sum(hom) from variant'")
-    #     het = self.runCmd("vtools execute 'select sum(het) from variant'")
-    #     other = self.runCmd("vtools execute 'select sum(other) from variant'")
-    #     cnt = self.runCmd("vtools execute 'select cnt from variant LIMIT 1'")
-    #     for to,ho,he,ot in zip(total.strip().split('\n'), hom.strip().split('\n'), het.strip().split('\n'), other.strip().split('\n')):
-    #         self.assertEqual(int(to), int(ho)*2+int(he)+int(ot))
-    #     self.assertSucc('vtools update CEU --from_stat "CEU_num=#(alt)" -s "filename like \'%CEU%\'"')
-    #     self.assertOutput("vtools execute 'select sum(CEU_num) from variant'", '6383\n', partial=True)
-    #     self.assertSucc('vtools update CEU --from_stat "CEU_num=#(alt)" "CEU_hom=#(hom)" "CEU_het=#(het)" "CEU_other=#(other)"  --samples "filename like \'%CEU%\'"')
-    #     self.assertSucc('vtools update CEU --from_stat "CEU_cases_het=#(het)" --samples "filename like \'%CEU%\' and aff=\'2\'"')
-    #     self.assertOutput("vtools execute 'select sum(CEU_cases_het) from variant'", '1601\n', partial=True)
-    #     self.assertSucc('vtools update CEU --from_stat "CEU_strls_het=#(het)" -s "filename like \'%CEU%\' and aff=\'1\'"')
+    def testSampleStat(self):
+        'Test command vtools update'
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
+        self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
+        self.assertFail('vtools update')
+        self.assertSucc('vtools update -h')
+        self.assertFail('vtools update "num=#(alt)"')
+        self.assertSucc('vtools update variant --from_stat "cnt=#(GT)" "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
+        total = self.runCmd("vtools execute 'select sum(num) from variant'")
+        hom = self.runCmd("vtools execute 'select sum(hom) from variant'")
+        het = self.runCmd("vtools execute 'select sum(het) from variant'")
+        other = self.runCmd("vtools execute 'select sum(other) from variant'")
+        cnt = self.runCmd("vtools execute 'select cnt from variant LIMIT 1'")
+        for to,ho,he,ot in zip(total.strip().split('\n'), hom.strip().split('\n'), het.strip().split('\n'), other.strip().split('\n')):
+            self.assertEqual(int(to), int(ho)*2+int(he)+int(ot))
+        self.assertSucc('vtools update CEU --from_stat "CEU_num=#(alt)" -s "filename like \'%CEU%\'"')
+        self.assertOutput("vtools execute 'select sum(CEU_num) from variant'", '6383\n', partial=True)
+        self.assertSucc('vtools update CEU --from_stat "CEU_num=#(alt)" "CEU_hom=#(hom)" "CEU_het=#(het)" "CEU_other=#(other)"  --samples "filename like \'%CEU%\'"')
+        self.assertSucc('vtools update CEU --from_stat "CEU_cases_het=#(het)" --samples "filename like \'%CEU%\' and aff=\'2\'"')
+        self.assertOutput("vtools execute 'select sum(CEU_cases_het) from variant'", '1601\n', partial=True)
+        self.assertSucc('vtools update CEU --from_stat "CEU_strls_het=#(het)" -s "filename like \'%CEU%\' and aff=\'1\'"')
         
     # def testMaf(self):
     #     'Test computation of MAF'
