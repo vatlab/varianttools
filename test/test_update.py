@@ -134,32 +134,32 @@ class TestUpdate(ProcessTestCase):
     #     self.assertProj(info={'res': ['0']*6})
         
 
-    def testSet(self):
-        'Testing vtools update --set'
-        self.runCmd('vtools init test -f')
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.runCmd('''vtools select variant "chr='1'" -t chr1''')
-        self.runCmd('vtools update chr1 --from_stat "num=#(alt)" "total=#(GT)"')
-        self.runCmd('vtools update chr1 --set "ratio=num/(total*1.0)"')
-        self.runCmd('vtools select variant "ratio is NULL" -t other')
-        self.assertProj(numOfVariants={'other': 100})
-        self.assertSucc('vtools show fields')
-
-    # def testGenoAnnoSet(self):
-    #     'Testing command vtools update --set'
+    # def testSet(self):
+    #     'Testing vtools update --set'
     #     self.runCmd('vtools init test -f')
-    #     self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')    
-    #     self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' 'minDP=min(GD)' 'maxDP=max(GD)' 'meanDP=avg(GD)' 'minGQv=min(GQ)' 'maxGQv=max(GQ)' 'meanGQv=avg(GQ)'")
-    #     self.assertSucc('vtools update variant --set "maf=num/(total*2.0)"')
-    #     self.assertSucc('vtools output variant chr pos total num maf -l 10')
-    #     #we can set the fields from the annotation file
-    #     self.assertSucc('vtools liftover hg19')
-    #     # evs does not exist for some reason
-    #     self.assertSucc('vtools use refGene')
-    #     self.assertSucc('vtools update variant --set evs_gene=refGene.name2')
-    #     self.assertOutput('vtools execute "select chr,pos, ref, alt, evs_gene from variant where evs_gene is not null"',
-    #         '22\t49524956\tG\tA\tACR\n', partial=True)
-    #     self.assertOutput(('vtools select variant "evs_gene is not NULL" -c'), '121\n')
+    #     self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+    #     self.runCmd('''vtools select variant "chr='1'" -t chr1''')
+    #     self.runCmd('vtools update chr1 --from_stat "num=#(alt)" "total=#(GT)"')
+    #     self.runCmd('vtools update chr1 --set "ratio=num/(total*1.0)"')
+    #     self.runCmd('vtools select variant "ratio is NULL" -t other')
+    #     self.assertProj(numOfVariants={'other': 100})
+    #     self.assertSucc('vtools show fields')
+
+    def testGenoAnnoSet(self):
+        'Testing command vtools update --set'
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')    
+        self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' 'minDP=min(GD)' 'maxDP=max(GD)' 'meanDP=avg(GD)' 'minGQv=min(GQ)' 'maxGQv=max(GQ)' 'meanGQv=avg(GQ)'")
+        self.assertSucc('vtools update variant --set "maf=num/(total*2.0)"')
+        self.assertSucc('vtools output variant chr pos total num maf -l 10')
+        #we can set the fields from the annotation file
+        self.assertSucc('vtools liftover hg19')
+        # evs does not exist for some reason
+        self.assertSucc('vtools use refGene')
+        self.assertSucc('vtools update variant --set evs_gene=refGene.name2')
+        self.assertOutput('vtools execute "select chr,pos, ref, alt, evs_gene from variant where evs_gene is not null"',
+            '22\t49524956\tG\tA\tACR\n', partial=True)
+        self.assertOutput(('vtools select variant "evs_gene is not NULL" -c'), '121\n')
 
     # def testSetMultiValues(self):
     #     self.runCmd('vtools import txt/variants.txt --format basic --build hg19')
