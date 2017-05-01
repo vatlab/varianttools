@@ -83,98 +83,98 @@ class TestUpdate(ProcessTestCase):
     #     self.assertOutput("vtools execute 'select sum(CEU_cases_het) from variant'", '1601\n', partial=True)
     #     self.assertSucc('vtools update CEU --from_stat "CEU_strls_het=#(het)" -s "filename like \'%CEU%\' and aff=\'1\'"')
         
-    def testMaf(self):
-        'Test computation of MAF'
-        # all females
-        self.runCmd('vtools import vcf/chromX.vcf.gz --build hg18')
-        self.runCmd('vtools phenotype --set "sex=2" --samples 1')
-        self.assertSucc('vtools update variant --from_stat "cnt0=#(GT)" "num0=#(alt)" "hom0=#(hom)" "het0=#(het)" "other0=#(other)" "maf0=maf()"')
-        cnt = self.runCmd("vtools execute 'select cnt0 from variant LIMIT 10'")
-        num = self.runCmd("vtools execute 'select num0 from variant LIMIT 10'")
-        maf = self.runCmd("vtools execute 'select maf0 from variant LIMIT 10'")
-        for c,n,m in zip(cnt.strip().split('\n'), num.strip().split('\n'), maf.strip().split('\n')):
-            value = float(n)/float(c)/2.0
-            value = value if value < 0.5 else 1 - value
-            self.assertAlmostEqual(float(m), value)
-        # all males
-        self.runCmd('vtools phenotype --set "sex=1" --samples 1')
-        self.assertSucc('vtools update variant --from_stat "cnt1=#(GT)" "num1=#(alt)" "hom1=#(hom)" "het1=#(het)" "other1=#(other)" "maf1=maf()"')
-        cnt = self.runCmd("vtools execute 'select cnt1 from variant LIMIT 10'")
-        num = self.runCmd("vtools execute 'select num1 from variant LIMIT 10'")
-        maf = self.runCmd("vtools execute 'select maf1 from variant LIMIT 10'")
-        for c,n,m in zip(cnt.strip().split('\n'), num.strip().split('\n'), maf.strip().split('\n')):
-            value = float(n)/float(c)
-            value = value if value < 0.5 else 1 - value
-            self.assertAlmostEqual(float(m), value)
+    # def testMaf(self):
+    #     'Test computation of MAF'
+    #     # all females
+    #     self.runCmd('vtools import vcf/chromX.vcf.gz --build hg18')
+    #     self.runCmd('vtools phenotype --set "sex=2" --samples 1')
+    #     self.assertSucc('vtools update variant --from_stat "cnt0=#(GT)" "num0=#(alt)" "hom0=#(hom)" "het0=#(het)" "other0=#(other)" "maf0=maf()"')
+    #     cnt = self.runCmd("vtools execute 'select cnt0 from variant LIMIT 10'")
+    #     num = self.runCmd("vtools execute 'select num0 from variant LIMIT 10'")
+    #     maf = self.runCmd("vtools execute 'select maf0 from variant LIMIT 10'")
+    #     for c,n,m in zip(cnt.strip().split('\n'), num.strip().split('\n'), maf.strip().split('\n')):
+    #         value = float(n)/float(c)/2.0
+    #         value = value if value < 0.5 else 1 - value
+    #         self.assertAlmostEqual(float(m), value)
+    #     # all males
+    #     self.runCmd('vtools phenotype --set "sex=1" --samples 1')
+    #     self.assertSucc('vtools update variant --from_stat "cnt1=#(GT)" "num1=#(alt)" "hom1=#(hom)" "het1=#(het)" "other1=#(other)" "maf1=maf()"')
+    #     cnt = self.runCmd("vtools execute 'select cnt1 from variant LIMIT 10'")
+    #     num = self.runCmd("vtools execute 'select num1 from variant LIMIT 10'")
+    #     maf = self.runCmd("vtools execute 'select maf1 from variant LIMIT 10'")
+    #     for c,n,m in zip(cnt.strip().split('\n'), num.strip().split('\n'), maf.strip().split('\n')):
+    #         value = float(n)/float(c)
+    #         value = value if value < 0.5 else 1 - value
+    #         self.assertAlmostEqual(float(m), value)
         
        
-    def testGenotypeSumStats(self):
-        'Test command vtools update min/max/sum/mean_FIELD'
-        self.runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
-        # non-existing field, should fail
-        self.assertFail('vtools update variant --from_stat "max_gq=max(GQ1)" "min_gq=min(GQ)"')
-        self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' \
-                            'minDP=min(GD)' 'maxDP=max(GD)' 'meanDP=avg(GD)' 'minGQv=min(GQ)' 'maxGQv=max(GQ)' 'meanGQv=avg(GQ)'")
-        self.assertOutput('vtools output variant maxGQv minGQv meanGQv --precision 4', 'output/update_sum_stat.txt')
-        self.assertSucc('vtools update variant --from_stat "total_dp=sum(GD)"')
-        self.assertProj(info={'total_dp': ['None', 'None', 'None', '60', '7', '4']})
-        # ffilter out variants having GQ less than 4,
-        # then for each remining variant count the total number of alt genotypes across all samples
-        self.assertSucc('vtools update variant --from_stat "gq_ge_4=#(alt)" --genotype "GQ >= 4"')
-        self.assertProj(info={'gq_ge_4': ['0', '0', '0', '0', '3', '1']})
-        #
-        self.assertSucc('vtools update variant --from_stat "missing=#(missing)" "wt=#(wtGT)" "mut=#(mutGT)" "total=#(GT)"')
-        self.assertSucc('vtools update variant --set "res=total-wt-hom-het-other"')
-        self.assertProj(info={'res': ['0']*6})
-        self.assertSucc('vtools update variant --set "res=num-2*hom-het-other"')
-        self.assertProj(info={'res': ['0']*6})
-        self.assertSucc('vtools update variant --set "res=4-missing-total"')
-        self.assertProj(info={'res': ['0']*6})
-        self.assertSucc('vtools update variant --set "res=mut-hom-het-other"')
-        self.assertProj(info={'res': ['0']*6})
+    # def testGenotypeSumStats(self):
+    #     'Test command vtools update min/max/sum/mean_FIELD'
+    #     self.runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
+    #     # non-existing field, should fail
+    #     self.assertFail('vtools update variant --from_stat "max_gq=max(GQ1)" "min_gq=min(GQ)"')
+    #     self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' \
+    #                         'minDP=min(GD)' 'maxDP=max(GD)' 'meanDP=avg(GD)' 'minGQv=min(GQ)' 'maxGQv=max(GQ)' 'meanGQv=avg(GQ)'")
+    #     self.assertOutput('vtools output variant maxGQv minGQv meanGQv --precision 4', 'output/update_sum_stat.txt')
+    #     self.assertSucc('vtools update variant --from_stat "total_dp=sum(GD)"')
+    #     self.assertProj(info={'total_dp': ['None', 'None', 'None', '60', '7', '4']})
+    #     # ffilter out variants having GQ less than 4,
+    #     # then for each remining variant count the total number of alt genotypes across all samples
+    #     self.assertSucc('vtools update variant --from_stat "gq_ge_4=#(alt)" --genotype "GQ >= 4"')
+    #     self.assertProj(info={'gq_ge_4': ['0', '0', '0', '0', '3', '1']})
+    #     #
+    #     self.assertSucc('vtools update variant --from_stat "missing=#(missing)" "wt=#(wtGT)" "mut=#(mutGT)" "total=#(GT)"')
+    #     self.assertSucc('vtools update variant --set "res=total-wt-hom-het-other"')
+    #     self.assertProj(info={'res': ['0']*6})
+    #     self.assertSucc('vtools update variant --set "res=num-2*hom-het-other"')
+    #     self.assertProj(info={'res': ['0']*6})
+    #     self.assertSucc('vtools update variant --set "res=4-missing-total"')
+    #     self.assertProj(info={'res': ['0']*6})
+    #     self.assertSucc('vtools update variant --set "res=mut-hom-het-other"')
+    #     self.assertProj(info={'res': ['0']*6})
         
 
-    # def testSet(self):
-    #     'Testing vtools update --set'
-    #     self.runCmd('vtools init test -f')
-    #     self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-    #     self.runCmd('''vtools select variant "chr='1'" -t chr1''')
-    #     self.runCmd('vtools update chr1 --from_stat "num=#(alt)" "total=#(GT)"')
-    #     self.runCmd('vtools update chr1 --set "ratio=num/(total*1.0)"')
-    #     self.runCmd('vtools select variant "ratio is NULL" -t other')
-    #     self.assertProj(numOfVariants={'other': 100})
-    #     self.assertSucc('vtools show fields')
+    def testSet(self):
+        'Testing vtools update --set'
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        self.runCmd('''vtools select variant "chr='1'" -t chr1''')
+        self.runCmd('vtools update chr1 --from_stat "num=#(alt)" "total=#(GT)"')
+        self.runCmd('vtools update chr1 --set "ratio=num/(total*1.0)"')
+        self.runCmd('vtools select variant "ratio is NULL" -t other')
+        self.assertProj(numOfVariants={'other': 100})
+        self.assertSucc('vtools show fields')
 
-    # def testGenoAnnoSet(self):
-    #     'Testing command vtools update --set'
-    #     self.runCmd('vtools init test -f')
-    #     self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')    
-    #     self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' 'minDP=min(GD)' 'maxDP=max(GD)' 'meanDP=avg(GD)' 'minGQv=min(GQ)' 'maxGQv=max(GQ)' 'meanGQv=avg(GQ)'")
-    #     self.assertSucc('vtools update variant --set "maf=num/(total*2.0)"')
-    #     self.assertSucc('vtools output variant chr pos total num maf -l 10')
-    #     #we can set the fields from the annotation file
-    #     self.assertSucc('vtools liftover hg19')
-    #     # evs does not exist for some reason
-    #     self.assertSucc('vtools use refGene')
-    #     self.assertSucc('vtools update variant --set evs_gene=refGene.name2')
-    #     self.assertOutput('vtools execute "select chr,pos, ref, alt, evs_gene from variant where evs_gene is not null"',
-    #         '22\t49524956\tG\tA\tACR\n', partial=True)
-    #     self.assertOutput(('vtools select variant "evs_gene is not NULL" -c'), '121\n')
+    def testGenoAnnoSet(self):
+        'Testing command vtools update --set'
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')    
+        self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' 'minDP=min(GD)' 'maxDP=max(GD)' 'meanDP=avg(GD)' 'minGQv=min(GQ)' 'maxGQv=max(GQ)' 'meanGQv=avg(GQ)'")
+        self.assertSucc('vtools update variant --set "maf=num/(total*2.0)"')
+        self.assertSucc('vtools output variant chr pos total num maf -l 10')
+        #we can set the fields from the annotation file
+        self.assertSucc('vtools liftover hg19')
+        # evs does not exist for some reason
+        self.assertSucc('vtools use refGene')
+        self.assertSucc('vtools update variant --set evs_gene=refGene.name2')
+        self.assertOutput('vtools execute "select chr,pos, ref, alt, evs_gene from variant where evs_gene is not null"',
+            '22\t49524956\tG\tA\tACR\n', partial=True)
+        self.assertOutput(('vtools select variant "evs_gene is not NULL" -c'), '121\n')
 
-    # def testSetMultiValues(self):
-    #     self.runCmd('vtools import txt/variants.txt --format basic --build hg19')
-    #     self.runCmd('vtools use refGene')
-    #     self.runCmd('vtools update variant --set "gname=refGene.name2"')
-    #     lines = self.runCmd('vtools output variant chr pos ref alt gname refGene.name2 -d"\t"', ret='list')
-    #     # does not count duplicate lines
-    #     line_count = len(set(lines))
-    #     for line in lines:
-    #         values = line.split('\t')
-    #         self.assertEqual(values[-2], values[-1])
-    #     self.runCmd('vtools update variant --set "vname=refGene.name"')
-    #     lines = self.runCmd('vtools output variant chr pos ref alt vname refGene.name', ret='list')
-    #     # there should not be more lines
-    #     self.assertEqual(line_count, len(set(lines)))
+    def testSetMultiValues(self):
+        self.runCmd('vtools import txt/variants.txt --format basic --build hg19')
+        self.runCmd('vtools use refGene')
+        self.runCmd('vtools update variant --set "gname=refGene.name2"')
+        lines = self.runCmd('vtools output variant chr pos ref alt gname refGene.name2 -d"\t"', ret='list')
+        # does not count duplicate lines
+        line_count = len(set(lines))
+        for line in lines:
+            values = line.split('\t')
+            self.assertEqual(values[-2], values[-1])
+        self.runCmd('vtools update variant --set "vname=refGene.name"')
+        lines = self.runCmd('vtools output variant chr pos ref alt vname refGene.name', ret='list')
+        # there should not be more lines
+        self.assertEqual(line_count, len(set(lines)))
         
 if __name__ == '__main__':
     unittest.main()
