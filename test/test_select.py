@@ -47,10 +47,10 @@ class TestSelect(ProcessTestCase):
             # # save a snapshot, which will make the test run much faster
             # self.runCmd('vtools admin --save_snapshot TestSelect.tar.gz "initial population for testing of command select"')
 
-    def testSelect(self):
-        'Test command vtools select'
-        self.assertFail('vtools select')
-        self.assertSucc('vtools select -h')
+    # def testSelect(self):
+    #     'Test command vtools select'
+    #     self.assertFail('vtools select')
+    #     self.assertSucc('vtools select -h')
     #     # Variant table non_existing_variant does not exist.
     #     self.assertFail('vtools select non_existing_variant')
         # # Neither --to_table and --output/--count is specified. Nothing to do.
