@@ -52,7 +52,7 @@ class TestSelect(ProcessTestCase):
         self.assertFail('vtools select')
         self.assertSucc('vtools select -h')
         # Variant table non_existing_variant does not exist.
-        # self.assertFail('vtools select non_existing_variant')
+        self.assertFail('vtools select non_existing_variant')
         # # Neither --to_table and --output/--count is specified. Nothing to do.
         # self.assertFail('vtools select variant \'testNSFP.non_existing_item is not null\'')
         # Neither --to_table and --output/--count is specified. Nothing to do.
