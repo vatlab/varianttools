@@ -41,8 +41,8 @@ class TestSelect(ProcessTestCase):
             self.runCmd('vtools import txt/input.tsv --format fmt/basic_hg18.fmt --sample_name input.tsv')
             self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
             self.runCmd('vtools use ann/testNSFP.ann')
-            # self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
-            # self.runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
+            self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
+            self.runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
             # self.runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_het=#(het)"')
             # # save a snapshot, which will make the test run much faster
             # self.runCmd('vtools admin --save_snapshot TestSelect.tar.gz "initial population for testing of command select"')
