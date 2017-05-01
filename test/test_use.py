@@ -188,37 +188,37 @@ class TestUse(ProcessTestCase):
     #     self.assertFail('vtools update variant --set gene_name=evs.Genes')
         #self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
 
-    # def testUsePosition(self):
-    #     self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
-    #     #If we use the option of positon, the linked_fields have to be "chr" and "position"
-    #     #the following command is current, but no variant was linked to the annotation database
-    #     self.assertSucc('vtools use gwasCatalog --anno_type position --linked_fields chr position')
-    #     #the output is none from the command below. in order to get the output, create gene_name in variant first
-    #     self.assertSucc('vtools update variant --set gene_name=1')
-    #     self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
-    #     pos_out = self.runCmd('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', ret='list')
-    #     self.assertEqual(pos_out,['9468354\t-\tA\t1'])
-    #     #using another way to export this table
-    #     self.runCmd('vtools init test -f')
-    #     self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
-    #     self.assertSucc('vtools use gwasCatalog')
-    #     #the output is none from the command too
-    #     self.assertSucc('vtools update variant --set gene_name=1')
-    #     self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
-    #     self.assertOutput('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', 'output/use_position.txt')
+    def testUsePosition(self):
+        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        #If we use the option of positon, the linked_fields have to be "chr" and "position"
+        #the following command is current, but no variant was linked to the annotation database
+        self.assertSucc('vtools use gwasCatalog --anno_type position --linked_fields chr position')
+        #the output is none from the command below. in order to get the output, create gene_name in variant first
+        self.assertSucc('vtools update variant --set gene_name=1')
+        self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
+        pos_out = self.runCmd('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', ret='list')
+        self.assertEqual(pos_out,['9468354\t-\tA\t1'])
+        #using another way to export this table
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        self.assertSucc('vtools use gwasCatalog')
+        #the output is none from the command too
+        self.assertSucc('vtools update variant --set gene_name=1')
+        self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
+        self.assertOutput('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', 'output/use_position.txt')
     
     
-    # def testUseAs(self):
-    #     '''Testing the --as option of command vtools use'''
-    #     self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
-    #     #this is the default method. the linked_fields have to be in the order in the test below.
-    #     self.assertSucc('vtools use ESP --anno_type variant --linked_fields chr pos ref alt')
-    #     #it is same with
-    #     self.assertSucc('vtools use ESP --as e')
-    #     self.assertSucc('vtools use ESP --as e1')
-    #     self.assertSucc('vtools show annotation e')
-    #     self.assertSucc('vtools output variant chr pos e.chr e1.chr')
-    #     self.assertSucc('vtools select variant "e.chr is not Null" "e1.chr is not Null" --output chr pos e.chr e1.chr')
+    def testUseAs(self):
+        '''Testing the --as option of command vtools use'''
+        self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+        #this is the default method. the linked_fields have to be in the order in the test below.
+        self.assertSucc('vtools use ESP --anno_type variant --linked_fields chr pos ref alt')
+        #it is same with
+        self.assertSucc('vtools use ESP --as e')
+        self.assertSucc('vtools use ESP --as e1')
+        self.assertSucc('vtools show annotation e')
+        self.assertSucc('vtools output variant chr pos e.chr e1.chr')
+        self.assertSucc('vtools select variant "e.chr is not Null" "e1.chr is not Null" --output chr pos e.chr e1.chr')
 
         
 if __name__ == '__main__':
