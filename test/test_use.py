@@ -154,71 +154,71 @@ class TestUse(ProcessTestCase):
     #     self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields chr position --linked_by chr')
     #     self.assertSucc('vtools use gwasCatalog --anno_type field --linked_fields chr position --linked_by chr pos')
     
-    # def testUseField_2(self):
-    #     self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
-    #     #import the first annotation database
-    #     self.runCmd('vtools use cytoBand')
-    #     self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields region --linked_by genes')
-    #     self.assertSucc('vtools use gwasCatalog --anno_type field --linked_fields region --linked_by cytoBand.name')
-    #     self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
-    #     self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
-    #     self.assertSucc('vtools select variant "gwasCatalog.genes == \'VAMP3\'" -o variant.chr variant.pos variant.ref variant.alt gwasCatalog.trait gwasCatalog.name gwasCatalog.position gwasCatalog.pValue gwasCatalog.journal gwasCatalog.title gwasCatalog.genes')
-    #     #For comparison, if we choise "name" in the linked_fields,nothing will be outputed.  
-    #     self.runCmd('vtools init test -f')
-    #     self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
-    #     self.runCmd('vtools use cytoBand')
-    #     self.assertSucc('vtools use gwasCatalog --anno_type field --linked_fields name --linked_by cytoBand.name')
-    #     self.assertSucc('vtools update variant --set gene_name=1')
-    #     self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
-    #     self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
-    #     self.assertOutput('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', 'output/use_field.txt')
-        
-        
-    # def testUseVariant(self):
-    #     self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
-    #     #this is the default method. the linked_fields have to be in the order in the test below.
-    #     self.assertSucc('vtools use ESP --anno_type variant --linked_fields chr pos ref alt')
-    #     #it is same with
-    #     self.assertSucc('vtools use ESP')
-    #     # --linked_by option will be ignored if you use the option of --anno_type variant
-    #     self.assertFail('vtools use ESP --anno_type variant --linked_fields chr')
-    #     self.assertFail('vtools use ESP --anno_type variant --linked_fields chr pos')
-    #     self.assertFail('vtools use ESP --anno_type variant --linked_fields chr pos ref')
-    #     # because all values are NULL
-    #     self.assertFail('vtools update variant --set gene_name=evs.Genes')
-        #self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
-
-    def testUsePosition(self):
+    def testUseField_2(self):
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
-        #If we use the option of positon, the linked_fields have to be "chr" and "position"
-        #the following command is current, but no variant was linked to the annotation database
-        self.assertSucc('vtools use gwasCatalog --anno_type position --linked_fields chr position')
-        #the output is none from the command below. in order to get the output, create gene_name in variant first
-        self.assertSucc('vtools update variant --set gene_name=1')
+        #import the first annotation database
+        self.runCmd('vtools use cytoBand')
+        self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields region --linked_by genes')
+        self.assertSucc('vtools use gwasCatalog --anno_type field --linked_fields region --linked_by cytoBand.name')
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
-        pos_out = self.runCmd('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', ret='list')
-        self.assertEqual(pos_out,['9468354\t-\tA\t1'])
-        #using another way to export this table
+        self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
+        self.assertSucc('vtools select variant "gwasCatalog.genes == \'VAMP3\'" -o variant.chr variant.pos variant.ref variant.alt gwasCatalog.trait gwasCatalog.name gwasCatalog.position gwasCatalog.pValue gwasCatalog.journal gwasCatalog.title gwasCatalog.genes')
+        #For comparison, if we choise "name" in the linked_fields,nothing will be outputed.  
         self.runCmd('vtools init test -f')
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
-        self.assertSucc('vtools use gwasCatalog')
-        #the output is none from the command too
+        self.runCmd('vtools use cytoBand')
+        self.assertSucc('vtools use gwasCatalog --anno_type field --linked_fields name --linked_by cytoBand.name')
         self.assertSucc('vtools update variant --set gene_name=1')
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
-        self.assertOutput('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', 'output/use_position.txt')
-    
-    
-    def testUseAs(self):
-        '''Testing the --as option of command vtools use'''
+        self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
+        self.assertOutput('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', 'output/use_field.txt')
+        
+        
+    def testUseVariant(self):
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #this is the default method. the linked_fields have to be in the order in the test below.
         self.assertSucc('vtools use ESP --anno_type variant --linked_fields chr pos ref alt')
         #it is same with
-        self.assertSucc('vtools use ESP --as e')
-        self.assertSucc('vtools use ESP --as e1')
-        self.assertSucc('vtools show annotation e')
-        self.assertSucc('vtools output variant chr pos e.chr e1.chr')
-        self.assertSucc('vtools select variant "e.chr is not Null" "e1.chr is not Null" --output chr pos e.chr e1.chr')
+        self.assertSucc('vtools use ESP')
+        # --linked_by option will be ignored if you use the option of --anno_type variant
+        self.assertFail('vtools use ESP --anno_type variant --linked_fields chr')
+        self.assertFail('vtools use ESP --anno_type variant --linked_fields chr pos')
+        self.assertFail('vtools use ESP --anno_type variant --linked_fields chr pos ref')
+        # because all values are NULL
+        self.assertFail('vtools update variant --set gene_name=evs.Genes')
+        self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
+
+    # def testUsePosition(self):
+    #     self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+    #     #If we use the option of positon, the linked_fields have to be "chr" and "position"
+    #     #the following command is current, but no variant was linked to the annotation database
+    #     self.assertSucc('vtools use gwasCatalog --anno_type position --linked_fields chr position')
+    #     #the output is none from the command below. in order to get the output, create gene_name in variant first
+    #     self.assertSucc('vtools update variant --set gene_name=1')
+    #     self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
+    #     pos_out = self.runCmd('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', ret='list')
+    #     self.assertEqual(pos_out,['9468354\t-\tA\t1'])
+    #     #using another way to export this table
+    #     self.runCmd('vtools init test -f')
+    #     self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+    #     self.assertSucc('vtools use gwasCatalog')
+    #     #the output is none from the command too
+    #     self.assertSucc('vtools update variant --set gene_name=1')
+    #     self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
+    #     self.assertOutput('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', 'output/use_position.txt')
+    
+    
+    # def testUseAs(self):
+    #     '''Testing the --as option of command vtools use'''
+    #     self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
+    #     #this is the default method. the linked_fields have to be in the order in the test below.
+    #     self.assertSucc('vtools use ESP --anno_type variant --linked_fields chr pos ref alt')
+    #     #it is same with
+    #     self.assertSucc('vtools use ESP --as e')
+    #     self.assertSucc('vtools use ESP --as e1')
+    #     self.assertSucc('vtools show annotation e')
+    #     self.assertSucc('vtools output variant chr pos e.chr e1.chr')
+    #     self.assertSucc('vtools select variant "e.chr is not Null" "e1.chr is not Null" --output chr pos e.chr e1.chr')
 
         
 if __name__ == '__main__':
