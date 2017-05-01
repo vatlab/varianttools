@@ -39,9 +39,9 @@ class TestShow(ProcessTestCase):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools use ann/testNSFP.ann')
         
-    def testShow(self):
-        'Test command vtools show'
-        self.assertSucc('vtools show -h')
+    # def testShow(self):
+    #     'Test command vtools show'
+    #     self.assertSucc('vtools show -h')
         # Please specify a table to display
         # self.assertFail('vtools show table')
         # self.assertSucc('vtools show tables')
