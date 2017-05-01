@@ -74,74 +74,74 @@ class TestSelect(ProcessTestCase):
         self.assertSucc('vtools show table "* ns@"')
         self.assertSucc('vtools show table "ns@sub"')
         
-    def testSelectSample(self):
-        self.assertOutput("vtools select variant --samples 'filename like \"%input.tsv\"' -c", '1446')
-        self.assertOutput("vtools select variant --samples 'filename like \"%CEU.vcf.gz\" ' -c", '288\n')
-        self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "filename like \'%input.tsv\'" -t ns_input')
-        #nsfp = output2list('vtools execute "select chr, hg18pos, ref, alt from testNSFP"')
-        #variantid = [output2list('vtools execute "select variant_id from variant where chr={0} and pos={1} and ref={2} and alt={3}"'.format(x.split()[0], x.split()[1], repr(x.split()[2]), repr(x.split()[3]))) for x in nsfp]
-        #print variantid
-        self.assertOutput("vtools select ns_input -c", '1446')
-        self.assertSucc('vtools select ns_input \'genename = "PLEKHN1"\'  -t plekhn1')
-        self.assertOutput("vtools select plekhn1 -c", '1427')
-        self.assertSucc('vtools select plekhn1 "polyphen2_score>0.9 and sift_score>0.9" -t d_plekhn1')
-        self.assertOutput("vtools select d_plekhn1 -c", '427\n')
-        self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "aff=1" -t ns_aff')
-        self.assertOutput("vtools select ns_aff -c", '0\n')
-        #
-        self.assertSucc('vtools select variant --samples "aff=\'1\' and BMI<20" -t ns3')
-        namelist = self.runCmd('vtools execute "select sample_id from sample where aff=1 and BMI<20"')
-        variantlist = [self.runCmd('vtools execute "select variant_id from genotype_{} where GT <> 0"'.format(x), ret='list') 
-            for x in namelist.strip().split('\n')]
-        variantlist = [x for y in variantlist for x in y]
-        lv = str(len(set(variantlist)))
-        self.assertOutput("vtools select ns3 -c", '{}\n'.format(lv))
-        self.assertOutput("vtools execute 'select count(*) from sample where aff=1 and BMI<20'", '10\n')
-        self.assertSucc('vtools select variant --samples "aff=\'1\'" "BMI<20" -t ns3')
-        self.assertOutput("vtools select ns3 -c", lv)
-        #
-        self.assertSucc('vtools select variant --samples "aff=\'1\' or BMI<20" -t ns2')
-        namelist = self.runCmd('vtools execute "select sample_id from sample where aff=1 or BMI<20"')
-        variantlist = [self.runCmd('vtools execute "select variant_id from genotype_{} where GT <> 0"'.format(x), ret='list')
-            for x in namelist.strip().split('\n')]
-        variantlist = [x for y in variantlist for x in y]
-        lv = str(len(set(variantlist)))
-        #
-        self.assertOutput("vtools select ns2 -c", lv)
-        self.assertOutput("vtools execute 'select count(*) from sample where aff=1 or BMI<20'", '40\n')
-        #
-        self.assertSucc('vtools select variant "testNSFP.chr is not null" "genename=\'PLEKHN1\'" "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
-        #
-        self.assertSucc('vtools select variant --samples "sample_name like \'NA0%\'" -t NA0')
-        namelist = self.runCmd('vtools execute "select sample_id from sample where sample_name like \'NA0%\'"')
-        variantlist = [self.runCmd('vtools execute "select variant_id from genotype_{} where gt <> 0"'.format(x), ret='list')
-            for x in namelist.strip().split('\n')]
-        variantlist = [x for y in variantlist for x in y]
-        lv = str(len(set(variantlist)))
-        self.assertOutput("vtools select NA0 -c", lv)
-        self.assertOutput("vtools execute 'select count(*) from sample where sample_name like \"NA0%\"'", '9\n')
-        self.assertSucc('vtools select CEU -s "BMI<18.5" -t Underweight')
+    # def testSelectSample(self):
+    #     self.assertOutput("vtools select variant --samples 'filename like \"%input.tsv\"' -c", '1446')
+    #     self.assertOutput("vtools select variant --samples 'filename like \"%CEU.vcf.gz\" ' -c", '288\n')
+    #     self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "filename like \'%input.tsv\'" -t ns_input')
+    #     #nsfp = output2list('vtools execute "select chr, hg18pos, ref, alt from testNSFP"')
+    #     #variantid = [output2list('vtools execute "select variant_id from variant where chr={0} and pos={1} and ref={2} and alt={3}"'.format(x.split()[0], x.split()[1], repr(x.split()[2]), repr(x.split()[3]))) for x in nsfp]
+    #     #print variantid
+    #     self.assertOutput("vtools select ns_input -c", '1446')
+    #     self.assertSucc('vtools select ns_input \'genename = "PLEKHN1"\'  -t plekhn1')
+    #     self.assertOutput("vtools select plekhn1 -c", '1427')
+    #     self.assertSucc('vtools select plekhn1 "polyphen2_score>0.9 and sift_score>0.9" -t d_plekhn1')
+    #     self.assertOutput("vtools select d_plekhn1 -c", '427\n')
+    #     self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "aff=1" -t ns_aff')
+    #     self.assertOutput("vtools select ns_aff -c", '0\n')
+    #     #
+    #     self.assertSucc('vtools select variant --samples "aff=\'1\' and BMI<20" -t ns3')
+    #     namelist = self.runCmd('vtools execute "select sample_id from sample where aff=1 and BMI<20"')
+    #     variantlist = [self.runCmd('vtools execute "select variant_id from genotype_{} where GT <> 0"'.format(x), ret='list') 
+    #         for x in namelist.strip().split('\n')]
+    #     variantlist = [x for y in variantlist for x in y]
+    #     lv = str(len(set(variantlist)))
+    #     self.assertOutput("vtools select ns3 -c", '{}\n'.format(lv))
+    #     self.assertOutput("vtools execute 'select count(*) from sample where aff=1 and BMI<20'", '10\n')
+    #     self.assertSucc('vtools select variant --samples "aff=\'1\'" "BMI<20" -t ns3')
+    #     self.assertOutput("vtools select ns3 -c", lv)
+    #     #
+    #     self.assertSucc('vtools select variant --samples "aff=\'1\' or BMI<20" -t ns2')
+    #     namelist = self.runCmd('vtools execute "select sample_id from sample where aff=1 or BMI<20"')
+    #     variantlist = [self.runCmd('vtools execute "select variant_id from genotype_{} where GT <> 0"'.format(x), ret='list')
+    #         for x in namelist.strip().split('\n')]
+    #     variantlist = [x for y in variantlist for x in y]
+    #     lv = str(len(set(variantlist)))
+    #     #
+    #     self.assertOutput("vtools select ns2 -c", lv)
+    #     self.assertOutput("vtools execute 'select count(*) from sample where aff=1 or BMI<20'", '40\n')
+    #     #
+    #     self.assertSucc('vtools select variant "testNSFP.chr is not null" "genename=\'PLEKHN1\'" "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
+    #     #
+    #     self.assertSucc('vtools select variant --samples "sample_name like \'NA0%\'" -t NA0')
+    #     namelist = self.runCmd('vtools execute "select sample_id from sample where sample_name like \'NA0%\'"')
+    #     variantlist = [self.runCmd('vtools execute "select variant_id from genotype_{} where gt <> 0"'.format(x), ret='list')
+    #         for x in namelist.strip().split('\n')]
+    #     variantlist = [x for y in variantlist for x in y]
+    #     lv = str(len(set(variantlist)))
+    #     self.assertOutput("vtools select NA0 -c", lv)
+    #     self.assertOutput("vtools execute 'select count(*) from sample where sample_name like \"NA0%\"'", '9\n')
+    #     self.assertSucc('vtools select CEU -s "BMI<18.5" -t Underweight')
 
-    def testSelectSampleWithWildtypeGenotype(self):
-        self.runCmd('vtools import vcf/with_wildtype.vcf --sample_name WT')
-        # original 989 variants but some of them have only wildtype genotype
-        self.assertOutput('''vtools select variant --samples "sample_name='WT'" -c''', "934\n")
-
-
-    def testSelectLargeSample(self):
-        self.runCmd('vtools import vcf/500SAMP.vcf')
-        self.assertSucc('vtools select variant --samples "sample_name like \'SAM%\'" -c')
+    # def testSelectSampleWithWildtypeGenotype(self):
+    #     self.runCmd('vtools import vcf/with_wildtype.vcf --sample_name WT')
+    #     # original 989 variants but some of them have only wildtype genotype
+    #     self.assertOutput('''vtools select variant --samples "sample_name='WT'" -c''', "934\n")
 
 
-    def testFunctionLeast(self):
-        'Testing a self-defined sql function least'
-        self.assertSucc('vtools update variant --set "nil=NULL"')
-        # the least function will ignore value from nil
-        self.assertSucc('vtools update variant --set "lst=least_not_null(hom, het, nil)"')
-        counts = self.runCmd('vtools output variant hom het lst', ret='list')
-        for line in counts:
-            values = [int(x) for x in line.split()]
-            self.assertEqual(min(values[0], values[1]), values[2])
+    # def testSelectLargeSample(self):
+    #     self.runCmd('vtools import vcf/500SAMP.vcf')
+    #     self.assertSucc('vtools select variant --samples "sample_name like \'SAM%\'" -c')
+
+
+    # def testFunctionLeast(self):
+    #     'Testing a self-defined sql function least'
+    #     self.assertSucc('vtools update variant --set "nil=NULL"')
+    #     # the least function will ignore value from nil
+    #     self.assertSucc('vtools update variant --set "lst=least_not_null(hom, het, nil)"')
+    #     counts = self.runCmd('vtools output variant hom het lst', ret='list')
+    #     for line in counts:
+    #         values = [int(x) for x in line.split()]
+    #         self.assertEqual(min(values[0], values[1]), values[2])
 
     
 if __name__ == '__main__':
