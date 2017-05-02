@@ -39,10 +39,10 @@ class TestCompare(ProcessTestCase):
             self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
             self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
             self.runCmd('vtools use ann/testNSFP.ann')
-            self.runCmd('vtools select variant \'testNSFP.chr is not null\' -t ns')
-            self.runCmd('vtools select ns \'sift_score > 0.95\' -t ns_damaging')
-            self.runCmd('vtools select ns \'genename = "PLEKHN1"\' -t plekhn1')
-            self.runCmd('vtools select plekhn1 "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
+            # self.runCmd('vtools select variant \'testNSFP.chr is not null\' -t ns')
+            # self.runCmd('vtools select ns \'sift_score > 0.95\' -t ns_damaging')
+            # self.runCmd('vtools select ns \'genename = "PLEKHN1"\' -t plekhn1')
+            # self.runCmd('vtools select plekhn1 "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
             # self.runCmd('vtools admin --save_snapshot TestCompare.tar.gz "Snapshot for testing comapre command"')
 
     # def testCompare(self):
@@ -79,36 +79,36 @@ class TestCompare(ProcessTestCase):
     #     self.assertSucc('vtools compare \'ns*\' --union u')
     #     self.assertProj(hasTable='u')
 
-    def testCompareExpression1(self):
-        'Test command vtools compare (form 1)'
-        # fix me: the following only test the case with two tables, should also test for one and more than two tables
-        self.assertFail('vtools compare')
-        self.assertSucc('vtools compare -h')
-        # WARNING: No action parameter is specified. Nothing to do.
-        self.assertOutput('vtools compare plekhn1 d_plekhn1 ', ['431\t0\t996\t1427'])
-        # error: argument --A_and_B: expected one argument
-        self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "_1 & _2"')
-        self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "common=_1 & _2"')
-        # WARNING: Existing table common is renamed to common_Aug09_170022.
-        self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "common=_1 & _2"')
-        self.assertProj(numOfVariants={'common': 572})
-        self.assertSucc('vtools compare d_plekhn1 ns --expression "AorB=_1 | _2"')
-        self.assertProj(numOfVariants={'AorB': 1446})
-        self.assertSucc('vtools compare d_plekhn1 ns --expression "AandB=_1 & _2"')
-        self.assertProj(numOfVariants={'AandB': 996})
-        self.assertSucc('vtools compare d_plekhn1 ns --expression "AdiffB=_1 - _2"')
-        self.assertProj(numOfVariants={'AdiffB': 0})
-        self.assertSucc('vtools compare ns d_plekhn1 --expression "BdiffA=_1 - _2"')
-        self.assertProj(numOfVariants={'BdiffA': 450})
-        # use both options in one command should be allowed
-        self.assertSucc('vtools compare d_plekhn1 plekhn1  --expression "A_OR_B=_1 | _2"')
-        #
-        # handling of non-alphanum names
-        self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "\'KK@\'=_1 | _2"')
-        self.assertProj(hasTable='KK@')
-        self.runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
-        self.assertSucc('vtools compare "d@p" ns_damaging --expression "\'K&K@\'=_1 & _2"')
-        self.assertProj(hasTable='K&K@')
+    # def testCompareExpression1(self):
+    #     'Test command vtools compare (form 1)'
+    #     # fix me: the following only test the case with two tables, should also test for one and more than two tables
+    #     self.assertFail('vtools compare')
+    #     self.assertSucc('vtools compare -h')
+    #     # WARNING: No action parameter is specified. Nothing to do.
+    #     self.assertOutput('vtools compare plekhn1 d_plekhn1 ', ['431\t0\t996\t1427'])
+    #     # error: argument --A_and_B: expected one argument
+    #     self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "_1 & _2"')
+    #     self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "common=_1 & _2"')
+    #     # WARNING: Existing table common is renamed to common_Aug09_170022.
+    #     self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "common=_1 & _2"')
+    #     self.assertProj(numOfVariants={'common': 572})
+    #     self.assertSucc('vtools compare d_plekhn1 ns --expression "AorB=_1 | _2"')
+    #     self.assertProj(numOfVariants={'AorB': 1446})
+    #     self.assertSucc('vtools compare d_plekhn1 ns --expression "AandB=_1 & _2"')
+    #     self.assertProj(numOfVariants={'AandB': 996})
+    #     self.assertSucc('vtools compare d_plekhn1 ns --expression "AdiffB=_1 - _2"')
+    #     self.assertProj(numOfVariants={'AdiffB': 0})
+    #     self.assertSucc('vtools compare ns d_plekhn1 --expression "BdiffA=_1 - _2"')
+    #     self.assertProj(numOfVariants={'BdiffA': 450})
+    #     # use both options in one command should be allowed
+    #     self.assertSucc('vtools compare d_plekhn1 plekhn1  --expression "A_OR_B=_1 | _2"')
+    #     #
+    #     # handling of non-alphanum names
+    #     self.assertSucc('vtools compare d_plekhn1 ns_damaging --expression "\'KK@\'=_1 | _2"')
+    #     self.assertProj(hasTable='KK@')
+    #     self.runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
+    #     self.assertSucc('vtools compare "d@p" ns_damaging --expression "\'K&K@\'=_1 & _2"')
+    #     self.assertProj(hasTable='K&K@')
 
     # def testCompareExpression2(self):
     #     'Test command vtools compare (form 2)'
