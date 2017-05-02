@@ -42,7 +42,7 @@ class TestCompare(ProcessTestCase):
             self.runCmd('vtools select variant \'testNSFP.chr is not null\' -t ns')
             self.runCmd('vtools select ns \'sift_score > 0.95\' -t ns_damaging')
             self.runCmd('vtools select ns \'genename = "PLEKHN1"\' -t plekhn1')
-            # self.runCmd('vtools select plekhn1 "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
+            self.runCmd('vtools select plekhn1 "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
             # self.runCmd('vtools admin --save_snapshot TestCompare.tar.gz "Snapshot for testing comapre command"')
 
     # def testCompare(self):
