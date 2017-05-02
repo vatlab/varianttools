@@ -37,17 +37,17 @@ class TestAvgDepth(ProcessTestCase):
     def testAvgDepth(self):
         'Test command vtools_report avg_depth'
         self.assertFail('vtools_report avg_depth')
-        # self.assertSucc('vtools_report avg_depth -h')
-        # # error: argument -n/--num_field is required
-        # self.assertFail('vtools_report avg_depth variant non_existing_column')
-        # # error: argument -d/--depth_field is required
-        # self.assertFail('vtools_report avg_depth variant -n num')
-        # self.assertSucc('vtools_report avg_depth variant -n num -d depth')
-        # self.assertSucc('vtools_report avg_depth variant -d depth -n num')
-        # # error: argument -d/--depth_field is required
-        # self.assertFail('vtools_report avg_depth variant -n num --group_by num')
-        # self.assertSucc('vtools_report avg_depth variant -n num -d depth --group_by num')
-        # self.assertSucc('vtools_report avg_depth variant -n num -d depth --group_by depth')
+        self.assertSucc('vtools_report avg_depth -h')
+        # error: argument -n/--num_field is required
+        self.assertFail('vtools_report avg_depth variant non_existing_column')
+        # error: argument -d/--depth_field is required
+        self.assertFail('vtools_report avg_depth variant -n num')
+        self.assertSucc('vtools_report avg_depth variant -n num -d depth')
+        self.assertSucc('vtools_report avg_depth variant -d depth -n num')
+        # error: argument -d/--depth_field is required
+        self.assertFail('vtools_report avg_depth variant -n num --group_by num')
+        self.assertSucc('vtools_report avg_depth variant -n num -d depth --group_by num')
+        self.assertSucc('vtools_report avg_depth variant -n num -d depth --group_by depth')
 
 if __name__ == '__main__':
     unittest.main()
