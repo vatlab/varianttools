@@ -48,85 +48,85 @@ class TestRemove(ProcessTestCase):
             self.runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP --build hg18')
             self.runCmd('vtools admin --save_snapshot TestRemove.tar.gz "Snapshot for testing command remove"')
 
-    # def testRemove(self):
-    #     'Test command vtools remove'
-    #     self.assertFail('vtools remove')
-    #     self.assertSucc('vtools remove -h')
+    def testRemove(self):
+        'Test command vtools remove'
+        self.assertFail('vtools remove')
+        self.assertSucc('vtools remove -h')
 
-    #     #remove tables
-    #     self.assertFail('vtools remove table')
-    #     self.assertFail('vtools remove tables')
-    #     self.assertSucc('vtools remove tables unaffected')
-    #     self.assertFail('vtools show table unaffected')
-    #     #
-    #     # remove table with strange names
-    #     self.runCmd('vtools select variant -t "NAME WITH #$%"')
-    #     self.assertOutput('vtools show tables', 'NAME WITH #$%', partial=True)
-    #     self.assertSucc('vtools remove tables "NAME WITH #$%"')
-    #     # Removing field CEU_num from variant table CEU
-    #     count1 = len(self.runCmd('vtools show fields -v0', ret='list'))
-    #     self.assertSucc('vtools remove fields CEU_cases_num')
-    #     count2 = len(self.runCmd('vtools show fields -v0', ret='list'))
-    #     self.assertEqual(count1-count2, 1)
+        #remove tables
+        self.assertFail('vtools remove table')
+        self.assertFail('vtools remove tables')
+        self.assertSucc('vtools remove tables unaffected')
+        self.assertFail('vtools show table unaffected')
+        #
+        # remove table with strange names
+        self.runCmd('vtools select variant -t "NAME WITH #$%"')
+        self.assertOutput('vtools show tables', 'NAME WITH #$%', partial=True)
+        self.assertSucc('vtools remove tables "NAME WITH #$%"')
+        # Removing field CEU_num from variant table CEU
+        count1 = len(self.runCmd('vtools show fields -v0', ret='list'))
+        self.assertSucc('vtools remove fields CEU_cases_num')
+        count2 = len(self.runCmd('vtools show fields -v0', ret='list'))
+        self.assertEqual(count1-count2, 1)
 
-    #     #remove annotation
-    #     self.assertFail('vtools remove annotation')
-    #     self.assertFail('vtools remove annotations')
-    #     self.assertSucc('vtools remove annotations testNSFP')
-    #     self.assertFail('vtools show annotation testNSFP')
+        #remove annotation
+        self.assertFail('vtools remove annotation')
+        self.assertFail('vtools remove annotations')
+        self.assertSucc('vtools remove annotations testNSFP')
+        self.assertFail('vtools show annotation testNSFP')
 
-    # def testRemoveSample(self):
-    #     #remove samples
-    #     self.assertFail('vtools remove sample')
-    #     self.assertFail('vtools remove samples')
-    #     self.assertProj(numOfSamples= 63)
-    #     self.assertSucc('vtools remove samples "sample_name like \'NA070%\'"')
-    #     self.assertProj(numOfSamples= 60) 
-    #     self.assertSucc('vtools remove samples "BMI > 20"')
-    #     # note that the sample with missing BMI is still there
-    #     self.assertProj(numOfSamples= 28) 
-    #     self.assertSucc('vtools remove samples "BMI is NULL"')
-    #     self.assertProj(numOfSamples= 25) 
+    def testRemoveSample(self):
+        #remove samples
+        self.assertFail('vtools remove sample')
+        self.assertFail('vtools remove samples')
+        self.assertProj(numOfSamples= 63)
+        self.assertSucc('vtools remove samples "sample_name like \'NA070%\'"')
+        self.assertProj(numOfSamples= 60) 
+        self.assertSucc('vtools remove samples "BMI > 20"')
+        # note that the sample with missing BMI is still there
+        self.assertProj(numOfSamples= 28) 
+        self.assertSucc('vtools remove samples "BMI is NULL"')
+        self.assertProj(numOfSamples= 25) 
 
-        #remove variant
-    # def testRemoveVar(self):
-    #     self.assertFail('vtools remove variant')
-    #     self.assertFail('vtools remove variants')
-    #     self.assertSucc('vtools remove variants CEU')
-    #     self.assertProj(hasTable='CEU', negate=True)
+        remove variant
+    def testRemoveVar(self):
+        self.assertFail('vtools remove variant')
+        self.assertFail('vtools remove variants')
+        self.assertSucc('vtools remove variants CEU')
+        self.assertProj(hasTable='CEU', negate=True)
 
-    # def testRemoveFields(self):
-    #     #add a field in the variant table
-    #     self.runCmd('vtools use testNSFP')
-    #     self.runCmd('vtools update variant --set gene_name=testNSFP.genename')
-    #     self.assertOutput('vtools show table variant', 'output/remove_field_before.txt', partial=-3)
-    #     self.runCmd('vtools remove fields CEU_cases_num gene_name DP') 
-    #     self.assertOutput('vtools show table variant', 'output/remove_field_after.txt', partial=-3)
+    def testRemoveFields(self):
+        #add a field in the variant table
+        self.runCmd('vtools use testNSFP')
+        self.runCmd('vtools update variant --set gene_name=testNSFP.genename')
+        self.assertOutput('vtools show table variant', 'output/remove_field_before.txt', partial=-3)
+        self.runCmd('vtools remove fields CEU_cases_num gene_name DP') 
+        self.assertOutput('vtools show table variant', 'output/remove_field_after.txt', partial=-3)
 
-    # def testRemovePhenotype(self):
-    #     #remove genotype 
-    #     self.assertFail('vtools remove phenotype')
-    #     self.assertFail('vtools remove phenotypes')
-    #     # return 0 even with incorrect phenotype
-    #     self.assertSucc('vtools remove phenotypes sample_name')
-    #     self.assertSucc('vtools remove phenotypes filename')
-    #     self.assertSucc('vtools remove phenotypes "sex = "F""')
-    #     self.assertSucc('vtools remove phenotypes sex')
-    #     # removing non-existing phenotype should yield just a warning
-    #     self.assertSucc('vtools remove phenotypes non_existing')
-    #     self.assertOutput('vtools show samples', 'output/remove_phenotype.txt')
+    def testRemovePhenotype(self):
+        #remove genotype 
+        self.assertFail('vtools remove phenotype')
+        self.assertFail('vtools remove phenotypes')
+        # return 0 even with incorrect phenotype
+        self.assertSucc('vtools remove phenotypes sample_name')
+        self.assertSucc('vtools remove phenotypes filename')
+        self.assertSucc('vtools remove phenotypes "sex = "F""')
+        self.assertSucc('vtools remove phenotypes sex')
+        # removing non-existing phenotype should yield just a warning
+        self.assertSucc('vtools remove phenotypes non_existing')
+        self.assertOutput('vtools show samples', 'output/remove_phenotype.txt')
     
-    # def testRemoveGenoField(self):
-    #     #runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP--build hg18')
-    #     self.maxDiff=None
-    #     self.assertOutput('vtools show genotypes', 'output/remove_genofield_before.txt')
-    #     self.assertFail('vtools remove geno_fields')
-    #     self.assertFail('vtools remove geno_fields variant_id')
-    #     self.assertFail('vtools remove geno_fields gt')
-    #     self.assertSucc('vtools remove geno_fields DP_geno')
-    #     self.assertOutput('vtools show genotypes', 'output/remove_genofield_after.txt')
-    #     self.assertFail('vtools remove projects')
-    #     self.assertSucc('vtools remove project')
+    def testRemoveGenoField(self):
+        #runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP--build hg18')
+        self.maxDiff=None
+        self.assertOutput('vtools show genotypes', 'output/remove_genofield_before.txt')
+        self.assertFail('vtools remove geno_fields')
+        self.assertFail('vtools remove geno_fields variant_id')
+        self.assertFail('vtools remove geno_fields gt')
+        self.assertSucc('vtools remove geno_fields DP_geno')
+        self.assertOutput('vtools show genotypes', 'output/remove_genofield_after.txt')
+        self.assertFail('vtools remove projects')
+        self.assertSucc('vtools remove project')
 
 if __name__ == '__main__':
     unittest.main()
