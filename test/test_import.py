@@ -58,13 +58,13 @@ class TestImport(ProcessTestCase):
         # test downloading fmt file from the website
         self.assertFail('vtools import --build hg18 --format non_existing_fmt txt/input.tsv')
     
-    # def testGenotypes(self):
-    #     'Test the import of genotypes'
-    #     self.assertSucc('vtools import --format fmt/genotypes.fmt txt/genotypes.txt --build hg18')
-    #     with open('txt/genotypes.txt') as inputfile:
-    #         firstline = inputfile.readline()
-    #     self.assertProj(numOfSamples=49, numOfVariants=15, sampleNames=firstline.strip().split()[6:])
-    #     self.assertOutput('vtools output variant chr snp_id genet_dist pos ref alt -d"\t"', 'output/import_genotype_1.txt')
+    def testGenotypes(self):
+        'Test the import of genotypes'
+        self.assertSucc('vtools import --format fmt/genotypes.fmt txt/genotypes.txt --build hg18')
+        with open('txt/genotypes.txt') as inputfile:
+            firstline = inputfile.readline()
+        self.assertProj(numOfSamples=49, numOfVariants=15, sampleNames=firstline.strip().split()[6:])
+        self.assertOutput('vtools output variant chr snp_id genet_dist pos ref alt -d"\t"', 'output/import_genotype_1.txt')
 
     def testDupGenotype(self):
         'Test importing duplicated genotypes'
