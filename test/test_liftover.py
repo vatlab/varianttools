@@ -47,9 +47,9 @@ class TestLiftover(ProcessTestCase):
         self.assertOutput('vtools output variant bin chr pos alt_bin alt_chr alt_pos -d"\t"',
             'output/liftover_cmp.txt')
         
-        We write in hg19 to a datafile, create a new project, import the
-        data and liftover to hg18, we then compare if coordinates in these
-        projects are the same.
+        #We write in hg19 to a datafile, create a new project, import the
+        #data and liftover to hg18, we then compare if coordinates in these
+        #projects are the same.
         
         self.assertOutput('vtools output variant chr pos ref alt --build hg19 -d"\t"', 'output/liftover.txt')
         self.runCmd('vtools init test -f')
