@@ -42,36 +42,36 @@ class TestLiftover(ProcessTestCase):
         self.assertFail('vtools liftover -v 0')
         # non_existing_build
         self.assertFail('vtools liftover non_existing_build')
-        # # from hg18 to hg19
-        # self.assertSucc('vtools liftover hg19')
-        # self.assertOutput('vtools output variant bin chr pos alt_bin alt_chr alt_pos -d"\t"',
-        #     'output/liftover_cmp.txt')
-        #
-        # We write in hg19 to a datafile, create a new project, import the
-        # data and liftover to hg18, we then compare if coordinates in these
-        # projects are the same.
-        # 
-        # self.assertOutput('vtools output variant chr pos ref alt --build hg19 -d"\t"', 'output/liftover.txt')
-        # self.runCmd('vtools init test -f')
-        # self.assertSucc('vtools import --build hg19 --format ../format/basic output/liftover.txt')
-        # self.assertSucc('vtools liftover hg18')
-        # self.assertOutput('vtools output variant alt_bin alt_chr alt_pos bin chr pos -d"\t"',
-        #     'output/liftover_cmp.txt', lambda x: sorted([i for i in x if '.' not in i]))
+        # from hg18 to hg19
+        self.assertSucc('vtools liftover hg19')
+        self.assertOutput('vtools output variant bin chr pos alt_bin alt_chr alt_pos -d"\t"',
+            'output/liftover_cmp.txt')
+        
+        We write in hg19 to a datafile, create a new project, import the
+        data and liftover to hg18, we then compare if coordinates in these
+        projects are the same.
+        
+        self.assertOutput('vtools output variant chr pos ref alt --build hg19 -d"\t"', 'output/liftover.txt')
+        self.runCmd('vtools init test -f')
+        self.assertSucc('vtools import --build hg19 --format ../format/basic output/liftover.txt')
+        self.assertSucc('vtools liftover hg18')
+        self.assertOutput('vtools output variant alt_bin alt_chr alt_pos bin chr pos -d"\t"',
+            'output/liftover_cmp.txt', lambda x: sorted([i for i in x if '.' not in i]))
 
-    # def testLiftoverFlip(self):
-    #     self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-    #     self.assertFail('vtools liftover hg18')
-    #     self.assertFail('vtools liftover hg18 --flip')
-    #     self.assertSucc('vtools liftover hg19')
-    #     self.assertFail('vtools liftover hg18')
-    #     self.assertSucc('vtools liftover hg19 --flip')
-    #     self.assertSucc('vtools liftover hg18 --flip')   
-    #     var_tab18  = self.runCmd('vtools output variant bin chr pos')
-    #     var_tab18 = '\n'.join([x for x in var_tab18.split('\n') if 'NA' not in x])
-    #     self.runCmd('vtools liftover hg19 --flip')   
-    #     var_tab19  = self.runCmd('vtools output variant alt_bin alt_chr alt_pos')
-    #     var_tab19 = '\n'.join([x for x in var_tab19.split('\n') if 'NA' not in x])
-    #     self.assertEqual(var_tab18, var_tab19)
+    def testLiftoverFlip(self):
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        self.assertFail('vtools liftover hg18')
+        self.assertFail('vtools liftover hg18 --flip')
+        self.assertSucc('vtools liftover hg19')
+        self.assertFail('vtools liftover hg18')
+        self.assertSucc('vtools liftover hg19 --flip')
+        self.assertSucc('vtools liftover hg18 --flip')   
+        var_tab18  = self.runCmd('vtools output variant bin chr pos')
+        var_tab18 = '\n'.join([x for x in var_tab18.split('\n') if 'NA' not in x])
+        self.runCmd('vtools liftover hg19 --flip')   
+        var_tab19  = self.runCmd('vtools output variant alt_bin alt_chr alt_pos')
+        var_tab19 = '\n'.join([x for x in var_tab19.split('\n') if 'NA' not in x])
+        self.assertEqual(var_tab18, var_tab19)
 
  
 if __name__ == '__main__':
