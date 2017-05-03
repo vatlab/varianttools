@@ -110,64 +110,64 @@ class TestCompare(ProcessTestCase):
         self.assertSucc('vtools compare "d@p" ns_damaging --expression "\'K&K@\'=_1 & _2"')
         self.assertProj(hasTable='K&K@')
 
-    # def testCompareExpression2(self):
-    #     'Test command vtools compare (form 2)'
-    #     # fix me: the following only test the case with two tables, should also test for one and more than two tables
-    #     self.assertFail('vtools compare')
-    #     self.assertSucc('vtools compare -h')
-    #     # WARNING: No action parameter is specified. Nothing to do.
-    #     self.assertOutput('vtools compare plekhn1 d_plekhn1 ', ['431\t0\t996\t1427'], partial=True)
-    #     # error: argument --A_and_B: expected one argument
-    #     self.assertSucc('vtools compare --expression "d_plekhn1 & ns_damaging"')
-    #     self.assertSucc('vtools compare --expression "common=d_plekhn1 & ns_damaging"')
-    #     # WARNING: Existing table common is renamed to common_Aug09_170022.
-    #     self.assertSucc('vtools compare --expression "common=d_plekhn1 & ns_damaging"')
-    #     self.assertProj(numOfVariants={'common': 572})
-    #     self.assertSucc('vtools compare --expression "AorB=d_plekhn1 | ns"')
-    #     self.assertProj(numOfVariants={'AorB': 1446})
-    #     self.assertSucc('vtools compare --expression "AandB=d_plekhn1 & ns"')
-    #     self.assertProj(numOfVariants={'AandB': 996})
-    #     self.assertSucc('vtools compare --expression "AdiffB=d_plekhn1 -ns"')
-    #     self.assertProj(numOfVariants={'AdiffB': 0})
-    #     self.assertSucc('vtools compare --expression "BdiffA=ns-d_plekhn1"')
-    #     self.assertProj(numOfVariants={'BdiffA': 450})
-    #     # use both options in one command should be allowed
-    #     self.assertSucc('vtools compare --expression "A_OR_B=d_plekhn1|plekhn1"')
-    #     #
-    #     # handling of non-alphanum names
-    #     self.assertSucc('vtools compare --expression "\'KK@\'=d_plekhn1 |ns_damaging"')
-    #     self.assertProj(hasTable='KK@')
-    #     self.runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
-    #     self.assertSucc('vtools compare  --expression "\'K&K@\'=\'d@p\' & ns_damaging"')
-    #     self.assertProj(hasTable='K&K@')
+    def testCompareExpression2(self):
+        'Test command vtools compare (form 2)'
+        # fix me: the following only test the case with two tables, should also test for one and more than two tables
+        self.assertFail('vtools compare')
+        self.assertSucc('vtools compare -h')
+        # WARNING: No action parameter is specified. Nothing to do.
+        self.assertOutput('vtools compare plekhn1 d_plekhn1 ', ['431\t0\t996\t1427'], partial=True)
+        # error: argument --A_and_B: expected one argument
+        self.assertSucc('vtools compare --expression "d_plekhn1 & ns_damaging"')
+        self.assertSucc('vtools compare --expression "common=d_plekhn1 & ns_damaging"')
+        # WARNING: Existing table common is renamed to common_Aug09_170022.
+        self.assertSucc('vtools compare --expression "common=d_plekhn1 & ns_damaging"')
+        self.assertProj(numOfVariants={'common': 572})
+        self.assertSucc('vtools compare --expression "AorB=d_plekhn1 | ns"')
+        self.assertProj(numOfVariants={'AorB': 1446})
+        self.assertSucc('vtools compare --expression "AandB=d_plekhn1 & ns"')
+        self.assertProj(numOfVariants={'AandB': 996})
+        self.assertSucc('vtools compare --expression "AdiffB=d_plekhn1 -ns"')
+        self.assertProj(numOfVariants={'AdiffB': 0})
+        self.assertSucc('vtools compare --expression "BdiffA=ns-d_plekhn1"')
+        self.assertProj(numOfVariants={'BdiffA': 450})
+        # use both options in one command should be allowed
+        self.assertSucc('vtools compare --expression "A_OR_B=d_plekhn1|plekhn1"')
+        #
+        # handling of non-alphanum names
+        self.assertSucc('vtools compare --expression "\'KK@\'=d_plekhn1 |ns_damaging"')
+        self.assertProj(hasTable='KK@')
+        self.runCmd('vtools admin --rename_table d_plekhn1 "d@p"')
+        self.assertSucc('vtools compare  --expression "\'K&K@\'=\'d@p\' & ns_damaging"')
+        self.assertProj(hasTable='K&K@')
 
-    # def testSimpleProj(self):
-    #     'Test compare by site'
-    #     # do not use the default project
-    #     self.runCmd('vtools init test -f')
-    #     self.runCmd('vtools import vcf/compare.vcf --build hg18')
-    #     self.runCmd('vtools execute "DELETE FROM genotype.genotype_1 WHERE GT=0"')
-    #     self.runCmd('vtools execute "DELETE FROM genotype.genotype_2 WHERE GT=0"')
-    #     self.runCmd('vtools select variant "variant_id in (1, 2)" -t T1')
-    #     self.runCmd('vtools select variant "variant_id in (1, 3, 4)" -t T2')
-    #     # variant
-    #     self.assertOutput('vtools compare T1 T2 ', '1\t2\t1\t4\n')
-    #     self.assertOutput('vtools compare T1 T2 --difference', '1')
-    #     self.assertOutput('vtools compare T2 T1 --difference', '2')
-    #     self.assertOutput('vtools compare T1 T2 --intersection', '1')
-    #     self.assertOutput('vtools compare T1 T2 --union', '4')
-    #     # sample
-    #     self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 ', '1\t1\t1\t3\n')
-    #     self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --difference ', '1')
-    #     self.assertOutput('vtools compare variant --samples SAMP2 SAMP1 --difference ', '1')
-    #     self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --intersection ', '1')
-    #     self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --union', '3')
-    #     # site
-    #     self.assertOutput('vtools compare T1 T2 --mode site ', '0\t1\t3\t4\n')
-    #     self.assertOutput('vtools compare T1 T2 --mode site --difference ', '0')
-    #     self.assertOutput('vtools compare T2 T1 --mode site --difference ', '1')
-    #     self.assertOutput('vtools compare T1 T2 --mode site --intersection ', '3')
-    #     self.assertOutput('vtools compare T1 T2 --mode site --union ', '4')
+    def testSimpleProj(self):
+        'Test compare by site'
+        # do not use the default project
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/compare.vcf --build hg18')
+        self.runCmd('vtools execute "DELETE FROM genotype.genotype_1 WHERE GT=0"')
+        self.runCmd('vtools execute "DELETE FROM genotype.genotype_2 WHERE GT=0"')
+        self.runCmd('vtools select variant "variant_id in (1, 2)" -t T1')
+        self.runCmd('vtools select variant "variant_id in (1, 3, 4)" -t T2')
+        # variant
+        self.assertOutput('vtools compare T1 T2 ', '1\t2\t1\t4\n')
+        self.assertOutput('vtools compare T1 T2 --difference', '1')
+        self.assertOutput('vtools compare T2 T1 --difference', '2')
+        self.assertOutput('vtools compare T1 T2 --intersection', '1')
+        self.assertOutput('vtools compare T1 T2 --union', '4')
+        # sample
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 ', '1\t1\t1\t3\n')
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --difference ', '1')
+        self.assertOutput('vtools compare variant --samples SAMP2 SAMP1 --difference ', '1')
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --intersection ', '1')
+        self.assertOutput('vtools compare variant --samples SAMP1 SAMP2 --union', '3')
+        # site
+        self.assertOutput('vtools compare T1 T2 --mode site ', '0\t1\t3\t4\n')
+        self.assertOutput('vtools compare T1 T2 --mode site --difference ', '0')
+        self.assertOutput('vtools compare T2 T1 --mode site --difference ', '1')
+        self.assertOutput('vtools compare T1 T2 --mode site --intersection ', '3')
+        self.assertOutput('vtools compare T1 T2 --mode site --union ', '4')
 
 
 
