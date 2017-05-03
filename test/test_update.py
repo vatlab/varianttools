@@ -31,20 +31,20 @@ import subprocess
 from testUtils import ProcessTestCase
 
 class TestUpdate(ProcessTestCase):
-    # def testAddField(self):
-    #     self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-    #     self.runCmd('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv')
-    #     self.runCmd('vtools import vcf/SAMP1.vcf')
-    #     # no table specified
-    #     self.assertFail('vtools update --format ../format/ANNOVAR_exonic_variant_function --from_file txt/annovar.txt.exonic_variant_function')
-    #     #need a format file if you want to add field(s) into the variant table using --from_file
-    #     self.assertFail('vtools update variant --from_file txt/annovar.txt.exonic_variant_function')
-    #     self.assertFail('vtools update variant --format ../format/ANNOVAR_exonic_variant_function')
-    #     self.assertSucc('vtools update variant --format ../format/ANNOVAR_exonic_variant_function --from_file txt/annovar.txt.exonic_variant_function')
-    #     self.assertOutput('vtools select variant "mut_type is not null" -c', '21')
-    #     #for different version of genome
-    #     self.assertSucc('vtools update variant --format ../format/ANNOVAR_exonic_variant_function --from_file txt/annovar.txt.exonic_variant_function --build hg19')
-    #     self.assertOutput('vtools select variant "mut_type is not null" -c', '24')
+    def testAddField(self):
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        self.runCmd('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv')
+        self.runCmd('vtools import vcf/SAMP1.vcf')
+        # no table specified
+        self.assertFail('vtools update --format ../format/ANNOVAR_exonic_variant_function --from_file txt/annovar.txt.exonic_variant_function')
+        #need a format file if you want to add field(s) into the variant table using --from_file
+        self.assertFail('vtools update variant --from_file txt/annovar.txt.exonic_variant_function')
+        self.assertFail('vtools update variant --format ../format/ANNOVAR_exonic_variant_function')
+        self.assertSucc('vtools update variant --format ../format/ANNOVAR_exonic_variant_function --from_file txt/annovar.txt.exonic_variant_function')
+        self.assertOutput('vtools select variant "mut_type is not null" -c', '21')
+        #for different version of genome
+        self.assertSucc('vtools update variant --format ../format/ANNOVAR_exonic_variant_function --from_file txt/annovar.txt.exonic_variant_function --build hg19')
+        self.assertOutput('vtools select variant "mut_type is not null" -c', '24')
 
     def testUpdate(self):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
@@ -134,16 +134,16 @@ class TestUpdate(ProcessTestCase):
         self.assertProj(info={'res': ['0']*6})
         
 
-    # def testSet(self):
-    #     'Testing vtools update --set'
-    #     self.runCmd('vtools init test -f')
-    #     self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-    #     self.runCmd('''vtools select variant "chr='1'" -t chr1''')
-    #     self.runCmd('vtools update chr1 --from_stat "num=#(alt)" "total=#(GT)"')
-    #     self.runCmd('vtools update chr1 --set "ratio=num/(total*1.0)"')
-    #     self.runCmd('vtools select variant "ratio is NULL" -t other')
-    #     self.assertProj(numOfVariants={'other': 100})
-    #     self.assertSucc('vtools show fields')
+    def testSet(self):
+        'Testing vtools update --set'
+        self.runCmd('vtools init test -f')
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+        self.runCmd('''vtools select variant "chr='1'" -t chr1''')
+        self.runCmd('vtools update chr1 --from_stat "num=#(alt)" "total=#(GT)"')
+        self.runCmd('vtools update chr1 --set "ratio=num/(total*1.0)"')
+        self.runCmd('vtools select variant "ratio is NULL" -t other')
+        self.assertProj(numOfVariants={'other': 100})
+        self.assertSucc('vtools show fields')
 
     def testGenoAnnoSet(self):
         'Testing command vtools update --set'
