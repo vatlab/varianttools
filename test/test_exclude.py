@@ -49,8 +49,8 @@ class TestExclude(ProcessTestCase):
         # Cannot overwrite master variant table. Please choose another name for the variant table.
         self.assertFail('vtools exclude ns "sift_score<=0.94" -t variant')
         self.assertSucc('vtools exclude ns "sift_score <= 0.94" -t ns_non_damaging')
-        should have 5 variants
-        select "sift_score >= 0.94" will result in 6 variants
+        #should have 5 variants
+        #select "sift_score >= 0.94" will result in 6 variants
         self.assertOutput('vtools select ns "sift_score > 0.94" -c', 'output/exclude_sift.txt')
         self.assertOutput('vtools exclude ns "sift_score <= 0.94" -c', 'output/exclude_sift.txt')
         self.assertOutput('vtools exclude ns "variant_id=604" -c', '1445')
