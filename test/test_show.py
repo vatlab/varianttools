@@ -39,34 +39,34 @@ class TestShow(ProcessTestCase):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools use ann/testNSFP.ann')
         
-    # def testShow(self):
-    #     'Test command vtools show'
-    #     self.assertSucc('vtools show -h')
-        # Please specify a table to display
-        # self.assertFail('vtools show table')
-        # self.assertSucc('vtools show tables')
-        # # show project
-        # self.assertSucc('vtools show')
-        # # show project
-        # self.assertSucc('vtools show project')
-        # self.assertSucc('vtools show table variant')
-        # self.assertSucc('vtools show samples')
-        # self.assertFail('vtools show field')
-        # self.assertSucc('vtools show fields')
-        # self.assertFail('vtools show format')
-        # self.assertSucc('vtools show formats')
-        # self.assertFail('vtools show formats ANNOVAR')
-        # self.assertSucc('vtools show format ANNOVAR')
-        # self.assertSucc('vtools show genotypes')
-        # self.assertSucc('vtools show annotations')
-        # self.assertSucc('vtools show annotations testNSFP')
-        # self.assertSucc('vtools show annotation testNSFP')
-        # self.assertFail('vtools show test')
-        # self.assertSucc('vtools show tests')
-        # self.assertSucc('vtools show test CollapseBT')
-        # self.assertFail('vtools show tests CollapseBT')
-        # # show runtime options
-        # self.assertSucc('vtools show runtime_options')
+    def testShow(self):
+        'Test command vtools show'
+        self.assertSucc('vtools show -h')
+        Please specify a table to display
+        self.assertFail('vtools show table')
+        self.assertSucc('vtools show tables')
+        # show project
+        self.assertSucc('vtools show')
+        # show project
+        self.assertSucc('vtools show project')
+        self.assertSucc('vtools show table variant')
+        self.assertSucc('vtools show samples')
+        self.assertFail('vtools show field')
+        self.assertSucc('vtools show fields')
+        self.assertFail('vtools show format')
+        self.assertSucc('vtools show formats')
+        self.assertFail('vtools show formats ANNOVAR')
+        self.assertSucc('vtools show format ANNOVAR')
+        self.assertSucc('vtools show genotypes')
+        self.assertSucc('vtools show annotations')
+        self.assertSucc('vtools show annotations testNSFP')
+        self.assertSucc('vtools show annotation testNSFP')
+        self.assertFail('vtools show test')
+        self.assertSucc('vtools show tests')
+        self.assertSucc('vtools show test CollapseBT')
+        self.assertFail('vtools show tests CollapseBT')
+        # show runtime options
+        self.assertSucc('vtools show runtime_options')
 
 
 if __name__ == '__main__':
