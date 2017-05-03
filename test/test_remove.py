@@ -88,7 +88,7 @@ class TestRemove(ProcessTestCase):
         self.assertSucc('vtools remove samples "BMI is NULL"')
         self.assertProj(numOfSamples= 25) 
 
-        remove variant
+        #remove variant
     def testRemoveVar(self):
         self.assertFail('vtools remove variant')
         self.assertFail('vtools remove variants')
