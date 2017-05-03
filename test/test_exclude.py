@@ -56,19 +56,19 @@ class TestExclude(ProcessTestCase):
         self.assertOutput('vtools exclude ns "variant_id=604" -c', '1445')
 
 
-    def testExcludeAnno(self):
-       self.runCmd('vtools liftover hg19')
-       # FIXME: this test is bad because it requies downloading a large database
-       self.runCmd('vtools use dbSNP')
-       # this will exclude ones called unknown, but will keep the ones that is NULL
-       # and remove variants with more than one entries
-       #
-       #
-       self.assertSucc(''' vtools exclude variant "dbSNP.valid='unknown'" -t known ''')
-       self.assertOutput('vtools output known variant_id chr pos ref alt ', 'output/exclude_anno.txt')
-       self.assertSucc('vtools update variant --set dbSNP_valid=dbSNP.valid ')
-       self.assertOutput('''vtools select variant 'dbSNP.valid <> "unknown" OR dbSNP.valid is NULL' --output variant_id chr pos ref alt''',
-           'output/exclude_select_anno.txt')
+    # def testExcludeAnno(self):
+    #    self.runCmd('vtools liftover hg19')
+    #    # FIXME: this test is bad because it requies downloading a large database
+    #    self.runCmd('vtools use dbSNP')
+    #    # this will exclude ones called unknown, but will keep the ones that is NULL
+    #    # and remove variants with more than one entries
+    #    #
+    #    #
+    #    self.assertSucc(''' vtools exclude variant "dbSNP.valid='unknown'" -t known ''')
+    #    self.assertOutput('vtools output known variant_id chr pos ref alt ', 'output/exclude_anno.txt')
+    #    self.assertSucc('vtools update variant --set dbSNP_valid=dbSNP.valid ')
+    #    self.assertOutput('''vtools select variant 'dbSNP.valid <> "unknown" OR dbSNP.valid is NULL' --output variant_id chr pos ref alt''',
+    #        'output/exclude_select_anno.txt')
 
 
 if __name__ == '__main__':
