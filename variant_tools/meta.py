@@ -28,12 +28,15 @@ from math import sqrt
 from variant_tools.utils import openFile
 from variant_tools.project import AnnoDBWriter, Field
 from variant_tools.utils import env
-if sys.version_info.major == 2:
-    from variant_tools.assoTests_py2 import gsl_cdf_ugaussian_Pinv as qnorm
-    from variant_tools.assoTests_py2 import gsl_cdf_ugaussian_P as pnorm
-else:
-    from variant_tools.assoTests_py3 import gsl_cdf_ugaussian_Pinv as qnorm
-    from variant_tools.assoTests_py3 import gsl_cdf_ugaussian_P as pnorm
+# if sys.version_info.major == 2:
+#     from variant_tools.assoTests_py2 import gsl_cdf_ugaussian_Pinv as qnorm
+#     from variant_tools.assoTests_py2 import gsl_cdf_ugaussian_P as pnorm
+# else:
+#     from variant_tools.assoTests_py3 import gsl_cdf_ugaussian_Pinv as qnorm
+#     from variant_tools.assoTests_py3 import gsl_cdf_ugaussian_P as pnorm
+from variant_tools.assoTests import gsl_cdf_ugaussian_Pinv as qnorm
+from variant_tools.assoTests import gsl_cdf_ugaussian_P as pnorm
+
 
 class MetaAnalysis:
     def __init__(self, files, beta, pval, se, size, linker, method):
