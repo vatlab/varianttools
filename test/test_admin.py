@@ -33,16 +33,16 @@ class TestAdmin(ProcessTestCase):
         self.assertSucc('vtools admin')
         self.assertSucc('vtools admin -h')
 
-    #def testMergeSamples(self):
-    #    # Test command vtools admin --merge_samples'
-    #    self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
-    #    # this should actually be hg19, but we use it anyway for testing.
-    #    self.runCmd('vtools import vcf/SAMP1.vcf  --build hg18')
-    #    self.assertProj(numOfVariants=577, numOfSamples= 61)
-    #    self.runCmd('vtools admin --rename_samples \'filename like "%SAMP1%"\' NA06985')
-    #    self.assertProj(numOfSamples= 61)
-    #    self.runCmd('vtools admin --merge_samples')         
-    #    self.assertProj(numOfVariants=577, numOfSamples= 60)
+    def testMergeSamples(self):
+        # Test command vtools admin --merge_samples'
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
+        # this should actually be hg19, but we use it anyway for testing.
+        self.runCmd('vtools import vcf/SAMP1.vcf  --build hg18')
+        self.assertProj(numOfVariants=577, numOfSamples= 61)
+        self.runCmd('vtools admin --rename_samples \'filename like "%SAMP1%"\' NA06985')
+        self.assertProj(numOfSamples= 61)
+        self.runCmd('vtools admin --merge_samples')         
+        self.assertProj(numOfVariants=577, numOfSamples= 60)
 
     def testMergeWithOverlappingSamples(self):
         # Test merge samples with overlapping variants
