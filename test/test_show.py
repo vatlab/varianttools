@@ -42,7 +42,7 @@ class TestShow(ProcessTestCase):
     def testShow(self):
         'Test command vtools show'
         self.assertSucc('vtools show -h')
-        Please specify a table to display
+        #Please specify a table to display
         self.assertFail('vtools show table')
         self.assertSucc('vtools show tables')
         # show project
