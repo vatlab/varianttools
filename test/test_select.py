@@ -44,7 +44,7 @@ class TestSelect(ProcessTestCase):
             self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
             self.runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
             self.runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_het=#(het)"')
-            # save a snapshot, which will make the test run much faster
+            # # save a snapshot, which will make the test run much faster
             self.runCmd('vtools admin --save_snapshot TestSelect.tar.gz "initial population for testing of command select"')
 
     def testSelect(self):

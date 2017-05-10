@@ -32,6 +32,7 @@ import sys
 def importTests():
     tests = unittest.TestSuite()
     for file in os.listdir('.'):
+        # match = re.match("^(test_(.*))\\.py$", file)
         match = re.match("^(test_(.*))\\.py$", file)
         if match:
             m = match.group(1)
