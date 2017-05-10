@@ -1305,7 +1305,7 @@ class AnnoDBWriter:
                     raise ValueError('Existing database is not field-based. Cannot add results to it.')
             elif rec[0] == 'build':
                 if self.build != eval(rec[1]):
-                    raise ValueError('Existing database has different linking fields (existing: {}, required: {}).'.format(self.build, rec[1]))
+                    raise ValueError('Cannot update an annotation database with build {} with data on build {}. A new database should be created.'.format(self.build, rec[1]))
         # get existing fields
         cur.execute('SELECT name, field, "", "", type, comment from {}_field;'.format(self.name))
         # cur_fields is made a class member to make others know what are available
