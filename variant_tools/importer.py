@@ -43,6 +43,8 @@ from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
     openFile, DatabaseEngine, hasCommand, \
     downloadFile, env, RefGenome
 
+from .importer_hdf5 import importGenotypesInParallel
+
 
 try:
     from variant_tools.cgatools import normalize_variant
@@ -1819,9 +1821,6 @@ class Importer:
                         'deletions', 'complex variants', 'unsupported']) if x > 0]),
                     self.total_count[0], status.total_sample_count))
 
-    def importIntoHDF5(self):
-        print("Here")
-
 
 
 def importVariantsArguments(parser):
@@ -1881,9 +1880,8 @@ def importVariants(args):
                 # genotype together ...
                 importer.importFilesSequentially()
             else:
-                print(importer.genotype_info,importer.genotype_field)
                 if len(importer.genotype_info)==0 and importer.genotype_field[0]=="GT":
-                    importer.importIntoHDF5()
+                    importGenotypesInParallel(importer)
                 else:
                     importer.importFilesInParallel()
             importer.finalize()
