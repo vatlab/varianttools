@@ -1277,6 +1277,7 @@ class Importer:
         #
         self.genotype_field = [x.name for x in fmt.fields[fmt.ranges[2]:fmt.ranges[3]]]
         self.genotype_info = [x for x in fmt.fields[fmt.ranges[3]:fmt.ranges[4]]]
+
         if 'GT' in self.genotype_info:
             raise ValueError('GT (genotype) field should not be explicitly specified.')
         #
@@ -1818,6 +1819,10 @@ class Importer:
                         'deletions', 'complex variants', 'unsupported']) if x > 0]),
                     self.total_count[0], status.total_sample_count))
 
+    def importIntoHDF5(self):
+        print("Here")
+
+
 
 def importVariantsArguments(parser):
     parser.add_argument('input_files', nargs='+',
@@ -1876,7 +1881,11 @@ def importVariants(args):
                 # genotype together ...
                 importer.importFilesSequentially()
             else:
-                importer.importFilesInParallel()
+                print(importer.genotype_info,importer.genotype_field)
+                if len(importer.genotype_info)==0 and importer.genotype_field[0]=="GT":
+                    importer.importIntoHDF5()
+                else:
+                    importer.importFilesInParallel()
             importer.finalize()
         proj.close()
     except Exception as e:
