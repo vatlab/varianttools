@@ -1864,7 +1864,9 @@ def importVariantsArguments(parser):
             uses four processes to import variants and samples genotypes in 
             parallel, and you can use more or less processes by adjusting this
             parameter. Due to the overhead of inter-process communication, more
-            jobs do not automatically lead to better performance.''')
+            jobs do not automatically lead to better performance.'''),
+    parser.add_argument('--HDF5', action='store_true',
+        help='''Store genotypes into HDF5 files'''),
 
 def importVariants(args):
     try:
@@ -1875,12 +1877,13 @@ def importVariants(args):
             importer = Importer(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
+            
             if args.jobs <= 1:
                 # if jobs == 1, use the old algorithm that insert variant and
                 # genotype together ...
                 importer.importFilesSequentially()
             else:
-                if len(importer.genotype_info)==0 and importer.genotype_field[0]=="GT":
+                if len(importer.genotype_info)==0 and importer.genotype_field[0]=="GT" and args.HDF5:
                     importGenotypesInParallel(importer)
                 else:
                     importer.importFilesInParallel()

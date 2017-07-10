@@ -39,6 +39,8 @@ from .rtester import RTest, SKAT
 from variant_tools.vt_sqlite3 import OperationalError
 import argparse
 
+from .association_hdf5 import generateHDFbyGroup,getGenotype_HDF5
+
 def associateArguments(parser):
     data = parser.add_argument_group('Genotype, phenotype, and covariates')
     data.add_argument('variants', help='''Table of variants to be tested.''')
@@ -116,7 +118,9 @@ def associateArguments(parser):
         help='''Analyze all groups including those that have recorded results in
             the result database.''')
     parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
-        help='''Number of processes to carry out association tests.''')
+        help='''Number of processes to carry out association tests.'''),
+    parser.add_argument('--HDF5', action='store_true',
+        help='''Store genotypes into HDF5 files'''),
 
 class AssociationTestManager:
     '''Parse command line and get data for association testing. This class will provide
@@ -201,6 +205,8 @@ class AssociationTestManager:
         #
         # step 6: get groups
         self.group_names, self.group_types, self.groups = self.identifyGroups(group_by)
+
+     
 
     def getInfo(self, methods, var_info, geno_info):
         '''automatically update var_info or geno_info if input extern weights found in either'''
@@ -681,7 +687,7 @@ class ResultRecorder:
 
 class AssoTestsWorker(Process):
     '''Association test calculator'''
-    def __init__(self, param, grpQueue, resQueue, ready_flags, index, sampleMap, result_fields, shelf_lock):
+    def __init__(self, param, grpQueue, resQueue, ready_flags, index, sampleMap, result_fields, shelf_lock,args):
         Process.__init__(self, name='Phenotype association analysis for a group of variants')
         self.param = param
         self.proj = param.proj
@@ -716,6 +722,8 @@ class AssoTestsWorker(Process):
         self.g_na = float('NaN')
         if env.treat_missing_as_wildtype:
             self.g_na = 0.0
+        self.args=args
+
 
     def __del__(self):
         self.db.close()
@@ -787,6 +795,7 @@ class AssoTestsWorker(Process):
         # filter samples/variants for missingness
         gname = ':'.join(list(map(str, group)))
         return self.filterGenotype(genotype, geno_info, var_info, gname)
+
 
     def filterGenotype(self, genotype, geno_info, var_info, gname):
         '''
@@ -951,7 +960,10 @@ class AssoTestsWorker(Process):
             values = list(grp)
             try:
                 # select variants from each group:
-                genotype, which, var_info, geno_info = self.getGenotype(grp)
+                if not self.args.HDF5:
+                    genotype, which, var_info, geno_info = self.getGenotype(grp)
+                else:
+                    genotype, which, var_info, geno_info = getGenotype_HDF5(self,grp)
                 # if I throw an exception here, the program completes in 5 minutes, indicating
                 # the data collection part takes an insignificant part of the process.
                 # 
@@ -983,65 +995,31 @@ class AssoTestsWorker(Process):
             self.resQueue.put(values)
 
 
-def associate(args):
+def runAssociation(args,asso,proj,results):
     try:
-        with Project(verbosity=args.verbosity) as proj:
-            # step 0: create an association testing object with all group information
-            try:
-                asso = AssociationTestManager(proj, args.variants, args.phenotypes, args.covariates,
-                    args.var_info, args.geno_info, args.geno_name, args.methods, args.unknown_args,
-                    args.samples, args.genotypes, args.group_by, args.discard_samples, args.discard_variants)
-            except ValueError as e:
-                sys.exit(e)
-            if len(asso.groups) == 0:
-                env.logger.info('No data to analyze.')
-                sys.exit(0)
-            # define results here but it might fail if args.to_db is not writable
-            results = ResultRecorder(asso, args.to_db, args.delimiter, args.force)
-            # determine if some results are already exist
-            #
-            # if write to a db and
-            # if not forcefully recalculate everything and
-            # the file exists
-            # if the new fields is a subset of fields in the database
-            if args.to_db and (not args.force) and results.writer.update_existing and \
-                set([x.name for x in results.fields]).issubset(set([x.name for x in results.writer.cur_fields])):
-                    existing_groups = results.get_groups()
-                    num_groups = len(asso.groups)
-                    asso.groups = list(set(asso.groups).difference(set(existing_groups)))
-                    if len(asso.groups) != num_groups:
-                        env.logger.info('{} out of {} groups with existing results are ignored. '
-                                         'You can use option --force to re-analyze all groups.'.\
-                                         format(num_groups - len(asso.groups), num_groups))
-                        if len(asso.groups) == 0:
-                            sys.exit(0)
-                        # mark existing groups as ignored
-                        cur = proj.db.cursor()
-                        query = 'UPDATE __asso_tmp SET _ignored = 1 WHERE {}'.\
-                          format(' AND '.join(['{}={}'.format(x, proj.db.PH) for x in asso.group_names]))
-                        for grp in existing_groups:
-                            cur.execute(query, grp)
-                        proj.db.commit()
-            sampleQueue = Queue()
-            nJobs = max(min(args.jobs, len(asso.groups)), 1)
-            # loading from disk cannot really benefit from more than 8 simultaneous read
-            # due to disk access limits
-            # if env.associate_num_of_readers is set we'll use it directly
-            nLoaders = env.associate_num_of_readers
-            # if no env.associate_num_of_readers is set we limit it to a max of 8.
-            if not nLoaders > 0:
-                nLoaders = min(8, nJobs)
-            # step 1: getting all genotypes
-            # the loaders can start working only after all of them are ready. Otherwise one
-            # worker might block the database when others are trying to retrieve data
-            # which is a non-blocking procedure.
-            ready_flags = Array('L', [0]*nLoaders)
-            # Tells the master process which samples are loaded, used by the progress bar.
-            cached_samples = Array('L', max(asso.sample_IDs) + 1)
-            #
-            for id in asso.sample_IDs:
-                sampleQueue.put(id)
-            loaders = []
+        sampleQueue = Queue()
+        nJobs = max(min(args.jobs, len(asso.groups)), 1)
+        # loading from disk cannot really benefit from more than 8 simultaneous read
+        # due to disk access limits
+        # if env.associate_num_of_readers is set we'll use it directly
+        nLoaders = env.associate_num_of_readers
+        # if no env.associate_num_of_readers is set we limit it to a max of 8.
+        if not nLoaders > 0:
+            nLoaders = min(8, nJobs)
+        # step 1: getting all genotypes
+        # the loaders can start working only after all of them are ready. Otherwise one
+        # worker might block the database when others are trying to retrieve data
+        # which is a non-blocking procedure.
+        ready_flags = Array('L', [0]*nLoaders)
+        # Tells the master process which samples are loaded, used by the progress bar.
+        cached_samples = Array('L', max(asso.sample_IDs) + 1)
+        #
+        for id in asso.sample_IDs:
+            sampleQueue.put(id)
+        loaders = []
+        
+
+        if not args.HDF5:
             for i in range(nLoaders):
                 loader = GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples)
                 loader.start()
@@ -1083,75 +1061,130 @@ def associate(args):
             prog.done()
             for loader in loaders:
                 loader.join()
-            # step 1.5, start a maintenance process to create indexes, if needed.
-            maintenance_flag = Value('L', 1)
-            maintenance = MaintenanceProcess(proj, {'genotype_index': asso.sample_IDs}, maintenance_flag)
-            maintenance.start()
-            # step 2: workers work on genotypes
-            # the group queue is used to send groups
-            grpQueue = Queue()
-            # the result queue is used by workers to return results
-            resQueue = Queue()
-            # see if all workers are ready
-            ready_flags = Array('L', [0]*nJobs)
-            shelf_lock = Lock()
-            for j in range(nJobs):
-                # the dictionary has the number of temporary database for each sample
-                AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j, 
-                    {x:y-1 for x,y in enumerate(cached_samples) if y > 0},
-                    results.fields, shelf_lock).start()
-            # send jobs ...
-            # get initial completed and failed
-            # put all jobs to queue, the workers will work on them
-            for grp in asso.groups:
-                grpQueue.put(grp)
-            # the worker will stop once all jobs are finished
-            for j in range(nJobs):
-                grpQueue.put(None)
-            #
-            count = 0
-            s = delayedAction(env.logger.info, "Starting {} association test workers".format(nJobs))
+        
+
+
+        # step 1.5, start a maintenance process to create indexes, if needed.
+        maintenance_flag = Value('L', 1)
+        maintenance = MaintenanceProcess(proj, {'genotype_index': asso.sample_IDs}, maintenance_flag)
+        maintenance.start()
+        # step 2: workers work on genotypes
+        # the group queue is used to send groups
+        grpQueue = Queue()
+        # the result queue is used by workers to return results
+        resQueue = Queue()
+        # see if all workers are ready
+        ready_flags = Array('L', [0]*nJobs)
+        shelf_lock = Lock()
+        for j in range(nJobs):
+            # the dictionary has the number of temporary database for each sample
+            AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j, 
+                {x:y-1 for x,y in enumerate(cached_samples) if y > 0},
+                results.fields, shelf_lock, args).start()
+        # send jobs ...
+        # get initial completed and failed
+        # put all jobs to queue, the workers will work on them
+        for grp in asso.groups:
+            grpQueue.put(grp)
+        # the worker will stop once all jobs are finished
+        for j in range(nJobs):
+            grpQueue.put(None)
+        #
+        count = 0
+        s = delayedAction(env.logger.info, "Starting {} association test workers".format(nJobs))
+        while True:
+            if all(ready_flags):
+                break
+            else:
+                time.sleep(random.random()*2)
+        del s
+        prog = ProgressBar('Testing for association', len(asso.groups))
+        try:
             while True:
-                if all(ready_flags):
+                # if everything is done
+                if count >= len(asso.groups):
                     break
-                else:
-                    time.sleep(random.random()*2)
-            del s
-            prog = ProgressBar('Testing for association', len(asso.groups))
-            try:
-                while True:
-                    # if everything is done
-                    if count >= len(asso.groups):
-                        break
-                    # not done? wait from the queue and write to the result recorder
-                    res = resQueue.get()
-                    results.record(res)
-                    # update progress bar
-                    count = results.completed()
-                    prog.update(count, results.failed())
-                    # env.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
-            except KeyboardInterrupt as e:
-                env.logger.error('\nAssociation tests stopped by keyboard interruption ({}/{} completed).'.\
-                                  format(count, len(asso.groups)))
-                results.done()
-                proj.close()
-                sys.exit(1)
-            # finished
-            prog.done()
+                # not done? wait from the queue and write to the result recorder
+                res = resQueue.get()
+                results.record(res)
+                # update progress bar
+                count = results.completed()
+                prog.update(count, results.failed())
+                # env.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
+        except KeyboardInterrupt as e:
+            env.logger.error('\nAssociation tests stopped by keyboard interruption ({}/{} completed).'.\
+                              format(count, len(asso.groups)))
             results.done()
-            # summary
-            env.logger.info('Association tests on {} groups have completed. {} failed.'.\
-                             format(results.completed(), results.failed()))
-            # use the result database in the project
-            if args.to_db:
-                proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
-            # tells the maintenance process to stop
-            maintenance_flag.value = 0
-            # wait for the maitenance process to stop
-            s = delayedAction(env.logger.info,
-                              "Maintaining database. This might take a few minutes.", delay=10)
-            maintenance.join()
-            del s
+            proj.close()
+            sys.exit(1)
+        # finished
+        prog.done()
+        results.done()
+        # summary
+        env.logger.info('Association tests on {} groups have completed. {} failed.'.\
+                         format(results.completed(), results.failed()))
+        # use the result database in the project
+        if args.to_db:
+            proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
+        # tells the maintenance process to stop
+        maintenance_flag.value = 0
+        # wait for the maitenance process to stop
+        s = delayedAction(env.logger.info,
+                          "Maintaining database. This might take a few minutes.", delay=10)
+        maintenance.join()
+        del s
+    except Exception as e:
+        env.logger.error(e)
+        sys.exit(1)
+
+
+
+
+def associate(args):
+    try:
+        with Project(verbosity=args.verbosity) as proj:
+            # step 0: create an association testing object with all group information
+            try:
+                asso = AssociationTestManager(proj, args.variants, args.phenotypes, args.covariates,
+                    args.var_info, args.geno_info, args.geno_name, args.methods, args.unknown_args,
+                    args.samples, args.genotypes, args.group_by, args.discard_samples, args.discard_variants)
+            except ValueError as e:
+                sys.exit(e)
+            if len(asso.groups) == 0:
+                env.logger.info('No data to analyze.')
+                sys.exit(0)
+            # define results here but it might fail if args.to_db is not writable
+            results = ResultRecorder(asso, args.to_db, args.delimiter, args.force)
+            # determine if some results are already exist
+            #
+            # if write to a db and
+            # if not forcefully recalculate everything and
+            # the file exists
+            # if the new fields is a subset of fields in the database
+            if args.to_db and (not args.force) and results.writer.update_existing and \
+                set([x.name for x in results.fields]).issubset(set([x.name for x in results.writer.cur_fields])):
+                    existing_groups = results.get_groups()
+                    num_groups = len(asso.groups)
+                    asso.groups = list(set(asso.groups).difference(set(existing_groups)))
+                    if len(asso.groups) != num_groups:
+                        env.logger.info('{} out of {} groups with existing results are ignored. '
+                                         'You can use option --force to re-analyze all groups.'.\
+                                         format(num_groups - len(asso.groups), num_groups))
+                        if len(asso.groups) == 0:
+                            sys.exit(0)
+                        # mark existing groups as ignored
+                        cur = proj.db.cursor()
+                        query = 'UPDATE __asso_tmp SET _ignored = 1 WHERE {}'.\
+                          format(' AND '.join(['{}={}'.format(x, proj.db.PH) for x in asso.group_names]))
+                        for grp in existing_groups:
+                            cur.execute(query, grp)
+                        proj.db.commit()
+            
+            if len(asso.geno_info)==0 and args.HDF5:
+                generateHDFbyGroup(asso)
+            
+            runAssociation(args,asso,proj,results)
+
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
