@@ -369,10 +369,11 @@ class AssociationTestManager:
             phenotypes = [[] for x in pheno]
             covariates = [[] for x in covar]
             for i, j, p, c in data:
-                sample_IDs.append(i)
-                sample_names.append(j)
-                [x.append(y) for x,y in zip(phenotypes, p)]
-                [x.append(y) for x,y in zip(covariates, c)]
+                if j not in sample_names:
+                    sample_IDs.append(i)
+                    sample_names.append(j)
+                    [x.append(y) for x,y in zip(phenotypes, p)]
+                    [x.append(y) for x,y in zip(covariates, c)]
             if len(sample_IDs) == 0:
                 raise ValueError('No sample is selected by condition: {}'.\
                                  format(' AND '.join(['({})'.format(x) for x in condition])))

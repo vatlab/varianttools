@@ -1749,6 +1749,7 @@ class Importer:
                 workload[i % self.jobs] += 1
             # 
             env.logger.debug('Workload of processes: {}'.format(workload))
+       
             start_sample = 0
             for job in range(self.jobs):
                 if workload[job] == 0:

@@ -102,13 +102,14 @@ class GroupHDFGenerator(Process):
                         #     print(ids,idPos,minPos,maxPos,idPos)
                         #     continue
                         sub_indptr=hdf5_file.root.indptr[idPos[0]-1:idPos[-1]+1]
+
                         sub_indices=hdf5_file.root.indices[min(sub_indptr):max(sub_indptr)]
                         sub_data=hdf5_file.root.data[min(sub_indptr):max(sub_indptr)]
                         sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(len(sub_indptr))]
                         # sub_shape=(len(idPos),hdf5_file.root.shape[1])
                         sub_shape=(len(sub_indptr)-1,hdf5_file.root.shape[1])
                         adjust_id=[ idPos[i]-idPos[0] for i in range(len(idPos))]
-                        
+           
                         sub_matrix=csr_matrix((sub_data,sub_indices,sub_indptr),shape=sub_shape)    
                         geneGenotypes=sub_matrix[adjust_id,]
                         
@@ -190,88 +191,3 @@ def getGenotype_HDF5(worker, group):
     gname = ':'.join(list(map(str, group)))
     return worker.filterGenotype(genotype, geno_info, var_info, gname)
 
-
-                    
-# def runAssocaition_HDF5(args,asso,proj,results):
-	
-#     try:
-#         nJobs = max(min(args.jobs, len(asso.groups)), 1)
-#         nLoaders = env.associate_num_of_readers
-#         # if no env.associate_num_of_readers is set we limit it to a max of 8.
-#         if not nLoaders > 0:
-#             nLoaders = min(8, nJobs)
-
-#         ready_flags = Array('L', [0]*nLoaders)
-
-#         cached_samples = Array('L', max(asso.sample_IDs) + 1)
-
-     
-#         maintenance_flag = Value('L', 1)
-#         maintenance = MaintenanceProcess(proj, {'genotype_index': asso.sample_IDs}, maintenance_flag)
-#         maintenance.start()
-
-#         grpQueue = Queue()
-#         # the result queue is used by workers to return results
-#         resQueue = Queue()
-#         # see if all workers are ready
-#         ready_flags = Array('L', [0]*nJobs)
-
-#         for j in range(nJobs):
-#             # the dictionary has the number of temporary database for each sample
-#             AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j, 
-#                 {x:y-1 for x,y in enumerate(cached_samples) if y > 0},
-#                 results.fields, shelf_lock).start()
-
-
-#         for grp in asso.groups:
-#             grpQueue.put(grp)
-#         # the worker will stop once all jobs are finished
-#         for j in range(nJobs):
-#             grpQueue.put(None)
-#         #
-#         count = 0
-#         s = delayedAction(env.logger.info, "Starting {} association test workers".format(nJobs))
-#         while True:
-#             if all(ready_flags):
-#                 break
-#             else:
-#                 time.sleep(random.random()*2)
-#         del s
-#         prog = ProgressBar('Testing for association', len(asso.groups))
-#         try:
-#             while True:
-#                 # if everything is done
-#                 if count >= len(asso.groups):
-#                     break
-#                 # not done? wait from the queue and write to the result recorder
-#                 res = resQueue.get()
-#                 results.record(res)
-#                 # update progress bar
-#                 count = results.completed()
-#                 prog.update(count, results.failed())
-#                 # env.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
-#         except KeyboardInterrupt as e:
-#             env.logger.error('\nAssociation tests stopped by keyboard interruption ({}/{} completed).'.\
-#                               format(count, len(asso.groups)))
-#             results.done()
-#             proj.close()
-#             sys.exit(1)
-#         # finished
-#         prog.done()
-#         results.done()
-#         # summary
-#         env.logger.info('Association tests on {} groups have completed. {} failed.'.\
-#                          format(results.completed(), results.failed()))
-#         # use the result database in the project
-#         if args.to_db:
-#             proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
-#         # tells the maintenance process to stop
-#         maintenance_flag.value = 0
-#         # wait for the maitenance process to stop
-#         s = delayedAction(env.logger.info,
-#                           "Maintaining database. This might take a few minutes.", delay=10)
-#         maintenance.join()
-#         del s
-#     except Exception as e:
-#         env.logger.error(e)
-#         sys.exit(1)
