@@ -299,8 +299,8 @@ def importGenotypesInParallel(importer):
                     line_no=0
                     for job in range(importer.jobs):
                         readQueue[job].put(None)
-                    for importer in importers:
-                        importer.join()
+                    for worker in importers:
+                        worker.join()
                     start_sample = 0
                     for job in range(importer.jobs):
                         if workload[job] == 0:
