@@ -1515,12 +1515,18 @@ class Importer:
         # other threads will handle input
         # getNew=True so the reader only read variants not in variantIndex if no additional
         # variant info is imported
+        # if self.variant_info:
+        #     reader = TextReader(self.processor, input_filename, None, True, 
+        #         env.import_num_of_readers, self.encoding, self.header, quiet=False)
+        # else:
+        #     reader = TextReader(self.processor, input_filename, self.variantIndex, True,
+        #         env.import_num_of_readers, self.encoding, self.header, quiet=False)
         if self.variant_info:
             reader = TextReader(self.processor, input_filename, None, True, 
-                env.import_num_of_readers, self.encoding, self.header, quiet=False)
+                1, self.encoding, self.header, quiet=False)
         else:
             reader = TextReader(self.processor, input_filename, self.variantIndex, True,
-                env.import_num_of_readers, self.encoding, self.header, quiet=False)
+                1, self.encoding, self.header, quiet=False)
         # preprocess data
         prog = ProgressBar(os.path.split(input_filename)[-1], lc)
         last_count = 0
