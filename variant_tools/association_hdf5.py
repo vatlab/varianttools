@@ -90,15 +90,19 @@ class GroupHDFGenerator(Process):
                         
                         rownames=group.rownames[:]
                         rownames=[int(x.decode("utf-8")) for x in rownames]
+         
+                        # minPos=rownames.index(ids[0])
+                        # maxPos=rownames.index(ids[-1])
 
-                        minPos=rownames.index(ids[0])
-                        maxPos=rownames.index(ids[-1])
-                        # if maxPos<minPos:
-                        #     temp=minPos
-                        #     minPos=maxPos
-                        #     maxPos=temp
-                        idPos=rownames[minPos:maxPos+1]
-                        idPos=[int(x) for x in idPos]
+                        # idPos=rownames[minPos:maxPos+1]
+                        # idPos=[int(x) for x in idPos]
+                        idPos=[]
+                        for id in ids:
+                            try:
+                                pos=rownames.index(id)
+                                idPos.append(pos)
+                            except ValueError:
+                                continue
                         idPos.sort()
  
                         # try:
@@ -183,6 +187,7 @@ def getGenotype_HDF5(worker, group):
         endSample=int(fileName.split("_")[2])
         hdf5db=HDF5Engine_multi("dataTable")
         hdf5db.connect_HDF5(fileName)  
+
         hdf5db.load_HDF5(geneSymbol,chr)
         snpdict=hdf5db.load_genotype_by_variantID()
 
