@@ -67,8 +67,7 @@ class GroupHDFGenerator(Process):
                 if (os.path.isfile(HDFfileGroupName)):
                     os.remove(HDFfileGroupName)
                 try:
-                    rownames=hdf5_file.root.rownames[:]
-                    rownames=[int(x.decode("utf-8")) for x in rownames]
+                    
                     db = DatabaseEngine()
                     db.connect('{0}.proj'.format(self.proj.name), '__asso_tmp')
                     cur = db.cursor()
@@ -85,6 +84,12 @@ class GroupHDFGenerator(Process):
                         # idPos.sort()
                         ids=[int(x) for x in ids]
                         ids.sort()
+                    
+                        chr= getChr(ids[0],db.cursor())
+                        group=hdf5_file.get_node("/chr"+chr)
+                        
+                        rownames=group.rownames[:]
+                        rownames=[int(x.decode("utf-8")) for x in rownames]
 
                         minPos=rownames.index(ids[0])
                         maxPos=rownames.index(ids[-1])
@@ -101,19 +106,19 @@ class GroupHDFGenerator(Process):
                         # except:
                         #     print(ids,idPos,minPos,maxPos,idPos)
                         #     continue
-                        sub_indptr=hdf5_file.root.indptr[idPos[0]-1:idPos[-1]+1]
+                        sub_indptr=group.indptr[idPos[0]-1:idPos[-1]+1]
 
-                        sub_indices=hdf5_file.root.indices[min(sub_indptr):max(sub_indptr)]
-                        sub_data=hdf5_file.root.data[min(sub_indptr):max(sub_indptr)]
+                        sub_indices=group.indices[min(sub_indptr):max(sub_indptr)]
+                        sub_data=group.data[min(sub_indptr):max(sub_indptr)]
                         sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(len(sub_indptr))]
                         # sub_shape=(len(idPos),hdf5_file.root.shape[1])
-                        sub_shape=(len(sub_indptr)-1,hdf5_file.root.shape[1])
+                        sub_shape=(len(sub_indptr)-1,group.shape[1])
                         adjust_id=[ idPos[i]-idPos[0] for i in range(len(idPos))]
            
                         sub_matrix=csr_matrix((sub_data,sub_indices,sub_indptr),shape=sub_shape)    
                         geneGenotypes=sub_matrix[adjust_id,]
                         
-                        storage.store_csr_genotype_into_one_HDF5(geneGenotypes,"dataTable_"+geneSymbol,ids,self.proc_index,HDFfileGroupName)        
+                        storage.store_csr_genotype_into_one_HDF5(geneGenotypes,"dataTable_"+geneSymbol,ids,self.proc_index,chr,HDFfileGroupName)        
                         # storage.store_csr_arrays_into_earray_HDF5(sub_data,sub_indices,sub_indptr,sub_shape,ids,"dataTable_"+geneSymbol,HDFfileGroupName) 
                     hdf5_file.close()
 
@@ -148,6 +153,11 @@ def generateHDFbyGroup(testManager):
         for groupHDFGenerator in groupGenerators:
             groupHDFGenerator.join()
 
+def getChr(variantID,cur):
+    find_chr="SELECT chr from variant where variant_id={0}".format(variantID)
+    chr= [rec[0] for rec in cur.execute(find_chr)]
+    return chr[0]
+
 
 def getGenotype_HDF5(worker, group):
     '''Get genotype for variants in specified group'''
@@ -157,14 +167,15 @@ def getGenotype_HDF5(worker, group):
     cur = worker.db.cursor()
     # variant info
     var_info, variant_id = worker.getVarInfo(group, where_clause)
-
+    
+    find_chr="SELECT chr from variant where variant_id={0}".format(variant_id[0])
+    chr=getChr(variant_id[0],cur)
     # get genotypes / genotype info
     genotype = []
     geno_info = {x:[] for x in worker.geno_info}
     # getting samples locally from my own connection
 
     geneSymbol=transformGeneName(group[0])
-
     files=glob.glob("tmp*_genotypes_multi_genes.h5")
     files=sorted(files, key=lambda name: int(name.split("_")[1]))
     for fileName in files:
@@ -172,8 +183,10 @@ def getGenotype_HDF5(worker, group):
         endSample=int(fileName.split("_")[2])
         hdf5db=HDF5Engine_multi("dataTable")
         hdf5db.connect_HDF5(fileName)  
-        hdf5db.load_HDF5(geneSymbol)
+        hdf5db.load_HDF5(geneSymbol,chr)
         snpdict=hdf5db.load_genotype_by_variantID()
+
+
         # dbID=self.cached_genes[geneSymbol]-1
 
         # for ID in self.sample_IDs:

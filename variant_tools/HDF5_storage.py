@@ -53,11 +53,12 @@ def store_csc_genotype_into_one_HDF5(data, name, store='check.h5'):
     f.close()
 
 
-def store_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,name,store="check.h5"):
+def store_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,name,chr,store="check.h5"):
     rownames=np.array(ids)
     filters = tb.Filters(complevel=9, complib='blosc')
     full_name=None
     with tb.open_file(store,'a') as f:
+        group=f.create_group("/","chr"+chr,"chromosome")
         for par in ('data', 'indices', 'indptr', 'shape'):
             if len(name)>0:
                 full_name = '%s_%s' % (name, par) 
@@ -78,23 +79,23 @@ def store_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,name,store="
                 arr=np.array(shape)
                 atom=tb.Atom.from_dtype(np.dtype(np.int32))
             if (arr.shape[0]!=0):
-                ds = f.create_earray(f.root, full_name, atom, (0,),filters=filters)
+                ds = f.create_earray(group, full_name, atom, (0,),filters=filters)
                 ds.append(arr)
         if(len(name)>0): 
-            ds = f.create_earray(f.root, name+"_rownames",  tb.StringAtom(itemsize=200), (0,),filters=filters)
+            ds = f.create_earray(group, name+"_rownames",  tb.StringAtom(itemsize=200), (0,),filters=filters)
         else:
-            ds = f.create_earray(f.root, "rownames",  tb.StringAtom(itemsize=200), (0,),filters=filters)
+            ds = f.create_earray(group, "rownames",  tb.StringAtom(itemsize=200), (0,),filters=filters)
         ds.append(rownames)
-
-
         # ds = f.create_earray(f.root, "rownames",  tb.StringAtom(itemsize=200), (0,),filters=filters)
         # ds.append(rownames)
     f.close()
 
 
-def append_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,store="check.h5"):
+def append_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,chr,store="check.h5"):
     rownames=np.array(ids)
     with tb.open_file(store,'a') as f:
+        group=f.get_node("/chr"+chr)
+
         for par in ('data', 'indices', 'indptr'):
             full_name = '%s' % (par)
             arr = None
@@ -102,17 +103,17 @@ def append_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,store="chec
             ds=None
             if (par=='data'):
                 arr=np.array(data,dtype=np.dtype(np.float64))
-                ds=f.root.data
+                ds=group.data
             elif (par=='indices'):
                 arr=np.array(indices,dtype=np.dtype(np.int32))
-                ds=f.root.indices
+                ds=group.indices
             elif (par=='indptr'):
                 arr=np.array(indptr,dtype=np.dtype(np.int32))
-                ds=f.root.indptr
+                ds=group.indptr
             if (arr.shape[0]!=0):
                 ds.append(arr)
-        f.root.shape[0]=shape[0]
-        f.root.rownames.append(rownames)
+        group.shape[0]=shape[0]
+        group.rownames.append(rownames)
     f.close()
 
 
@@ -153,7 +154,7 @@ def store_csr_genotype_into_earray_HDF5(data, name, ids,store='check.h5'):
     f.close()
 
 
-def store_csr_genotype_into_one_HDF5(data, name, ids,index,store='check.h5'):
+def store_csr_genotype_into_one_HDF5(data, name, ids,index,chr,store='check.h5'):
     #data: a pandas data frame
     #name: the name of the tables
     if (data.__class__ != csr_matrix):
@@ -167,10 +168,15 @@ def store_csr_genotype_into_one_HDF5(data, name, ids,index,store='check.h5'):
     assert(m.__class__ == csr_matrix), msg
     filters = tb.Filters(complevel=9, complib='blosc')
     with tb.open_file(store,'a') as f:
+        node="/chr"+chr
+        if node in f:
+            group=f.get_node(node)
+        else:
+            group=f.create_group("/","chr"+chr,"chromosome")
         for par in ('data', 'indices', 'indptr', 'shape'):
             full_name = '%s_%s' % (name, par)
             try:
-                n = getattr(f.root, full_name)
+                n = getattr(group, full_name)
                 n._f_remove()
             except AttributeError:
                 pass
@@ -178,9 +184,9 @@ def store_csr_genotype_into_one_HDF5(data, name, ids,index,store='check.h5'):
             atom = tb.Atom.from_dtype(arr.dtype)
 
             if (arr.shape[0]!=0):
-                ds = f.create_carray(f.root, full_name, atom, arr.shape,filters=filters)
+                ds = f.create_carray(group, full_name, atom, arr.shape,filters=filters)
                 ds[:] = arr
-        ds = f.create_carray(f.root, name+"_rownames",  tb.StringAtom(itemsize=200), rownames.shape,filters=filters)
+        ds = f.create_carray(group, name+"_rownames",  tb.StringAtom(itemsize=200), rownames.shape,filters=filters)
         ds[:] = rownames
         # ds = f.create_carray(f.root, name+"_colnames", tb.StringAtom(itemsize=100), colnames.shape,filters=filters)
         # ds[:] = colnames

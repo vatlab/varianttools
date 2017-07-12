@@ -137,7 +137,7 @@ class HDF5GenotypeImportWorker(Process):
 
 
 
-    def writeIntoFile(self):
+    def writeIntoFile(self,chr):
         # print(self.proc_index,self.numVariants,max(self.indptr),min(self.indptr),max(self.indices),min(self.indices))
         # print(self.proc_index,len(self.indptr),self.variant_count.value,max(self.indptr),min(self.indptr))    
         # ids=[x+1 for x in range(len(self.indptr))]    
@@ -148,10 +148,10 @@ class HDF5GenotypeImportWorker(Process):
         if self.first:
             if os.path.isfile(self.HDFfileName):
                 os.remove(self.HDFfileName)
-            storage.store_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.ids,"",self.HDFfileName) 
+            storage.store_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.ids,"",chr,self.HDFfileName) 
             self.first=False
         else:
-            storage.append_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.ids,self.HDFfileName) 
+            storage.append_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.ids,chr,self.HDFfileName) 
         self.indptr=[]
         self.indices=[]
         self.data=[]
@@ -164,21 +164,32 @@ class HDF5GenotypeImportWorker(Process):
         if self.first:
             self.indptr.append(0)
         pre_variant_ID=None
+        pre_chr=None
         self.start_count = self.variant_count.value
-        line_no=0
+        firstLine=True
+      
         self.processor.reset(import_sample_range=[self.start_sample,self.end_sample])
         while True:
             line=self.readQueue.get()
-            line_no+=1
+      
             if line is None:
-                self.writeIntoFile()
+                self.writeIntoFile(pre_chr)
                 break
             for bins,rec in self.processor.process(line):
                 variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
-                if (pre_variant_ID==variant_id):
+                if pre_variant_ID==variant_id:
                     continue
                 else:
                     pre_variant_ID=variant_id
+
+                if firstLine:
+                    pre_chr=rec[0]
+                    firstLine=False
+                
+                if pre_chr!=rec[0]:
+                    self.writeIntoFile(pre_chr)
+                    pre_chr=rec[0]
+
                    
                 for idx in range(self.end_sample-self.start_sample):
                     try:
@@ -340,17 +351,17 @@ def importGenotypesInParallel(importer):
             worker.join() 
         prog.done()
         # add range of id to the file name 
-        HDFfileNames=glob.glob("tmp*"+input_prefix+"_genotypes.h5")
-        for HDFfileName in HDFfileNames:
-            HDFfile=tb.open_file(HDFfileName)
-            firstID=HDFfile.root.rownames[0]
-            lastID=HDFfile.root.rownames[-1]
-            HDFfile.close()
-            cols=HDFfileName.split("_")
-            newHDFfileName="_".join(cols[:3])+"_"+str(int(firstID))+"_"+str(int(lastID))+"_"+"_".join(cols[3:])
-            if os.path.isfile(newHDFfileName):
-                os.remove(newHDFfileName)
-            os.rename(HDFfileName,newHDFfileName)
+        # HDFfileNames=glob.glob("tmp*"+input_prefix+"_genotypes.h5")
+        # for HDFfileName in HDFfileNames:
+        #     HDFfile=tb.open_file(HDFfileName)
+        #     firstID=HDFfile.root.rownames[0]
+        #     lastID=HDFfile.root.rownames[-1]
+        #     HDFfile.close()
+        #     cols=HDFfileName.split("_")
+        #     newHDFfileName="_".join(cols[:3])+"_"+str(int(firstID))+"_"+str(int(lastID))+"_"+"_".join(cols[3:])
+        #     if os.path.isfile(newHDFfileName):
+        #         os.remove(newHDFfileName)
+        #     os.rename(HDFfileName,newHDFfileName)
 
     # mergeJobs=[]
     # if len(importer.files)>1:

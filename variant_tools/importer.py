@@ -1876,6 +1876,7 @@ def importVariantsArguments(parser):
         help='''Store genotypes into HDF5 files'''),
 
 def importVariants(args):
+
     try:
         # the project is opened with verify=False so index on the master
         # variant table will not be created if it does not exist (because the
