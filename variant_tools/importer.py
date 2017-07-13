@@ -1395,7 +1395,7 @@ class Importer:
             if not self.genotype_field:
                 env.logger.warning('Sample information is not recorded for a file without genotype and sample name.')
                 self.sample_in_file = []
-                return ([], 0)
+                return ([], 0,[])
             else:
                 try:
                     numSample, names = probeSampleName(input_filename, self.prober, self.encoding)
@@ -1403,27 +1403,27 @@ class Importer:
                         if numSample == 1:
                             env.logger.debug('Missing sample name (name None is used)'.format(numSample))
                             self.sample_in_file = [None]
-                            return (self.recordFileAndSample(input_filename, ['']), 2)
+                            return (self.recordFileAndSample(input_filename, ['']), 2,names)
                         elif numSample == 0:
                             env.logger.debug('No genotype column exists in the input file so no sample will be recorded.')
                             self.sample_in_file = []
-                            return ([], 0)
+                            return ([], 0,[])
                         else:
                             raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name, or add a proper header to your input file that matches the columns of samples. See "vtools import -h" for details.'.format(numSample))
                     else:
                         self.sample_in_file = [x for x in names]
-                        return (self.recordFileAndSample(input_filename, names), 2)
+                        return (self.recordFileAndSample(input_filename, names), 2,names)
                 except ValueError as e:
                     # cannot find any genotype column, perhaps no genotype is defined in the file (which is allowed)
                     env.logger.warning('Cannot import genotype from the input file: {0}'.format(e))
                     self.sample_in_file = []
-                    return ([], 0)
+                    return ([], 0,[])
         else:
             self.sample_in_file = [x for x in self.sample_name]
             if not self.genotype_field:
                 # if no genotype, but a sample name is given
                 env.logger.debug('Input file does not contain any genotype. Only the variant ownership information is recorded.')
-                return (self.recordFileAndSample(input_filename, self.sample_name), 1)
+                return (self.recordFileAndSample(input_filename, self.sample_name), 1,[])
             else:
                 try:
                     numSample, names = probeSampleName(input_filename, self.prober, self.encoding)
@@ -1439,7 +1439,7 @@ class Importer:
                         raise ValueError("When there is no sample genotype, only one sample name is allowed.")
                 elif len(self.sample_name) != numSample:
                     raise ValueError('{} sample detected but only {} sample names are specified'.format(numSample, len(self.sample_name)))                        
-                return (self.recordFileAndSample(input_filename, self.sample_name), 1 if numSample == 0 else 2)
+                return (self.recordFileAndSample(input_filename, self.sample_name), 1 if numSample == 0 else 2,names)
  
     def importVariantAndGenotype(self, input_filename):
         '''Input variant and genotype at the same time, appropriate for cases with
@@ -1448,7 +1448,7 @@ class Importer:
         if self.genotype_field:
             self.prober.reset()
         #
-        sample_ids, genotype_status = self.getSampleIDs(input_filename)
+        sample_ids, genotype_status,names = self.getSampleIDs(input_filename)
         #
         cur = self.db.cursor()
         lc = lineCount(input_filename, self.encoding)
@@ -1706,7 +1706,7 @@ class Importer:
             if self.genotype_field:
                 self.prober.reset()
             # if there are samples?
-            sample_ids, genotype_status = self.getSampleIDs(input_filename)
+            sample_ids, genotype_status,names = self.getSampleIDs(input_filename)
             #
             # we should have file line count from importVariant
             num_of_lines = self.count[0]
@@ -1876,27 +1876,43 @@ def importVariantsArguments(parser):
         help='''Store genotypes into HDF5 files'''),
 
 def importVariants(args):
-
-    try:
-        # the project is opened with verify=False so index on the master
-        # variant table will not be created if it does not exist (because the
-        # last command was a vtools import command)
-        with Project(verbosity=args.verbosity, mode='SKIP_VERIFICATION') as proj:
-            importer = Importer(proj=proj, files=args.input_files,
-                build=args.build, format=args.format, sample_name=args.sample_name,
-                force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
-            
-            if args.jobs <= 1:
-                # if jobs == 1, use the old algorithm that insert variant and
-                # genotype together ...
-                importer.importFilesSequentially()
+    with Project(verbosity=args.verbosity, mode='SKIP_VERIFICATION') as proj:
+        importer = Importer(proj=proj, files=args.input_files,
+            build=args.build, format=args.format, sample_name=args.sample_name,
+            force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
+        
+        if args.jobs <= 1:
+            # if jobs == 1, use the old algorithm that insert variant and
+            # genotype together ...
+            importer.importFilesSequentially()
+        else:
+            if len(importer.genotype_info)==0 and importer.genotype_field[0]=="GT" and args.HDF5:
+                importGenotypesInParallel(importer)
             else:
-                if len(importer.genotype_info)==0 and importer.genotype_field[0]=="GT" and args.HDF5:
-                    importGenotypesInParallel(importer)
-                else:
-                    importer.importFilesInParallel()
-            importer.finalize()
-        proj.close()
-    except Exception as e:
-        env.logger.error(e)
-        sys.exit(1)
+                importer.importFilesInParallel()
+        importer.finalize()
+    proj.close()
+
+    # try:
+    #     # the project is opened with verify=False so index on the master
+    #     # variant table will not be created if it does not exist (because the
+    #     # last command was a vtools import command)
+    #     with Project(verbosity=args.verbosity, mode='SKIP_VERIFICATION') as proj:
+    #         importer = Importer(proj=proj, files=args.input_files,
+    #             build=args.build, format=args.format, sample_name=args.sample_name,
+    #             force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
+            
+    #         if args.jobs <= 1:
+    #             # if jobs == 1, use the old algorithm that insert variant and
+    #             # genotype together ...
+    #             importer.importFilesSequentially()
+    #         else:
+    #             if len(importer.genotype_info)==0 and importer.genotype_field[0]=="GT" and args.HDF5:
+    #                 importGenotypesInParallel(importer)
+    #             else:
+    #                 importer.importFilesInParallel()
+    #         importer.finalize()
+    #     proj.close()
+    # except Exception as e:
+    #     env.logger.error(e)
+    #     sys.exit(1)
