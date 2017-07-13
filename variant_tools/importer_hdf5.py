@@ -146,10 +146,10 @@ class HDF5GenotypeImportWorker(Process):
         shape=(self.variant_count.value,self.end_sample-self.start_sample)
         
         if self.first:
-            if os.path.isfile(self.HDFfileName):
-                os.remove(self.HDFfileName)
+            # if os.path.isfile(self.HDFfileName):
+            #     os.remove(self.HDFfileName)
             storage.store_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.ids,"",chr,self.HDFfileName) 
-            self.first=False
+            # self.first=False
         else:
             storage.append_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.ids,chr,self.HDFfileName) 
         self.indptr=[]
@@ -209,11 +209,13 @@ class HDF5GenotypeImportWorker(Process):
                 self.indptr.append(genoCount)
                 self.ids.append(variant_id)
 
+
+
 def updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDF5fileName):
     cur=importer.db.cursor()
     for id in range(start_sample,end_sample):
         sql="UPDATE sample SET HDF5=?, COLPOS=? WHERE sample_id=? and sample_name=?"
-        task=(HDF5fileName,id,sample_ids[id],names[id])
+        task=(HDF5fileName,allNames[names[id]],sample_ids[id],names[id])
         cur.execute(sql,task)
     
 
@@ -251,10 +253,12 @@ def importGenotypesInParallel(importer):
     # number of genotypes each process have imported
     variant_import_count = [Value('L', -1) for x in range(importer.jobs)]
     manageHDF5(importer)
+    for f in glob.glob("*h5"):
+        os.remove(f)
     
-   
     allNames={}
-    sample_count=0
+    sample_count=1
+    first=True
     for count, input_filename in enumerate(importer.files):
         indptr_count=[Value('L', 0) for x in range(importer.jobs)]
         
@@ -281,12 +285,13 @@ def importGenotypesInParallel(importer):
             workload=[len(sample_ids)]+[0]*(importer.jobs-1)
         else:
             workload = [int(float(len(sample_ids)) / importer.jobs)] * importer.jobs
-        print(workload)
+
         # if there are missing ones, spread it across workers ...
         # less than 0 is possible because of the at least 10 policy
         unallocated = max(0, len(sample_ids) - sum(workload))
         for i in range(unallocated):
             workload[i % importer.jobs] += 1
+        print(workload)
 
         # we should have file line count from importVariant
         num_of_lines = importer.count[0] 
@@ -305,14 +310,12 @@ def importGenotypesInParallel(importer):
         start_sample_name=sample_ids[0]-1
         # start_sample_name=0
         line_no = 0
-        num_lines=0
-        first=True
+        num_lines=0    
         # indptrDict=Manager().dict({ (i,0)for i in range(self.jobs)})
         readQueue=[]
         inputers=[]
 
         input_prefix=os.path.basename(input_filename).replace(".vcf","")
-        HDFfile_Merge="tmp_"+str(allNames[names[0]]+1)+"_"+str(allNames[names[-1]]+1)+"_genotypes.h5"
         for job in range(importer.jobs):      
             if workload[job] == 0:
                 continue
@@ -322,7 +325,12 @@ def importGenotypesInParallel(importer):
             print(start_sample,end_sample)     
             if end_sample <= start_sample:
                 continue
+            HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
             updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge)
+            if not os.path.isfile(HDFfile_Merge):
+                first=True
+            else:
+                first=False
             for i in range(importer.jobs):
                 if importers[i] is None or not importers[i].is_alive():
                     HDFfile="tmp_"+str(start_sample_name+1)+"_"+str(end_sample_name)+"_"+input_prefix+"_genotypes.h5"
@@ -363,6 +371,7 @@ def importGenotypesInParallel(importer):
                         end_sample_name=start_sample_name+workload[job]
                         if end_sample <= start_sample:
                             continue
+                        HDFfile_Merge="tmp_"+str(allNames[names[start_sample]]+1)+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
                         for i in range(importer.jobs):
                             if importers[i] is None or not importers[i].is_alive():
                                 HDFfile="tmp_"+str(start_sample_name+1)+"_"+str(end_sample_name)+"_"+input_prefix+"_genotypes.h5"
