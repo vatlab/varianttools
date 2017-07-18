@@ -165,50 +165,6 @@ class GroupHDFGenerator_update(Process):
             self.group_names=group_names
             self.proc_index=job
 
-        # def run(self):
-            
-        #     while True:
-        #         genoDict={}
-        #         HDFfileName=self.fileQueue.get()
-        #         if HDFfileName is None:
-        #             break
-        #         hdf5_file=tb.open_file(HDFfileName,mode="r")
-                
-        #         HDFfileGroupName=HDFfileName.replace(".h5","_multi_genes.h5")
-        #         if (os.path.isfile(HDFfileGroupName)):
-        #             os.remove(HDFfileGroupName)
-        #         try:
-        #             chr="22"
-        #             group=hdf5_file.get_node("/chr"+chr)
-        #             rownames=group.rownames[:]
-        #             rownames=[int(x.decode("utf-8")) for x in rownames]
-        #             for idx,id in enumerate(rownames):
-        #                 try:
-        #                     geneNames=self.geneDict[id]
-        #                     for geneName in geneNames:
-        #                         if geneName not in genoDict:
-        #                             genoDict[geneName]=[[0],[],[],[],[]]
-
-        #                         startPointer=group.indptr[idx]
-        #                         endPointer=group.indptr[idx+1]
-        #                         lastPos=genoDict[geneName][0][-1]
-        #                         if startPointer==endPointer:
-        #                             genoDict[geneName][0].append(lastPos)
-        #                         else:
-        #                             genoDict[geneName][0].append(lastPos+endPointer-startPointer)
-        #                             genoDict[geneName][1].extend(group.indices[startPointer:endPointer])
-        #                             genoDict[geneName][2].extend(group.data[startPointer:endPointer])
-        #                         genoDict[geneName][3].append(id)
-        #                             # genoDict[geneName][2[.extend(group.data[startPointer:endPointer])
-        #                 except:
-        #                     pass
-        #             for key,value in genoDict.items():
-        #                 print(key,len(value[0]),len(value[1]),len(value[2]),len(value[3]))
-        #                 storage.store_csr_arrays_into_earray_HDF5(value[2],value[1],value[0],(len(value[3]),group.shape[1]),value[3],"dataTable_"+key,chr,HDFfileGroupName) 
-        #         except KeyboardInterrupt as e:
-        #             hdf5_file.close()
-        #             pass
-
         def run(self):
             
             while True:
@@ -221,56 +177,100 @@ class GroupHDFGenerator_update(Process):
                 HDFfileGroupName=HDFfileName.replace(".h5","_multi_genes.h5")
                 if (os.path.isfile(HDFfileGroupName)):
                     os.remove(HDFfileGroupName)
-
-                for value in self.geneSet:
-                    storage.store_csr_arrays_into_earray_HDF5_multi([],[],[0],(0,0),[],value,"22",HDFfileGroupName)
-
                 try:
                     chr="22"
-
                     group=hdf5_file.get_node("/chr"+chr)
                     rownames=group.rownames[:]
                     rownames=[int(x.decode("utf-8")) for x in rownames]
-                    
                     for idx,id in enumerate(rownames):
                         try:
                             geneNames=self.geneDict[id]
-                            
                             for geneName in geneNames:
-                                node="/chr"+chr
-                                indptr=None
-                                data=None
-                                indices=None
-                                rownames=None
-                                shape=None
-                                f=tb.open_file(HDFfileGroupName,"r")
-                                geneGroup=f.get_node(node+"/"+geneName)
-                                lastPos=geneGroup.indptr[-1]
-                                f.close()
-            
+                                if geneName not in genoDict:
+                                    genoDict[geneName]=[[0],[],[],[],[]]
+
                                 startPointer=group.indptr[idx]
                                 endPointer=group.indptr[idx+1]
-                   
+                                lastPos=genoDict[geneName][0][-1]
                                 if startPointer==endPointer:
-                                    indptr=[lastPos]
+                                    genoDict[geneName][0].append(lastPos)
                                 else:
-                                    indptr=[lastPos+endPointer-startPointer]
-                                    indices=group.indices[startPointer:endPointer]
-                                    data=group.data[startPointer:endPointer]
-        
-                                shape=(1,group.shape[1])
-
-                                # print(data,indices,indptr)
-                                storage.append_csr_arrays_into_earray_HDF5_multi(data,indices,indptr,shape,[id],chr,geneName,HDFfileGroupName) 
-                            # except Exception as e:
-                            #     exc_type, exc_obj, exc_tb = sys.exc_info()
-                            #     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                            #     print(exc_type, fname, exc_tb.tb_lineno)    
-                        except KeyError: 
+                                    genoDict[geneName][0].append(lastPos+endPointer-startPointer)
+                                    genoDict[geneName][1].extend(group.indices[startPointer:endPointer])
+                                    genoDict[geneName][2].extend(group.data[startPointer:endPointer])
+                                genoDict[geneName][3].append(id)
+                                    # genoDict[geneName][2[.extend(group.data[startPointer:endPointer])
+                        except:
                             pass
+                    for key,value in genoDict.items():
+                        # print(key,len(value[0]),len(value[1]),len(value[2]),len(value[3]))
+                        storage.store_csr_arrays_into_earray_HDF5_multi(value[2],value[1],value[0],(len(value[3]),group.shape[1]),value[3],key,chr,HDFfileGroupName) 
                 except KeyboardInterrupt as e:
                     hdf5_file.close()
                     pass
+
+        # def run(self):
+            
+        #     while True:
+        #         genoDict={}
+        #         HDFfileName=self.fileQueue.get()
+        #         if HDFfileName is None:
+        #             break
+        #         hdf5_file=tb.open_file(HDFfileName,mode="r")
+                
+        #         HDFfileGroupName=HDFfileName.replace(".h5","_multi_genes.h5")
+        #         if (os.path.isfile(HDFfileGroupName)):
+        #             os.remove(HDFfileGroupName)
+
+        #         for value in self.geneSet:
+        #             storage.store_csr_arrays_into_earray_HDF5_multi([],[],[0],(0,0),[],value,"22",HDFfileGroupName)
+
+        #         try:
+        #             chr="22"
+
+        #             group=hdf5_file.get_node("/chr"+chr)
+        #             rownames=group.rownames[:]
+        #             rownames=[int(x.decode("utf-8")) for x in rownames]
+                    
+        #             for idx,id in enumerate(rownames):
+        #                 try:
+        #                     geneNames=self.geneDict[id]
+                            
+        #                     for geneName in geneNames:
+        #                         node="/chr"+chr
+        #                         indptr=None
+        #                         data=None
+        #                         indices=None
+        #                         rownames=None
+        #                         shape=None
+        #                         f=tb.open_file(HDFfileGroupName,"r")
+        #                         geneGroup=f.get_node(node+"/"+geneName)
+        #                         lastPos=geneGroup.indptr[-1]
+        #                         f.close()
+            
+        #                         startPointer=group.indptr[idx]
+        #                         endPointer=group.indptr[idx+1]
+                   
+        #                         if startPointer==endPointer:
+        #                             indptr=[lastPos]
+        #                         else:
+        #                             indptr=[lastPos+endPointer-startPointer]
+        #                             indices=group.indices[startPointer:endPointer]
+        #                             data=group.data[startPointer:endPointer]
+        
+        #                         shape=(1,group.shape[1])
+
+        #                         # print(data,indices,indptr)
+        #                         storage.append_csr_arrays_into_earray_HDF5_multi(data,indices,indptr,shape,[id],chr,geneName,HDFfileGroupName) 
+        #                     # except Exception as e:
+        #                     #     exc_type, exc_obj, exc_tb = sys.exc_info()
+        #                     #     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        #                     #     print(exc_type, fname, exc_tb.tb_lineno)    
+        #                 except KeyError: 
+        #                     pass
+        #         except KeyboardInterrupt as e:
+        #             hdf5_file.close()
+        #             pass
 
 
 
@@ -308,6 +308,7 @@ def generateHDFbyGroup_update(testManager):
         groupGenerators=[]
         fileQueue=Queue()
         geneDict,geneSet=getGroupDict(testManager)
+        start=time.time()
         for HDFfileName in HDFfileNames:
             fileQueue.put(HDFfileName)
         for i in range(njobs):
@@ -317,6 +318,7 @@ def generateHDFbyGroup_update(testManager):
             fileQueue.put(None)
         for groupHDFGenerator in groupGenerators:
             groupHDFGenerator.join()
+        print("groupTime: ",time.time()-start)
 
 
 
