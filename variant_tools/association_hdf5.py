@@ -204,7 +204,7 @@ class GroupHDFGenerator_update(Process):
                             pass
                     for key,value in genoDict.items():
                         # print(key,len(value[0]),len(value[1]),len(value[2]),len(value[3]))
-                        storage.store_csr_arrays_into_earray_HDF5_multi(value[2],value[1],value[0],(len(value[3]),group.shape[1]),value[3],key,chr,HDFfileGroupName) 
+                        storage.store_csr_arrays_into_earray_HDF5(value[2],value[1],value[0],(len(value[3]),group.shape[1]),value[3],key,chr,HDFfileGroupName) 
                 except KeyboardInterrupt as e:
                     hdf5_file.close()
                     pass
@@ -222,8 +222,8 @@ class GroupHDFGenerator_update(Process):
         #         if (os.path.isfile(HDFfileGroupName)):
         #             os.remove(HDFfileGroupName)
 
-        #         for value in self.geneSet:
-        #             storage.store_csr_arrays_into_earray_HDF5_multi([],[],[0],(0,0),[],value,"22",HDFfileGroupName)
+        #         for geneName in self.geneSet:
+        #             storage.store_csr_arrays_into_earray_HDF5([],[],[0],(0,0),[],geneName,"22",HDFfileGroupName)
 
         #         try:
         #             chr="22"
@@ -261,7 +261,7 @@ class GroupHDFGenerator_update(Process):
         #                         shape=(1,group.shape[1])
 
         #                         # print(data,indices,indptr)
-        #                         storage.append_csr_arrays_into_earray_HDF5_multi(data,indices,indptr,shape,[id],chr,geneName,HDFfileGroupName) 
+        #                         storage.append_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,[id],geneName,chr,HDFfileGroupName) 
         #                     # except Exception as e:
         #                     #     exc_type, exc_obj, exc_tb = sys.exc_info()
         #                     #     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
@@ -361,7 +361,7 @@ def getGenotype_HDF5(worker, group):
     for fileName in files:
         startSample=int(fileName.split("_")[1])
         endSample=int(fileName.split("_")[2])
-        hdf5db=HDF5Engine_multi("dataTable")
+        hdf5db=HDF5Engine_multi()
         hdf5db.connect_HDF5(fileName)  
 
         hdf5db.load_HDF5(geneSymbol,chr)

@@ -121,7 +121,7 @@ class HDF5GenotypeImportWorker(Process):
                 currentStart=group.indptr[-1]
                 f.close()
                 self.indptr=[x+currentStart for x in self.indptr]
-                storage.append_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,chr,self.HDFfileName) 
+                storage.append_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,"",chr,self.HDFfileName) 
             else:
                 self.indptr=[0]+self.indptr
                 f.close()

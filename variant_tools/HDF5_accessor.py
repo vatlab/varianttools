@@ -159,9 +159,8 @@ class HDF5Engine_csc:
 
 
 class HDF5Engine_multi:
-    def __init__(self,dbName):
+    def __init__(self):
         # print("HDF5 engine started")
-        self.dbName = dbName
         self.fileName=None
         self.m=None
         self.rownames=None
