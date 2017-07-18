@@ -167,21 +167,23 @@ def append_csr_arrays_into_earray_HDF5_multi(data,indices,indptr,shape,ids,chr,n
             atom = None
             ds=None
 
-            if (par=='data'):
+            if (par=='data' and data is not None):
                 arr=np.array(data,dtype=np.dtype(np.float64))
                 ds=group.data
-            elif (par=='indices'):
+                ds.append(arr)
+            elif (par=='indices' and indices is not None):
                 arr=np.array(indices,dtype=np.dtype(np.int32))
                 ds=group.indices
-            elif (par=='indptr'):
+                ds.append(arr)
+            elif (par=='indptr' and indptr is not None):
                 arr=np.array(indptr,dtype=np.dtype(np.int32))
                 ds=group.indptr
-            if (arr.shape[0]!=0):
                 ds.append(arr)
 
-        group.shape[0]=shape[0]
+       
         group.rownames.append(rownames)
-
+        group.shape[1]=shape[1]
+        group.shape[0]=len(group.rownames[:])
 
     f.close()
 

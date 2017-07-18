@@ -231,41 +231,42 @@ class GroupHDFGenerator_update(Process):
                     group=hdf5_file.get_node("/chr"+chr)
                     rownames=group.rownames[:]
                     rownames=[int(x.decode("utf-8")) for x in rownames]
+                    
                     for idx,id in enumerate(rownames):
                         try:
                             geneNames=self.geneDict[id]
-                            try:
-                                for geneName in geneNames:
-                                    node="/chr"+chr
-                                    indptr=None
-                                    data=None
-                                    indices=None
-                                    rownames=None
-                                    shape=None
-                                    f=tb.open_file(HDFfileGroupName,"r")
-                                    geneGroup=f.get_node(node+"/"+geneName)
-                                    lastPos=geneGroup.indptr[-1]
-                                    f.close()
-                
-                                    startPointer=group.indptr[idx]
-                                    endPointer=group.indptr[idx+1]
-                       
-                                    if startPointer==endPointer:
-                                        indptr=[lastPos]
-                                    else:
-                                        indptr=[lastPos+endPointer-startPointer]
-                                        indices=group.indices[startPointer:endPointer]
-                                        data=group.data[startPointer:endPointer]
-                                    rownames=[id]
-                                    shape=(1,group.shape[1])
-                                    # print(data,indices,indptr)
-                                    storage.append_csr_arrays_into_earray_HDF5_multi(data,indices,indptr,shape,rownames,chr,geneName,HDFfileGroupName) 
-                            except Exception as e:
-                                pass
-                                # exc_type, exc_obj, exc_tb = sys.exc_info()
-                                # fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                                # print(exc_type, fname, exc_tb.tb_lineno)    
-                        except:
+                            
+                            for geneName in geneNames:
+                                node="/chr"+chr
+                                indptr=None
+                                data=None
+                                indices=None
+                                rownames=None
+                                shape=None
+                                f=tb.open_file(HDFfileGroupName,"r")
+                                geneGroup=f.get_node(node+"/"+geneName)
+                                lastPos=geneGroup.indptr[-1]
+                                f.close()
+            
+                                startPointer=group.indptr[idx]
+                                endPointer=group.indptr[idx+1]
+                   
+                                if startPointer==endPointer:
+                                    indptr=[lastPos]
+                                else:
+                                    indptr=[lastPos+endPointer-startPointer]
+                                    indices=group.indices[startPointer:endPointer]
+                                    data=group.data[startPointer:endPointer]
+        
+                                shape=(1,group.shape[1])
+
+                                # print(data,indices,indptr)
+                                storage.append_csr_arrays_into_earray_HDF5_multi(data,indices,indptr,shape,[id],chr,geneName,HDFfileGroupName) 
+                            # except Exception as e:
+                            #     exc_type, exc_obj, exc_tb = sys.exc_info()
+                            #     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                            #     print(exc_type, fname, exc_tb.tb_lineno)    
+                        except KeyError: 
                             pass
                 except KeyboardInterrupt as e:
                     hdf5_file.close()
