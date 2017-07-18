@@ -90,6 +90,45 @@ def store_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,name,chr,sto
         # ds.append(rownames)
     f.close()
 
+def store_csr_arrays_into_earray_HDF5_multi(data,indices,indptr,shape,ids,name,chr,store="check.h5"):
+    rownames=np.array(ids)
+    filters = tb.Filters(complevel=9, complib='blosc')
+    full_name=None
+    with tb.open_file(store,'a') as f:
+        node="/chr"+chr+"/"+name
+        if node in f:
+            group=f.get_node(node)
+        else:
+            if "/chr"+chr not in f:
+                group=f.create_group("/","chr"+chr,"chromosome")
+            group=f.create_group("/chr"+chr,name)
+        for par in ('data', 'indices', 'indptr', 'shape'):
+
+            full_name = '%s' % (par)
+            arr = None
+            atom = None
+            if (par=='data'):
+                arr=np.array(data)
+                atom=tb.Atom.from_dtype(np.dtype(np.float64))
+            elif (par=='indices'):
+                arr=np.array(indices)
+                atom=tb.Atom.from_dtype(np.dtype(np.int32))
+            elif (par=='indptr'):
+                arr=np.array(indptr)
+                atom=tb.Atom.from_dtype(np.dtype(np.int32))
+            elif (par=='shape'):
+                arr=np.array(shape)
+                atom=tb.Atom.from_dtype(np.dtype(np.int32))
+          
+            ds = f.create_earray(group, full_name, atom, (0,),filters=filters)
+            ds.append(arr)
+  
+        ds = f.create_earray(group, "rownames",  tb.StringAtom(itemsize=200), (0,),filters=filters)
+        ds.append(rownames)
+        # ds = f.create_earray(f.root, "rownames",  tb.StringAtom(itemsize=200), (0,),filters=filters)
+        # ds.append(rownames)
+    f.close()
+
 
 def append_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,chr,store="check.h5"):
     rownames=np.array(ids)
@@ -114,6 +153,36 @@ def append_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,chr,store="
                 ds.append(arr)
         group.shape[0]=shape[0]
         group.rownames.append(rownames)
+    f.close()
+
+
+def append_csr_arrays_into_earray_HDF5_multi(data,indices,indptr,shape,ids,chr,name,store="check.h5"):
+    rownames=np.array(ids)
+
+    with tb.open_file(store,'a') as f:
+        group=f.get_node("/chr"+chr+"/"+name)
+        for par in ('data', 'indices', 'indptr'):
+            full_name = '%s' % (par)
+            arr = None
+            atom = None
+            ds=None
+
+            if (par=='data'):
+                arr=np.array(data,dtype=np.dtype(np.float64))
+                ds=group.data
+            elif (par=='indices'):
+                arr=np.array(indices,dtype=np.dtype(np.int32))
+                ds=group.indices
+            elif (par=='indptr'):
+                arr=np.array(indptr,dtype=np.dtype(np.int32))
+                ds=group.indptr
+            if (arr.shape[0]!=0):
+                ds.append(arr)
+
+        group.shape[0]=shape[0]
+        group.rownames.append(rownames)
+
+
     f.close()
 
 

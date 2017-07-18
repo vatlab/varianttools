@@ -85,7 +85,6 @@ class HDF5GenotypeImportWorker(Process):
         # self.indptr_count=indptr_count
         self.variantIndex = variantIndex
         self.variant_count = variant_count
-        
         self.proc_index = proc_index
         self.start_sample=start_sample
         self.end_sample=end_sample
