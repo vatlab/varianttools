@@ -94,6 +94,7 @@ def append_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,groupName,c
                 arr=np.array(indptr,dtype=np.dtype(np.int32))
                 ds=group.indptr
                 ds.append(arr)
+        # print(len(group.rownames[:]))
         group.rownames.append(rownames)
         group.shape[1]=shape[1]
         group.shape[0]=len(group.rownames[:])
@@ -136,9 +137,9 @@ def store_csr_genotype_into_earray_HDF5(data, name, ids,store='check.h5'):
     f.close()
 
 
-def store_csr_genotype_into_one_HDF5(data, name, ids,index,chr,store='check.h5'):
-    #data: a pandas data frame
-    #name: the name of the tables
+#passs in a data matrix, save into HDF5
+def store_csr_genotype_into_one_HDF5(data, groupName, ids,index,chr,store='check.h5'):
+
     if (data.__class__ != csr_matrix):
         m=csr_matrix(data.as_matrix())
         rownames=data.index.values
@@ -151,24 +152,27 @@ def store_csr_genotype_into_one_HDF5(data, name, ids,index,chr,store='check.h5')
     filters = tb.Filters(complevel=9, complib='blosc')
     with tb.open_file(store,'a') as f:
         node="/chr"+chr
+        if len(groupName)>0:
+            node="/chr"+chr+"/"+groupName
         if node in f:
             group=f.get_node(node)
         else:
-            group=f.create_group("/","chr"+chr,"chromosome")
+            if "/chr"+chr not in f:
+                group=f.create_group("/","chr"+chr,"chromosome")
+            if len(groupName)>0:
+                group=f.create_group("/chr"+chr,groupName)
         for par in ('data', 'indices', 'indptr', 'shape'):
-            full_name = '%s_%s' % (name, par)
             try:
-                n = getattr(group, full_name)
+                n = getattr(group, par)
                 n._f_remove()
             except AttributeError:
                 pass
             arr = np.array(getattr(m, par))
             atom = tb.Atom.from_dtype(arr.dtype)
-
-            if (arr.shape[0]!=0):
-                ds = f.create_carray(group, full_name, atom, arr.shape,filters=filters)
+            if (arr is not None):
+                ds = f.create_carray(group, par, atom, arr.shape,filters=filters)
                 ds[:] = arr
-        ds = f.create_carray(group, name+"_rownames",  tb.StringAtom(itemsize=200), rownames.shape,filters=filters)
+        ds = f.create_carray(group, "rownames",  tb.StringAtom(itemsize=200), rownames.shape,filters=filters)
         ds[:] = rownames
         # ds = f.create_carray(f.root, name+"_colnames", tb.StringAtom(itemsize=100), colnames.shape,filters=filters)
         # ds[:] = colnames

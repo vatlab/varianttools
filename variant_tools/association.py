@@ -1183,6 +1183,7 @@ def associate(args):
             
             if len(asso.geno_info)==0 and args.HDF5:
                 generateHDFbyGroup_update(asso)
+                # generateHDFbyGroup(asso)
             
             runAssociation(args,asso,proj,results)
 
