@@ -220,6 +220,8 @@ def generateHDFbyGroup(testManager):
             groupHDFGenerator.join()
         print("group time: ",time.time()-start)
 
+
+#keep sparase matrix in memory and write onece
 class GroupHDFGenerator_memory(Process):
 
         def __init__(self,geneDict,geneSet,fileQueue,project,group_names,job):
@@ -276,6 +278,7 @@ class GroupHDFGenerator_memory(Process):
                     pass
 
 
+#read ids one by one and append to gene group HDF5
 class GroupHDFGenerator_append(Process):
 
         def __init__(self,geneDict,geneSet,fileQueue,project,group_names,job):

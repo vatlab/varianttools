@@ -68,7 +68,7 @@ from .preprocessor import *
 class HDF5GenotypeImportWorker(Process):
     '''This class starts a process, import genotype to a temporary genotype database.'''
     def __init__(self, processor,readQueue,variantIndex, start_sample,end_sample,variant_count, 
-        proc_index,HDFfileName):
+        proc_index,geno_info,HDFfileName):
         '''
         variantIndex: a dictionary that returns ID for each variant.
         filelist: files from which variantIndex is created. If the passed filename
@@ -88,7 +88,7 @@ class HDF5GenotypeImportWorker(Process):
         self.proc_index = proc_index
         self.start_sample=start_sample
         self.end_sample=end_sample
-        
+        self.geno_info=geno_info
         self.indptr=[]
         self.indices=[]
         self.data=[]
@@ -317,7 +317,7 @@ def importGenotypesInParallel(importer,num_sample=0):
             for i in range(numProcess):
                 if importers[i] is None or not importers[i].is_alive():
                     importers[i] = HDF5GenotypeImportWorker(importer.processor,readQueue[i], importer.variantIndex, start_sample, end_sample, 
-                        variant_import_count[i], i, HDFfile_Merge)
+                        variant_import_count[i], i, importer.genotype_info,HDFfile_Merge)
                     importers[i].start()
                     start_sample = end_sample
                     break 
@@ -351,7 +351,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                         for i in range(numProcess):
                             if importers[i] is None or not importers[i].is_alive():
                                 importers[i] = HDF5GenotypeImportWorker(importer.processor,readQueue[i], importer.variantIndex, start_sample, end_sample, 
-                                    variant_import_count[i],i , HDFfile_Merge)
+                                    variant_import_count[i],i , importer.genotype_info,HDFfile_Merge)
                                 importers[i].start()
                                 start_sample = end_sample
                                 break      
