@@ -174,13 +174,6 @@ class HDF5Engine_multi:
     def load_HDF5(self,groupName,chr):
         # start_time = time.time()
         with tb.open_file(self.fileName) as f:
-            # group=f.get_node("/chr"+chr)
-            # pars = []
-            # for par in ('data', 'indices', 'indptr', 'shape','rownames'):
-            #     if hasattr(group, '%s_%s' % (self.dbName+"_"+str(groupName), par)):
-            #         pars.append(getattr(group, '%s_%s' % (self.dbName+"_"+str(groupName), par)).read())
-            #     else:
-            #         pars.append([])
             group=f.get_node("/chr"+chr+"/"+groupName)
             pars = []
             for par in ('data', 'indices', 'indptr', 'shape','rownames'):

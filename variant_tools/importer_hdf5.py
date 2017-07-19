@@ -187,10 +187,13 @@ class HDF5GenotypeImportWorker(Process):
 
 def updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDF5fileName):
     cur=importer.db.cursor()
+    pos=0
     for id in range(start_sample,end_sample):
         sql="UPDATE sample SET HDF5=?, COLPOS=? WHERE sample_id=? and sample_name=?"
-        task=(HDF5fileName,allNames[names[id]],sample_ids[id],names[id])
+        # task=(HDF5fileName,allNames[names[id]],sample_ids[id],names[id])
+        task=(HDF5fileName,pos,sample_ids[id],names[id])
         cur.execute(sql,task)
+        pos+=1
     
 
 
