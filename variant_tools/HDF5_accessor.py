@@ -12,6 +12,117 @@ import HDF5_storage as storage
 from .utils import env
 
 
+
+
+
+class HDF5Engine_access:
+    def __init__(self,fileName):
+        # print("HDF5 engine started")
+        self.fileName=fileName
+        self.rownames=None
+        self.colnames=None
+        self.indptr=None
+        self.indices=None
+        self.data=None
+        self.shape=None
+
+    
+    def load_HDF5(self,groupName,chr):
+        # start_time = time.time()
+        with tb.open_file(self.fileName) as f:
+            node="/chr"+chr
+            if node in f:
+                group=f.get_node(node)
+            if len(groupName)>0:
+                node="/chr"+chr+"/"+groupName
+                if node in f:
+                    group=f.get_node("/chr"+chr+"/"+groupName)
+            pars = []
+            for par in ('data', 'indices', 'indptr', 'shape','rownames',"colnames"):
+                if hasattr(group, par):
+                    pars.append(getattr(group, par).read())
+                else:
+                    pars.append([])
+        f.close()
+        self.data=pars[0]
+        self.indices=pars[1]
+        self.indptr=pars[2]
+        self.shape=pars[3]
+        self.rownames=pars[4]
+        self.colnames=pars[5]
+
+
+    def load_all_GT(self):
+
+        snpdict=dict.fromkeys(self.colnames,{})
+        for key,value in snpdict.iteritems():
+            snpdict[key]=dict.fromkeys(self.rownames.tolist(),(0,))
+      
+        for idx,id in enumerate(self.rownames):
+            start=self.indptr[idx]
+            end=self.indptr[idx+1]
+            if end>start:
+                indices=self.indices[start:end]
+                data=self.data[start:end]
+                for colidx,samplePos in enumerate(indices):
+                        snpdict[self.colnames[samplePos]][id]=(data[colidx],)
+        
+        return snpdict
+
+
+
+
+class HDF5Engine_multi:
+    def __init__(self,fileName):
+        # print("HDF5 engine started")
+        self.fileName=None
+        self.m=None
+        self.rownames=None
+        self.fileName=fileName
+
+    
+    def load_HDF5(self,groupName,chr):
+        # start_time = time.time()
+        group=None
+        with tb.open_file(self.fileName) as f:
+            node="/chr"+chr
+            if node in f:
+                group=f.get_node(node)
+            if len(groupName)>0:
+                node="/chr"+chr+"/"+groupName
+                if node in f:
+                    group=f.get_node("/chr"+chr+"/"+groupName)
+            pars = []
+            for par in ('data', 'indices', 'indptr', 'shape','rownames','colnames'):
+                if hasattr(group, par):
+                    pars.append(getattr(group, par).read())
+                else:
+                    pars.append([])
+        f.close()
+        # print(groupName,pars[3])
+        self.m = csr_matrix(tuple(pars[:3]), shape=pars[3])
+        self.rownames=pars[4]
+        self.colnames=pars[5]
+
+    def load_all_GT(self):      
+
+        snpdict=dict.fromkeys(self.colnames,{})
+        for key,value in snpdict.iteritems():
+            snpdict[key]=dict.fromkeys(self.rownames.tolist(),(0,))
+
+        for idx,id in enumerate(self.rownames):
+            value=self.m.getrow(idx)
+            cols=value.indices
+            genotypes=value.data
+            for colindex,samplePos in enumerate(cols): 
+                snpdict[self.colnames[samplePos]][id]=(genotypes[colindex],)
+               
+        return snpdict
+
+
+
+
+
 class HDF5Engine:
     def __init__(self,dbName):
         # print("HDF5 engine started")
@@ -158,133 +269,8 @@ class HDF5Engine_csc:
 
 
 
-class HDF5Engine_multi:
-    def __init__(self):
-        # print("HDF5 engine started")
-        self.fileName=None
-        self.m=None
-        self.rownames=None
 
 
-    def connect_HDF5(self,db):
-        # db = os.path.expanduser(db)
-        # self.fileName = db.replace(".proj","_multi_genes.h5") if (db.endswith('.proj') or db.endswith('.h5')) else db.replace(".DB","_multi_genes.h5")
-        self.fileName=db
-    
-    def load_HDF5(self,groupName,chr):
-        # start_time = time.time()
-        with tb.open_file(self.fileName) as f:
-            group=f.get_node("/chr"+chr+"/"+groupName)
-            pars = []
-            for par in ('data', 'indices', 'indptr', 'shape','rownames'):
-                if hasattr(group, '%s' % (par)):
-                    pars.append(getattr(group, '%s' % (par)).read())
-                else:
-                    pars.append([])
-        f.close()
-        # print(groupName,pars[3])
-        self.m = csr_matrix(tuple(pars[:3]), shape=pars[3])
-        self.rownames=pars[4].astype('int')
-        # print(groupName,self.rownames)
-        # print("--- %s seconds ---" % (time.time() - start_time))
-
-    def load_genotype_by_variantID(self):
-        
-        sampleNames=self.m.shape[1]
-        ids=self.m.shape[0]
-        innerall=0
-        starttime=time.time()
-
-        samplePos=[x+1 for x in range(sampleNames)]
-        idPos=[int(self.rownames[x]) for x in range(ids)]
-        snpdict=dict.fromkeys(samplePos,{})
-        for key,value in snpdict.iteritems():
-            snpdict[key]=dict.fromkeys(idPos,(0,))
-
-        # print("create time {}".format(time.time()-starttime))
-        # print("inner time {}".format(innerall))
-        starttime=time.time()
-        for idPosition in range(ids):
-            id=int(self.rownames[idPosition])
-            value=self.m.getrow(idPosition)
-            cols=value.indices
-            genotypes=value.data
-            for index,pos in enumerate(cols): 
-                if math.isnan(genotypes[index]):
-                    #pass
-                    snpdict[pos+1][id]=(genotypes[index],)
-                else:
-                    snpdict[pos+1][id]=(int(genotypes[index]),)
-                # print(id,sampleName,value)
-        # print("change time {}".format(time.time()-starttime))
-        # print(snpdict)
-        return snpdict
-
-
-class HDF5Engine_access:
-    def __init__(self,fileName):
-        # print("HDF5 engine started")
-        self.fileName=fileName
-        self.rownames=None
-        self.indptr=None
-        self.indices=None
-        self.data=None
-        self.shape=None
-
-    
-    def load_HDF5(self,groupName,chr):
-        # start_time = time.time()
-        with tb.open_file(self.fileName) as f:
-            node="/chr"+chr
-            if node in f:
-                group=f.get_node(node)
-            if len(groupName)>0:
-                node="/chr"+chr+"/"+groupName
-                if node in f:
-                    group=f.get_node("/chr"+chr+"/"+groupName)
-            pars = []
-            for par in ('data', 'indices', 'indptr', 'shape','rownames'):
-                if hasattr(group, par):
-                    pars.append(getattr(group, par).read())
-                else:
-                    pars.append([])
-        f.close()
-        self.data=pars[0]
-        self.indices=pars[1]
-        self.indptr=pars[2]
-        self.shape=pars[3]
-        self.rownames=pars[4]
-
-
-    # def load_genotype_by_variantID(self):
-        
-    #     sampleNames=self.shape[1]
-    #     ids=self.shape[0]
-
-    #     samplePos=[x+1 for x in range(sampleNames)]
-    #     idPos=[int(self.rownames[x]) for x in range(ids)]
-    #     snpdict=dict.fromkeys(samplePos,{})
-    #     for key,value in snpdict.iteritems():
-    #         snpdict[key]=dict.fromkeys(idPos,(0,))
-
-    #     # print("create time {}".format(time.time()-starttime))
-    #     # print("inner time {}".format(innerall))
-    #     starttime=time.time()
-    #     for idPosition in range(ids):
-    #         id=int(self.rownames[idPosition])
-    #         value=self.m.getrow(idPosition)
-    #         cols=value.indices
-    #         genotypes=value.data
-    #         for index,pos in enumerate(cols): 
-    #             if math.isnan(genotypes[index]):
-    #                 #pass
-    #                 snpdict[pos+1][id]=(genotypes[index],)
-    #             else:
-    #                 snpdict[pos+1][id]=(int(genotypes[index]),)
-    #             # print(id,sampleName,value)
-    #     # print("change time {}".format(time.time()-starttime))
-    #     # print(snpdict)
-    #     return snpdict
 
 
 

@@ -426,30 +426,34 @@ def getGenotype_HDF5(worker, group):
     geneSymbol=transformGeneName(group[0])
     files=glob.glob("tmp*_genotypes_multi_genes.h5")
     files=sorted(files, key=lambda name: int(name.split("_")[1]))
+
     for fileName in files:
         startSample=int(fileName.split("_")[1])
         endSample=int(fileName.split("_")[2])
-        hdf5db=HDF5Engine_multi()
-        hdf5db.connect_HDF5(fileName)  
+        
+        # hdf5db=HDF5Engine_multi(fileName)
+        # hdf5db.load_HDF5(geneSymbol,chr)
+        # snpdict=hdf5db.load_all_GT()
 
+        # for ID in range(startSample,endSample+1):           
+        #     data=snpdict[ID]
+
+       
+        hdf5db=HDF5Engine_access(fileName)
         hdf5db.load_HDF5(geneSymbol,chr)
-        snpdict=hdf5db.load_genotype_by_variantID()
-
-
-        # dbID=self.cached_genes[geneSymbol]-1
-
-        # for ID in self.sample_IDs:
-        for ID in range(endSample-startSample+1):
-            data=snpdict[ID+1]
+        snpdict=hdf5db.load_all_GT()
+        for ID in range(startSample,endSample+1):
+            data=snpdict[ID]
             # handle missing values
             gtmp = [data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in variant_id]
-            # handle -1 coding (double heterozygotes)
+            # handle -1 coding (double heterozygotes)     
             genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
             #
             # handle genotype_info
             #
             for idx, key in enumerate(worker.geno_info):
                 geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
+            
     gname = ':'.join(list(map(str, group)))
     return worker.filterGenotype(genotype, geno_info, var_info, gname)
 

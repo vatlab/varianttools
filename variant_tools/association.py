@@ -959,6 +959,19 @@ class AssoTestsWorker(Process):
             self.data = t.AssoData()
             self.pydata = {}
             values = list(grp)
+
+
+            if not self.args.HDF5:
+                genotype, which, var_info, geno_info = self.getGenotype(grp)
+            else:
+                genotype, which, var_info, geno_info = getGenotype_HDF5(self,grp)
+            # if I throw an exception here, the program completes in 5 minutes, indicating
+            # the data collection part takes an insignificant part of the process.
+            # 
+            # set C++ data object
+         
+
+
             try:
                 # select variants from each group:
                 if not self.args.HDF5:

@@ -402,7 +402,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                 num_lines+=1
                 for job in range(len(readQueue)):
                     readQueue[job].put(line)
-                if (line_no>=2000):
+                if (line_no>=10000):
                     print(num_lines)
                     prog.update(num_lines*len(sample_ids))
                     line_no=0
