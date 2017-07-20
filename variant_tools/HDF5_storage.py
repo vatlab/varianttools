@@ -45,7 +45,10 @@ def store_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,groupName,ch
             atom = None
             if (par=='data'):
                 arr=np.array(data)
-                atom=tb.Atom.from_dtype(np.dtype(np.float64))
+                if groupName=="AD_geno" or groupName=="PL_geno":
+                    atom=tb.Atom.from_dtype(np.dtype('S20'))
+                else:
+                    atom=tb.Atom.from_dtype(np.dtype(np.float64))
             elif (par=='indices'):
                 arr=np.array(indices)
                 atom=tb.Atom.from_dtype(np.dtype(np.int32))
@@ -83,7 +86,10 @@ def append_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,groupName,c
             atom = None
             ds=None
             if (par=='data' and data is not None):
-                arr=np.array(data,dtype=np.dtype(np.float64))
+                if groupName=="AD_geno" or groupName=="PL_geno":
+                    arr=np.array(data,dtype=np.dtype("S20"))
+                else:
+                    arr=np.array(data,dtype=np.dtype(np.float64))
                 ds=group.data
                 ds.append(arr)
             elif (par=='indices' and indices is not None):

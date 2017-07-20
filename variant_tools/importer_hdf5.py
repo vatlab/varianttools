@@ -95,8 +95,12 @@ class HDF5GenotypeImportWorker(Process):
         self.rownames=[]
 
         self.HDFfileName=HDFfileName
+        self.info={}
+        if len(self.geno_info)>0:
+            for info in self.geno_info:
+                #indptr,indices,data,shape,rownames
+                self.info[info.name]=[[],[],[],[],[]]
         
-
 
 
     def writeIntoFile(self,chr):
@@ -110,11 +114,16 @@ class HDF5GenotypeImportWorker(Process):
         #If file doesn't exist, create file
         #if file exists but chromosome does not exist, create chr group
         #if file exists and chromosome exists, append to file
-        if self.proc_index==1:
-            print(len(self.rownames),self.rownames[0],self.rownames[-1])
+ 
         if not os.path.isfile(self.HDFfileName):
             self.indptr=[0]+self.indptr
             storage.store_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,"",chr,self.HDFfileName) 
+            if len(self.geno_info)>0:
+                for key,value in self.info.items():
+                    value[0]=[0]+value[0]
+                    # if (key!="AD_geno" and key!="PL_geno"):
+                    storage.store_csr_arrays_into_earray_HDF5(value[2],value[1],value[0],shape,value[3],key,chr,self.HDFfileName) 
+
         else:
             node="/chr"+chr
             f=tb.open_file(self.HDFfileName,"r")
@@ -124,25 +133,46 @@ class HDF5GenotypeImportWorker(Process):
                 f.close()
                 self.indptr=[x+currentStart for x in self.indptr]
                 storage.append_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,"",chr,self.HDFfileName) 
-            else:
-                self.indptr=[0]+self.indptr
-                f.close()
-                storage.store_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,"",chr,self.HDFfileName) 
+                
+                if len(self.geno_info)>0:
+                    for key,value in self.info.items():
+                        f=tb.open_file(self.HDFfileName,"r")
+                        group=f.get_node(node+"/"+key)
+                        currentStart=group.indptr[-1]
+                        f.close()
+                        value[0]=[x+currentStart for x in value[0]]
+                        storage.append_csr_arrays_into_earray_HDF5(value[2],value[1],value[0],shape,value[3],key,chr,self.HDFfileName) 
+
+            # else:
+            #     self.indptr=[0]+self.indptr
+            #     f.close()
+            #     storage.store_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,"",chr,self.HDFfileName) 
             
         self.indptr=[]
         self.indices=[]
         self.data=[]
         self.rownames=[]
 
+        if len(self.geno_info)>0:
+            for info in self.geno_info:
+                #indptr,indices,data,shape,rownames
+                self.info[info.name]=[[0],[],[],[],[]]
+
 
 
     def run(self): 
         genoCount=0
+        genoDict={}
+        if len(self.geno_info)>0:
+            for info in self.geno_info:
+                genoDict[info.name]=0
         pre_variant_ID=None
         pre_chr=None
         self.start_count = self.variant_count.value
         firstLine=True
-      
+
+        # if self.HDFfileName.split("_")[1]=="1":
+        #      print(self.HDFfileName)
         self.processor.reset(import_sample_range=[self.start_sample,self.end_sample])
         while True:
             line=self.readQueue.get()
@@ -151,6 +181,8 @@ class HDF5GenotypeImportWorker(Process):
                 self.writeIntoFile(pre_chr)
                 break
             for bins,rec in self.processor.process(line):
+                # if self.HDFfileName.split("_")[1]=="1":
+                #      print(rec)
                 variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
                 if pre_variant_ID==variant_id:
                     continue
@@ -164,8 +196,10 @@ class HDF5GenotypeImportWorker(Process):
                 if pre_chr!=rec[0]:
                     self.writeIntoFile(pre_chr)
                     pre_chr=rec[0]
+
+                numSamples=self.end_sample-self.start_sample
          
-                for idx in range(self.end_sample-self.start_sample):
+                for idx in range(numSamples):
                     try:
                         pos=4+idx
                         if rec[pos] is not None:
@@ -182,6 +216,39 @@ class HDF5GenotypeImportWorker(Process):
                             len(rec), fld_cols[-1][-1] + 1, rec))
                 self.indptr.append(genoCount)
                 self.rownames.append(variant_id)
+
+                if len(self.geno_info)>0:
+                    for infoIndex,info in enumerate(self.geno_info):
+    
+                        for idx in range(numSamples):
+                            try:
+                                pos=4+(infoIndex+1)*numSamples+idx
+                                if rec[pos] is not None:
+                                    if rec[pos]!='0':
+                                        genoDict[info.name]=genoDict[info.name]+1
+                                        self.info[info.name][1].append(idx)
+                                        try:
+                                            self.info[info.name][2].append(int(rec[pos]))
+                                        except ValueError:
+                                            if rec[pos] != ".":
+                                                self.info[info.name][2].append(rec[pos])
+                                            else:
+                                                self.info[info.name][2].append(0)
+
+                                else:
+                                    genoDict[info.name]=genoDict[info.name]+1
+                                    self.info[info.name][1].append(idx)
+                                    self.info[info.name][2].append(np.nan)
+                            except IndexError:
+                                env.logger.warning('Incorrect number of genotype fields: {} fields found, {} expected for record {}'.format(
+                                    len(rec), fld_cols[-1][-1] + 1, rec))
+                        self.info[info.name][0].append(genoDict[info.name])
+                        self.info[info.name][3].append(variant_id)
+
+
+
+
+
 
 
 
@@ -333,7 +400,8 @@ def importGenotypesInParallel(importer,num_sample=0):
                 num_lines+=1
                 for job in range(len(readQueue)):
                     readQueue[job].put(line)
-                if (line_no>=10000):
+                if (line_no>=2000):
+                    print(num_lines)
                     prog.update(num_lines*len(sample_ids))
                     line_no=0
                     for job in range(numProcess):
