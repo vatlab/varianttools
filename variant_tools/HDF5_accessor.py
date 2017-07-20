@@ -221,56 +221,70 @@ class HDF5Engine_multi:
         return snpdict
 
 
-
-class HDF5Engine_full:
-    def __init__(self,dbName):
+class HDF5Engine_access:
+    def __init__(self,fileName):
         # print("HDF5 engine started")
-        self.dbName = dbName
-        self.fileName=None
-        self.m=None
-        self.columns=None
+        self.fileName=fileName
+        self.rownames=None
+        self.indptr=None
+        self.indices=None
+        self.data=None
+        self.shape=None
+
+    
+    def load_HDF5(self,groupName,chr):
+        # start_time = time.time()
+        with tb.open_file(self.fileName) as f:
+            node="/chr"+chr
+            if node in f:
+                group=f.get_node(node)
+            if len(groupName)>0:
+                node="/chr"+chr+"/"+groupName
+                if node in f:
+                    group=f.get_node("/chr"+chr+"/"+groupName)
+            pars = []
+            for par in ('data', 'indices', 'indptr', 'shape','rownames'):
+                if hasattr(group, par):
+                    pars.append(getattr(group, par).read())
+                else:
+                    pars.append([])
+        f.close()
+        self.data=pars[0]
+        self.indices=pars[1]
+        self.indptr=pars[2]
+        self.shape=pars[3]
+        self.rownames=pars[4]
 
 
-    def connect_HDF5(self,db):
-        db = os.path.expanduser(db)
-        # self.fileName = "/Users/jma7/Development/VAT/chr22_10t/multiple/"+str(sample)+".h5"
-        self.fileName = "/Users/jma7/Development/VAT/chr22_10t/full_chr22_test.h5"
-        # self.fileName = db if (db.endswith('.proj') or db.endswith('.h5')) else db.replace(".DB","") + '.h5'
-       
+    # def load_genotype_by_variantID(self):
+        
+    #     sampleNames=self.shape[1]
+    #     ids=self.shape[0]
 
-    def load_HDF5(self):
-        self.m=pd.HDFStore(self.fileName)
-        self.columns=self.m[self.dbName].columns
-    # def load_genotype_by_variantID(self,ids,sampleName):
-    #     sample=self.columns[sampleName]
-    #     # idindex=[int(x)-1 for x in ids]
-    #     # start=time.time()
-    #     genotypes=self.m.select(self.dbName,"index in ids & columns==sample")
-    #     # sample=sample.replace("v ","v  ")
-    #     # genotypes=self.m.select_column(self.dbName,"index")
-    #     data={}
-    #     # print("get column {}".format(time.time()-start))
-    #     # start=time.time()
-    #     selectedGeno=genotypes.to_dict()[sample]
-    #     # print("get rows {}".format(time.time()-start))
-    #     for id,genotype in selectedGeno.iteritems():
-    #         data[int(id)+1]=(genotype,)
-    #     return data
+    #     samplePos=[x+1 for x in range(sampleNames)]
+    #     idPos=[int(self.rownames[x]) for x in range(ids)]
+    #     snpdict=dict.fromkeys(samplePos,{})
+    #     for key,value in snpdict.iteritems():
+    #         snpdict[key]=dict.fromkeys(idPos,(0,))
 
-    def load_genotype_by_variantID(self,ids):
-        start=time.time()
-        idindex=[int(x) for x in ids]
-        genotypes=self.m.select(self.dbName,"index in idindex")
-        print("get row {}".format(time.time()-start))
-        start=time.time()
-        data={}
-        for idx,sample in enumerate(self.columns):
-            selectGeno=genotypes[sample].to_dict()
-            data[idx+1]={}
-            for id,genotype in selectGeno.iteritems():
-                data[idx+1][int(id)+1]=(genotype,)
-        print("get output {}".format(time.time()-start))
-        return data
+    #     # print("create time {}".format(time.time()-starttime))
+    #     # print("inner time {}".format(innerall))
+    #     starttime=time.time()
+    #     for idPosition in range(ids):
+    #         id=int(self.rownames[idPosition])
+    #         value=self.m.getrow(idPosition)
+    #         cols=value.indices
+    #         genotypes=value.data
+    #         for index,pos in enumerate(cols): 
+    #             if math.isnan(genotypes[index]):
+    #                 #pass
+    #                 snpdict[pos+1][id]=(genotypes[index],)
+    #             else:
+    #                 snpdict[pos+1][id]=(int(genotypes[index]),)
+    #             # print(id,sampleName,value)
+    #     # print("change time {}".format(time.time()-starttime))
+    #     # print(snpdict)
+    #     return snpdict
 
 
 

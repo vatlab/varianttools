@@ -26,8 +26,8 @@ def store_full_genotype_into_HDF5(file,store):
 
 
 
-def store_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,groupName,chr,store="check.h5"):
-    rownames=np.array(ids)
+def store_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,variant_ids,samples,groupName,chr,store="check.h5"):
+  
     filters = tb.Filters(complevel=9, complib='blosc')
     with tb.open_file(store,'a') as f:
         node="/chr"+chr
@@ -40,9 +40,9 @@ def store_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,groupName,ch
                 group=f.create_group("/","chr"+chr,"chromosome")
             if len(groupName)>0:
                 group=f.create_group("/chr"+chr,groupName)
-        for par in ('data', 'indices', 'indptr', 'shape'):
+        for par in ('data', 'indices', 'indptr', 'shape',"rownames","colnames"):
             arr = None
-            atom = None
+            atom=tb.Atom.from_dtype(np.dtype(np.int32))
             if (par=='data'):
                 arr=np.array(data)
                 if groupName=="AD_geno" or groupName=="PL_geno":
@@ -50,22 +50,21 @@ def store_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,groupName,ch
                 else:
                     atom=tb.Atom.from_dtype(np.dtype(np.float64))
             elif (par=='indices'):
-                arr=np.array(indices)
-                atom=tb.Atom.from_dtype(np.dtype(np.int32))
+                arr=np.array(indices)                
             elif (par=='indptr'):
                 arr=np.array(indptr)
-                atom=tb.Atom.from_dtype(np.dtype(np.int32))
             elif (par=='shape'):
                 arr=np.array(shape)
-                atom=tb.Atom.from_dtype(np.dtype(np.int32))
-            # if (arr.shape[0]!=0):
+            elif(par=="rownames"):
+                arr=np.array(variant_ids)
+            elif(par=="colnames"):
+                arr=np.array(samples)
             ds = f.create_earray(group, par, atom, (0,),filters=filters)
             ds.append(arr)
        
-        ds = f.create_earray(group, "rownames",  tb.StringAtom(itemsize=200), (0,),filters=filters)
-        ds.append(rownames)
-        # ds = f.create_earray(f.root, "rownames",  tb.StringAtom(itemsize=200), (0,),filters=filters)
+        # ds = f.create_earray(group, "rownames",  tb.StringAtom(itemsize=200), (0,),filters=filters)
         # ds.append(rownames)
+
     f.close()
 
 
@@ -81,27 +80,22 @@ def append_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,ids,groupName,c
             node="/chr"+chr+"/"+groupName
         if node in f:
             group=f.get_node(node)
-        for par in ('data', 'indices', 'indptr'):
-            arr = None
-            atom = None
-            ds=None
-            if (par=='data' and data is not None):
-                if groupName=="AD_geno" or groupName=="PL_geno":
-                    arr=np.array(data,dtype=np.dtype("S20"))
-                else:
-                    arr=np.array(data,dtype=np.dtype(np.float64))
-                ds=group.data
-                ds.append(arr)
-            elif (par=='indices' and indices is not None):
-                arr=np.array(indices,dtype=np.dtype(np.int32))
-                ds=group.indices
-                ds.append(arr)
-            elif (par=='indptr' and indptr is not None):
-                arr=np.array(indptr,dtype=np.dtype(np.int32))
-                ds=group.indptr
-                ds.append(arr)
-        # print(len(group.rownames[:]))
-        group.rownames.append(rownames)
+        arr = None
+        if data is not None:
+            if groupName=="AD_geno" or groupName=="PL_geno":
+                arr=np.array(data,dtype=np.dtype("S20"))
+            else:
+                arr=np.array(data,dtype=np.dtype(np.float64))
+            group.data.append(arr)
+        if indices is not None:
+            arr=np.array(indices,dtype=np.dtype(np.int32))
+            group.indices.append(arr)
+        if  indptr is not None:
+            arr=np.array(indptr,dtype=np.dtype(np.int32))
+            group.indptr.append(arr)
+        if  rownames is not None:
+            arr=np.array(rownames,dtype=np.dtype(np.int32))
+            group.rownames.append(arr)
         group.shape[1]=shape[1]
         group.shape[0]=len(group.rownames[:])
     f.close()

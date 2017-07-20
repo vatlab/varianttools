@@ -77,40 +77,26 @@ class GroupHDFGenerator(Process):
                     for row in cur.execute(select_group):
                         geneSymbol=transformGeneName(row[0])
                         ids=row[1].split(",")
-                        # idPos=[int(x) for x in ids]
-                        # idPos.sort()     
-                        # varPos=[np.where(rownames==varID) for varID in ids]
-                        # idPos=[rownames.index(varID) for varID in ids]
-                        # idPos.sort()
                         ids=[int(x) for x in ids]
                         ids.sort()
-                    
+                        
                         chr= getChr(ids[0],db.cursor())
                         group=hdf5_file.get_node("/chr"+chr)
                         
-                        rownames=group.rownames[:]
-                        rownames=[int(x.decode("utf-8")) for x in rownames]
+                        rownames=group.rownames[:].tolist()
+                        colnames=group.colnames[:]
          
                         minPos=rownames.index(ids[0])
                         maxPos=rownames.index(ids[-1])
-
                         idPos=rownames[minPos:maxPos+1]
                         
                         sub_indptr=group.indptr[idPos[0]-1:idPos[-1]+1]
-
                         sub_indices=group.indices[min(sub_indptr):max(sub_indptr)]
                         sub_data=group.data[min(sub_indptr):max(sub_indptr)]
                         sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(len(sub_indptr))]
-
-         
                         sub_shape=(len(sub_indptr)-1,group.shape[1])
-                        adjust_id=[ idPos[i]-idPos[0] for i in range(len(idPos))]
-           
-                        sub_matrix=csr_matrix((sub_data,sub_indices,sub_indptr),shape=sub_shape)    
-                        geneGenotypes=sub_matrix[adjust_id,]
-                     
-                        storage.store_csr_genotype_into_one_HDF5(geneGenotypes,geneSymbol,ids,self.proc_index,chr,HDFfileGroupName)        
-                        # storage.store_csr_arrays_into_earray_HDF5(sub_data,sub_indices,sub_indptr,sub_shape,ids,"dataTable_"+geneSymbol,HDFfileGroupName) 
+
+                        storage.store_csr_arrays_into_earray_HDF5(sub_data,sub_indices,sub_indptr,sub_shape,ids,colnames,geneSymbol,chr,HDFfileGroupName) 
                     hdf5_file.close()
 
                 except KeyboardInterrupt as e:
@@ -249,7 +235,8 @@ class GroupHDFGenerator_memory(Process):
                     chr="22"
                     group=hdf5_file.get_node("/chr"+chr)
                     rownames=group.rownames[:]
-                    rownames=[int(x.decode("utf-8")) for x in rownames]
+                    colnames=group.colnames[:]
+                    # rownames=[int(x.decode("utf-8")) for x in rownames]
                     for idx,id in enumerate(rownames):
                         try:
                             geneNames=self.geneDict[id]
@@ -272,7 +259,7 @@ class GroupHDFGenerator_memory(Process):
                             pass
                     for key,value in genoDict.items():
                         # print(key,len(value[0]),len(value[1]),len(value[2]),len(value[3]))
-                        storage.store_csr_arrays_into_earray_HDF5(value[2],value[1],value[0],(len(value[3]),group.shape[1]),value[3],key,chr,HDFfileGroupName) 
+                        storage.store_csr_arrays_into_earray_HDF5(value[2],value[1],value[0],(len(value[3]),group.shape[1]),value[3],colnames,key,chr,HDFfileGroupName) 
                 except KeyboardInterrupt as e:
                     hdf5_file.close()
                     pass
@@ -303,16 +290,16 @@ class GroupHDFGenerator_append(Process):
                 if (os.path.isfile(HDFfileGroupName)):
                     os.remove(HDFfileGroupName)
 
+                group=hdf5_file.get_node("/chr"+chr)
                 for geneName in self.geneSet:
-                    storage.store_csr_arrays_into_earray_HDF5([],[],[0],(0,0),[],geneName,"22",HDFfileGroupName)
+                    storage.store_csr_arrays_into_earray_HDF5([],[],[0],(0,0),[],group.colnames[:],geneName,"22",HDFfileGroupName)
 
                 try:
                     chr="22"
-
-                    group=hdf5_file.get_node("/chr"+chr)
+       
                     rownames=group.rownames[:]
-                    rownames=[int(x.decode("utf-8")) for x in rownames]
-                    
+                    # rownames=[int(x.decode("utf-8")) for x in rownames]
+             
                     for idx,id in enumerate(rownames):
                         try:
                             geneNames=self.geneDict[id]

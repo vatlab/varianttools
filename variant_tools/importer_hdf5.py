@@ -93,6 +93,7 @@ class HDF5GenotypeImportWorker(Process):
         self.indices=[]
         self.data=[]
         self.rownames=[]
+        self.colnames=[sample for sample in range(start_sample+1,end_sample+1)]
 
         self.HDFfileName=HDFfileName
         self.info={}
@@ -117,12 +118,12 @@ class HDF5GenotypeImportWorker(Process):
  
         if not os.path.isfile(self.HDFfileName):
             self.indptr=[0]+self.indptr
-            storage.store_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,"",chr,self.HDFfileName) 
+            storage.store_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames,"",chr,self.HDFfileName) 
             if len(self.geno_info)>0:
                 for key,value in self.info.items():
                     value[0]=[0]+value[0]
                     # if (key!="AD_geno" and key!="PL_geno"):
-                    storage.store_csr_arrays_into_earray_HDF5(value[2],value[1],value[0],shape,value[3],key,chr,self.HDFfileName) 
+                    storage.store_csr_arrays_into_earray_HDF5(value[2],value[1],value[0],shape,value[3],self.colnames,key,chr,self.HDFfileName) 
 
         else:
             node="/chr"+chr
@@ -216,6 +217,7 @@ class HDF5GenotypeImportWorker(Process):
                             len(rec), fld_cols[-1][-1] + 1, rec))
                 self.indptr.append(genoCount)
                 self.rownames.append(variant_id)
+
 
                 if len(self.geno_info)>0:
                     for infoIndex,info in enumerate(self.geno_info):
