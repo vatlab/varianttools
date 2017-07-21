@@ -1886,9 +1886,9 @@ def importVariants(args):
             # genotype together ...
             importer.importFilesSequentially()
         else:
-            # if len(importer.genotype_info)==0 and importer.genotype_field[0]=="GT" and args.HDF5:
+            # if num_sample specified, each HDF5 file will have speciefied number of samples in the file
             if args.HDF5:
-                importGenotypesInParallel(importer,200)
+                importGenotypesInParallel(importer,num_sample=300)
             else:
                 importer.importFilesInParallel()
         importer.finalize()

@@ -84,7 +84,6 @@ class HDF5GenotypeImportWorker(Process):
         # self.daemon=True
         self.processor=processor
         self.readQueue=readQueue
-        # self.indptr_count=indptr_count
         self.variantIndex = variantIndex
         self.variant_count = variant_count
         self.proc_index = proc_index
@@ -110,7 +109,7 @@ class HDF5GenotypeImportWorker(Process):
         # print(self.proc_index,self.numVariants,max(self.indptr),min(self.indptr),max(self.indices),min(self.indices))
         # print(self.proc_index,len(self.indptr),self.variant_count.value,max(self.indptr),min(self.indptr))    
         # ids=[x+1 for x in range(len(self.indptr))]    
-        # self.indptr_count.value=self.indptr[-1]
+
         self.variant_count.value = self.variant_count.value + len(self.indptr)
         shape=(self.variant_count.value,self.end_sample-self.start_sample)
         
@@ -201,7 +200,8 @@ class HDF5GenotypeImportWorker(Process):
                     pre_chr=rec[0]
 
                 numSamples=self.end_sample-self.start_sample
-         
+                
+                #Process GT        
                 for idx in range(numSamples):
                     try:
                         pos=4+idx
@@ -220,7 +220,7 @@ class HDF5GenotypeImportWorker(Process):
                 self.indptr.append(genoCount)
                 self.rownames.append(variant_id)
 
-
+                #Process other geno_info
                 if len(self.geno_info)>0:
                     for infoIndex,info in enumerate(self.geno_info):
     
@@ -294,18 +294,12 @@ def manageHDF5(importer):
 
 
 
-
-
-
-
 def importGenotypesInParallel(importer,num_sample=0):
 
-    # number of genotypes each process have imported
-    
+
     allNames,sample_count=manageHDF5(importer)
-    indptr_count=None
+
     for count, input_filename in enumerate(importer.files):
-        # indptr_count=[Value('L', 0) for x in range(importer.jobs)]
         
         env.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(importer.files)))
         importer.importVariant(input_filename)
@@ -319,6 +313,8 @@ def importGenotypesInParallel(importer,num_sample=0):
             importer.prober.reset()
         # if there are samples?
         sample_ids, genotype_status,names = importer.getSampleIDs(input_filename)
+        if len(sample_ids) == 0:
+            continue
 
         for name in names:
             if name not in allNames:
@@ -326,33 +322,29 @@ def importGenotypesInParallel(importer,num_sample=0):
                 sample_count+=1
         workload=None
        
-
+        #determine number of samples to be processed in each process
         if num_sample>0:
             num_files=int(len(sample_ids)/num_sample)
             workload=[num_sample]*num_files
             if len(sample_ids)%num_sample!=0:
                 workload.append(len(sample_ids)%num_sample)
-            # if len(workload)<importer.jobs:
-            #     workload=workload+[0]*(importer.jobs-len(workload))
+            if len(workload)<importer.jobs:
+                importer.jobs=len(workload)
         else:
-            if len(sample_ids)<importer.jobs:
-                workload=[len(sample_ids)]+[0]*(importer.jobs-1)
+            if len(sample_ids)<50:
+                importer.jobs=len(workload)
             else:
                 workload = [int(float(len(sample_ids)) / importer.jobs)] * importer.jobs
-
-            # if there are missing ones, spread it across workers ...
-            # less than 0 is possible because of the at least 10 policy
             unallocated = max(0, len(sample_ids) - sum(workload))
             for i in range(unallocated):
                 workload[i % importer.jobs] += 1
 
 
         print(workload)
-        numProcess=len(workload)
-
+        numTasks=len(workload)
         # importers = [None] * numProcess
         importers=[None]*importer.jobs
-        variant_import_count = [Value('L', -1) for x in range(numProcess)]
+        variant_import_count = [Value('L', -1) for x in range(numTasks)]
 
         # we should have file line count from importVariant
         num_of_lines = importer.count[0] 
@@ -360,8 +352,7 @@ def importGenotypesInParallel(importer,num_sample=0):
         for i in range(len(importer.count)):
             importer.total_count[i] += importer.count[i]
             importer.count[i] = 0
-        if len(sample_ids) == 0:
-            continue
+        
 
         # env.logger.debug('Workload of processes: {}'.format(workload))
         
@@ -371,9 +362,10 @@ def importGenotypesInParallel(importer,num_sample=0):
         readQueue=[]
 
         taskQueue=Queue.Queue()
-
         input_prefix=os.path.basename(input_filename).replace(".vcf","")
-        for job in range(numProcess):      
+        
+        #Put tasks in the queue first
+        for job in range(numTasks):      
             if workload[job] == 0:
                 continue
             readQueue.append(mpQueue())
@@ -400,13 +392,13 @@ def importGenotypesInParallel(importer,num_sample=0):
                     continue
                 line_no+=1
                 num_lines+=1
-                for job in range(len(readQueue)):
+                for job in range(numTasks):
                     readQueue[job].put(line)
-                if (line_no>=2000):
+                #Read the VCF by chunck
+                if (line_no>=10000):
                     print(num_lines)
-                    prog.update(num_lines*len(sample_ids))
                     line_no=0
-                    for job in range(numProcess):
+                    for job in range(numTasks):
                         readQueue[job].put(None)
                     while taskQueue.qsize()>0:
                         for i in range(importer.jobs):    
@@ -418,8 +410,9 @@ def importGenotypesInParallel(importer,num_sample=0):
                                 break 
                     for worker in importers:
                         worker.join()
+                    prog.update(num_lines*len(sample_ids))
                     start_sample =0
-                    for job in range(numProcess):
+                    for job in range(numTasks):
                         if workload[job] == 0:
                             continue
                         end_sample = min(start_sample + workload[job], len(sample_ids))
@@ -430,7 +423,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                             variant_import_count[job], job, importer.genotype_info,HDFfile_Merge))
                         start_sample = end_sample   
 
-
+        #Process remaining lines
         for job in range(len(readQueue)):
             readQueue[job].put(None)
         while taskQueue.qsize()>0:
