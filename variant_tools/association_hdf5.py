@@ -242,7 +242,8 @@ class GroupHDFGenerator_memory(Process):
                             geneNames=self.geneDict[id]
                             for geneName in geneNames:
                                 if geneName not in genoDict:
-                                    genoDict[geneName]=[[0],[],[],[],[]]
+                                    #indptr,indices,data,rownames
+                                    genoDict[geneName]=[[0],[],[],[]]
 
                                 startPointer=group.indptr[idx]
                                 endPointer=group.indptr[idx+1]
@@ -439,18 +440,17 @@ def getGenotype_HDF5(worker, group):
 
        
         hdf5db=HDF5Engine_access(fileName)
-        hdf5db.load_HDF5(geneSymbol,chr)
-        snpdict=hdf5db.load_all_GT()
+        snpdict=hdf5db.load_all_GT_by_group(geneSymbol,chr)
         for ID in range(startSample,endSample+1):
             data=snpdict[ID]
             # handle missing values
 
-        hdf5db=HDF5Engine_multi(fileName)
-        hdf5db.load_HDF5(geneSymbol,chr)
-        snpdict=hdf5db.load_all_GT()
-        for ID in range(startSample,endSample+1):           
-            data=snpdict[ID]
-            
+        # hdf5db=HDF5Engine_multi(fileName)
+        # hdf5db.load_HDF5(geneSymbol,chr)
+        # snpdict=hdf5db.load_all_GT()
+        # for ID in range(startSample,endSample+1):           
+        #     data=snpdict[ID]
+
             gtmp = [data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in variant_id]
             # handle -1 coding (double heterozygotes)     
             genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])

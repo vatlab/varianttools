@@ -25,10 +25,15 @@ class HDF5Engine_access:
         self.indices=None
         self.data=None
         self.shape=None
+        self.chr=None
 
     
-    def load_HDF5(self,groupName,chr):
-        # start_time = time.time()
+    def load_HDF5_by_chr(self,chr):
+        load_HDF5_by_group("",chr)
+    
+
+    def load_HDF5_by_group(self,groupName,chr):
+        self.chr=chr
         with tb.open_file(self.fileName) as f:
             node="/chr"+chr
             if node in f:
@@ -52,7 +57,13 @@ class HDF5Engine_access:
         self.colnames=pars[5]
 
 
-    def load_all_GT(self):
+
+    def load_all_GT_by_group(self,groupName,chr=None):
+        if chr is None:
+            pass
+        if self.chr is None:
+            self.chr=chr
+            self.load_HDF5_by_group(groupName,chr)
 
         snpdict=dict.fromkeys(self.colnames,{})
         for key,value in snpdict.iteritems():
@@ -68,6 +79,24 @@ class HDF5Engine_access:
                         snpdict[self.colnames[samplePos]][id]=(data[colidx],)
         
         return snpdict
+
+    def load_all_geno_info_by_chr(self,type,chr):
+        pass
+
+    def load_geno_info_by_variantID(self,type,variant_ID):
+        pass
+
+    def get_number_of_samples(self):
+        pass
+
+    def get_sample_ids(self):
+        pass
+
+    def get_number_of_variants(self):
+        pass
+
+    def get_chromosomes(self):
+        pass
 
 
 
