@@ -26,29 +26,37 @@ class HDF5Engine_access:
         self.data=None
         self.shape=None
         self.chr=None
+        self.file=tb.open_file(fileName,"r")
+        self.group=None
 
     
     def load_HDF5_by_chr(self,chr):
-        load_HDF5_by_group("",chr)
-    
+        self.load_HDF5_by_group(chr)
 
-    def load_HDF5_by_group(self,groupName,chr):
+
+    def setGroup(self,chr,groupName=""):
         self.chr=chr
-        with tb.open_file(self.fileName) as f:
-            node="/chr"+chr
-            if node in f:
-                group=f.get_node(node)
-            if len(groupName)>0:
-                node="/chr"+chr+"/"+groupName
-                if node in f:
-                    group=f.get_node("/chr"+chr+"/"+groupName)
-            pars = []
-            for par in ('data', 'indices', 'indptr', 'shape','rownames',"colnames"):
-                if hasattr(group, par):
-                    pars.append(getattr(group, par).read())
-                else:
-                    pars.append([])
-        f.close()
+        # with tb.open_file(self.fileName) as f:
+        node="/chr"+chr
+        if node in self.file:
+            self.group=self.file.get_node(node)
+        if len(groupName)>0:
+            node="/chr"+chr+"/"+groupName
+            if node in self.file:
+                self.group=self.file.get_node("/chr"+chr+"/"+groupName)
+        return self.group
+
+
+    def load_HDF5_by_group(self,chr,groupName=""):
+        self.chr=chr
+        self.setGroup(chr,groupName)
+        pars = []
+        for par in ('data', 'indices', 'indptr', 'shape','rownames',"colnames"):
+            if hasattr(self.group, par):
+                pars.append(getattr(self.group, par).read())
+            else:
+                pars.append([])
+        # f.close()
         self.data=pars[0]
         self.indices=pars[1]
         self.indptr=pars[2]
@@ -57,28 +65,75 @@ class HDF5Engine_access:
         self.colnames=pars[5]
 
 
+    def close(self):
+        self.file.close()
+
 
     def load_all_GT_by_group(self,groupName,chr=None):
         if chr is None:
             pass
         if self.chr is None:
             self.chr=chr
-            self.load_HDF5_by_group(groupName,chr)
+            self.load_HDF5_by_group(chr,groupName)
 
         snpdict=dict.fromkeys(self.colnames,{})
         for key,value in snpdict.iteritems():
             snpdict[key]=dict.fromkeys(self.rownames.tolist(),(0,))
       
         for idx,id in enumerate(self.rownames):
-            start=self.indptr[idx]
-            end=self.indptr[idx+1]
-            if end>start:
-                indices=self.indices[start:end]
-                data=self.data[start:end]
+            variant_ID,indices,data=self.get_GT_by_row_ID(idx)
+            if len(indices)>0:
                 for colidx,samplePos in enumerate(indices):
-                        snpdict[self.colnames[samplePos]][id]=(data[colidx],)
+                    snpdict[self.colnames[samplePos]][id]=(data[colidx],)
         
         return snpdict
+
+    
+    def get_GT_by_row_ID(self,rowID):
+
+        if self.indices is None:
+            self.load_HDF5_by_chr(self.chr)
+        start=self.indptr[rowID]
+        end=self.indptr[rowID+1]
+        variant_ID=self.rownames[rowID]
+        indices=None
+        data=None
+ 
+        if end==start:
+            indices=[]
+            data=[]
+        else:
+            indices=self.indices[start:end]
+            data=self.data[start:end]
+        return variant_ID,indices,data
+
+    def get_rownames(self,chr,groupName=""):
+        if self.chr is None:
+            self.chr=chr
+        self.group=self.setGroup(chr,groupName)
+        return self.group.rownames
+
+    def get_colnames(self,chr,groupName=""):
+        if self.chr is None:
+            self.chr=chr
+        self.group=self.setGroup(chr,groupName)
+        return self.group.colnames
+
+    def get_shape(self,chr,groupName=""):
+        if self.chr is None:
+            self.chr=chr
+        self.group=self.setGroup(chr,groupName)
+        return self.group.shape
+
+    def get_indptr(self,chr,groupName=""):
+        if self.chr is None:
+            self.chr=chr
+        self.group=self.setGroup(chr,groupName)
+        return self.group.indptr
+
+
+
+
 
     def load_all_geno_info_by_chr(self,type,chr):
         pass
