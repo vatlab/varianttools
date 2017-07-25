@@ -1205,8 +1205,9 @@ def associate(args):
                         proj.db.commit()
             
             if args.HDF5:
-                # generateHDFbyGroup_update(asso)
-                generateHDFbyGroup(asso)
+                nJobs = max(args.jobs, 1)
+                generateHDFbyGroup_update(asso,nJobs)
+                # generateHDFbyGroup(asso,nJobs)
             
             runAssociation(args,asso,proj,results)
 

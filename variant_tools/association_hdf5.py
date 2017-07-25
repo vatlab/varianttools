@@ -25,6 +25,8 @@
 
 import sys, os, re
 from multiprocessing import Process, Queue, Pipe, Value, Array, Lock, Manager
+from multiprocessing import Queue as mpQueue
+import Queue
 import time
 import random
 import math
@@ -99,21 +101,30 @@ class GroupHDFGenerator(Process):
 
 
 
-def generateHDFbyGroup(testManager):
+def generateHDFbyGroup(testManager,njobs):
         # HDFfileName=self.proj.name+"_genotype.h5"
         # HDFfileGroupName=self.proj.name+"_genotype_multi_genes.h5"
 
         HDFfileNames=glob.glob("tmp*_genotypes.h5")
         groupGenerators=[]
-        fileQueue=Queue()
+        fileQueue=mpQueue()
+        taskQueue=Queue.Queue()
         start=time.time()
+        groupGenerators=[None]*njobs
         for HDFfileName in HDFfileNames:
             fileQueue.put(HDFfileName)
         for i in range(len(HDFfileNames)):
-            groupGenerator=GroupHDFGenerator(fileQueue,testManager.proj,testManager.group_names,i)
-            groupGenerator.start()
-            groupGenerators.append(groupGenerator)
-            fileQueue.put(None)
+
+            taskQueue.put(GroupHDFGenerator(fileQueue,testManager.proj,testManager.group_names,i))
+        while taskQueue.qsize()>0:
+            print(taskQueue.qsize())
+            for i in range(njobs):
+                if groupGenerators[i] is None or not groupGenerators[i].is_alive():
+                    task=taskQueue.get()
+                    groupGenerators[i]=task
+                    task.start()
+                    fileQueue.put(None)
+                    break
         for groupHDFGenerator in groupGenerators:
             groupHDFGenerator.join()
         print("group time: ",time.time()-start)
@@ -263,28 +274,34 @@ def getGroupDict(testManager):
 
 
 
-def generateHDFbyGroup_update(testManager):
+def generateHDFbyGroup_update(testManager,njobs):
         # HDFfileName=self.proj.name+"_genotype.h5"
         # HDFfileGroupName=self.proj.name+"_genotype_multi_genes.h5"
 
         HDFfileNames=glob.glob("tmp*_genotypes.h5")
-        njobs=8
-        groupGenerators=[]
-        fileQueue=Queue()
-        geneDict,geneSet=getGroupDict(testManager)
+
+        fileQueue=mpQueue()
+        taskQueue=Queue.Queue()
         start=time.time()
+        groupGenerators=[None]*njobs
+        geneDict,geneSet=getGroupDict(testManager)
         for HDFfileName in HDFfileNames:
             fileQueue.put(HDFfileName)
-        for i in range(njobs):
-            # groupGenerator=GroupHDFGenerator_memory(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i)
-            groupGenerator=GroupHDFGenerator_append(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i)
+        for i in range(len(HDFfileNames)):
+            taskQueue.put(GroupHDFGenerator_memory(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i))
 
-            groupGenerator.start()
-            groupGenerators.append(groupGenerator)
-            fileQueue.put(None)
+        while taskQueue.qsize()>0:
+            for i in range(njobs):
+                if groupGenerators[i] is None or not groupGenerators[i].is_alive():
+                    task=taskQueue.get()
+                    groupGenerators[i]=task
+                    fileQueue.put(None)
+                    task.start()
+                    break
         for groupHDFGenerator in groupGenerators:
             groupHDFGenerator.join()
-        print("groupTime: ",time.time()-start)
+        print("group time: ",time.time()-start)
+
 
 
 
