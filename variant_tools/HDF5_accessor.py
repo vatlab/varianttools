@@ -121,8 +121,8 @@ class HDF5Engine_access:
 
 
     
-    def load_HDF5_by_chr(self,chr):
-        self.load_HDF5_by_group(chr)
+    def load_HDF5_by_chr(self,chr,groupName=""):
+        self.load_HDF5_by_group(chr,groupName)
 
 
     def setGroup(self,chr,groupName=""):
@@ -165,7 +165,7 @@ class HDF5Engine_access:
         self.file.close()
 
 
-    def load_all_GT_by_group(self,groupName,chr=None):
+    def get_geno_info_by_group(self,groupName,chr=None):
         if chr is None:
             pass
         if self.chr is None:
@@ -177,7 +177,7 @@ class HDF5Engine_access:
             snpdict[key]=dict.fromkeys(self.rownames.tolist(),(0,))
       
         for idx,id in enumerate(self.rownames):
-            variant_ID,indices,data=self.get_GT_by_row_ID(idx)
+            variant_ID,indices,data=self.get_geno_info_by_row_ID(idx)
             if len(indices)>0:
                 for colidx,samplePos in enumerate(indices):
                     snpdict[self.colnames[samplePos]][id]=(data[colidx],)
@@ -185,10 +185,10 @@ class HDF5Engine_access:
         return snpdict
 
     
-    def get_GT_by_row_ID(self,rowID):
+    def get_geno_info_by_row_ID(self,rowID,groupName=""):
 
         if self.indices is None:
-            self.load_HDF5_by_chr(self.chr)
+            self.load_HDF5_by_chr(self.chr,groupName)
         start=self.indptr[rowID]
         end=self.indptr[rowID+1]
         variant_ID=self.rownames[rowID]
@@ -204,8 +204,8 @@ class HDF5Engine_access:
         return variant_ID,indices,data
 
 
-    def load_GT_by_row_IDs(self,rowIDs,chr,groupName=""):
-
+    def get_GT_by_row_IDs(self,rowIDs,chr,groupName=""):
+        # if not sorted?
         #                  for id in ids:
         #                     try:
         #                         pos=rownames.index(id)
@@ -254,18 +254,8 @@ class HDF5Engine_access:
         return group.indptr
 
 
-    
 
 
-
-
-
-
-    def load_all_geno_info_by_chr(self,type,chr):
-        pass
-
-    def load_geno_info_by_variantID(self,type,variant_ID):
-        pass
 
     def get_number_of_samples(self):
         pass

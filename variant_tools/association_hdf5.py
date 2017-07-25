@@ -87,7 +87,7 @@ class GroupHDFGenerator(Process):
                         ids.sort()
                         chr= getChr(ids[0],db.cursor())
             
-                        sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames=hdf5.load_GT_by_row_IDs(ids,chr)
+                        sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames=hdf5.get_geno_info_by_row_IDs(ids,chr)
                     
                         hdf5group.store_arrays_into_HDF5(sub_data,sub_indices,sub_indptr,sub_shape,ids,colnames,chr,geneSymbol) 
                     hdf5.close()
@@ -155,9 +155,9 @@ class GroupHDFGenerator_memory(Process):
                 HDFfileGroupName=HDFfileName.replace(".h5","_multi_genes.h5")
                 if (os.path.isfile(HDFfileGroupName)):
                     os.remove(HDFfileGroupName)
+                hdf5group=HDF5Engine_access(HDFfileGroupName)
                 try:
                     chr="22"
-    
                     rownames=hdf5.get_rownames(chr)
                     colnames=hdf5.get_colnames(chr)
           
@@ -169,7 +169,7 @@ class GroupHDFGenerator_memory(Process):
                                     #indptr,indices,data,rownames
                                     genoDict[geneName]=[[0],[],[],[]]
             
-                                variant_ID,indices,data=hdf5.get_GT_by_row_ID(idx)
+                                variant_ID,indices,data=hdf5.get_geno_info_by_row_ID(idx)
                               
                                 lastPos=genoDict[geneName][0][-1]
                                 if len(indices)==0:
@@ -183,11 +183,12 @@ class GroupHDFGenerator_memory(Process):
                         except:
                             pass
                     for key,value in genoDict.items():
-                        # print(key,len(value[0]),len(value[1]),len(value[2]),len(value[3]))
-                        storage.store_csr_arrays_into_earray_HDF5(value[2],value[1],value[0],(len(value[3]),len(colnames)),value[3],colnames,key,chr,HDFfileGroupName) 
+                        hdf5group.store_arrays_into_HDF5(value[2],value[1],value[0],(len(value[3]),len(colnames)),value[3],colnames,chr,key) 
                     hdf5.close()
+                    hdf5group.close()
                 except KeyboardInterrupt as e:
-                    hdf5_file.close()
+                    hdf5.close()
+                    hdf5group.close()
                     pass
 
 
@@ -215,13 +216,13 @@ class GroupHDFGenerator_append(Process):
                 HDFfileGroupName=HDFfileName.replace(".h5","_multi_genes.h5")
                 if (os.path.isfile(HDFfileGroupName)):
                     os.remove(HDFfileGroupName)
+                hdf5group=HDF5Engine_access(HDFfileGroupName)
                 chr="22"
                 colnames=hdf5.get_colnames(chr)   
                 rownames=hdf5.get_rownames(chr)
      
-
                 for geneName in self.geneSet:
-                    storage.store_csr_arrays_into_earray_HDF5([],[],[0],(0,0),[],colnames,geneName,"22",HDFfileGroupName)
+                    hdf5group.store_arrays_into_HDF5([],[],[0],(0,0),[],colnames,chr,geneName)
                 try:
 
                     for idx,id in enumerate(rownames):
@@ -232,19 +233,21 @@ class GroupHDFGenerator_append(Process):
                                 indptr=groupHDF5.get_indptr(chr,geneName)
                                 lastPos=indptr[-1]
                                 groupHDF5.close()
-                                variant_ID,indices,data=hdf5.get_GT_by_row_ID(idx)
+                                variant_ID,indices,data=hdf5.get_geno_info_by_row_ID(idx)
             
                                 if len(indices)==0:
                                     indptr=[lastPos]
                                 else:
                                     indptr=[lastPos+len(indices)]
                                 shape=(1,len(colnames))
-                                storage.append_csr_arrays_into_earray_HDF5(data,indices,indptr,shape,[id],geneName,chr,HDFfileGroupName) 
- 
+                                hdf5group.append_arrays_into_HDF5(data,indices,indptr,shape,[id],chr,geneName)
                         except KeyError: 
                             pass
+                    hdf5.close()
+                    hdf5group.close()
                 except KeyboardInterrupt as e:
                     hdf5.close()
+                    hdf5group.close()
                     pass
 
 
@@ -288,8 +291,8 @@ def generateHDFbyGroup_update(testManager,njobs):
         for HDFfileName in HDFfileNames:
             fileQueue.put(HDFfileName)
         for i in range(len(HDFfileNames)):
-            taskQueue.put(GroupHDFGenerator_memory(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i))
-
+            # taskQueue.put(GroupHDFGenerator_memory(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i))
+            taskQueue.put(GroupHDFGenerator_append(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i))
         while taskQueue.qsize()>0:
             for i in range(njobs):
                 if groupGenerators[i] is None or not groupGenerators[i].is_alive():
@@ -346,15 +349,9 @@ def getGenotype_HDF5(worker, group):
         startSample=int(fileName.split("_")[1])
         endSample=int(fileName.split("_")[2])
         
-        # hdf5db=HDF5Engine_multi(fileName)
-        # hdf5db.load_HDF5(geneSymbol,chr)
-        # snpdict=hdf5db.load_all_GT()
-        # for ID in range(startSample,endSample+1):           
-        #     data=snpdict[ID]
-
        
         hdf5db=HDF5Engine_access(fileName)
-        snpdict=hdf5db.load_all_GT_by_group(geneSymbol,chr)
+        snpdict=hdf5db.get_geno_info_by_group(geneSymbol,chr)
         hdf5db.close()
         for ID in range(startSample,endSample+1):
             data=snpdict[ID]
