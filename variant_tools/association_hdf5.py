@@ -61,11 +61,15 @@ class GroupHDFGenerator(Process):
                 HDFfileName=self.fileQueue.get()
                 if HDFfileName is None:
                     break
-                hdf5_file=tb.open_file(HDFfileName,mode="r")
-                
+
                 HDFfileGroupName=HDFfileName.replace(".h5","_multi_genes.h5")
                 if (os.path.isfile(HDFfileGroupName)):
                     os.remove(HDFfileGroupName)
+
+                hdf5=HDF5Engine_access(HDFfileName)
+                hdf5group=HDF5Engine_access(HDFfileGroupName)
+                
+                
                 try:
                     
                     db = DatabaseEngine()
@@ -79,111 +83,20 @@ class GroupHDFGenerator(Process):
                         ids=row[1].split(",")
                         ids=[int(x) for x in ids]
                         ids.sort()
-                        
                         chr= getChr(ids[0],db.cursor())
-                        group=hdf5_file.get_node("/chr"+chr)
-                        
-                        rownames=group.rownames[:].tolist()
-                        colnames=group.colnames[:]
-         
-                        minPos=rownames.index(ids[0])
-                        maxPos=rownames.index(ids[-1])
-                        idPos=rownames[minPos:maxPos+1]
-                        
-                        sub_indptr=group.indptr[idPos[0]-1:idPos[-1]+1]
-                        sub_indices=group.indices[min(sub_indptr):max(sub_indptr)]
-                        sub_data=group.data[min(sub_indptr):max(sub_indptr)]
-                        sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(len(sub_indptr))]
-                        sub_shape=(len(sub_indptr)-1,group.shape[1])
-
-                        storage.store_csr_arrays_into_earray_HDF5(sub_data,sub_indices,sub_indptr,sub_shape,ids,colnames,geneSymbol,chr,HDFfileGroupName) 
-                    hdf5_file.close()
+            
+                        sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames=hdf5.load_GT_by_row_IDs(ids,chr)
+                    
+                        hdf5group.store_arrays_into_HDF5(sub_data,sub_indices,sub_indptr,sub_shape,ids,colnames,chr,geneSymbol) 
+                    hdf5.close()
+                    hdf5group.close()
 
                 except KeyboardInterrupt as e:
-                    hdf5_file.close()
+                    hdf5.close()
+                    hdf5group.close()
                     pass
 
-        # def run(self):
-            
-        #     while True:
-        #         HDFfileName=self.fileQueue.get()
-        #         if HDFfileName is None:
-        #             break
-        #         hdf5_file=tb.open_file(HDFfileName,mode="r")
-               
-        #         HDFfileGroupName=HDFfileName.replace(".h5","_multi_genes.h5")
-        #         if (os.path.isfile(HDFfileGroupName)):
-        #             os.remove(HDFfileGroupName)
-        #         try:
-                    
-        #             db = DatabaseEngine()
-        #             db.connect('{0}.proj'.format(self.proj.name), '__asso_tmp')
-        #             cur = db.cursor()
-            
-        #             select_group="SELECT {0}, group_concat(variant_id) from __asso_tmp group by {0}".\
-        #                format(self.group_names[0])
-        #             for row in cur.execute(select_group):
-        #                 geneSymbol=transformGeneName(row[0])
-        #                 ids=row[1].split(",")
-        #                 # idPos=[int(x) for x in ids]
-        #                 # idPos.sort()     
-        #                 # varPos=[np.where(rownames==varID) for varID in ids]
-        #                 # idPos=[rownames.index(varID) for varID in ids]
-        #                 # idPos.sort()
-        #                 ids=[int(x) for x in ids]
-        #                 ids.sort()
-                    
-        #                 chr= getChr(ids[0],db.cursor())
-        #                 group=hdf5_file.get_node("/chr"+chr)
-                        
-        #                 rownames=group.rownames[:]
-        #                 rownames=[int(x.decode("utf-8")) for x in rownames]
-         
-        #                 # minPos=rownames.index(ids[0])
-        #                 # maxPos=rownames.index(ids[-1])
 
-        #                 # idPos=rownames[minPos:maxPos+1]
-        #                 # idPos=[int(x) for x in idPos]
-        #                 idPos=[]
-        #                 for id in ids:
-        #                     try:
-        #                         pos=rownames.index(id)
-        #                         idPos.append(pos)
-        #                     except ValueError:
-        #                         continue    
-        #                 idPos.sort()
- 
-        #                 # try:
-        #                 #     print(idPos[0]-1,idPos[-1]+1)
-        #                 # except:
-        #                 #     print(ids,idPos,minPos,maxPos,idPos)
-        #                 #     continue
-
-        #                 sub_indptr=group.indptr[idPos[0]-1:idPos[-1]+1]
-
-        #                 sub_indices=group.indices[min(sub_indptr):max(sub_indptr)]
-        #                 sub_data=group.data[min(sub_indptr):max(sub_indptr)]
-        #                 sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(len(sub_indptr))]
-
-        #                 # if self.proc_index==1:
-        #                 #     print(geneSymbol,idPos)
-        #                 #     print(len(sub_indptr))
-
-
-        #                 # sub_shape=(len(idPos),hdf5_file.root.shape[1])
-        #                 sub_shape=(len(sub_indptr)-1,group.shape[1])
-        #                 adjust_id=[ idPos[i]-idPos[0] for i in range(len(idPos))]
-           
-        #                 sub_matrix=csr_matrix((sub_data,sub_indices,sub_indptr),shape=sub_shape)    
-        #                 geneGenotypes=sub_matrix[adjust_id,]
-                     
-        #                 storage.store_csr_genotype_into_one_HDF5(geneGenotypes,geneSymbol,ids,self.proc_index,chr,HDFfileGroupName)        
-        #                 # storage.store_csr_arrays_into_earray_HDF5(sub_data,sub_indices,sub_indptr,sub_shape,ids,"dataTable_"+geneSymbol,HDFfileGroupName) 
-        #             hdf5_file.close()
-
-        #         except KeyboardInterrupt as e:
-        #             hdf5_file.close()
-        #             pass
 
 
 def generateHDFbyGroup(testManager):
@@ -320,7 +233,7 @@ class GroupHDFGenerator_append(Process):
                         except KeyError: 
                             pass
                 except KeyboardInterrupt as e:
-                    hdf5_file.close()
+                    hdf5.close()
                     pass
 
 

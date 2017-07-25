@@ -26,8 +26,99 @@ class HDF5Engine_access:
         self.data=None
         self.shape=None
         self.chr=None
-        self.file=tb.open_file(fileName,"r")
-        self.group=None
+        self.file=tb.open_file(fileName,"a")
+ 
+
+
+
+    def store_arrays_into_HDF5(self,data,indices,indptr,shape,rownames,colnames,chr,groupName=""):
+  
+        filters = tb.Filters(complevel=9, complib='blosc')       
+        group=self.setGroup(chr,groupName)
+        
+        for par in ('data', 'indices', 'indptr', 'shape',"rownames","colnames"):
+            arr = None
+            atom=tb.Atom.from_dtype(np.dtype(np.int32))
+            if (par=='data'):
+                arr=np.array(data)
+                if groupName=="AD_geno" or groupName=="PL_geno":
+                    atom=tb.Atom.from_dtype(np.dtype('S20'))
+                else:
+                    atom=tb.Atom.from_dtype(np.dtype(np.float64))
+            elif (par=='indices'):
+                arr=np.array(indices)                
+            elif (par=='indptr'):
+                arr=np.array(indptr)
+            elif (par=='shape'):
+                arr=np.array(shape)
+            elif(par=="rownames"):
+                arr=np.array(rownames)
+            elif(par=="colnames"):
+                arr=np.array(colnames)
+
+            ds = self.file.create_earray(group, par, atom, (0,),filters=filters)
+            ds.append(arr)
+           
+            # ds = f.create_earray(group, "rownames",  tb.StringAtom(itemsize=200), (0,),filters=filters)
+            # ds.append(rownames)
+ 
+
+
+
+    def append_arrays_into_HDF5(self,data,indices,indptr,shape,rownames,chr,groupName=""):
+    
+        group=self.setGroup(chr,groupName)
+        arr = None
+        if data is not None:
+            if groupName=="AD_geno" or groupName=="PL_geno":
+                arr=np.array(data,dtype=np.dtype("S20"))
+            else:
+                arr=np.array(data,dtype=np.dtype(np.float64))
+            group.data.append(arr)
+        if indices is not None:
+            arr=np.array(indices,dtype=np.dtype(np.int32))
+            group.indices.append(arr)
+        if  indptr is not None:
+            arr=np.array(indptr,dtype=np.dtype(np.int32))
+            group.indptr.append(arr)
+        if  rownames is not None:
+            arr=np.array(rownames,dtype=np.dtype(np.int32))
+            group.rownames.append(arr)
+        group.shape[1]=shape[1]
+        group.shape[0]=len(group.rownames[:])
+
+
+
+    def store_matrix_into_HDF5(self,data,rownames,chr,groupName=""):
+
+        if (data.__class__ != csr_matrix):
+            m=csr_matrix(data.as_matrix())
+            rownames=data.index.values
+            colnames=data.columns.values
+        else:
+            m=data
+            rownames=np.array(rownames)
+        msg = "This code only works for csr matrices"
+        assert(m.__class__ == csr_matrix), msg
+        filters = tb.Filters(complevel=9, complib='blosc')
+        group=self.setGroup(chr,groupName)
+        for par in ('data', 'indices', 'indptr', 'shape'):
+            try:
+                n = getattr(group, par)
+                n._f_remove()
+            except AttributeError:
+                pass
+            arr = np.array(getattr(m, par))
+            atom = tb.Atom.from_dtype(arr.dtype)
+            if (arr is not None):
+                ds = f.create_carray(group, par, atom, arr.shape,filters=filters)
+                ds[:] = arr
+        ds = self.file.create_carray(group, "rownames",  tb.StringAtom(itemsize=200), rownames.shape,filters=filters)
+        ds[:] = rownames
+        # ds = self.f.create_carray(f.root, name+"_colnames", tb.StringAtom(itemsize=100), colnames.shape,filters=filters)
+        # # ds[:] = colnames
+
+
 
     
     def load_HDF5_by_chr(self,chr):
@@ -39,21 +130,26 @@ class HDF5Engine_access:
         # with tb.open_file(self.fileName) as f:
         node="/chr"+chr
         if node in self.file:
-            self.group=self.file.get_node(node)
+            group=self.file.get_node(node)
+        else:
+            group=self.file.create_group("/","chr"+chr,"chromosome")
         if len(groupName)>0:
             node="/chr"+chr+"/"+groupName
+
             if node in self.file:
-                self.group=self.file.get_node("/chr"+chr+"/"+groupName)
-        return self.group
+                group=self.file.get_node(node)
+            else:
+                group=self.file.create_group("/chr"+chr,groupName)
+        return group
 
 
     def load_HDF5_by_group(self,chr,groupName=""):
         self.chr=chr
-        self.setGroup(chr,groupName)
+        group=self.setGroup(chr,groupName)
         pars = []
         for par in ('data', 'indices', 'indptr', 'shape','rownames',"colnames"):
-            if hasattr(self.group, par):
-                pars.append(getattr(self.group, par).read())
+            if hasattr(group, par):
+                pars.append(getattr(group, par).read())
             else:
                 pars.append([])
         # f.close()
@@ -107,29 +203,59 @@ class HDF5Engine_access:
             data=self.data[start:end]
         return variant_ID,indices,data
 
+
+    def load_GT_by_row_IDs(self,rowIDs,chr,groupName=""):
+
+        #                  for id in ids:
+        #                     try:
+        #                         pos=rownames.index(id)
+        #                         idPos.append(pos)
+        #                     except ValueError:
+        #                         continue    
+        #                 idPos.sort()
+        group=self.setGroup(chr)
+        rownames=group.rownames[:].tolist()
+        colnames=group.colnames[:]
+
+        minPos=rownames.index(rowIDs[0])
+        maxPos=rownames.index(rowIDs[-1])
+        idPos=rownames[minPos:maxPos+1]
+        
+        sub_indptr=group.indptr[rowIDs[0]-1:rowIDs[-1]+1]
+        sub_indices=group.indices[min(sub_indptr):max(sub_indptr)]
+        sub_data=group.data[min(sub_indptr):max(sub_indptr)]
+        sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(len(sub_indptr))]
+        sub_shape=(len(sub_indptr)-1,group.shape[1])
+        return sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames
+
+
     def get_rownames(self,chr,groupName=""):
         if self.chr is None:
             self.chr=chr
-        self.group=self.setGroup(chr,groupName)
-        return self.group.rownames
+        group=self.setGroup(chr,groupName)
+        return group.rownames
 
     def get_colnames(self,chr,groupName=""):
         if self.chr is None:
             self.chr=chr
-        self.group=self.setGroup(chr,groupName)
-        return self.group.colnames
+        group=self.setGroup(chr,groupName)
+        return group.colnames
 
     def get_shape(self,chr,groupName=""):
         if self.chr is None:
             self.chr=chr
-        self.group=self.setGroup(chr,groupName)
-        return self.group.shape
+        group=self.setGroup(chr,groupName)
+        return group.shape
 
     def get_indptr(self,chr,groupName=""):
         if self.chr is None:
             self.chr=chr
-        self.group=self.setGroup(chr,groupName)
-        return self.group.indptr
+        group=self.setGroup(chr,groupName)
+        return group.indptr
+
+
+    
+
 
 
 

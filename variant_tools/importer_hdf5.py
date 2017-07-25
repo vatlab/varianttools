@@ -51,7 +51,7 @@ import tables as tb
 import HDF5_storage as storage
 import glob
 from shutil import copyfile
-
+from .HDF5_accessor import *
 
 try:
     from variant_tools.cgatools import normalize_variant
@@ -97,6 +97,7 @@ class HDF5GenotypeImportWorker(Process):
         self.colnames=[sample for sample in range(start_sample+1,end_sample+1)]
 
         self.HDFfileName=HDFfileName
+
         self.info={}
         if len(self.geno_info)>0:
             for info in self.geno_info:
@@ -104,52 +105,38 @@ class HDF5GenotypeImportWorker(Process):
                 self.info[info.name]=[[],[],[],[],[]]
         
 
-
     def writeIntoFile(self,chr):
-        # print(self.proc_index,self.numVariants,max(self.indptr),min(self.indptr),max(self.indices),min(self.indices))
-        # print(self.proc_index,len(self.indptr),self.variant_count.value,max(self.indptr),min(self.indptr))    
-        # ids=[x+1 for x in range(len(self.indptr))]    
 
         self.variant_count.value = self.variant_count.value + len(self.indptr)
         shape=(self.variant_count.value,self.end_sample-self.start_sample)
-        
+
         #If file doesn't exist, create file
         #if file exists but chromosome does not exist, create chr group
         #if file exists and chromosome exists, append to file
- 
+        
+        
         if not os.path.isfile(self.HDFfileName):
+            hdf5=HDF5Engine_access(self.HDFfileName)
             self.indptr=[0]+self.indptr
-            storage.store_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames,"",chr,self.HDFfileName) 
+
+            hdf5.store_arrays_into_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames,chr) 
             if len(self.geno_info)>0:
                 for key,value in self.info.items():
                     value[0]=[0]+value[0]
-                    # if (key!="AD_geno" and key!="PL_geno"):
-                    storage.store_csr_arrays_into_earray_HDF5(value[2],value[1],value[0],shape,value[3],self.colnames,key,chr,self.HDFfileName) 
-
+                    hdf5.store_arrays_into_HDF5(value[2],value[1],value[0],shape,value[3],self.colnames,chr,key) 
+            hdf5.close()
         else:
-            node="/chr"+chr
-            f=tb.open_file(self.HDFfileName,"r")
-            if node in f:
-                group=f.get_node(node)
-                currentStart=group.indptr[-1]
-                f.close()
-                self.indptr=[x+currentStart for x in self.indptr]
-                storage.append_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,"",chr,self.HDFfileName) 
-                
-                if len(self.geno_info)>0:
-                    for key,value in self.info.items():
-                        f=tb.open_file(self.HDFfileName,"r")
-                        group=f.get_node(node+"/"+key)
-                        currentStart=group.indptr[-1]
-                        f.close()
-                        value[0]=[x+currentStart for x in value[0]]
-                        storage.append_csr_arrays_into_earray_HDF5(value[2],value[1],value[0],shape,value[3],key,chr,self.HDFfileName) 
-
-            # else:
-            #     self.indptr=[0]+self.indptr
-            #     f.close()
-            #     storage.store_csr_arrays_into_earray_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,"",chr,self.HDFfileName) 
-            
+            hdf5=HDF5Engine_access(self.HDFfileName)
+            currentStart=hdf5.get_indptr(chr)[-1]
+            self.indptr=[x+currentStart for x in self.indptr]
+            hdf5.append_arrays_into_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,chr)       
+            if len(self.geno_info)>0:
+                for key,value in self.info.items():
+                    currentStart=hdf5.get_indptr(chr,key)[-1]
+                    value[0]=[x+currentStart for x in value[0]]
+                    hdf5.append_arrays_into_HDF5(value[2],value[1],value[0],shape,value[3],chr,key) 
+            hdf5.close()
+        
         self.indptr=[]
         self.indices=[]
         self.data=[]
@@ -395,7 +382,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                 for job in range(numTasks):
                     readQueue[job].put(line)
                 #Read the VCF by chunck
-                if (line_no>=10000):
+                if (line_no>5000):
                     print(num_lines)
                     line_no=0
                     for job in range(numTasks):
