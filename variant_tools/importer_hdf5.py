@@ -114,21 +114,18 @@ class HDF5GenotypeImportWorker(Process):
         #if file exists but chromosome does not exist, create chr group
         #if file exists and chromosome exists, append to file
         
-        
-        if not os.path.isfile(self.HDFfileName):
-            hdf5=HDF5Engine_storage(self.HDFfileName)
+        hdf5=HDF5Engine_storage(self.HDFfileName)
+        if not hdf5.checkGroup(chr):
             hdf5.store_arrays_into_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames,chr) 
             if len(self.geno_info)>0:
                 for key,value in self.info.items():
                     hdf5.store_arrays_into_HDF5(value[2],value[1],value[0],shape,value[3],self.colnames,chr,key) 
-            hdf5.close()
         else:
-            hdf5=HDF5Engine_storage(self.HDFfileName)
             hdf5.append_arrays_into_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,chr)       
             if len(self.geno_info)>0:
                 for key,value in self.info.items():
                     hdf5.append_arrays_into_HDF5(value[2],value[1],value[0],shape,value[3],chr,key) 
-            hdf5.close()
+        hdf5.close()
         
         self.indptr=[]
         self.indices=[]

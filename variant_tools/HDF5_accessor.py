@@ -24,7 +24,7 @@ class HDF5Engine_storage:
     def store_arrays_into_HDF5(self,data,indices,indptr,shape,rownames,colnames,chr,groupName=""):
   
         filters = tb.Filters(complevel=9, complib='blosc')       
-        group=self.setGroup(chr,groupName)
+        group=self.getGroup(chr,groupName)
         #check to see if 0 has been added to the start of indptr
         if len(indptr)==len(rownames):
             indptr=[0]+indptr
@@ -60,7 +60,7 @@ class HDF5Engine_storage:
 
     def append_arrays_into_HDF5(self,data,indices,indptr,shape,rownames,chr,groupName=""):
     
-        group=self.setGroup(chr,groupName)
+        group=self.getGroup(chr,groupName)
         arr = None
         currentStart=group.indptr[-1]
 
@@ -86,7 +86,6 @@ class HDF5Engine_storage:
             group.rownames.append(arr)
         group.shape[1]=shape[1]
         group.shape[0]=len(group.rownames[:])
-
 
 
     def store_matrix_into_HDF5(self,data,rownames,chr,groupName=""):
@@ -119,17 +118,27 @@ class HDF5Engine_storage:
         # # ds[:] = colnames
 
 
-    def setGroup(self,chr,groupName=""):
+    def checkGroup(self,chr,groupName=""):
+        node="/chr"+chr
+        exist=True if node in self.file else False
+        if len(groupName)>0:
+            node="/chr"+chr+"/"+groupName
+            exist=True if node in self.file else False
+        return exist
+
+
+
+    def getGroup(self,chr,groupName=""):
         # with tb.open_file(self.fileName) as f:
         node="/chr"+chr
-        if node in self.file:
+        if self.checkGroup(chr):
             group=self.file.get_node(node)
         else:
             group=self.file.create_group("/","chr"+chr,"chromosome")
         if len(groupName)>0:
             node="/chr"+chr+"/"+groupName
 
-            if node in self.file:
+            if self.checkGroup(chr,groupName):
                 group=self.file.get_node(node)
             else:
                 group=self.file.create_group("/chr"+chr,groupName)
