@@ -245,17 +245,17 @@ class HDF5GenotypeImportWorker(Process):
 
 def updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDF5fileName):
     cur=importer.db.cursor()
-    pos=0
+    
     for id in range(start_sample,end_sample):
-        sql="UPDATE sample SET HDF5=?, COLPOS=? WHERE sample_id=? and sample_name=?"
+        sql="UPDATE sample SET HDF5=? WHERE sample_id=? and sample_name=?"
         # task=(HDF5fileName,allNames[names[id]],sample_ids[id],names[id])
-        task=(HDF5fileName,pos,sample_ids[id],names[id])
+        task=(HDF5fileName,sample_ids[id],names[id])
         cur.execute(sql,task)
-        pos+=1
+        
     
 
 
-def manageHDF5(importer):
+def manageHDF5(importer,allNames={}):
     # for f in glob.glob("*h5"):
     #     os.remove(f)
     cur=importer.db.cursor()
@@ -264,19 +264,15 @@ def manageHDF5(importer):
         cur.execute(sql)
     except:
         pass
-    sql="ALTER TABLE sample ADD COLUMN COLPOS INT"
-    try:
-        cur.execute(sql)
-    except:
-        pass
-    sql="SELECT sample_name,COLPOS from sample"
-    allNames={}
-    maxCount=0
+   
+    sql="SELECT sample_name,sample_id from sample"
+
+  
     for rec in cur.execute(sql):
-        allNames[rec[0]]=int(rec[1])
-        if int(rec[1])>maxCount:
-            maxCount=int(rec[1])
-    return allNames,maxCount+1
+        if rec[0] not in allNames:
+            allNames[rec[0]]=int(rec[1])
+     
+    return allNames
 
 
 
@@ -284,12 +280,14 @@ def manageHDF5(importer):
 def importGenotypesInParallel(importer,num_sample=0):
 
 
-    allNames,sample_count=manageHDF5(importer)
-
+    
+    allNames=manageHDF5(importer)
+    
     for count, input_filename in enumerate(importer.files):
         
         env.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(importer.files)))
         importer.importVariant(input_filename)
+
         env.logger.info('{:,} new variants {}{}{} from {:,} lines are imported.'\
             .format(importer.count[2], "(" if importer.count[2] else '', 
                 ', '.join(['{:,} {}'.format(x, y) for x, y in \
@@ -302,11 +300,13 @@ def importGenotypesInParallel(importer,num_sample=0):
         sample_ids, genotype_status,names = importer.getSampleIDs(input_filename)
         if len(sample_ids) == 0:
             continue
+        allNames=manageHDF5(importer,allNames)
+       
 
-        for name in names:
-            if name not in allNames:
-                allNames[name]=sample_count
-                sample_count+=1
+        # for name in names:
+        #     if name not in allNames:
+        #         allNames[name]=sample_count
+        #         sample_count+=1
         workload=None
        
         #determine number of samples to be processed in each process
@@ -319,9 +319,11 @@ def importGenotypesInParallel(importer,num_sample=0):
                 importer.jobs=len(workload)
         else:
             if len(sample_ids)<50:
-                importer.jobs=len(workload)
+                importer.jobs=1
+                workload=[len(sample_ids)]
             else:
                 workload = [int(float(len(sample_ids)) / importer.jobs)] * importer.jobs
+          
             unallocated = max(0, len(sample_ids) - sum(workload))
             for i in range(unallocated):
                 workload[i % importer.jobs] += 1

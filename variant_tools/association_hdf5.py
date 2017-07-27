@@ -355,7 +355,7 @@ def getGenotype_HDF5(worker, group):
        
         hdf5db=HDF5Engine_access(fileName)
         snpdict=hdf5db.get_geno_info_by_group(geneSymbol,chr)
-        print(snpdict.keys(),startSample,endSample)
+        # print(snpdict.keys(),startSample,endSample)
         hdf5db.close()
         for ID in range(startSample,endSample+1):
             data=snpdict[ID]
