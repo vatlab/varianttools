@@ -1206,8 +1206,8 @@ def associate(args):
             
             if args.HDF5:
                 nJobs = max(args.jobs, 1)
-                generateHDFbyGroup_update(asso,nJobs)
-                # generateHDFbyGroup(asso,nJobs)
+                # generateHDFbyGroup_update(asso,nJobs)
+                generateHDFbyGroup(asso,nJobs)
             
             runAssociation(args,asso,proj,results)
 

@@ -181,7 +181,7 @@ class HDF5Engine_access:
             if len(indices)>0:
                 for colidx,samplePos in enumerate(indices):
                     snpdict[self.colnames[samplePos]][id]=(data[colidx],)
-        
+    
         return snpdict
 
     
@@ -204,7 +204,7 @@ class HDF5Engine_access:
         return variant_ID,indices,data
 
 
-    def get_GT_by_row_IDs(self,rowIDs,chr,groupName=""):
+    def get_genotype_by_row_IDs(self,rowIDs,chr,groupName=""):
         # if not sorted?
         #                  for id in ids:
         #                     try:
@@ -217,16 +217,27 @@ class HDF5Engine_access:
         rownames=group.rownames[:].tolist()
         colnames=group.colnames[:]
 
-        minPos=rownames.index(rowIDs[0])
-        maxPos=rownames.index(rowIDs[-1])
-        idPos=rownames[minPos:maxPos+1]
-        
-        sub_indptr=group.indptr[rowIDs[0]-1:rowIDs[-1]+1]
-        sub_indices=group.indices[min(sub_indptr):max(sub_indptr)]
-        sub_data=group.data[min(sub_indptr):max(sub_indptr)]
+        for id in rowIDs:
+            try:
+                minPos=rownames.index(id)
+                break
+            except ValueError:
+                continue
+        for id in reversed(rowIDs):
+            try:
+                maxPos=rownames.index(id)
+                break
+            except ValueError:
+                continue
+
+        update_rownames=rownames[minPos:maxPos+1]
+        sub_indptr=group.indptr[minPos:maxPos+2]
+        # print(idPos[0],idPos[-1],len(sub_indptr))
+        sub_indices=group.indices[sub_indptr[0]:sub_indptr[-1]]
+        sub_data=group.data[sub_indptr[0]:sub_indptr[-1]]
         sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(len(sub_indptr))]
         sub_shape=(len(sub_indptr)-1,group.shape[1])
-        return sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames
+        return sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames
 
 
     def get_rownames(self,chr,groupName=""):

@@ -69,7 +69,7 @@ from .preprocessor import *
 
 class HDF5GenotypeImportWorker(Process):
     '''This class starts a process, import genotype to a temporary genotype database.'''
-    def __init__(self, processor,readQueue,variantIndex, start_sample,end_sample,variant_count, 
+    def __init__(self, processor,readQueue,variantIndex, start_sample,end_sample,sample_ids,variant_count, 
         proc_index,geno_info,HDFfileName):
         '''
         variantIndex: a dictionary that returns ID for each variant.
@@ -94,7 +94,7 @@ class HDF5GenotypeImportWorker(Process):
         self.indices=[]
         self.data=[]
         self.rownames=[]
-        self.colnames=[sample for sample in range(start_sample+1,end_sample+1)]
+        self.colnames=[sample_ids[i] for i in range(start_sample,end_sample)]
 
         self.HDFfileName=HDFfileName
 
@@ -342,7 +342,6 @@ def importGenotypesInParallel(importer,num_sample=0):
         
 
         # env.logger.debug('Workload of processes: {}'.format(workload))
-        
         start_sample =0
         line_no = 0
         num_lines=0    
@@ -363,7 +362,7 @@ def importGenotypesInParallel(importer,num_sample=0):
             HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
             updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge)
             taskQueue.put(HDF5GenotypeImportWorker(importer.processor,readQueue[job], importer.variantIndex, start_sample, end_sample, 
-                        variant_import_count[job], job, importer.genotype_info,HDFfile_Merge))
+                        sample_ids,variant_import_count[job], job, importer.genotype_info,HDFfile_Merge))
             start_sample = end_sample
 
         total_genotype_count=importer.total_count[2]*len(sample_ids)
@@ -407,7 +406,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                             continue
                         HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
                         taskQueue.put(HDF5GenotypeImportWorker(importer.processor,readQueue[job], importer.variantIndex, start_sample, end_sample, 
-                            variant_import_count[job], job, importer.genotype_info,HDFfile_Merge))
+                            sample_ids,variant_import_count[job], job, importer.genotype_info,HDFfile_Merge))
                         start_sample = end_sample   
 
         #Process remaining lines

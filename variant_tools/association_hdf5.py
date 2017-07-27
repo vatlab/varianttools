@@ -78,18 +78,22 @@ class GroupHDFGenerator(Process):
                     db.connect('{0}.proj'.format(self.proj.name), '__asso_tmp')
                     cur = db.cursor()
             
-                    select_group="SELECT {0}, group_concat(variant_id) from __asso_tmp group by {0}".\
+                    # select_group="SELECT {0}, group_concat(variant_id) from __asso_tmp group by {0}".\
+                    #    format(self.group_names[0])
+                    select_group="SELECT {0}, group_concat(t.variant_id) from __asso_tmp as t join variant as v on t.variant_id=v.variant_id group by {0} order by v.pos".\
                        format(self.group_names[0])
                     for row in cur.execute(select_group):
                         geneSymbol=transformGeneName(row[0])
                         ids=row[1].split(",")
                         ids=[int(x) for x in ids]
-                        ids.sort()
+                        # ids.sort()
                         chr= getChr(ids[0],db.cursor())
-            
-                        sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames=hdf5.get_geno_info_by_row_IDs(ids,chr)
+                        # if (self.proc_index==1):
+                        #     print(ids)
+                        #     print(hdf5.get_rownames(chr)[:])
+                        sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames=hdf5.get_genotype_by_row_IDs(ids,chr)
                     
-                        hdf5group.store_arrays_into_HDF5(sub_data,sub_indices,sub_indptr,sub_shape,ids,colnames,chr,geneSymbol) 
+                        hdf5group.store_arrays_into_HDF5(sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames,chr,geneSymbol) 
                     hdf5.close()
                     hdf5group.close()
 
@@ -117,7 +121,6 @@ def generateHDFbyGroup(testManager,njobs):
 
             taskQueue.put(GroupHDFGenerator(fileQueue,testManager.proj,testManager.group_names,i))
         while taskQueue.qsize()>0:
-            print(taskQueue.qsize())
             for i in range(njobs):
                 if groupGenerators[i] is None or not groupGenerators[i].is_alive():
                     task=taskQueue.get()
@@ -352,9 +355,11 @@ def getGenotype_HDF5(worker, group):
        
         hdf5db=HDF5Engine_access(fileName)
         snpdict=hdf5db.get_geno_info_by_group(geneSymbol,chr)
+        print(snpdict.keys(),startSample,endSample)
         hdf5db.close()
         for ID in range(startSample,endSample+1):
             data=snpdict[ID]
+            
             # handle missing values
 
         # hdf5db=HDF5Engine_multi(fileName)
