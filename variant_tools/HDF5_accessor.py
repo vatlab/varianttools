@@ -13,19 +13,9 @@ from .utils import env
 
 
 
-
-
-class HDF5Engine_access:
+class HDF5Engine_storage:
     def __init__(self,fileName):
         # print("HDF5 engine started")
-        self.fileName=fileName
-        self.rownames=None
-        self.colnames=None
-        self.indptr=None
-        self.indices=None
-        self.data=None
-        self.shape=None
-        self.chr=None
         self.file=tb.open_file(fileName,"a")
  
 
@@ -35,6 +25,9 @@ class HDF5Engine_access:
   
         filters = tb.Filters(complevel=9, complib='blosc')       
         group=self.setGroup(chr,groupName)
+        #check to see if 0 has been added to the start of indptr
+        if len(indptr)==len(rownames):
+            indptr=[0]+indptr
         
         for par in ('data', 'indices', 'indptr', 'shape',"rownames","colnames"):
             arr = None
@@ -69,6 +62,13 @@ class HDF5Engine_access:
     
         group=self.setGroup(chr,groupName)
         arr = None
+        currentStart=group.indptr[-1]
+
+        if indptr is not None:
+            indptr=[x+currentStart for x in indptr]
+        else:
+            indptr=[currentStart]
+
         if data is not None:
             if groupName=="AD_geno" or groupName=="PL_geno":
                 arr=np.array(data,dtype=np.dtype("S20"))
@@ -119,6 +119,43 @@ class HDF5Engine_access:
         # # ds[:] = colnames
 
 
+    def setGroup(self,chr,groupName=""):
+        # with tb.open_file(self.fileName) as f:
+        node="/chr"+chr
+        if node in self.file:
+            group=self.file.get_node(node)
+        else:
+            group=self.file.create_group("/","chr"+chr,"chromosome")
+        if len(groupName)>0:
+            node="/chr"+chr+"/"+groupName
+
+            if node in self.file:
+                group=self.file.get_node(node)
+            else:
+                group=self.file.create_group("/chr"+chr,groupName)
+        return group
+
+    def close(self):
+        self.file.close()
+
+
+
+
+
+
+class HDF5Engine_access:
+    def __init__(self,fileName):
+        # print("HDF5 engine started")
+        self.fileName=fileName
+        self.rownames=None
+        self.colnames=None
+        self.indptr=None
+        self.indices=None
+        self.data=None
+        self.shape=None
+        self.chr=None
+        self.file=tb.open_file(fileName,"a")
+ 
 
     
     def load_HDF5_by_chr(self,chr,groupName=""):
@@ -235,7 +272,7 @@ class HDF5Engine_access:
         # print(idPos[0],idPos[-1],len(sub_indptr))
         sub_indices=group.indices[sub_indptr[0]:sub_indptr[-1]]
         sub_data=group.data[sub_indptr[0]:sub_indptr[-1]]
-        sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(len(sub_indptr))]
+        sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(1,len(sub_indptr))]
         sub_shape=(len(sub_indptr)-1,group.shape[1])
         return sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames
 
@@ -477,11 +514,6 @@ class HDF5Engine_csc:
             else:
                 data[int(id)]=(int(genotype),)
         return data
-
-
-
-
-
 
 
 

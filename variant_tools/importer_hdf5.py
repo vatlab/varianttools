@@ -116,24 +116,17 @@ class HDF5GenotypeImportWorker(Process):
         
         
         if not os.path.isfile(self.HDFfileName):
-            hdf5=HDF5Engine_access(self.HDFfileName)
-            self.indptr=[0]+self.indptr
-
+            hdf5=HDF5Engine_storage(self.HDFfileName)
             hdf5.store_arrays_into_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames,chr) 
             if len(self.geno_info)>0:
                 for key,value in self.info.items():
-                    value[0]=[0]+value[0]
                     hdf5.store_arrays_into_HDF5(value[2],value[1],value[0],shape,value[3],self.colnames,chr,key) 
             hdf5.close()
         else:
-            hdf5=HDF5Engine_access(self.HDFfileName)
-            currentStart=hdf5.get_indptr(chr)[-1]
-            self.indptr=[x+currentStart for x in self.indptr]
+            hdf5=HDF5Engine_storage(self.HDFfileName)
             hdf5.append_arrays_into_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,chr)       
             if len(self.geno_info)>0:
                 for key,value in self.info.items():
-                    currentStart=hdf5.get_indptr(chr,key)[-1]
-                    value[0]=[x+currentStart for x in value[0]]
                     hdf5.append_arrays_into_HDF5(value[2],value[1],value[0],shape,value[3],chr,key) 
             hdf5.close()
         
@@ -145,7 +138,7 @@ class HDF5GenotypeImportWorker(Process):
         if len(self.geno_info)>0:
             for info in self.geno_info:
                 #indptr,indices,data,shape,rownames
-                self.info[info.name]=[[0],[],[],[],[]]
+                self.info[info.name]=[[],[],[],[],[]]
 
 
 
@@ -391,7 +384,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                     while taskQueue.qsize()>0:
                         for i in range(importer.jobs):    
                             if importers[i] is None or not importers[i].is_alive():
-                                print(i)
+                         
                                 task=taskQueue.get()
                                 importers[i]=task
                                 importers[i].start()           
@@ -417,7 +410,6 @@ def importGenotypesInParallel(importer,num_sample=0):
         while taskQueue.qsize()>0:
             for i in range(importer.jobs):    
                 if importers[i] is None or not importers[i].is_alive():
-                    print(i)
                     task=taskQueue.get()
                     importers[i]=task
                     importers[i].start()           

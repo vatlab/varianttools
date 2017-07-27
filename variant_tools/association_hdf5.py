@@ -69,7 +69,7 @@ class GroupHDFGenerator(Process):
                     os.remove(HDFfileGroupName)
 
                 hdf5=HDF5Engine_access(HDFfileName)
-                hdf5group=HDF5Engine_access(HDFfileGroupName)
+                hdf5group=HDF5Engine_storage(HDFfileGroupName)
                 
                 
                 try:
@@ -158,7 +158,7 @@ class GroupHDFGenerator_memory(Process):
                 HDFfileGroupName=HDFfileName.replace(".h5","_multi_genes.h5")
                 if (os.path.isfile(HDFfileGroupName)):
                     os.remove(HDFfileGroupName)
-                hdf5group=HDF5Engine_access(HDFfileGroupName)
+                hdf5group=HDF5Engine_storage(HDFfileGroupName)
                 try:
                     chr="22"
                     rownames=hdf5.get_rownames(chr)
@@ -214,12 +214,12 @@ class GroupHDFGenerator_append(Process):
                 HDFfileName=self.fileQueue.get()
                 if HDFfileName is None:
                     break
-                # hdf5_file=tb.open_file(HDFfileName,mode="r")
+      
                 hdf5=HDF5Engine_access(HDFfileName)
                 HDFfileGroupName=HDFfileName.replace(".h5","_multi_genes.h5")
                 if (os.path.isfile(HDFfileGroupName)):
                     os.remove(HDFfileGroupName)
-                hdf5group=HDF5Engine_access(HDFfileGroupName)
+                hdf5group=HDF5Engine_storage(HDFfileGroupName)
                 chr="22"
                 colnames=hdf5.get_colnames(chr)   
                 rownames=hdf5.get_rownames(chr)
@@ -232,16 +232,11 @@ class GroupHDFGenerator_append(Process):
                         try:
                             geneNames=self.geneDict[id]                           
                             for geneName in geneNames:
-                                groupHDF5=HDF5Engine_access(HDFfileGroupName)
-                                indptr=groupHDF5.get_indptr(chr,geneName)
-                                lastPos=indptr[-1]
-                                groupHDF5.close()
+      
                                 variant_ID,indices,data=hdf5.get_geno_info_by_row_ID(idx)
-            
-                                if len(indices)==0:
-                                    indptr=[lastPos]
-                                else:
-                                    indptr=[lastPos+len(indices)]
+                                indptr=None
+                                if len(indices)>0:
+                                    indptr=[len(indices)]
                                 shape=(1,len(colnames))
                                 hdf5group.append_arrays_into_HDF5(data,indices,indptr,shape,[id],chr,geneName)
                         except KeyError: 
@@ -294,8 +289,8 @@ def generateHDFbyGroup_update(testManager,njobs):
         for HDFfileName in HDFfileNames:
             fileQueue.put(HDFfileName)
         for i in range(len(HDFfileNames)):
-            # taskQueue.put(GroupHDFGenerator_memory(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i))
-            taskQueue.put(GroupHDFGenerator_append(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i))
+            taskQueue.put(GroupHDFGenerator_memory(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i))
+            # taskQueue.put(GroupHDFGenerator_append(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i))
         while taskQueue.qsize()>0:
             for i in range(njobs):
                 if groupGenerators[i] is None or not groupGenerators[i].is_alive():
