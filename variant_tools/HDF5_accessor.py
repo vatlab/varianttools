@@ -100,7 +100,7 @@ class HDF5Engine_storage:
         msg = "This code only works for csr matrices"
         assert(m.__class__ == csr_matrix), msg
         filters = tb.Filters(complevel=9, complib='blosc')
-        group=self.setGroup(chr,groupName)
+        group=self.getGroup(chr,groupName)
         for par in ('data', 'indices', 'indptr', 'shape'):
             try:
                 n = getattr(group, par)
@@ -171,7 +171,7 @@ class HDF5Engine_access:
         self.load_HDF5_by_group(chr,groupName)
 
 
-    def setGroup(self,chr,groupName=""):
+    def getGroup(self,chr,groupName=""):
         self.chr=chr
         # with tb.open_file(self.fileName) as f:
         node="/chr"+chr
@@ -191,7 +191,7 @@ class HDF5Engine_access:
 
     def load_HDF5_by_group(self,chr,groupName=""):
         self.chr=chr
-        group=self.setGroup(chr,groupName)
+        group=self.getGroup(chr,groupName)
         pars = []
         for par in ('data', 'indices', 'indptr', 'shape','rownames',"colnames"):
             if hasattr(group, par):
@@ -259,7 +259,9 @@ class HDF5Engine_access:
         #                     except ValueError:
         #                         continue    
         #                 idPos.sort()
-        group=self.setGroup(chr)
+
+        #assume rowIDs are sorted by genome position
+        group=self.getGroup(chr)
         rownames=group.rownames[:].tolist()
         colnames=group.colnames[:]
 
@@ -289,25 +291,25 @@ class HDF5Engine_access:
     def get_rownames(self,chr,groupName=""):
         if self.chr is None:
             self.chr=chr
-        group=self.setGroup(chr,groupName)
+        group=self.getGroup(chr,groupName)
         return group.rownames
 
     def get_colnames(self,chr,groupName=""):
         if self.chr is None:
             self.chr=chr
-        group=self.setGroup(chr,groupName)
+        group=self.getGroup(chr,groupName)
         return group.colnames
 
     def get_shape(self,chr,groupName=""):
         if self.chr is None:
             self.chr=chr
-        group=self.setGroup(chr,groupName)
+        group=self.getGroup(chr,groupName)
         return group.shape
 
     def get_indptr(self,chr,groupName=""):
         if self.chr is None:
             self.chr=chr
-        group=self.setGroup(chr,groupName)
+        group=self.getGroup(chr,groupName)
         return group.indptr
 
 
@@ -380,113 +382,7 @@ class HDF5Engine_multi:
 
 
 
-class HDF5Engine:
-    def __init__(self,dbName):
-        # print("HDF5 engine started")
-        self.dbName = dbName
-        self.fileName=None
-        self.m=None
-        self.rownames=None
-        self.colnames=None
 
-    def connect_HDF5(self,db):
-        db = os.path.expanduser(db)
-        self.fileName = db if (db.endswith('.proj') or db.endswith('.h5')) else db.replace(".DB","") + '.h5'
-        
-
-
-    def load_HDF5(self):
-        # start_time = time.time()
-        with tb.open_file(self.fileName) as f:
-            pars = []
-            for par in ('data', 'indices', 'indptr', 'shape',"rownames","colnames"):
-                pars.append(getattr(f.root, '%s_%s' % (self.dbName, par)).read())
-        f.close()
-        self.m = csr_matrix(tuple(pars[:3]), shape=pars[3])
-        self.rownames=pars[4].astype('int')
-        self.colnames=pars[5].astype('str')
-        del pars
-        # print("--- %s seconds ---" % (time.time() - start_time))
-
-
-    def binarySearchName(self,nameArray,name):
-        start=0
-        end=len(nameArray)-1
-        found=False
-        mid=0
-        while (start<=end and not found):
-            mid=(end+start)//2
-            if (name==nameArray[mid]):
-                found=True
-            else:
-                if (name<nameArray[mid]):
-                    end=mid-1
-                elif (name>nameArray[mid]):
-                    start=mid+1
-        if not found:
-            mid=-1
-        return mid
-
-
-    def load_genotype_by_variantID(self,ids):
-        snpdict={}
-        print(len(ids))
-        for sample in range(len(self.colnames)):
-            snpdict[sample+1]={}
-        for id in ids:
-            # valindex=self.binarySearchName(self.rownames,id)
-            valindex=int(id)-1
-            value=self.m.getrow(valindex)
-            cols=value.indices
-            genotypes=value.data
-            for index,pos in enumerate(cols):       
-                if math.isnan(genotypes[index]):
-                    pass
-                else:
-                    snpdict[pos+1][int(id)]=(int(genotypes[index]),)
-                # print(id,sampleName,value)
-        return snpdict
-
-    def representsInt(self,s):
-        try: 
-            int(s)
-            return True
-        except ValueError:
-            return False
-
-    def load_genotype_by_variantID_samples(self,ids,samples):
-        # count=0
-        sampleArray=[]
-        snpdict={}
-        for sample in samples:
-            if self.representsInt(sample):
-                sample=int(sample)
-            sampleArray.append(sample)
-            snpdict[sample]={}
-        totaltime=0
-        for id in ids:
-            if self.representsInt(id):
-                id=int(id)
-            # idIndex=self.binarySearchName(self.rownames,id)
-            # env.logger.info(str(idIndex)+" "+str(id))
-            idIndex=id-1         
-            if idIndex!=-1:
-                value=self.m.getrow(idIndex)
-                cols=value.indices
-                genotypes=value.data
-                ## use binary search
-                start=time.time()
-                for sampleName in sampleArray:
-                    samplePos=self.binarySearchName(cols,sampleName-1)  
-                    if samplePos!=-1:
-                        if math.isnan(genotypes[samplePos]):
-                            pass
-                        else:
-                            genotype=genotypes[samplePos]
-                            snpdict[sampleName][id]=(int(genotype),)
-                # totaltime=totaltime+time.time()-start           
-        # print("get genotype "+str(len(ids))+" "+str(len(samples))+" "+str(totaltime))
-        return snpdict
 
 
 class HDF5Engine_csc:
