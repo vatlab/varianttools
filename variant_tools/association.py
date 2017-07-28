@@ -1204,7 +1204,7 @@ def associate(args):
                             cur.execute(query, grp)
                         proj.db.commit()
             
-            if args.HDF5:
+            if args.HDF5 and args.force:
                 nJobs = max(args.jobs, 1)
                 # generateHDFbyGroup_update(asso,nJobs)
                 generateHDFbyGroup(asso,nJobs)

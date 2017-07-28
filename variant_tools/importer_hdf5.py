@@ -291,6 +291,7 @@ def importGenotypesInParallel(importer,num_sample=0):
         if len(sample_ids) == 0:
             continue
         allNames=manageHDF5(importer,allNames)
+        sample_ids=[int(allNames[name]) for name in names]
        
 
         # for name in names:
