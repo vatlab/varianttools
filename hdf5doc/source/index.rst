@@ -28,7 +28,3 @@ This is something I want to say that is not in the docstring.
 .. automodule:: HDF5_accessor
 	:members:
 
-.. autoclass:: HDF5Engine_storage
-
-.. autoclass:: HDF5Engine_access
-   

@@ -9,7 +9,9 @@ import os
 import sys
 # from memory_profiler import profile
 import HDF5_storage as storage
-# from .utils import env
+# from .utils import 
+
+
 
 
 
@@ -312,14 +314,17 @@ class HDF5Engine_access:
                 break
             except ValueError:
                 continue
-
+        
         update_rownames=rownames[minPos:maxPos+1]
         sub_indptr=group.indptr[minPos:maxPos+2]
         # print(idPos[0],idPos[-1],len(sub_indptr))
-        sub_indices=group.indices[sub_indptr[0]:sub_indptr[-1]]
-        sub_data=group.data[sub_indptr[0]:sub_indptr[-1]]
-        sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(1,len(sub_indptr))]
-        sub_shape=(len(sub_indptr)-1,group.shape[1])
+        sub_indices=sub_data=sub_shape=None
+        if len(sub_indptr)>0:
+            sub_indices=group.indices[sub_indptr[0]:sub_indptr[-1]]
+            sub_data=group.data[sub_indptr[0]:sub_indptr[-1]]
+            sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(1,len(sub_indptr))]
+            sub_shape=(len(sub_indptr)-1,group.shape[1])
+
         return sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames
 
 

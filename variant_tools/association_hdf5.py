@@ -92,8 +92,8 @@ class GroupHDFGenerator(Process):
                         #     print(ids)
                         #     print(hdf5.get_rownames(chr)[:])
                         sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames=hdf5.get_genotype_by_row_IDs(ids,chr)
-                    
-                        hdf5group.store_arrays_into_HDF5(sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames,chr,geneSymbol) 
+                        if sub_indices is not None:
+                            hdf5group.store_arrays_into_HDF5(sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames,chr,geneSymbol) 
                     hdf5.close()
                     hdf5group.close()
 
