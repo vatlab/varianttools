@@ -961,61 +961,61 @@ class AssoTestsWorker(Process):
             values = list(grp)
 
             #select variants from each group:
-            if not self.args.HDF5:
-                genotype, which, var_info, geno_info = self.getGenotype(grp)
-            else:
-                genotype, which, var_info, geno_info = getGenotype_HDF5(self,grp)
-            # if I throw an exception here, the program completes in 5 minutes, indicating
-            # the data collection part takes an insignificant part of the process.
-            # 
-            # set C++ data object
-            if (len(self.tests) - self.num_extern_tests) > 0:
-                self.setGenotype(which, genotype, geno_info, grpname)
-                self.setPhenotype(which)
-                self.setVarInfo(var_info)
-            # set Python data object, for external tests
-            if self.num_extern_tests:
-                self.setPyData(which, genotype, var_info, geno_info, None, grpname)
-            # association tests
-            for test in self.tests:
-                test.setData(self.data, self.pydata)
-                result = test.calculate(env.association_timeout)
-                # env.logger.debug('Finished association test on {}'.format(repr(grpname)))
-                values.extend(result)
-            # try:
-            #     # select variants from each group:
-            #     if not self.args.HDF5:
-            #         genotype, which, var_info, geno_info = self.getGenotype(grp)
-            #     else:
-            #         genotype, which, var_info, geno_info = getGenotype_HDF5(self,grp)
-            #     # if I throw an exception here, the program completes in 5 minutes, indicating
-            #     # the data collection part takes an insignificant part of the process.
-            #     # 
-            #     # set C++ data object
-            #     if (len(self.tests) - self.num_extern_tests) > 0:
-            #         self.setGenotype(which, genotype, geno_info, grpname)
-            #         self.setPhenotype(which)
-            #         self.setVarInfo(var_info)
-            #     # set Python data object, for external tests
-            #     if self.num_extern_tests:
-            #         self.setPyData(which, genotype, var_info, geno_info, None, grpname)
-            #     # association tests
-            #     for test in self.tests:
-            #         test.setData(self.data, self.pydata)
-            #         result = test.calculate(env.association_timeout)
-            #         # env.logger.debug('Finished association test on {}'.format(repr(grpname)))
-            #         values.extend(result)
-            # except KeyboardInterrupt as e:
-            #     # die silently if stopped by Ctrl-C
-            #     break
-            # except Exception as e:
-            #     env.logger.debug('An ERROR has occurred in process {} while processing {}: {}'.\
-            #                       format(self.index, repr(grpname), e))
-            #     # self.data might have been messed up, create a new one
-            #     self.data = t.AssoData()
-            #     self.pydata = {}
-            #     # return no result for any of the tests if an error message is captured.
-            #     values.extend([float('NaN') for x in range(len(self.result_fields) - len(list(grp)))])
+            # if not self.args.HDF5:
+            #     genotype, which, var_info, geno_info = self.getGenotype(grp)
+            # else:
+            #     genotype, which, var_info, geno_info = getGenotype_HDF5(self,grp)
+            # # if I throw an exception here, the program completes in 5 minutes, indicating
+            # # the data collection part takes an insignificant part of the process.
+            # # 
+            # # set C++ data object
+            # if (len(self.tests) - self.num_extern_tests) > 0:
+            #     self.setGenotype(which, genotype, geno_info, grpname)
+            #     self.setPhenotype(which)
+            #     self.setVarInfo(var_info)
+            # # set Python data object, for external tests
+            # if self.num_extern_tests:
+            #     self.setPyData(which, genotype, var_info, geno_info, None, grpname)
+            # # association tests
+            # for test in self.tests:
+            #     test.setData(self.data, self.pydata)
+            #     result = test.calculate(env.association_timeout)
+            #     # env.logger.debug('Finished association test on {}'.format(repr(grpname)))
+            #     values.extend(result)
+            try:
+                # select variants from each group:
+                if not self.args.HDF5:
+                    genotype, which, var_info, geno_info = self.getGenotype(grp)
+                else:
+                    genotype, which, var_info, geno_info = getGenotype_HDF5(self,grp)
+                # if I throw an exception here, the program completes in 5 minutes, indicating
+                # the data collection part takes an insignificant part of the process.
+                # 
+                # set C++ data object
+                if (len(self.tests) - self.num_extern_tests) > 0:
+                    self.setGenotype(which, genotype, geno_info, grpname)
+                    self.setPhenotype(which)
+                    self.setVarInfo(var_info)
+                # set Python data object, for external tests
+                if self.num_extern_tests:
+                    self.setPyData(which, genotype, var_info, geno_info, None, grpname)
+                # association tests
+                for test in self.tests:
+                    test.setData(self.data, self.pydata)
+                    result = test.calculate(env.association_timeout)
+                    # env.logger.debug('Finished association test on {}'.format(repr(grpname)))
+                    values.extend(result)
+            except KeyboardInterrupt as e:
+                # die silently if stopped by Ctrl-C
+                break
+            except Exception as e:
+                env.logger.debug('An ERROR has occurred in process {} while processing {}: {}'.\
+                                  format(self.index, repr(grpname), e))
+                # self.data might have been messed up, create a new one
+                self.data = t.AssoData()
+                self.pydata = {}
+                # return no result for any of the tests if an error message is captured.
+                values.extend([float('NaN') for x in range(len(self.result_fields) - len(list(grp)))])
             self.resQueue.put(values)
 
 
