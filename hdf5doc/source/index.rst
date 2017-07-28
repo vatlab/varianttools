@@ -6,24 +6,16 @@
 Welcome to HDF5Engine's documentation!
 ======================================
 
-Contents:
-
 .. toctree::
    :maxdepth: 2
 
 
-
-Indices and tables
-==================
-
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
 
-useful #1 -- auto members
-=========================
 
-This is something I want to say that is not in the docstring.
+
+A documentation for store and retrieval genotype information into HDF5.
 
 .. automodule:: HDF5_accessor
 	:members:

@@ -7,22 +7,13 @@ import time
 import math
 import os
 import sys
-# from memory_profiler import profile
 import HDF5_storage as storage
-# from .utils import 
-
 
 
 
 
 class HDF5Engine_storage:
-    """We use this as a public class example class.
-
-    You never call this class before calling :func:`public_fn_with_sphinxy_docstring`.
-
-    .. note::
-
-       An example of intersphinx is this: you **cannot** use :mod:`pickle` on this class.
+    """This is the class for storage of genotype info into HDF5
 
     """
 
@@ -34,30 +25,30 @@ class HDF5Engine_storage:
 
 
     def store_arrays_into_HDF5(self,data,indices,indptr,shape,rownames,colnames,chr,groupName=""):
-        """This function does something.
+        """This function accept three arrys to represent the matrix (or sparse matrix), the shape of matrix
+        rownames (variant_ids), colnames (sample names), chromosome and groupName (HDF5 group name)
 
             Args:
-               name (str):  The name to use.
+               data (list):
+               indices (list):
+               indptr (list):
+               shape (tuple):
+               rownames (list):
+               colnames (list):
+               chr (string)
+               groupName (string):
 
-            Kwargs:
-               state (bool): Current state to be in.
 
-            Returns:
-               int.  The return code::
 
-                  0 -- Success!
-                  1 -- No good.
-                  2 -- Try again.
+            An example of indptr,indices and data
 
-            Raises:
-               AttributeError, KeyError
-
-            A really great idea.  A way you might use me is
-
-            >>> print public_fn_with_googley_docstring(name='foo', state=None)
-            0
-
-            BTW, this always returns 0.  **NEVER** use with :class:`MyPublicClass`.
+            >>> indptr = np.array([0, 2, 3, 6])
+            >>> indices = np.array([0, 2, 2, 0, 1, 2])
+            >>> data = np.array([1, 2, 3, 4, 5, 6])
+            >>> csr_matrix((data, indices, indptr), shape=(3, 3)).toarray()
+            array([[1, 0, 2],
+                   [0, 0, 3],
+                   [4, 5, 6]])
 
         """
         filters = tb.Filters(complevel=9, complib='blosc')       
