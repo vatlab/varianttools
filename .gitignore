@@ -28,3 +28,4 @@ variant_tools/cgatools_wrap.cpp
 variant_tools/swigpyrun.h
 variant_tools/ucsctools.py
 variant_tools/ucsctools_wrap.cpp
+.DS_Store
