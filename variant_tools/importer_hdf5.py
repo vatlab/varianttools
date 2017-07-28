@@ -374,7 +374,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                 for job in range(numTasks):
                     readQueue[job].put(line)
                 #Read the VCF by chunck
-                if (line_no>5000):
+                if (line_no>20000):
                     print(num_lines)
                     line_no=0
                     for job in range(numTasks):
