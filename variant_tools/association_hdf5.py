@@ -172,7 +172,7 @@ class GroupHDFGenerator_memory(Process):
                                     #indptr,indices,data,rownames
                                     genoDict[geneName]=[[0],[],[],[]]
             
-                                variant_ID,indices,data=hdf5.get_geno_info_by_row_ID(idx)
+                                variant_ID,indices,data=hdf5.get_geno_info_by_row_pos(idx)
                               
                                 lastPos=genoDict[geneName][0][-1]
                                 if len(indices)==0:
@@ -233,7 +233,7 @@ class GroupHDFGenerator_append(Process):
                             geneNames=self.geneDict[id]                           
                             for geneName in geneNames:
       
-                                variant_ID,indices,data=hdf5.get_geno_info_by_row_ID(idx)
+                                variant_ID,indices,data=hdf5.get_geno_info_by_row_pos(idx)
                                 indptr=None
                                 if len(indices)>0:
                                     indptr=[len(indices)]

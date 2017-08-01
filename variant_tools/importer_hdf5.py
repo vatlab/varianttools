@@ -270,7 +270,7 @@ def manageHDF5(importer,allNames={}):
 def importGenotypesInParallel(importer,num_sample=0):
 
 
-    
+   
     allNames=manageHDF5(importer)
     
     for count, input_filename in enumerate(importer.files):
@@ -320,7 +320,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                 workload[i % importer.jobs] += 1
 
 
-        print(workload)
+        env.logger.debug("work load {}".format(workload))
         numTasks=len(workload)
         # importers = [None] * numProcess
         importers=[None]*importer.jobs
@@ -349,7 +349,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                 continue
             readQueue.append(mpQueue())
             end_sample = min(start_sample + workload[job], len(sample_ids))
-            print(start_sample,end_sample)     
+            env.logger.debug("{},{}".format(start_sample,end_sample))     
             if end_sample <= start_sample:
                 continue
             HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
@@ -375,7 +375,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                     readQueue[job].put(line)
                 #Read the VCF by chunck
                 if (line_no>20000):
-                    print(num_lines)
+                    eng.logger.debug("number of lines {}".format(num_lines))
                     line_no=0
                     for job in range(numTasks):
                         readQueue[job].put(None)

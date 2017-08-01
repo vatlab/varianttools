@@ -1876,23 +1876,6 @@ def importVariantsArguments(parser):
         help='''Store genotypes into HDF5 files'''),
 
 def importVariants(args):
-    # with Project(verbosity=args.verbosity, mode='SKIP_VERIFICATION') as proj:
-    #     importer = Importer(proj=proj, files=args.input_files,
-    #         build=args.build, format=args.format, sample_name=args.sample_name,
-    #         force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
-        
-    #     if args.jobs <= 1:
-    #         # if jobs == 1, use the old algorithm that insert variant and
-    #         # genotype together ...
-    #         importer.importFilesSequentially()
-    #     else:
-    #         # if num_sample specified, each HDF5 file will have speciefied number of samples in the file
-    #         if args.HDF5:
-    #             importGenotypesInParallel(importer)
-    #         else:
-    #             importer.importFilesInParallel()
-    #     importer.finalize()
-    # proj.close()
 
     try:
         # the project is opened with verify=False so index on the master
@@ -1902,18 +1885,18 @@ def importVariants(args):
             importer = Importer(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
-            
-            if args.jobs <= 1:
+            print(env.temp_dir)
+            if args.jobs <= 1 and not args.HDF5:
                 # if jobs == 1, use the old algorithm that insert variant and
                 # genotype together ...
                 importer.importFilesSequentially()
             else:
-                if len(importer.genotype_info)==0 and importer.genotype_field[0]=="GT" and args.HDF5:
+                if args.HDF5:
                     importGenotypesInParallel(importer)
                 else:
                     importer.importFilesInParallel()
             importer.finalize()
         proj.close()
     except Exception as e:
-        env.logger.error(e)
+        env.logger.error(e,exc_info=True)
         sys.exit(1)

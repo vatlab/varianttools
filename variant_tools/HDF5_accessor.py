@@ -7,7 +7,7 @@ import time
 import math
 import os
 import sys
-import HDF5_storage as storage
+
 
 
 
@@ -25,18 +25,19 @@ class HDF5Engine_storage:
 
 
     def store_arrays_into_HDF5(self,data,indices,indptr,shape,rownames,colnames,chr,groupName=""):
-        """This function accept three arrys to represent the matrix (or sparse matrix), the shape of matrix
+        """This function accept three arrays which represent the matrix (or sparse matrix,check below for example), the shape of matrix,
         rownames (variant_ids), colnames (sample names), chromosome and groupName (HDF5 group name)
 
             Args:
-               data (list):
-               indices (list):
-               indptr (list):
-               shape (tuple):
-               rownames (list):
-               colnames (list):
-               chr (string)
-               groupName (string):
+            
+               - data (list): the genotype value for row i are stored in data[indptr[i]:indptr[i+1]]
+               - indices (list): the column indices for row i are stored in indices[indptr[i]:indptr[i+1]]
+               - indptr (list): the position for each row in the data and indices array
+               - shape (tuple): the shape of the matrix
+               - rownames (list): variant_id for each variant
+               - colnames (list): sample name for each sample
+               - chr (string): the chromosome 
+               - groupName (string): the group name, for example gene name
 
 
 
@@ -87,6 +88,21 @@ class HDF5Engine_storage:
 
 
     def append_arrays_into_HDF5(self,data,indices,indptr,shape,rownames,chr,groupName=""):
+        """This function appends a new matrix to exisiting matrix stored in HDF5, accepts three arrays as described above,
+            shape of matrix, rownames,chromosome and groupName. **The columns of appending matrix should have the exact same samples as 
+            exisiting matrix and in the same order.**  
+
+            Args:
+
+               - data (list): the genotype value for row i are stored in data[indptr[i]:indptr[i+1]]
+               - indices (list): the column indices for row i are stored in indices[indptr[i]:indptr[i+1]]
+               - indptr (list): the position for each row in the data and indices array
+               - shape (tuple): the shape of the matrix
+               - rownames (list): variant_id for each variant
+               - chr (string): the chromosome
+               - groupName (string): the group name, for example gene name
+
+        """
     
         group=self.getGroup(chr,groupName)
         arr = None
@@ -117,6 +133,16 @@ class HDF5Engine_storage:
 
 
     def store_matrix_into_HDF5(self,data,rownames,chr,groupName=""):
+        """This function accepts a matrix and store the matrix in to HDF5 file. 
+
+            Args:
+
+               - data (matrix): a matrix with rows as variants and cols as samples, each cell records the geno info
+               - rownames (list): variant_id for each variant
+               - chr (string): the chromosome 
+               - groupName (string): the group name, for example gene name
+
+        """
 
         if (data.__class__ != csr_matrix):
             m=csr_matrix(data.as_matrix())
@@ -147,6 +173,22 @@ class HDF5Engine_storage:
 
 
     def checkGroup(self,chr,groupName=""):
+        """This function check the existance of a group
+
+            Args:
+
+               - chr (string): the chromosome 
+               - groupName (string): the group name, for example gene name
+
+            Returns:
+
+                bool : True if group exists
+
+            
+
+        """
+        if chr.startswith("/chr"):
+            chr=chr.replace("/chr","")
         node="/chr"+chr
         exist=True if node in self.file else False
         if len(groupName)>0:
@@ -157,7 +199,20 @@ class HDF5Engine_storage:
 
 
     def getGroup(self,chr,groupName=""):
-        # with tb.open_file(self.fileName) as f:
+        """This function gets the node of specified group.
+
+            Args:
+
+               - chr (string): the chromosome 
+               - groupName (string): the group name, for example gene name
+
+            Returns:
+
+                the node of the group
+
+        """
+        if chr.startswith("/chr"):
+            chr=chr.replace("/chr","")
         node="/chr"+chr
         if self.checkGroup(chr):
             group=self.file.get_node(node)
@@ -173,6 +228,9 @@ class HDF5Engine_storage:
         return group
 
     def close(self):
+        """This function closes the HDF5 file.
+
+        """
         self.file.close()
 
 
@@ -181,6 +239,9 @@ class HDF5Engine_storage:
 
 
 class HDF5Engine_access:
+    """This is the class for access genotype info in HDF5
+
+    """
     def __init__(self,fileName):
         # print("HDF5 engine started")
         self.fileName=fileName
@@ -196,28 +257,81 @@ class HDF5Engine_access:
 
     
     def load_HDF5_by_chr(self,chr,groupName=""):
+        """This function loads matrix, rownames and colnames of specified chromosome into memory
+
+            Args:
+
+               - chr (string): the chromosome 
+
+
+        """
         self.load_HDF5_by_group(chr,groupName)
 
 
     def getGroup(self,chr,groupName=""):
-        self.chr=chr
+        """This function gets the node of specified group.
+
+            Args:
+
+               - chr (string): the chromosome 
+               - groupName (string): the group name, for example gene name
+
+            Returns:
+
+                - the node of the group
+
+        """
+        if self.chr is None:
+            self.chr=chr
+        if chr.startswith("/chr"):
+            chr=chr.replace("/chr","")
         # with tb.open_file(self.fileName) as f:
         node="/chr"+chr
-        if node in self.file:
-            group=self.file.get_node(node)
-        else:
-            group=self.file.create_group("/","chr"+chr,"chromosome")
+        if node not in self.file:
+            self.file.create_group("/","chr"+chr,"chromosome")
+        group=self.file.get_node(node)
+
         if len(groupName)>0:
             node="/chr"+chr+"/"+groupName
 
-            if node in self.file:
-                group=self.file.get_node(node)
-            else:
-                group=self.file.create_group("/chr"+chr,groupName)
+            if node not in self.file:
+                self.file.create_group("/chr"+chr,groupName)
+            group=self.file.get_node(node)
         return group
+
+    def checkGroup(self,chr,groupName=""):
+        """This function check the existance of a group
+
+            Args:
+
+                - chr (string): the chromosome 
+                - groupName (string): the group name, for example gene name
+
+            Returns:
+
+                - bool : True if group exists
+
+        """
+        if chr.startswith("/chr"):
+            chr=chr.replace("/chr","")
+        node="/chr"+chr
+        exist=True if node in self.file else False
+        if len(groupName)>0:
+            node="/chr"+chr+"/"+groupName
+            exist=True if node in self.file else False
+        return exist
 
 
     def load_HDF5_by_group(self,chr,groupName=""):
+        """This function loads matrix, rownames and colnames of specified group into memory
+
+            Args:
+
+               chr (string): the chromosome 
+               groupName (string): the group name, for example gene name
+
+
+        """
         self.chr=chr
         group=self.getGroup(chr,groupName)
         pars = []
@@ -236,11 +350,27 @@ class HDF5Engine_access:
 
 
     def close(self):
+        """This function closes the HDF5 file.
+
+        """
         self.file.close()
 
 
     def get_geno_info_by_group(self,groupName,chr=None):
+        """This function gets the genotype info of specified group into a dictionay
+
+            Args:
+
+                - chr (string): the chromosome which the group is in 
+                - groupName (string): the group which variants are in, for example gene name
+
+            Returns:
+
+                - dict : snpdict[sample_id][variant_id]=genotype value
+
+        """
         if chr is None:
+            #raise error
             pass
         if self.chr is None:
             self.chr=chr
@@ -259,13 +389,27 @@ class HDF5Engine_access:
         return snpdict
 
     
-    def get_geno_info_by_row_ID(self,rowID,groupName=""):
+    def get_geno_info_by_row_pos(self,rowpos,groupName=""):
+        """This function gets the genotype info of a row specified by the position of the row in the matrix. 
+
+            Args:
+
+                - chr (string): the chromosome which the group is in 
+                - groupName (string): the group which variants are in, for example gene name
+
+            Returns:
+
+                - variant_id (string): the variant_id of the variant
+                - indices (list): the position of samples
+                - data (list): the genotype info
+
+        """
 
         if self.indices is None:
             self.load_HDF5_by_chr(self.chr,groupName)
-        start=self.indptr[rowID]
-        end=self.indptr[rowID+1]
-        variant_ID=self.rownames[rowID]
+        start=self.indptr[rowpos]
+        end=self.indptr[rowpos+1]
+        variant_ID=self.rownames[rowpos]
         indices=None
         data=None
  
@@ -279,6 +423,25 @@ class HDF5Engine_access:
 
 
     def get_genotype_by_row_IDs(self,rowIDs,chr,groupName=""):
+        """This function gets a slice of genotype info specified by a list of variant ids. 
+            **The position of these variants should be consecutive.**  
+
+            Args:
+                
+                - rowIDs (list): a list of variant ids. 
+                - chr (string): the chromosome 
+                - groupName (string): the group name, for example gene name
+
+            Returns:
+
+                - sub_data (list): the data array of sub matrix
+                - sub_indices (list): the indices array of sub matrix
+                - sub_indptr (list): the indptr array of sub matrix
+                - sub_shape (tuple): the shape of sub matrix
+                - update_rownames (list): the updated rownames of variants in the matrix
+                - colnames (list): the sample names of sub matrix
+
+        """
         # if not sorted?
         #                  for id in ids:
         #                     try:
@@ -320,31 +483,83 @@ class HDF5Engine_access:
 
 
     def get_rownames(self,chr,groupName=""):
-        if self.chr is None:
-            self.chr=chr
+        """This function gets rownames of specified group.
+            
+            Args:
+
+                - chr (string): the chromosome 
+                - groupName (string): the group name, for example gene name
+
+            Return:
+                - a list of rownames
+
+        """
         group=self.getGroup(chr,groupName)
-        return group.rownames
+        return group.rownames[:]
 
     def get_colnames(self,chr,groupName=""):
-        if self.chr is None:
-            self.chr=chr
+        """This function gets colnames of specified group.
+            
+            Args:
+
+                - chr (string): the chromosome 
+                - groupName (string): the group name, for example gene name
+
+            Return:
+                a list of colnames
+
+        """
         group=self.getGroup(chr,groupName)
-        return group.colnames
+        return group.colnames[:]
 
     def get_shape(self,chr,groupName=""):
-        if self.chr is None:
-            self.chr=chr
+        """This function gets shape of specified group.
+            
+            Args:
+
+                - chr (string): the chromosome 
+                - groupName (string): the group name, for example gene name
+
+            Return:
+                shape of matrix
+
+        """
         group=self.getGroup(chr,groupName)
-        return group.shape
+        return group.shape[:]
 
     def get_indptr(self,chr,groupName=""):
-        if self.chr is None:
-            self.chr=chr
+        """This function gets indptr array of specified group.
+            
+            Args:
+
+                - chr (string): the chromosome 
+                - groupName (string): the group name, for example gene name
+
+            Return:
+                - indptr array
+
+        """
         group=self.getGroup(chr,groupName)
-        return group.indptr
+        return group.indptr[:]
+
+    def get_data(self,chr,groupName=""):
+        """This function gets data array of specified group.
+            
+            Args:
+
+                - chr (string): the chromosome 
+                - groupName (string): the group name, for example gene name
+
+            Return:
+                - data array
+
+        """
+        group=self.getGroup(chr,groupName)
+        return group.data[:]
 
 
-
+    def show_file_structure():
+        pass
 
 
     def get_number_of_samples(self):

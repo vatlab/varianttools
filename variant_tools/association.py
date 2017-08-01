@@ -1010,7 +1010,7 @@ class AssoTestsWorker(Process):
                 break
             except Exception as e:
                 env.logger.debug('An ERROR has occurred in process {} while processing {}: {}'.\
-                                  format(self.index, repr(grpname), e))
+                                  format(self.index, repr(grpname), e),exc_info=True)
                 # self.data might have been messed up, create a new one
                 self.data = t.AssoData()
                 self.pydata = {}

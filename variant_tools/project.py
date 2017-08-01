@@ -1562,7 +1562,7 @@ class Project:
             if len(files) > 0:
                 if 'REMOVE_EXISTING' in self.mode:
                     existing_files = glob.glob('*.proj') + glob.glob('*.lck') + \
-                        glob.glob('*.proj-journal') + glob.glob('*_genotype.DB')
+                        glob.glob('*.proj-journal') + glob.glob('*_genotype.DB')+glob.glob("tmp*.h5")
                     for f in existing_files:
                         # if the project was created or updated in the past
                         # 24 hours, do not check for update
