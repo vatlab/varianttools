@@ -960,7 +960,6 @@ class AssoTestsWorker(Process):
             self.pydata = {}
             values = list(grp)
 
-            #select variants from each group:
             # if not self.args.HDF5:
             #     genotype, which, var_info, geno_info = self.getGenotype(grp)
             # else:

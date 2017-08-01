@@ -132,13 +132,14 @@ class HDF5Engine_storage:
         group.shape[0]=len(group.rownames[:])
 
 
-    def store_matrix_into_HDF5(self,data,rownames,chr,groupName=""):
+    def store_matrix_into_HDF5(self,data,chr,rownames=None,colnames=None,groupName=""):
         """This function accepts a matrix and store the matrix in to HDF5 file. 
 
             Args:
 
                - data (matrix): a matrix with rows as variants and cols as samples, each cell records the geno info
                - rownames (list): variant_id for each variant
+               - colnames (list): sample name for each sample
                - chr (string): the chromosome 
                - groupName (string): the group name, for example gene name
 
@@ -149,8 +150,14 @@ class HDF5Engine_storage:
             rownames=data.index.values
             colnames=data.columns.values
         else:
-            m=data
+            m=data            
+            if rownames is None:
+                raise ValueError("The rownames of sparse matrix can't be None.")
+            elif colnames is None:
+                raise ValueError("The colnames of sparse matrix can't be None.")
             rownames=np.array(rownames)
+            colnames=np.array(colnames)
+
         msg = "This code only works for csr matrices"
         assert(m.__class__ == csr_matrix), msg
         filters = tb.Filters(complevel=9, complib='blosc')
@@ -162,14 +169,15 @@ class HDF5Engine_storage:
             except AttributeError:
                 pass
             arr = np.array(getattr(m, par))
-            atom = tb.Atom.from_dtype(arr.dtype)
+            # atom = tb.Atom.from_dtype(arr.dtype)
+            atom=tb.Atom.from_dtype(np.dtype(np.int32))
             if (arr is not None):
-                ds = f.create_carray(group, par, atom, arr.shape,filters=filters)
-                ds[:] = arr
-        ds = self.file.create_carray(group, "rownames",  tb.StringAtom(itemsize=200), rownames.shape,filters=filters)
-        ds[:] = rownames
-        # ds = self.f.create_carray(f.root, name+"_colnames", tb.StringAtom(itemsize=100), colnames.shape,filters=filters)
-        # # ds[:] = colnames
+                ds = self.file.create_earray(group, par, atom, (0,),filters=filters)
+                ds.append(arr)
+        ds = self.file.create_earray(group, "rownames", atom, (0,),filters=filters)
+        ds.append(rownames)
+        ds = self.file.create_earray(group, "colnames", atom, (0,),filters=filters)
+        ds.append(colnames)
 
 
     def checkGroup(self,chr,groupName=""):
@@ -183,9 +191,6 @@ class HDF5Engine_storage:
             Returns:
 
                 bool : True if group exists
-
-            
-
         """
         if chr.startswith("/chr"):
             chr=chr.replace("/chr","")
@@ -381,7 +386,7 @@ class HDF5Engine_access:
             snpdict[key]=dict.fromkeys(self.rownames.tolist(),(0,))
       
         for idx,id in enumerate(self.rownames):
-            variant_ID,indices,data=self.get_geno_info_by_row_ID(idx)
+            variant_ID,indices,data=self.get_geno_info_by_row_pos(idx)
             if len(indices)>0:
                 for colidx,samplePos in enumerate(indices):
                     snpdict[self.colnames[samplePos]][id]=(data[colidx],)
@@ -422,7 +427,7 @@ class HDF5Engine_access:
         return variant_ID,indices,data
 
 
-    def get_genotype_by_row_IDs(self,rowIDs,chr,groupName=""):
+    def get_genotype_by_variant_IDs(self,rowIDs,chr,groupName=""):
         """This function gets a slice of genotype info specified by a list of variant ids. 
             **The position of these variants should be consecutive.**  
 
@@ -480,6 +485,18 @@ class HDF5Engine_access:
             sub_shape=(len(sub_indptr)-1,group.shape[1])
 
         return sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames
+
+
+
+    def get_genotype_by_variant_ID(self,variantID,chr,groupName=""):
+        group=self.getGroup(chr)
+        rownames=group.rownames[:].tolist()
+        try:
+            pos=rownames.index(variantID)
+            return get_geno_info_by_row_pos(variantID,groupName)
+        except ValueError as e:
+            env.logger.error("Variant with ID {} not in the specified group.".format(variantID))
+
 
 
     def get_rownames(self,chr,groupName=""):
