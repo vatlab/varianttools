@@ -91,7 +91,7 @@ class GroupHDFGenerator(Process):
                         # if (self.proc_index==1):
                         #     print(ids)
                         #     print(hdf5.get_rownames(chr)[:])
-                        sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames=hdf5.get_genotype_by_variant_IDs(ids,chr)
+                        sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames=hdf5.get_geno_info_by_variant_IDs(ids,chr)
                         if sub_indices is not None:
                             hdf5group.store_arrays_into_HDF5(sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames,chr,geneSymbol) 
                     hdf5.close()
@@ -172,7 +172,7 @@ class GroupHDFGenerator_memory(Process):
                                     #indptr,indices,data,rownames
                                     genoDict[geneName]=[[0],[],[],[]]
             
-                                variant_ID,indices,data=hdf5.get_geno_info_by_row_pos(idx)
+                                variant_ID,indices,data=hdf5.get_geno_info_by_row_pos(idx,chr)
                               
                                 lastPos=genoDict[geneName][0][-1]
                                 if len(indices)==0:
@@ -233,7 +233,7 @@ class GroupHDFGenerator_append(Process):
                             geneNames=self.geneDict[id]                           
                             for geneName in geneNames:
       
-                                variant_ID,indices,data=hdf5.get_geno_info_by_row_pos(idx)
+                                variant_ID,indices,data=hdf5.get_geno_info_by_row_pos(idx,chr)
                                 indptr=None
                                 if len(indices)>0:
                                     indptr=[len(indices)]

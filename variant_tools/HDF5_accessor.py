@@ -386,7 +386,7 @@ class HDF5Engine_access:
             snpdict[key]=dict.fromkeys(self.rownames.tolist(),(0,))
       
         for idx,id in enumerate(self.rownames):
-            variant_ID,indices,data=self.get_geno_info_by_row_pos(idx)
+            variant_ID,indices,data=self.get_geno_info_by_row_pos(idx,chr)
             if len(indices)>0:
                 for colidx,samplePos in enumerate(indices):
                     snpdict[self.colnames[samplePos]][id]=(data[colidx],)
@@ -394,7 +394,7 @@ class HDF5Engine_access:
         return snpdict
 
     
-    def get_geno_info_by_row_pos(self,rowpos,groupName=""):
+    def get_geno_info_by_row_pos(self,rowpos,chr,groupName=""):
         """This function gets the genotype info of a row specified by the position of the row in the matrix. 
 
             Args:
@@ -410,11 +410,25 @@ class HDF5Engine_access:
 
         """
 
-        if self.indices is None:
-            self.load_HDF5_by_chr(self.chr,groupName)
-        start=self.indptr[rowpos]
-        end=self.indptr[rowpos+1]
-        variant_ID=self.rownames[rowpos]
+        # if self.indices is None:
+        #     self.load_HDF5_by_chr(chr,groupName)
+        # start=self.indptr[rowpos]
+        # end=self.indptr[rowpos+1]
+        # variant_ID=self.rownames[rowpos]
+        # indices=None
+        # data=None
+ 
+        # if end==start:
+        #     indices=[]
+        #     data=[]
+        # else:
+        #     indices=self.indices[start:end]
+        #     data=self.data[start:end]
+        # return variant_ID,indices,data
+        group=self.getGroup(chr,groupName)
+        start=group.indptr[rowpos]
+        end=group.indptr[rowpos+1]
+        variant_ID=group.rownames[rowpos]
         indices=None
         data=None
  
@@ -422,12 +436,12 @@ class HDF5Engine_access:
             indices=[]
             data=[]
         else:
-            indices=self.indices[start:end]
-            data=self.data[start:end]
+            indices=group.indices[start:end]
+            data=group.data[start:end]
         return variant_ID,indices,data
 
 
-    def get_genotype_by_variant_IDs(self,rowIDs,chr,groupName=""):
+    def get_geno_info_by_variant_IDs(self,rowIDs,chr,groupName=""):
         """This function gets a slice of genotype info specified by a list of variant ids. 
             **The position of these variants should be consecutive.**  
 
@@ -435,7 +449,7 @@ class HDF5Engine_access:
                 
                 - rowIDs (list): a list of variant ids. 
                 - chr (string): the chromosome 
-                - groupName (string): the group name, for example gene name
+                - groupName (string): the group name, if not specified, default is genotype
 
             Returns:
 
@@ -488,12 +502,12 @@ class HDF5Engine_access:
 
 
 
-    def get_genotype_by_variant_ID(self,variantID,chr,groupName=""):
+    def get_geno_info_by_variant_ID(self,variantID,chr,groupName=""):
         group=self.getGroup(chr)
         rownames=group.rownames[:].tolist()
         try:
             pos=rownames.index(variantID)
-            return get_geno_info_by_row_pos(variantID,groupName)
+            return self.get_geno_info_by_row_pos(pos,chr,groupName)
         except ValueError as e:
             env.logger.error("Variant with ID {} not in the specified group.".format(variantID))
 
@@ -575,8 +589,9 @@ class HDF5Engine_access:
         return group.data[:]
 
 
-    def show_file_structure():
-        pass
+    def show_file_node(self):
+        for node in self.file:
+            print(node)
 
 
     def get_number_of_samples(self):
