@@ -132,7 +132,7 @@ class HDF5Engine_storage:
         group.shape[0]=len(group.rownames[:])
 
 
-    def store_matrix_into_HDF5(self,data,chr,rownames=None,colnames=None,groupName=""):
+    def store_matrix_into_HDF5(self,data,rownames,colnames,chr,groupName=""):
         """This function accepts a matrix and store the matrix in to HDF5 file. 
 
             Args:
@@ -160,24 +160,38 @@ class HDF5Engine_storage:
 
         msg = "This code only works for csr matrices"
         assert(m.__class__ == csr_matrix), msg
-        filters = tb.Filters(complevel=9, complib='blosc')
-        group=self.getGroup(chr,groupName)
-        for par in ('data', 'indices', 'indptr', 'shape'):
-            try:
-                n = getattr(group, par)
-                n._f_remove()
-            except AttributeError:
-                pass
-            arr = np.array(getattr(m, par))
-            # atom = tb.Atom.from_dtype(arr.dtype)
-            atom=tb.Atom.from_dtype(np.dtype(np.int32))
-            if (arr is not None):
-                ds = self.file.create_earray(group, par, atom, (0,),filters=filters)
-                ds.append(arr)
-        ds = self.file.create_earray(group, "rownames", atom, (0,),filters=filters)
-        ds.append(rownames)
-        ds = self.file.create_earray(group, "colnames", atom, (0,),filters=filters)
-        ds.append(colnames)
+        # filters = tb.Filters(complevel=9, complib='blosc')
+        # group=self.getGroup(chr,groupName)
+        # for par in ('data', 'indices', 'indptr', 'shape'):
+        #     try:
+        #         n = getattr(group, par)
+        #         n._f_remove()
+        #     except AttributeError:
+        #         pass
+        #     arr = np.array(getattr(m, par))
+        #     # atom = tb.Atom.from_dtype(arr.dtype)
+        #     atom=tb.Atom.from_dtype(np.dtype(np.int32))
+        #     if (arr is not None):
+        #         ds = self.file.create_earray(group, par, atom, (0,),filters=filters)
+        #         ds.append(arr)
+        # ds = self.file.create_earray(group, "rownames", atom, (0,),filters=filters)
+        # ds.append(rownames)
+        # ds = self.file.create_earray(group, "colnames", atom, (0,),filters=filters)
+        # ds.append(colnames)
+        self.store_arrays_into_HDF5(m.data,m.indices,m.indptr,m.shape,rownames,colnames,chr,groupName)
+
+
+    def append_matrix_into_HDF5(self,data,rownames,chr,groupName=""):
+        if (data.__class__ != csr_matrix):
+            m=csr_matrix(data.as_matrix())
+            rownames=data.index.values
+        else:
+            m=data            
+            if rownames is None:
+                raise ValueError("The rownames of sparse matrix can't be None.")
+            rownames=np.array(rownames)
+        self.append_arrays_into_HDF5(m.data,m.indices,m.indptr[1:],m.shape,rownames,chr,groupName)
+              
 
 
     def checkGroup(self,chr,groupName=""):
@@ -366,7 +380,7 @@ class HDF5Engine_access:
 
             Args:
 
-                - chr (string): the chromosome which the group is in 
+                - chr (string): the chromosome
                 - groupName (string): the group which variants are in, for example gene name
 
             Returns:
@@ -395,11 +409,11 @@ class HDF5Engine_access:
 
     
     def get_geno_info_by_row_pos(self,rowpos,chr,groupName=""):
-        """This function gets the genotype info of a row specified by the position of the row in the matrix. 
+        """This function gets the genotype info of a variant specified by the position of the variant in the matrix. 
 
             Args:
-
-                - chr (string): the chromosome which the group is in 
+                - rowpos (int): the position of the variant in the matrix
+                - chr (string): the chromosome
                 - groupName (string): the group which variants are in, for example gene name
 
             Returns:
@@ -503,6 +517,21 @@ class HDF5Engine_access:
 
 
     def get_geno_info_by_variant_ID(self,variantID,chr,groupName=""):
+        """This function gets the genotype info of a variant specified by the variant_id stored in rownames. 
+
+            Args:
+
+                - variantID : the variant ID stored in rownames 
+                - chr (string): the chromosome  
+                - groupName (string): the group which variants are in, for example gene name
+
+            Returns:
+
+                - variant_id (string): the variant_id of the variant
+                - indices (list): the position of samples
+                - data (list): the genotype info
+
+        """
         group=self.getGroup(chr)
         rownames=group.rownames[:].tolist()
         try:
@@ -512,6 +541,53 @@ class HDF5Engine_access:
             env.logger.error("Variant with ID {} not in the specified group.".format(variantID))
 
 
+    def get_geno_info_by_sample_ID(self,sampleID,chr,groupName=""):
+        """This function gets the genotype info of a sample specified by the sample ID in the colnames. 
+
+            Args:
+
+                - sampleID : the sample ID stored in colnames
+                - chr (string): the chromosome 
+                - groupName (string): the group which variants are in, for example gene name
+
+            Returns:
+
+                - variant_id (string): the variant_id of the variant
+                - indices (list): the position of samples
+                - data (list): the genotype info
+
+        """
+        self.load_HDF5_by_group(chr,groupName)
+        colnames=self.colnames[:].tolist()
+        try:
+            colPos=colnames.index(sampleID)
+        except ValueError:
+            env.logger.error("Given sampleID is not in this HDF5 file.")
+        matrix=csr_matrix((self.data,self.indices,self.indptr),shape=self.shape)
+        col=matrix.getcol(colPos)
+        snpdict={}
+        for idx,value in enumerate(col.toarray()):
+            genotype=value[0]
+            if not math.isnan(genotype):
+                genotype=int(value[0])
+            snpdict[self.rownames[idx]]=genotype
+        return snpdict
+
+
+    def compare_HDF5(self,hdf5,chr,groupName=""):
+        """This function checks the similarity of two HDF5 files.
+
+            Args:
+
+                - hdf5 (HDF5Engine_access object): another hdf5 to compare with
+                - chr (string): the chromosome
+                - groupName (string): the group name, for example gene name 
+
+        """
+        assert sum(self.get_rownames(chr)==hdf5.get_rownames(chr))==len(self.get_rownames(chr)),"rownames not the same"
+        assert sum(self.get_data(chr)==hdf5.get_data(chr))==len(self.get_data(chr)),"data not the same" 
+        assert sum(self.get_indices(chr)==hdf5.get_indices(chr))==len(self.get_indices(chr)),"indices not the same"             
+        assert sum(self.get_indptr(chr)==hdf5.get_indptr(chr))==len(self.get_indptr(chr)),"indptr not the same"       
 
     def get_rownames(self,chr,groupName=""):
         """This function gets rownames of specified group.
@@ -573,6 +649,23 @@ class HDF5Engine_access:
         group=self.getGroup(chr,groupName)
         return group.indptr[:]
 
+    def get_indices(self,chr,groupName=""):
+        """This function gets indptr array of specified group.
+            
+            Args:
+
+                - chr (string): the chromosome 
+                - groupName (string): the group name, for example gene name
+
+            Return:
+                - indptr array
+
+        """
+        group=self.getGroup(chr,groupName)
+        return group.indices[:]
+
+
+
     def get_data(self,chr,groupName=""):
         """This function gets data array of specified group.
             
@@ -590,6 +683,9 @@ class HDF5Engine_access:
 
 
     def show_file_node(self):
+        """This function prints the nodes in the file. 
+
+        """
         for node in self.file:
             print(node)
 
@@ -605,98 +701,6 @@ class HDF5Engine_access:
 
     def get_chromosomes(self):
         pass
-
-
-
-
-class HDF5Engine_multi:
-    def __init__(self,fileName):
-        # print("HDF5 engine started")
-        self.fileName=None
-        self.m=None
-        self.rownames=None
-        self.fileName=fileName
-
-    
-    def load_HDF5(self,groupName,chr):
-        # start_time = time.time()
-        group=None
-        with tb.open_file(self.fileName) as f:
-            node="/chr"+chr
-            if node in f:
-                group=f.get_node(node)
-            if len(groupName)>0:
-                node="/chr"+chr+"/"+groupName
-                if node in f:
-                    group=f.get_node("/chr"+chr+"/"+groupName)
-            pars = []
-            for par in ('data', 'indices', 'indptr', 'shape','rownames','colnames'):
-                if hasattr(group, par):
-                    pars.append(getattr(group, par).read())
-                else:
-                    pars.append([])
-        f.close()
-        # print(groupName,pars[3])
-        self.m = csr_matrix(tuple(pars[:3]), shape=pars[3])
-        self.rownames=pars[4]
-        self.colnames=pars[5]
-
-    def load_all_GT(self):      
-
-        snpdict=dict.fromkeys(self.colnames,{})
-        for key,value in snpdict.iteritems():
-            snpdict[key]=dict.fromkeys(self.rownames.tolist(),(0,))
-
-        for idx,id in enumerate(self.rownames):
-            value=self.m.getrow(idx)
-            cols=value.indices
-            genotypes=value.data
-            for colindex,samplePos in enumerate(cols): 
-                snpdict[self.colnames[samplePos]][id]=(genotypes[colindex],)
-               
-        return snpdict
-
-
-
-
-
-
-
-
-class HDF5Engine_csc:
-    def __init__(self,dbName):
-        # print("HDF5 engine started")
-        self.dbName = dbName
-        self.fileName=None
-        self.m=None
-
-
-    def connect_HDF5(self,db):
-        db = os.path.expanduser(db)
-        # self.fileName = "/Users/jma7/Development/VAT/chr22_10t/csc_chr22_test.h5"
-        self.fileName = "/Users/jma7/Development/VAT/chr22_50t/csc_chr22_test.h5"
-        
-
-    def load_HDF5(self):
-        # start_time = time.time()
-        with tb.open_file(self.fileName) as f:
-            pars = []
-            for par in ('data', 'indices', 'indptr', 'shape'):
-                pars.append(getattr(f.root, '%s_%s' % (self.dbName, par)).read())
-        f.close()
-        self.m = csc_matrix(tuple(pars[:3]), shape=pars[3])
-
-
-    def load_genotype_by_variantID(self,ids,sampleID):
-        result=self.m.getcol(int(sampleID)-1).toarray()
-        data={}
-        for id in ids:
-            genotype=result[int(id)-1][0]
-            if math.isnan(genotype):
-                data[int(id)]=(0,)
-            else:
-                data[int(id)]=(int(genotype),)
-        return data
 
 
 

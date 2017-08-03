@@ -113,7 +113,7 @@ class HDF5GenotypeImportWorker(Process):
         #If file doesn't exist, create file
         #if file exists but chromosome does not exist, create chr group
         #if file exists and chromosome exists, append to file
-        
+ 
         hdf5=HDF5Engine_storage(self.HDFfileName)
         if not hdf5.checkGroup(chr):
             hdf5.store_arrays_into_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames,chr) 
@@ -324,7 +324,7 @@ def importGenotypesInParallel(importer,num_sample=0):
         numTasks=len(workload)
         # importers = [None] * numProcess
         importers=[None]*importer.jobs
-        variant_import_count = [Value('L', -1) for x in range(numTasks)]
+        variant_import_count = [Value('L', 0) for x in range(numTasks)]
 
         # we should have file line count from importVariant
         num_of_lines = importer.count[0] 

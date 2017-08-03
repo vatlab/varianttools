@@ -12,7 +12,6 @@ import sys
 import unittest
 import subprocess
 from testUtils import ProcessTestCase 
-import logging
 from variant_tools.HDF5_accessor import *
 
 
@@ -34,25 +33,37 @@ class TestHDF5_storage(ProcessTestCase):
                 self.lines.append(rec)
         self.genotype=np.array(self.lines)
         self.genotype_matrix=csr_matrix(self.genotype)
-        self.fileName="testHDF5.h5"
+        self.store_matrix=csr_matrix(np.array(self.lines[:500]))
+        self.append_matrix=csr_matrix(np.array(self.lines[500:]))
+        self.matrixFileName="testHDF5_matrix.h5"
+        self.arrayFileName="testHDF5_array.h5"
         self.rownames=list(self.variants.keys())
         self.colnames=[i+1 for i in range(len(vcf.samples))]
+        self.chr="22"
 
 
     def test_import_matrix(self):
-        if os.path.isfile(self.fileName):
-            os.remove(self.fileName)
-        hdf5=HDF5Engine_storage(self.fileName)
-        hdf5.store_matrix_into_HDF5(self.genotype_matrix,"22",self.rownames,self.colnames)
-        self.assertTrue(os.path.isfile(self.fileName))
+        if os.path.isfile(self.matrixFileName):
+            os.remove(self.matrixFileName)
+        hdf5=HDF5Engine_storage(self.matrixFileName)
+        hdf5.store_matrix_into_HDF5(self.genotype_matrix,self.rownames,self.colnames,self.chr)
+        self.assertTrue(os.path.isfile(self.matrixFileName))
+        hdf5.close()
+
+        if os.path.isfile(self.matrixFileName):
+            os.remove(self.matrixFileName)
+        hdf5=HDF5Engine_storage(self.matrixFileName)
+        hdf5.store_matrix_into_HDF5(self.store_matrix,self.rownames[:500],self.colnames,self.chr)
+        hdf5.append_matrix_into_HDF5(self.append_matrix,self.rownames[500:],self.chr)
+        self.assertTrue(os.path.isfile(self.matrixFileName))
         hdf5.close()
 
 
 
     def test_import_matrix_as_arrays(self):
-        if os.path.isfile(self.fileName):
-            os.remove(self.fileName)
-        hdf5=HDF5Engine_storage(self.fileName)
+        if os.path.isfile(self.arrayFileName):
+            os.remove(self.arrayFileName)
+        hdf5=HDF5Engine_storage(self.arrayFileName)
         data=indices=indptr=shape=None
         for par in ('data', 'indices', 'indptr', 'shape'):
             arr = np.array(getattr(self.genotype_matrix, par))
@@ -64,10 +75,12 @@ class TestHDF5_storage(ProcessTestCase):
                 indptr=arr
             elif par=='shape':
                 shape=arr
-        hdf5.store_arrays_into_HDF5(data,indices,indptr,shape,self.rownames,self.colnames,"22")
-        self.assertTrue(os.path.isfile(self.fileName))
-
+        hdf5.store_arrays_into_HDF5(data,indices,indptr,shape,self.rownames,self.colnames,self.chr)
+        self.assertTrue(os.path.isfile(self.arrayFileName))
         hdf5.close()
+        matrixFile=HDF5Engine_access(self.matrixFileName)
+        arrayFile=HDF5Engine_access(self.arrayFileName)
+        matrixFile.compare_HDF5(arrayFile,self.chr)
 
 
 
@@ -113,16 +126,15 @@ class TestHDF5_access(ProcessTestCase):
         self.assertTrue(len(sub_indices)==491)
         self.assertTrue(len(sub_indptr)==1)
         self.assertTrue(update_rownames[0]==7)
-
+        snpdict=self.hdf5.get_geno_info_by_sample_ID(1,self.chr)
+        nonzero=0
+        for key,value in snpdict.items():
+        	if value!=0:
+        		nonzero+=1
+        self.assertTrue(nonzero==40)
 
         
-
-        
-
-
-
 
 if __name__=='__main__':
-    logging.basicConfig( stream=sys.stderr, level=logging.DEBUG )
     unittest.main()
 
