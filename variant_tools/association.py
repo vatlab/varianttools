@@ -1041,7 +1041,7 @@ def runAssociation(args,asso,proj,results):
             sampleQueue.put(id)
         loaders = []
         
-
+        # use SQLite DB 
         if not args.HDF5:
             for i in range(nLoaders):
                 loader = GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples)
@@ -1206,6 +1206,7 @@ def associate(args):
             if args.HDF5 and args.force:
                 nJobs = max(args.jobs, 1)
                 # generateHDFbyGroup_update(asso,nJobs)
+                # generate HDF5 with variants grouped by gene name.
                 generateHDFbyGroup(asso,nJobs)
             
             runAssociation(args,asso,proj,results)

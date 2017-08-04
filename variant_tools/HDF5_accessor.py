@@ -182,6 +182,17 @@ class HDF5Engine_storage:
 
 
     def append_matrix_into_HDF5(self,data,rownames,chr,groupName=""):
+         """This function appends a new matrix to exisiting matrix stored in HDF5, accepts a matrix, rownames,chromosome and groupName. 
+            **The columns of appending matrix should have the exact same samples as exisiting matrix and in the same order.**  
+
+            Args:
+
+               - data (list): the genotype value for row i are stored in data[indptr[i]:indptr[i+1]]
+               - rownames (list): variant_id for each variant
+               - chr (string): the chromosome
+               - groupName (string): the group name, for example gene name
+
+        """
         if (data.__class__ != csr_matrix):
             m=csr_matrix(data.as_matrix())
             rownames=data.index.values

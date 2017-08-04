@@ -46,8 +46,7 @@ import HDF5_storage as storage
 import sqlite3
 import glob
 
-
-# Maybe useful for single VCF file?
+#Assume vcf files are sorted and imported by chromosome positions. 
 class GroupHDFGenerator(Process):
 
         def __init__(self,fileQueue,project,group_names,job):
@@ -134,7 +133,7 @@ def generateHDFbyGroup(testManager,njobs):
         print("group time: ",time.time()-start)
 
 
-#keep sparase matrix in memory and write onece
+#keep sparase matrix in memory and write once
 class GroupHDFGenerator_memory(Process):
 
         def __init__(self,geneDict,geneSet,fileQueue,project,group_names,job):
@@ -324,7 +323,6 @@ def getChr(variantID,cur):
 
 def getGenotype_HDF5(worker, group):
     '''Get genotype for variants in specified group'''
-    # get variant_id
 
     where_clause = ' AND '.join(['{0}={1}'.format(x, worker.db.PH) for x in worker.group_names])
     cur = worker.db.cursor()
