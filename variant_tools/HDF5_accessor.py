@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from scipy.sparse import csr_matrix,rand,coo_matrix,csc_matrix
 import tables as tb
 import numpy as np
@@ -7,6 +8,10 @@ import time
 import math
 import os
 import sys
+
+import glob
+from multiprocessing import Process,Manager
+import queue
 
 
 
@@ -182,7 +187,7 @@ class HDF5Engine_storage:
 
 
     def append_matrix_into_HDF5(self,data,rownames,chr,groupName=""):
-         """This function appends a new matrix to exisiting matrix stored in HDF5, accepts a matrix, rownames,chromosome and groupName. 
+        """This function appends a new matrix to exisiting matrix stored in HDF5, accepts a matrix, rownames,chromosome and groupName. 
             **The columns of appending matrix should have the exact same samples as exisiting matrix and in the same order.**  
 
             Args:
@@ -704,6 +709,62 @@ class HDF5Engine_access:
         return group.data[:]
 
 
+class AccessEachHDF5(Process):
+
+    def __init__(self,fileName,variantID,result,chr,groupName=""):
+        Process.__init__(self)
+        self.hdf5=HDF5Engine_access(fileName)
+        self.variantID=variantID
+        self.chr=chr
+        self.groupName=groupName
+        self.result=result
+
+    def run(self):
+        variant_ID,indices,data=self.hdf5.get_geno_info_by_variant_ID(self.variantID,self.chr,self.groupName)
+        print(variant_ID,len(indices))
+        colnames=self.hdf5.get_colnames(self.chr,self.groupName)
+        for idx,col in enumerate(indices):
+            if not math.isnan(data[idx]):
+                self.result[colnames[col]]=int(data[idx])
+            else:
+                self.result[colnames[col]]=data[idx]
+        self.hdf5.close()
+
+class HDF5Engine_access_multi:
+    def __init__(self,files,jobs):
+        self.files=files
+        self.jobs=jobs
+
+
+    def get_geno_info_by_variant_ID(self,variantID,chr,groupName=""):
+        taskQueue=queue.Queue()
+        importers=[None]*self.jobs
+        result=Manager().dict()
+        for file in self.files:
+            taskQueue.put(AccessEachHDF5(file,variantID,result,chr,groupName))
+        while taskQueue.qsize()>0:
+            for i in range(self.jobs):    
+                if importers[i] is None or not importers[i].is_alive():
+                    task=taskQueue.get()
+                    importers[i]=task
+                    importers[i].start()           
+                    break 
+        for worker in importers:
+            worker.join() 
+        print(result)
+
 
 if __name__ == '__main__':
-    pass
+    files=glob.glob("/Users/jma7/Development/VAT/importTest_12t/tmp*genotypes.h5")
+    testHDF=HDF5Engine_access_multi(files,8)
+    testHDF.get_geno_info_by_variant_ID(2,"22")
+    testHDF=HDF5Engine_access("/Users/jma7/Development/VAT/importTest_11t/tmp_1_2504_genotypes.h5")
+    variant_ID,indices,data=testHDF.get_geno_info_by_variant_ID(2,"22")
+    colnames=testHDF.get_colnames("22")
+    result={}
+    for idx,col in enumerate(indices):
+            if not math.isnan(data[idx]):
+                result[colnames[col]]=int(data[idx])
+            else:
+                result[colnames[col]]=data[idx]
+    print(result)
