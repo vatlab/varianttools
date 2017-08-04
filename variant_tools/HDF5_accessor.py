@@ -400,7 +400,7 @@ class HDF5Engine_access:
             snpdict[key]=dict.fromkeys(self.rownames.tolist(),(0,))
       
         for idx,id in enumerate(self.rownames):
-            variant_ID,indices,data=self.get_geno_info_by_row_pos(idx,chr)
+            variant_ID,indices,data=self.get_geno_info_by_row_pos(idx,chr,groupName)
             if len(indices)>0:
                 for colidx,samplePos in enumerate(indices):
                     snpdict[self.colnames[samplePos]][id]=(data[colidx],)
@@ -439,7 +439,9 @@ class HDF5Engine_access:
         #     indices=self.indices[start:end]
         #     data=self.data[start:end]
         # return variant_ID,indices,data
+
         group=self.getGroup(chr,groupName)
+      
         start=group.indptr[rowpos]
         end=group.indptr[rowpos+1]
         variant_ID=group.rownames[rowpos]
@@ -511,7 +513,6 @@ class HDF5Engine_access:
             sub_data=group.data[sub_indptr[0]:sub_indptr[-1]]
             sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(1,len(sub_indptr))]
             sub_shape=(len(sub_indptr)-1,group.shape[1])
-
         return sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames
 
 
@@ -589,8 +590,18 @@ class HDF5Engine_access:
         assert sum(self.get_indices(chr)==hdf5.get_indices(chr))==len(self.get_indices(chr)),"indices not the same"             
         assert sum(self.get_indptr(chr)==hdf5.get_indptr(chr))==len(self.get_indptr(chr)),"indptr not the same"       
 
+    
+    def show_file_node(self):
+        """This function prints the nodes in the file. 
+
+        """
+        for node in self.file:
+            print(node)
+
+
+
     def get_rownames(self,chr,groupName=""):
-        """This function gets rownames of specified group.
+        """This function gets variant IDs of specified group.
             
             Args:
 
@@ -598,14 +609,14 @@ class HDF5Engine_access:
                 - groupName (string): the group name, for example gene name
 
             Return:
-                - a list of rownames
+                - a list of variant IDs
 
         """
         group=self.getGroup(chr,groupName)
         return group.rownames[:]
 
     def get_colnames(self,chr,groupName=""):
-        """This function gets colnames of specified group.
+        """This function gets sample IDs of specified group.
             
             Args:
 
@@ -613,7 +624,7 @@ class HDF5Engine_access:
                 - groupName (string): the group name, for example gene name
 
             Return:
-                a list of colnames
+                a list of sample IDs
 
         """
         group=self.getGroup(chr,groupName)
@@ -680,27 +691,6 @@ class HDF5Engine_access:
         """
         group=self.getGroup(chr,groupName)
         return group.data[:]
-
-
-    def show_file_node(self):
-        """This function prints the nodes in the file. 
-
-        """
-        for node in self.file:
-            print(node)
-
-
-    def get_number_of_samples(self):
-        pass
-
-    def get_sample_ids(self):
-        pass
-
-    def get_number_of_variants(self):
-        pass
-
-    def get_chromosomes(self):
-        pass
 
 
 

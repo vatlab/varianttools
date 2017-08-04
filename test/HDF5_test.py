@@ -20,6 +20,7 @@ class TestHDF5_storage(ProcessTestCase):
     def __init__(self,methodName='runTest'):
         ProcessTestCase.__init__(self,methodName)
         vcf=VCF('vcf/hdf5_test.vcf')
+        # vcf=VCF('../../test/test.vcf')
         # vcf=VCF("/Users/jma7/Development/VAT/importTest_10t/firstchr22.vcf")
         self.lines=[]
         self.variants={}

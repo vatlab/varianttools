@@ -80,7 +80,8 @@ class GroupHDFGenerator(Process):
             
                     # select_group="SELECT {0}, group_concat(variant_id) from __asso_tmp group by {0}".\
                     #    format(self.group_names[0])
-                    select_group="SELECT {0}, group_concat(t.variant_id) from __asso_tmp as t join variant as v on t.variant_id=v.variant_id group by {0} order by v.pos".\
+             
+                    select_group="SELECT {0}, group_concat(variant_id) from (select {0},t.variant_id from __asso_tmp as t join variant as v on t.variant_id=v.variant_id  order by v.pos) group by {0}".\
                        format(self.group_names[0])
                     for row in cur.execute(select_group):
                         geneSymbol=transformGeneName(row[0])
@@ -91,7 +92,7 @@ class GroupHDFGenerator(Process):
                         # if (self.proc_index==1):
                         #     print(ids)
                         #     print(hdf5.get_rownames(chr)[:])
-                        sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames=hdf5.get_geno_info_by_variant_IDs(ids,chr)
+                        sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames=hdf5.get_geno_info_by_variant_IDs(ids,chr,geneSymbol)
                         if sub_indices is not None:
                             hdf5group.store_arrays_into_HDF5(sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames,chr,geneSymbol) 
                     hdf5.close()
@@ -276,8 +277,6 @@ def getGroupDict(testManager):
 
 
 def generateHDFbyGroup_update(testManager,njobs):
-        # HDFfileName=self.proj.name+"_genotype.h5"
-        # HDFfileGroupName=self.proj.name+"_genotype_multi_genes.h5"
 
         HDFfileNames=glob.glob("tmp*_genotypes.h5")
 
@@ -350,19 +349,11 @@ def getGenotype_HDF5(worker, group):
        
         hdf5db=HDF5Engine_access(fileName)
         snpdict=hdf5db.get_geno_info_by_group(geneSymbol,chr)
-        # print(snpdict.keys(),startSample,endSample)
+        # print(geneSymbol,snpdict.keys(),startSample,endSample)
         hdf5db.close()
         for ID in range(startSample,endSample+1):
             data=snpdict[ID]
             
-            # handle missing values
-
-        # hdf5db=HDF5Engine_multi(fileName)
-        # hdf5db.load_HDF5(geneSymbol,chr)
-        # snpdict=hdf5db.load_all_GT()
-        # for ID in range(startSample,endSample+1):           
-        #     data=snpdict[ID]
-
             gtmp = [data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in variant_id]
             # handle -1 coding (double heterozygotes)     
             genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
