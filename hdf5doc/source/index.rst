@@ -11,6 +11,7 @@ Welcome to HDF5Engine's documentation!
 
 
 * :ref:`genindex`
+* :ref:`modindex`
 * :ref:`search`
 
 
@@ -26,4 +27,5 @@ A documentation for store and retrieval genotype information into HDF5.
 
 .. autoclass:: HDF5Engine_access
 	:members:
+
 
