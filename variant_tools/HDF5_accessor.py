@@ -291,7 +291,7 @@ class HDF5Engine_access:
  
 
     
-    def load_HDF5_by_chr(self,chr,groupName=""):
+    def __load_HDF5_by_chr(self,chr,groupName=""):
         """This function loads matrix, rownames and colnames of specified chromosome into memory
 
             Args:
@@ -300,7 +300,7 @@ class HDF5Engine_access:
 
 
         """
-        self.load_HDF5_by_group(chr,groupName)
+        self.__load_HDF5_by_group(chr,groupName)
 
 
     def getGroup(self,chr,groupName=""):
@@ -357,7 +357,7 @@ class HDF5Engine_access:
         return exist
 
 
-    def load_HDF5_by_group(self,chr,groupName=""):
+    def __load_HDF5_by_group(self,chr,groupName=""):
         """This function loads matrix, rownames and colnames of specified group into memory
 
             Args:
@@ -384,12 +384,6 @@ class HDF5Engine_access:
         self.colnames=pars[5]
 
 
-    def close(self):
-        """This function closes the HDF5 file.
-
-        """
-        self.file.close()
-
 
     def get_geno_info_by_group(self,groupName,chr=None):
         """This function gets the genotype info of specified group into a dictionay
@@ -409,7 +403,7 @@ class HDF5Engine_access:
             pass
         if self.chr is None:
             self.chr=chr
-            self.load_HDF5_by_group(chr,groupName)
+            self.__load_HDF5_by_group(chr,groupName)
 
         snpdict=dict.fromkeys(self.colnames,{})
         for key,value in snpdict.iteritems():
@@ -574,7 +568,7 @@ class HDF5Engine_access:
                 - data (list): the genotype info
 
         """
-        self.load_HDF5_by_group(chr,groupName)
+        self.__load_HDF5_by_group(chr,groupName)
         colnames=self.colnames[:].tolist()
         try:
             colPos=colnames.index(sampleID)
@@ -707,6 +701,14 @@ class HDF5Engine_access:
         """
         group=self.getGroup(chr,groupName)
         return group.data[:]
+
+    
+    def close(self):
+        """This function closes the HDF5 file.
+
+        """
+        self.file.close()
+
 
 
 class AccessEachHDF5(Process):
