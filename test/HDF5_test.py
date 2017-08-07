@@ -100,12 +100,7 @@ class TestHDF5_access(ProcessTestCase):
         self.assertTrue(len(self.hdf5.get_indptr(self.chr))==1009)
         self.assertTrue(len(self.hdf5.get_rownames(self.chr))==1008)
         self.assertTrue(len(self.hdf5.get_colnames(self.chr))==500) 
-        self.hdf5.load_HDF5_by_chr(self.chr)
-        self.assertTrue(len(self.hdf5.data)==18676)
-        self.assertTrue(len(self.hdf5.indices)==18676)
-        self.assertTrue(len(self.hdf5.indptr)==1009)
-        self.assertTrue(len(self.hdf5.rownames)==1008)
-        self.assertTrue(len(self.hdf5.colnames)==500)
+
 
     def test_get_genotype_from_HDF5(self):
         variant_ID,indices,data=self.hdf5.get_geno_info_by_row_pos(6,self.chr)
@@ -117,17 +112,17 @@ class TestHDF5_access(ProcessTestCase):
         self.assertTrue(len(indices)==491)
         self.assertTrue(len(data)==491)
         variant_IDs=[i for i in range(69,152)]
-        sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames=self.hdf5.get_geno_info_by_variant_IDs(variant_IDs,self.chr)
-        self.assertTrue(len(sub_data)==1705)
-        self.assertTrue(len(sub_indices)==1705)
-        self.assertTrue(len(sub_indptr)==83)
-        self.assertTrue(len(update_rownames)==83)
-        self.assertTrue(len(colnames)==500)
-        sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames=self.hdf5.get_geno_info_by_variant_IDs([7],self.chr)
-        self.assertTrue(len(sub_data)==491)
-        self.assertTrue(len(sub_indices)==491)
-        self.assertTrue(len(sub_indptr)==1)
-        self.assertTrue(update_rownames[0]==7)
+        subMatrix=self.hdf5.get_geno_info_by_variant_IDs(variant_IDs,self.chr)
+        self.assertTrue(len(subMatrix.data)==1705)
+        self.assertTrue(len(subMatrix.indices)==1705)
+        self.assertTrue(len(subMatrix.indptr)==83)
+        self.assertTrue(len(subMatrix.rownames)==83)
+        self.assertTrue(len(subMatrix.colnames)==500)
+        subMatrix=self.hdf5.get_geno_info_by_variant_IDs([7],self.chr)
+        self.assertTrue(len(subMatrix.data)==491)
+        self.assertTrue(len(subMatrix.indices)==491)
+        self.assertTrue(len(subMatrix.indptr)==1)
+        self.assertTrue(subMatrix.rownames[0]==7)
         snpdict=self.hdf5.get_geno_info_by_sample_ID(1,self.chr)
         nonzero=0
         for key,value in snpdict.items():
