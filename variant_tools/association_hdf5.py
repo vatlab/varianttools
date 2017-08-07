@@ -91,9 +91,9 @@ class GroupHDFGenerator(Process):
                         # if (self.proc_index==1):
                         #     print(ids)
                         #     print(hdf5.get_rownames(chr)[:])
-                        sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames=hdf5.get_geno_info_by_variant_IDs(ids,chr,geneSymbol)
-                        if sub_indices is not None:
-                            hdf5group.store_arrays_into_HDF5(sub_data,sub_indices,sub_indptr,sub_shape,rownames,colnames,chr,geneSymbol) 
+                        subMatrix=hdf5.get_geno_info_by_variant_IDs(ids,chr,geneSymbol)
+                        if subMatrix.indices is not None:
+                            hdf5group.store_HDF5(subMatrix,chr,geneSymbol) 
                     hdf5.close()
                     hdf5group.close()
 
@@ -186,7 +186,8 @@ class GroupHDFGenerator_memory(Process):
                         except:
                             pass
                     for key,value in genoDict.items():
-                        hdf5group.store_arrays_into_HDF5(value[2],value[1],value[0],(len(value[3]),len(colnames)),value[3],colnames,chr,key) 
+                        hdf5matrix=HMatrix(value[2],value[1],value[0],(len(value[3]),len(colnames)),value[3],colnames)
+                        hdf5group.store_HDF5(hdf5matrix,chr,key) 
                     hdf5.close()
                     hdf5group.close()
                 except KeyboardInterrupt as e:
@@ -225,7 +226,8 @@ class GroupHDFGenerator_append(Process):
                 rownames=hdf5.get_rownames(chr)
      
                 for geneName in self.geneSet:
-                    hdf5group.store_arrays_into_HDF5([],[],[0],(0,0),[],colnames,chr,geneName)
+                    hdf5matrix=HMatrix([],[],[0],(0,0),[],colnames)
+                    hdf5group.store_HDF5(hdf5matrix,chr,geneName)
                 try:
 
                     for idx,id in enumerate(rownames):
@@ -238,7 +240,8 @@ class GroupHDFGenerator_append(Process):
                                 if len(indices)>0:
                                     indptr=[len(indices)]
                                 shape=(1,len(colnames))
-                                hdf5group.append_arrays_into_HDF5(data,indices,indptr,shape,[id],chr,geneName)
+                                hdf5matrix=HMatrix(data,indices,indptr,shape,[id],colnames)
+                                hdf5group.append_HDF5(hdf5matrix,chr,geneName)
                         except KeyError: 
                             pass
                     hdf5.close()

@@ -76,7 +76,8 @@ class TestHDF5_storage(ProcessTestCase):
                 indptr=arr
             elif par=='shape':
                 shape=arr
-        hdf5.store_arrays_into_HDF5(data,indices,indptr,shape,self.rownames,self.colnames,self.chr)
+        h5matrix=HMatrix(data,indices,indptr,shape,self.rownames,self.colnames)
+        hdf5.store_HDF5(h5matrix,self.chr)
         self.assertTrue(os.path.isfile(self.arrayFileName))
         hdf5.close()
         matrixFile=HDF5Engine_access(self.matrixFileName)

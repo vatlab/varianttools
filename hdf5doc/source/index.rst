@@ -22,6 +22,9 @@ A documentation for store and retrieval genotype information into HDF5.
 .. automodule:: HDF5_accessor
 
 
+.. autoclass:: HMatrix
+	:members: 
+
 .. autoclass:: HDF5Engine_storage
 	:members:
 

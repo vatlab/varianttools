@@ -13,7 +13,88 @@ import glob
 from multiprocessing import Process,Manager
 import queue
 
+class HMatrix:
+    """This class accept three arrays which represent the matrix (or sparse matrix,check below for example), the shape of the matrix,
+        rownames (variant_ids), colnames (sample names) to create an object.
 
+            Args:
+            
+               - data (list): the genotype value for row i are stored in data[indptr[i]:indptr[i+1]]
+               - indices (list): the column indices for row i are stored in indices[indptr[i]:indptr[i+1]]
+               - indptr (list): the position for each row in the data and indices array
+               - shape (tuple): the shape of the matrix
+               - rownames (list): variant_id for each variant
+               - colnames (list): sample name for each sample
+
+            An example of indptr,indices and data
+
+            >>> indptr = np.array([0, 2, 3, 6])
+            >>> indices = np.array([0, 2, 2, 0, 1, 2])
+            >>> data = np.array([1, 2, 3, 4, 5, 6])
+            >>> csr_matrix((data, indices, indptr), shape=(3, 3)).toarray()
+            array([[1, 0, 2],
+                   [0, 0, 3],
+                   [4, 5, 6]])
+
+    """
+    def __init__(self,data,indices,indptr,shape,rownames,colnames):
+        self.rownames=rownames
+        self.colnames=colnames
+        self.indptr=indptr
+        self.indices=indices
+        self.data=data
+        self.shape=shape
+
+    @property
+    def rownames(self):
+        return self.__rownames
+
+    @property
+    def colnames(self):
+        return self.__colnames
+
+    @property
+    def indptr(self):
+        return self.__indptr
+
+    @property
+    def indices(self):
+        return self.__indices
+
+    @property
+    def data(self):
+        return self.__data
+
+    @property
+    def shape(self):
+        return self.__shape
+
+    @rownames.setter
+    def rownames(self,rownames):
+        self.__rownames=rownames
+
+    @colnames.setter
+    def colnames(self,colnames):
+        self.__colnames=colnames
+
+    @indptr.setter
+    def indptr(self,indptr):
+        self.__indptr=indptr
+
+    @indices.setter
+    def indices(self,indices):
+        self.__indices=indices
+
+    @data.setter
+    def data(self,data):
+        self.__data=data
+
+    @shape.setter
+    def shape(self,shape):
+        self.__shape=shape
+
+
+   
 
 
 
@@ -25,12 +106,93 @@ class HDF5Engine_storage:
     def __init__(self,fileName):
         # print("HDF5 engine started")
         self.file=tb.open_file(fileName,"a")
+
+
+    def store_HDF5(self,hmatrix,chr,groupName=""):
+        """This function accepts a HMatrix object and stores it into HDF5 file. 
+
+            Args:
+
+               - hmatrix (HMatrix): An object contains matrix, rownames,colnames
+               - chr (string): the chromosome 
+               - groupName (string): the group name, for example gene name
+
+        """
+        
+        filters = tb.Filters(complevel=9, complib='blosc')       
+        group=self.getGroup(chr,groupName)
+        #check to see if 0 has been added to the start of indptr
+        if len(hmatrix.indptr)==len(hmatrix.rownames):
+            hmatrix.indptr=[0]+hmatrix.indptr
+        
+        for par in ('data', 'indices', 'indptr', 'shape',"rownames","colnames"):
+            arr = None
+            atom=tb.Atom.from_dtype(np.dtype(np.int32))
+            if (par=='data'):
+                arr=np.array(hmatrix.data)
+                if groupName=="AD_geno" or groupName=="PL_geno":
+                    atom=tb.Atom.from_dtype(np.dtype('S20'))
+                else:
+                    atom=tb.Atom.from_dtype(np.dtype(np.float64))
+            elif (par=='indices'):
+                arr=np.array(hmatrix.indices)                
+            elif (par=='indptr'):
+                arr=np.array(hmatrix.indptr)
+            elif (par=='shape'):
+                arr=np.array(hmatrix.shape)
+            elif(par=="rownames"):
+                arr=np.array(hmatrix.rownames)
+            elif(par=="colnames"):
+                arr=np.array(hmatrix.colnames)
+
+            ds = self.file.create_earray(group, par, atom, (0,),filters=filters)
+            ds.append(arr)
+
+
+    def append_HDF5(self,hmatrix,chr,groupName=""):
+        """This function accepts a HMatrix object and appends it to HDF5 file.
+            **The columns of appending matrix should have the exact same samples as exisiting matrix and in the same order.**  
+
+            Args:
+
+               - hmatrix (HMatrix): An object contains matrix, rownames,colnames
+               - chr (string): the chromosome 
+               - groupName (string): the group name, for example gene name
+
+        """
+    
+        group=self.getGroup(chr,groupName)
+        arr = None
+        currentStart=group.indptr[-1]
+
+        if hmatrix.indptr is not None:
+            hmatrix.indptr=[x+currentStart for x in hmatrix.indptr]
+        else:
+            hmatrix.indptr=[currentStart]
+
+        if hmatrix.data is not None:
+            if groupName=="AD_geno" or groupName=="PL_geno":
+                arr=np.array(hmatrix.data,dtype=np.dtype("S20"))
+            else:
+                arr=np.array(hmatrix.data,dtype=np.dtype(np.float64))
+            group.data.append(arr)
+        if hmatrix.indices is not None:
+            arr=np.array(hmatrix.indices,dtype=np.dtype(np.int32))
+            group.indices.append(arr)
+        if  hmatrix.indptr is not None:
+            arr=np.array(hmatrix.indptr,dtype=np.dtype(np.int32))
+            group.indptr.append(arr)
+        if  hmatrix.rownames is not None:
+            arr=np.array(hmatrix.rownames,dtype=np.dtype(np.int32))
+            group.rownames.append(arr)
+        group.shape[1]=hmatrix.shape[1]
+        group.shape[0]=len(group.rownames[:])
  
 
 
 
-    def store_arrays_into_HDF5(self,data,indices,indptr,shape,rownames,colnames,chr,groupName=""):
-        """This function accept three arrays which represent the matrix (or sparse matrix,check below for example), the shape of matrix,
+    def __store_arrays_into_HDF5(self,data,indices,indptr,shape,rownames,colnames,chr,groupName=""):
+        """This function accept three arrays which represent the matrix (or sparse matrix,check below for example), the shape of the matrix,
         rownames (variant_ids), colnames (sample names), chromosome and groupName (HDF5 group name)
 
             Args:
@@ -43,19 +205,6 @@ class HDF5Engine_storage:
                - colnames (list): sample name for each sample
                - chr (string): the chromosome 
                - groupName (string): the group name, for example gene name
-
-
-
-            An example of indptr,indices and data
-
-            >>> indptr = np.array([0, 2, 3, 6])
-            >>> indices = np.array([0, 2, 2, 0, 1, 2])
-            >>> data = np.array([1, 2, 3, 4, 5, 6])
-            >>> csr_matrix((data, indices, indptr), shape=(3, 3)).toarray()
-            array([[1, 0, 2],
-                   [0, 0, 3],
-                   [4, 5, 6]])
-
         """
         filters = tb.Filters(complevel=9, complib='blosc')       
         group=self.getGroup(chr,groupName)
@@ -92,7 +241,7 @@ class HDF5Engine_storage:
 
 
 
-    def append_arrays_into_HDF5(self,data,indices,indptr,shape,rownames,chr,groupName=""):
+    def __append_arrays_into_HDF5(self,data,indices,indptr,shape,rownames,chr,groupName=""):
         """This function appends a new matrix to exisiting matrix stored in HDF5, accepts three arrays as described above,
             shape of matrix, rownames,chromosome and groupName. **The columns of appending matrix should have the exact same samples as 
             exisiting matrix and in the same order.**  
@@ -138,7 +287,7 @@ class HDF5Engine_storage:
 
 
     def store_matrix_into_HDF5(self,data,rownames,colnames,chr,groupName=""):
-        """This function accepts a matrix and store the matrix in to HDF5 file. 
+        """This function accepts a matrix and store the matrix into HDF5 file. 
 
             Args:
 
@@ -183,7 +332,8 @@ class HDF5Engine_storage:
         # ds.append(rownames)
         # ds = self.file.create_earray(group, "colnames", atom, (0,),filters=filters)
         # ds.append(colnames)
-        self.store_arrays_into_HDF5(m.data,m.indices,m.indptr,m.shape,rownames,colnames,chr,groupName)
+        h5matrix=HMatrix(m.data,m.indices,m.indptr,m.shape,rownames,colnames)
+        self.store_HDF5(h5matrix,chr,groupName)
 
 
     def append_matrix_into_HDF5(self,data,rownames,chr,groupName=""):
@@ -206,12 +356,14 @@ class HDF5Engine_storage:
             if rownames is None:
                 raise ValueError("The rownames of sparse matrix can't be None.")
             rownames=np.array(rownames)
-        self.append_arrays_into_HDF5(m.data,m.indices,m.indptr[1:],m.shape,rownames,chr,groupName)
+        h5matrix=HMatrix(m.data,m.indices,m.indptr[1:],m.shape,rownames,[])
+        self.append_HDF5(h5matrix,chr,groupName)
+ 
               
 
 
     def checkGroup(self,chr,groupName=""):
-        """This function check the existance of a group
+        """This function check the existence of a group
 
             Args:
 
@@ -335,7 +487,7 @@ class HDF5Engine_access:
         return group
 
     def checkGroup(self,chr,groupName=""):
-        """This function check the existance of a group
+        """This function check the existence of a group
 
             Args:
 
@@ -479,12 +631,7 @@ class HDF5Engine_access:
 
             Returns:
 
-                - sub_data (list): the data array of sub matrix
-                - sub_indices (list): the indices array of sub matrix
-                - sub_indptr (list): the indptr array of sub matrix
-                - sub_shape (tuple): the shape of sub matrix
-                - update_rownames (list): the updated rownames of variants in the matrix
-                - colnames (list): the sample names of sub matrix
+                - A HMatrix object
 
         """
         # if not sorted?
@@ -523,7 +670,7 @@ class HDF5Engine_access:
             sub_data=group.data[sub_indptr[0]:sub_indptr[-1]]
             sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(1,len(sub_indptr))]
             sub_shape=(len(sub_indptr)-1,group.shape[1])
-        return sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames
+        return HMatrix(sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
 
 
 
@@ -590,7 +737,7 @@ class HDF5Engine_access:
 
             Args:
 
-                - hdf5 (HDF5Engine_access object): another hdf5 to compare with
+                - hdf5 (HDF5Engine_access object): another HDF5_access object to compare with
                 - chr (string): the chromosome
                 - groupName (string): the group name, for example gene name 
 
@@ -702,7 +849,7 @@ class HDF5Engine_access:
         group=self.getGroup(chr,groupName)
         return group.data[:]
 
-    
+
     def close(self):
         """This function closes the HDF5 file.
 
