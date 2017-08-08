@@ -14,8 +14,8 @@ from multiprocessing import Process,Manager
 import queue
 
 class HMatrix:
-    """This class accept three arrays which represent the matrix (or sparse matrix,check below for example), the shape of the matrix,
-        rownames (variant_ids), colnames (sample names) to create an object.
+    """This class accepts three arrays which represent the matrix (or sparse matrix,check below for example), the shape of the matrix,
+        rownames (variant_ids), colnames (sample names) to create an object to be used as input for storage into HDF5.
 
             Args:
             
@@ -242,7 +242,7 @@ class HDF5Engine_storage:
 
 
     def __store_arrays_into_HDF5(self,data,indices,indptr,shape,rownames,colnames,chr,groupName=""):
-        """This function accept three arrays which represent the matrix (or sparse matrix,check below for example), the shape of the matrix,
+        """This function accepts three arrays which represent the matrix (or sparse matrix,check below for example), the shape of the matrix,
         rownames (variant_ids), colnames (sample names), chromosome and groupName (HDF5 group name)
 
             Args:
@@ -337,7 +337,7 @@ class HDF5Engine_storage:
 
 
     def store_matrix_into_HDF5(self,data,rownames,colnames,chr,groupName=""):
-        """This function accepts a matrix and store the matrix into HDF5 file. 
+        """This function accepts a matrix and stores the matrix into HDF5 file. 
 
             Args:
 
@@ -413,7 +413,7 @@ class HDF5Engine_storage:
 
 
     def checkGroup(self,chr,groupName=""):
-        """This function check the existence of a group
+        """This function checks the existence of a group
 
             Args:
 
@@ -537,7 +537,7 @@ class HDF5Engine_access:
         return group
 
     def checkGroup(self,chr,groupName=""):
-        """This function check the existence of a group
+        """This function checks the existence of a group
 
             Args:
 
@@ -588,7 +588,7 @@ class HDF5Engine_access:
 
 
     def get_geno_info_by_group(self,groupName,chr=None):
-        """This function gets the genotype info of specified group into a dictionay
+        """This function gets the genotype info of specified group into a dictionary
 
             Args:
 
@@ -760,9 +760,7 @@ class HDF5Engine_access:
 
             Returns:
 
-                - variant_id (string): the variant_id of the variant
-                - indices (list): the position of samples
-                - data (list): the genotype info
+                - dict: snpdict[variant_id]=genotype value
 
         """
         self.__load_HDF5_by_group(chr,groupName)
@@ -816,7 +814,7 @@ class HDF5Engine_access:
                 - groupName (string): the group name, for example gene name
 
             Return:
-                - a list of variant IDs
+                - a ndarray of variant IDs
 
         """
         group=self.getGroup(chr,groupName)
@@ -831,7 +829,7 @@ class HDF5Engine_access:
                 - groupName (string): the group name, for example gene name
 
             Return:
-                a list of sample IDs
+                a ndarray of sample IDs
 
         """
         group=self.getGroup(chr,groupName)
@@ -861,7 +859,7 @@ class HDF5Engine_access:
                 - groupName (string): the group name, for example gene name
 
             Return:
-                - indptr array
+                - indptr ndarray
 
         """
         group=self.getGroup(chr,groupName)
@@ -876,7 +874,7 @@ class HDF5Engine_access:
                 - groupName (string): the group name, for example gene name
 
             Return:
-                - indptr array
+                - indptr ndarray
 
         """
         group=self.getGroup(chr,groupName)
@@ -893,7 +891,7 @@ class HDF5Engine_access:
                 - groupName (string): the group name, for example gene name
 
             Return:
-                - data array
+                - data ndarray
 
         """
         group=self.getGroup(chr,groupName)
@@ -930,12 +928,28 @@ class AccessEachHDF5(Process):
         self.hdf5.close()
 
 class HDF5Engine_access_multi:
+    """This is the class for access genotype info stored in multiple HDF5 (under development).
+
+    """
     def __init__(self,files,jobs):
         self.files=files
         self.jobs=jobs
 
 
     def get_geno_info_by_variant_ID(self,variantID,chr,groupName=""):
+        """This function gets the genotype info of a variant specified by the variant_id stored in rownames. 
+
+            Args:
+
+                - variantID : the variant ID stored in rownames 
+                - chr (string): the chromosome  
+                - groupName (string): the group which variants are in, for example gene name
+
+            Returns:
+
+                right now, just print a dict of dict[sampleID]=genotype info
+
+        """
         taskQueue=queue.Queue()
         importers=[None]*self.jobs
         result=Manager().dict()
@@ -954,16 +968,17 @@ class HDF5Engine_access_multi:
 
 
 if __name__ == '__main__':
-    files=glob.glob("/Users/jma7/Development/VAT/importTest_12t/tmp*genotypes.h5")
-    testHDF=HDF5Engine_access_multi(files,8)
-    testHDF.get_geno_info_by_variant_ID(2,"22")
-    testHDF=HDF5Engine_access("/Users/jma7/Development/VAT/importTest_11t/tmp_1_2504_genotypes.h5")
-    variant_ID,indices,data=testHDF.get_geno_info_by_variant_ID(2,"22")
-    colnames=testHDF.get_colnames("22")
-    result={}
-    for idx,col in enumerate(indices):
-            if not math.isnan(data[idx]):
-                result[colnames[col]]=int(data[idx])
-            else:
-                result[colnames[col]]=data[idx]
-    print(result)
+    # files=glob.glob("/Users/jma7/Development/VAT/importTest_12t/tmp*genotypes.h5")
+    # testHDF=HDF5Engine_access_multi(files,8)
+    # testHDF.get_geno_info_by_variant_ID(2,"22")
+    # testHDF=HDF5Engine_access("/Users/jma7/Development/VAT/importTest_11t/tmp_1_2504_genotypes.h5")
+    # variant_ID,indices,data=testHDF.get_geno_info_by_variant_ID(2,"22")
+    # colnames=testHDF.get_colnames("22")
+    # result={}
+    # for idx,col in enumerate(indices):
+    #         if not math.isnan(data[idx]):
+    #             result[colnames[col]]=int(data[idx])
+    #         else:
+    #             result[colnames[col]]=data[idx]
+    # print(result)
+    pass

@@ -16,7 +16,7 @@ Welcome to HDF5Engine's documentation!
 
 
 
-A documentation for store and retrieval genotype information into HDF5.
+A documentation for store and retrieval genotype information with HDF5.
 
 
 .. automodule:: HDF5_accessor
@@ -29,6 +29,9 @@ A documentation for store and retrieval genotype information into HDF5.
 	:members:
 
 .. autoclass:: HDF5Engine_access
+	:members:
+
+.. autoclass:: HDF5Engine_access_multi
 	:members:
 
 
