@@ -178,12 +178,12 @@ class TestImportHDF5(ProcessTestCase):
             self.assertTrue(hdf5.checkGroup("/chr1") and hdf5.checkGroup("/chr22"))
             self.assertTrue(len(hdf5.get_rownames("/chr1","DP_geno"))==188 and len(hdf5.get_rownames("/chr22","DP_geno")==100))
 
-    # def testImportVCFIndel(self):
-    #     'Test importing Indel from VCF files'
-    #     self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
-    #     self.assertProj(numOfSamples= 0, numOfVariants=134)
-    #     self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno_info')
-    #     self.assertProj(numOfSamples= 0, numOfVariants=11877)
+    def testImportVCFIndel(self):
+        'Test importing Indel from VCF files'
+        self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19 --HDF5')
+        self.assertProj(numOfSamples= 0, numOfVariants=134)
+        self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno_info --HDF5')
+        self.assertProj(numOfSamples= 0, numOfVariants=11877)
         
     # def testMPImport(self):
     #     'Test multi-processing import'

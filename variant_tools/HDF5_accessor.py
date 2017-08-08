@@ -94,6 +94,56 @@ class HMatrix:
         self.__shape=shape
 
 
+# class HMatrix(csr_matrix):
+#     """This class accept three arrays which represent the matrix (or sparse matrix,check below for example), the shape of the matrix,
+#         rownames (variant_ids), colnames (sample names) to create an object.
+
+#             Args:
+            
+#                - data (list): the genotype value for row i are stored in data[indptr[i]:indptr[i+1]]
+#                - indices (list): the column indices for row i are stored in indices[indptr[i]:indptr[i+1]]
+#                - indptr (list): the position for each row in the data and indices array
+#                - shape (tuple): the shape of the matrix
+#                - rownames (list): variant_id for each variant
+#                - colnames (list): sample name for each sample
+
+#             An example of indptr,indices and data
+
+#             >>> indptr = np.array([0, 2, 3, 6])
+#             >>> indices = np.array([0, 2, 2, 0, 1, 2])
+#             >>> data = np.array([1, 2, 3, 4, 5, 6])
+#             >>> csr_matrix((data, indices, indptr), shape=(3, 3)).toarray()
+#             array([[1, 0, 2],
+#                    [0, 0, 3],
+#                    [4, 5, 6]])
+
+#     """
+#     def __init__(self,data,indices,indptr,shape,rownames,colnames):
+#         self.rownames=rownames
+#         self.colnames=colnames
+#         if len(rownames)==len(indptr):
+#             indptr=[0]+indptr
+#         csr_matrix.__init__(self,(data,indices,indptr),shape=shape)
+
+
+#     @property
+#     def rownames(self):
+#         return self.__rownames
+
+#     @property
+#     def colnames(self):
+#         return self.__colnames
+
+
+#     @rownames.setter
+#     def rownames(self,rownames):
+#         self.__rownames=rownames
+
+#     @colnames.setter
+#     def colnames(self,colnames):
+#         self.__colnames=colnames
+
+
    
 
 
