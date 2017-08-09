@@ -146,16 +146,11 @@ class HMatrix:
 
 class Engine_Storage(object):
 
-    # def __init__(self,dbLocation):
-    #     self.dbPath=dbLocation
-    #     self.storage=self.choose_storage_engine()
 
     def choose_storage_engine(dbPath):
         if dbPath.split(".")[-1]=="h5":
             return HDF5Engine_storage(dbPath)
 
-    # def store(self,data,chr,groupName=""):
-    #     self.storage.store(data,chr,groupName)
     choose_storage_engine=staticmethod(choose_storage_engine)
 
 
@@ -166,7 +161,7 @@ class Base_Storage(object):
     def __init__(self,dbLocation):
         self.dbPath=dbLocation
 
-    def store(self):
+    def store(self,data,chr,groupName):
         raise NotImplementError()
 
     def close(self):
