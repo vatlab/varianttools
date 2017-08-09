@@ -716,7 +716,6 @@ setup(name = "variant_tools",
         'variant_tools.vt_sqlite3',
         'variant_tools.importer_hdf5',
         'variant_tools.HDF5_accessor',
-        'variant_tools.HDF5_storage',
         'variant_tools.association_hdf5'
         ],
     ext_modules = [

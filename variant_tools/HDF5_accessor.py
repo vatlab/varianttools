@@ -144,18 +144,55 @@ class HMatrix:
 #         self.__colnames=colnames
 
 
-   
+class Engine_Storage(object):
+
+    # def __init__(self,dbLocation):
+    #     self.dbPath=dbLocation
+    #     self.storage=self.choose_storage_engine()
+
+    def choose_storage_engine(dbPath):
+        if dbPath.split(".")[-1]=="h5":
+            return HDF5Engine_storage(dbPath)
+
+    # def store(self,data,chr,groupName=""):
+    #     self.storage.store(data,chr,groupName)
+    choose_storage_engine=staticmethod(choose_storage_engine)
 
 
 
-class HDF5Engine_storage:
+
+class Base_Storage(object):
+
+    def __init__(self,dbLocation):
+        self.dbPath=dbLocation
+
+    def store(self):
+        raise NotImplementError()
+
+    def close(self):
+        raise NotImplementError()
+
+
+
+class HDF5Engine_storage(Base_Storage):
     """This is the class for storage of genotype info into HDF5
 
     """
 
     def __init__(self,fileName):
         # print("HDF5 engine started")
-        self.file=tb.open_file(fileName,"a")
+        Base_Storage.__init__(self,fileName)
+        # self.file=tb.open_file(self.dbPath,"a")
+
+
+    def store(self,hmatrix,chr,groupName=""):
+        self.file=tb.open_file(self.dbPath,"a")
+        if not self.checkGroup(chr,groupName):
+            self.store_HDF5(hmatrix,chr,groupName) 
+        else:
+            self.append_HDF5(hmatrix,chr,groupName)
+        self.close()       
+ 
 
 
     def store_HDF5(self,hmatrix,chr,groupName=""):
@@ -472,15 +509,50 @@ class HDF5Engine_storage:
 
 
 
+class Engine_Access(object):
+
+
+    def choose_access_engine(dbPath):
+        if dbPath.split(".")[-1]=="h5":
+            return HDF5Engine_access(dbPath)
+
+
+    choose_access_engine=staticmethod(choose_access_engine)
 
 
 
-class HDF5Engine_access:
+class Base_Access(object):
+
+    def __init__(self,dbLocation):
+        self.dbPath=dbLocation
+
+    def get_geno_info_by_variant_IDs(self,variant_ids,chr,groupName):
+        raise NotImplementError()
+
+    def get_geno_info_by_sample_ID(self,sample_id,chr,groupName):
+        raise NotImplementError()
+
+    def get_geno_info_by_group(self,groupName,chr):
+        raise NotImplementError();
+
+    def get_geno_info_by_variant_ID(self,variant_id,chr,groupname):
+        raise NotImplementError()
+
+    def get_geno_info_by_row_pos(self,rowPos,chr,grouopName):
+        raise NotImplementError()
+
+    def close(self):
+        raise NotImplementError()
+
+
+
+class HDF5Engine_access(Base_Access):
     """This is the class for access genotype info in HDF5
 
     """
     def __init__(self,fileName):
         # print("HDF5 engine started")
+        Base_Access.__init__(self,fileName)
         self.fileName=fileName
         self.rownames=None
         self.colnames=None
@@ -489,7 +561,7 @@ class HDF5Engine_access:
         self.data=None
         self.shape=None
         self.chr=None
-        self.file=tb.open_file(fileName,"a")
+        self.file=tb.open_file(self.dbPath,"a")
  
 
     

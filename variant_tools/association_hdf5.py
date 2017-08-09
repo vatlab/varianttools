@@ -67,9 +67,9 @@ class GroupHDFGenerator(Process):
                 if (os.path.isfile(HDFfileGroupName)):
                     os.remove(HDFfileGroupName)
 
-                hdf5=HDF5Engine_access(HDFfileName)
-                hdf5group=HDF5Engine_storage(HDFfileGroupName)
                 
+                accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+                storageEngine=Engine_Storage.choose_storage_engine(HDFfileGroupName)
                 
                 try:
                     
@@ -91,15 +91,16 @@ class GroupHDFGenerator(Process):
                         # if (self.proc_index==1):
                         #     print(ids)
                         #     print(hdf5.get_rownames(chr)[:])
-                        subMatrix=hdf5.get_geno_info_by_variant_IDs(ids,chr,geneSymbol)
+                        subMatrix=accessEngine.get_geno_info_by_variant_IDs(ids,chr,geneSymbol)
                         if subMatrix.indices is not None:
-                            hdf5group.store_HDF5(subMatrix,chr,geneSymbol) 
-                    hdf5.close()
-                    hdf5group.close()
+                            storageEngine.store(subMatrix,chr,geneSymbol) 
+                        # storageEngine.close() 
+                    accessEngine.close()
+                    # 
 
                 except KeyboardInterrupt as e:
-                    hdf5.close()
-                    hdf5group.close()
+                    accessEngine.close()
+                    storageEngine.close()
                     pass
 
 
@@ -114,7 +115,7 @@ def generateHDFbyGroup(testManager,njobs):
         fileQueue=mpQueue()
         taskQueue=Queue.Queue()
         start=time.time()
-        groupGenerators=[None]*njobs
+        groupGenerators=[None]*min(njobs,len(HDFfileNames))
         for HDFfileName in HDFfileNames:
             fileQueue.put(HDFfileName)
         for i in range(len(HDFfileNames)):
@@ -153,16 +154,16 @@ class GroupHDFGenerator_memory(Process):
                 if HDFfileName is None:
                     break
                 # hdf5_file=tb.open_file(HDFfileName,mode="r")
-                hdf5=HDF5Engine_access(HDFfileName)
+                accessEngine=Engine_Access.choose_access_engine(HDFfileName)
 
                 HDFfileGroupName=HDFfileName.replace(".h5","_multi_genes.h5")
                 if (os.path.isfile(HDFfileGroupName)):
                     os.remove(HDFfileGroupName)
-                hdf5group=HDF5Engine_storage(HDFfileGroupName)
+                storageEngine=Engine_Storage.choose_storage_engine(HDFfileGroupName)
                 try:
                     chr="22"
-                    rownames=hdf5.get_rownames(chr)
-                    colnames=hdf5.get_colnames(chr)
+                    rownames=accessEngine.get_rownames(chr)
+                    colnames=accessEngine.get_colnames(chr)
           
                     for idx,id in enumerate(rownames):
                         try:
@@ -172,7 +173,7 @@ class GroupHDFGenerator_memory(Process):
                                     #indptr,indices,data,rownames
                                     genoDict[geneName]=[[0],[],[],[]]
             
-                                variant_ID,indices,data=hdf5.get_geno_info_by_row_pos(idx,chr)
+                                variant_ID,indices,data=accessEngine.get_geno_info_by_row_pos(idx,chr)
                               
                                 lastPos=genoDict[geneName][0][-1]
                                 if len(indices)==0:
@@ -187,12 +188,12 @@ class GroupHDFGenerator_memory(Process):
                             pass
                     for key,value in genoDict.items():
                         hdf5matrix=HMatrix(value[2],value[1],value[0],(len(value[3]),len(colnames)),value[3],colnames)
-                        hdf5group.store_HDF5(hdf5matrix,chr,key) 
-                    hdf5.close()
-                    hdf5group.close()
+                        storageEngine.store(hdf5matrix,chr,key) 
+                    accessEngine.close()
+                    storageEngine.close()
                 except KeyboardInterrupt as e:
-                    hdf5.close()
-                    hdf5group.close()
+                    accessEngine.close()
+                    storageEngine.close()
                     pass
 
 
@@ -216,18 +217,18 @@ class GroupHDFGenerator_append(Process):
                 if HDFfileName is None:
                     break
       
-                hdf5=HDF5Engine_access(HDFfileName)
+                accessEngine=Engine_Access.choose_access_engine(HDFfileName)
                 HDFfileGroupName=HDFfileName.replace(".h5","_multi_genes.h5")
                 if (os.path.isfile(HDFfileGroupName)):
                     os.remove(HDFfileGroupName)
-                hdf5group=HDF5Engine_storage(HDFfileGroupName)
+                storageEngine=Engine_Storage.choose_storage_engine(HDFfileGroupName)
                 chr="22"
-                colnames=hdf5.get_colnames(chr)   
-                rownames=hdf5.get_rownames(chr)
+                colnames=accessEngine.get_colnames(chr)   
+                rownames=accessEngine.get_rownames(chr)
      
                 for geneName in self.geneSet:
                     hdf5matrix=HMatrix([],[],[0],(0,0),[],colnames)
-                    hdf5group.store_HDF5(hdf5matrix,chr,geneName)
+                    storageEngine.store(hdf5matrix,chr,geneName)
                 try:
 
                     for idx,id in enumerate(rownames):
@@ -235,20 +236,20 @@ class GroupHDFGenerator_append(Process):
                             geneNames=self.geneDict[id]                           
                             for geneName in geneNames:
       
-                                variant_ID,indices,data=hdf5.get_geno_info_by_row_pos(idx,chr)
+                                variant_ID,indices,data=accessEngine.get_geno_info_by_row_pos(idx,chr)
                                 indptr=None
                                 if len(indices)>0:
                                     indptr=[len(indices)]
                                 shape=(1,len(colnames))
                                 hdf5matrix=HMatrix(data,indices,indptr,shape,[id],colnames)
-                                hdf5group.append_HDF5(hdf5matrix,chr,geneName)
+                                storageEngine.store(hdf5matrix,chr,geneName)
                         except KeyError: 
                             pass
-                    hdf5.close()
-                    hdf5group.close()
+                    accessEngine.close()
+                    storageEngine.close()
                 except KeyboardInterrupt as e:
-                    hdf5.close()
-                    hdf5group.close()
+                    accessEngine.close()
+                    storageEngine.close()
                     pass
 
 
@@ -285,13 +286,13 @@ def generateHDFbyGroup_update(testManager,njobs):
         fileQueue=mpQueue()
         taskQueue=Queue.Queue()
         start=time.time()
-        groupGenerators=[None]*njobs
+        groupGenerators=[None]*min(njobs,len(HDFfileNames))
         geneDict,geneSet=getGroupDict(testManager)
         for HDFfileName in HDFfileNames:
             fileQueue.put(HDFfileName)
         for i in range(len(HDFfileNames)):
-            taskQueue.put(GroupHDFGenerator_memory(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i))
-            # taskQueue.put(GroupHDFGenerator_append(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i))
+            # taskQueue.put(GroupHDFGenerator_memory(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i))
+            taskQueue.put(GroupHDFGenerator_append(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i))
         while taskQueue.qsize()>0:
             for i in range(njobs):
                 if groupGenerators[i] is None or not groupGenerators[i].is_alive():
@@ -348,10 +349,11 @@ def getGenotype_HDF5(worker, group):
         endSample=int(fileName.split("_")[2])
         
        
-        hdf5db=HDF5Engine_access(fileName)
-        snpdict=hdf5db.get_geno_info_by_group(geneSymbol,chr)
+        accessEngine=Engine_Access.choose_access_engine(fileName)
+        snpdict=accessEngine.get_geno_info_by_group(geneSymbol,chr)
+        
         # print(geneSymbol,snpdict.keys(),startSample,endSample)
-        hdf5db.close()
+        accessEngine.close()
         for ID in range(startSample,endSample+1):
             data=snpdict[ID]
             

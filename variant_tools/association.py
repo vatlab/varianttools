@@ -1042,6 +1042,7 @@ def runAssociation(args,asso,proj,results):
         loaders = []
         
         # use SQLite DB 
+
         if not args.HDF5:
             for i in range(nLoaders):
                 loader = GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples)

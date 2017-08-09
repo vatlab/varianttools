@@ -70,7 +70,7 @@ from .preprocessor import *
 class HDF5GenotypeImportWorker(Process):
     '''This class starts a process, import genotype to a temporary genotype database.'''
     def __init__(self, processor,readQueue,variantIndex, start_sample,end_sample,sample_ids,variant_count, 
-        proc_index,geno_info,HDFfileName):
+        proc_index,geno_info,dbLocation):
         '''
         variantIndex: a dictionary that returns ID for each variant.
         filelist: files from which variantIndex is created. If the passed filename
@@ -96,7 +96,7 @@ class HDF5GenotypeImportWorker(Process):
         self.rownames=[]
         self.colnames=[sample_ids[i] for i in range(start_sample,end_sample)]
 
-        self.HDFfileName=HDFfileName
+        self.dbLocation=dbLocation
 
         self.info={}
         if len(self.geno_info)>0:
@@ -114,34 +114,14 @@ class HDF5GenotypeImportWorker(Process):
         #if file exists but chromosome does not exist, create chr group
         #if file exists and chromosome exists, append to file
  
-        hdf5=HDF5Engine_storage(self.HDFfileName)
-        # if not hdf5.checkGroup(chr):
-        #     hdf5.store_arrays_into_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames,chr) 
-        #     if len(self.geno_info)>0:
-        #         for key,value in self.info.items():
-        #             hdf5.store_arrays_into_HDF5(value[2],value[1],value[0],shape,value[3],self.colnames,chr,key) 
-        # else:
-        #     hdf5.append_arrays_into_HDF5(self.data,self.indices,self.indptr,shape,self.rownames,chr)       
-        #     if len(self.geno_info)>0:
-        #         for key,value in self.info.items():
-        #             hdf5.append_arrays_into_HDF5(value[2],value[1],value[0],shape,value[3],chr,key) 
-        # hdf5.close()
-
-        if not hdf5.checkGroup(chr):
-            h5matrix=HMatrix(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames)
-            hdf5.store_HDF5(h5matrix,chr) 
-            if len(self.geno_info)>0:
+        # hdf5=HDF5Engine_storage(self.dbLocation)
+        storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
+        hmatrix=HMatrix(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames)
+        storageEngine.store(hmatrix,chr)
+        if len(self.geno_info)>0:
                 for key,value in self.info.items():
-                    h5matrix=HMatrix(value[2],value[1],value[0],shape,value[3],self.colnames)
-                    hdf5.store_HDF5(h5matrix,chr,key) 
-        else:
-            h5matrix=HMatrix(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames)
-            hdf5.append_HDF5(h5matrix,self.rownames,chr)       
-            if len(self.geno_info)>0:
-                for key,value in self.info.items():
-                    h5matrix=HMatrix(value[2],value[1],value[0],shape,value[3],self.colnames)
-                    hdf5.append_HDF5(h5matrix,chr,key) 
-        hdf5.close()
+                    hmatrix=HMatrix(value[2],value[1],value[0],shape,value[3],self.colnames)
+                    storageEngine.store(hmatrix,chr,key) 
         
         self.indptr=[]
         self.indices=[]
@@ -166,8 +146,8 @@ class HDF5GenotypeImportWorker(Process):
         self.start_count = self.variant_count.value
         firstLine=True
 
-        # if self.HDFfileName.split("_")[1]=="1":
-        #      print(self.HDFfileName)
+        # if self.dbLocation.split("_")[1]=="1":
+        #      print(self.dbLocation)
         self.processor.reset(import_sample_range=[self.start_sample,self.end_sample])
         while True:
             line=self.readQueue.get()
@@ -176,7 +156,7 @@ class HDF5GenotypeImportWorker(Process):
                 self.writeIntoFile(pre_chr)
                 break
             for bins,rec in self.processor.process(line):
-                # if self.HDFfileName.split("_")[1]=="1":
+                # if self.dbLocation.split("_")[1]=="1":
                 #      print(rec)
                 variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
                 if pre_variant_ID==variant_id:
