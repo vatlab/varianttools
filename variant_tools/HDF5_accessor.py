@@ -182,7 +182,7 @@ class HDF5Engine_storage(Base_Storage):
     def __init__(self,fileName):
         # print("HDF5 engine started")
         Base_Storage.__init__(self,fileName)
-        # self.file=tb.open_file(self.dbPath,"a")
+        self.file=tb.open_file(self.dbPath,"a")
 
 
     def store(self,hmatrix,chr,groupName=""):

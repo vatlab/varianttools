@@ -46,14 +46,14 @@ class TestHDF5_storage(ProcessTestCase):
     def test_import_matrix(self):
         if os.path.isfile(self.matrixFileName):
             os.remove(self.matrixFileName)
-        hdf5=HDF5Engine_storage(self.matrixFileName)
+        hdf5=Engine_Storage.choose_storage_engine(self.matrixFileName)
         hdf5.store_matrix_into_HDF5(self.genotype_matrix,self.rownames,self.colnames,self.chr)
         self.assertTrue(os.path.isfile(self.matrixFileName))
         hdf5.close()
 
         if os.path.isfile(self.matrixFileName):
             os.remove(self.matrixFileName)
-        hdf5=HDF5Engine_storage(self.matrixFileName)
+        hdf5=Engine_Storage.choose_storage_engine(self.matrixFileName)
         hdf5.store_matrix_into_HDF5(self.store_matrix,self.rownames[:500],self.colnames,self.chr)
         hdf5.append_matrix_into_HDF5(self.append_matrix,self.rownames[500:],self.chr)
         self.assertTrue(os.path.isfile(self.matrixFileName))
@@ -64,7 +64,7 @@ class TestHDF5_storage(ProcessTestCase):
     def test_import_matrix_as_arrays(self):
         if os.path.isfile(self.arrayFileName):
             os.remove(self.arrayFileName)
-        hdf5=HDF5Engine_storage(self.arrayFileName)
+        hdf5=Engine_Storage.choose_storage_engine(self.arrayFileName)
         data=indices=indptr=shape=None
         for par in ('data', 'indices', 'indptr', 'shape'):
             arr = np.array(getattr(self.genotype_matrix, par))
@@ -77,11 +77,11 @@ class TestHDF5_storage(ProcessTestCase):
             elif par=='shape':
                 shape=arr
         h5matrix=HMatrix(data,indices,indptr,shape,self.rownames,self.colnames)
-        hdf5.store_HDF5(h5matrix,self.chr)
+        hdf5.store(h5matrix,self.chr)
         self.assertTrue(os.path.isfile(self.arrayFileName))
         hdf5.close()
-        matrixFile=HDF5Engine_access(self.matrixFileName)
-        arrayFile=HDF5Engine_access(self.arrayFileName)
+        matrixFile=Engine_Access.choose_access_engine(self.matrixFileName)
+        arrayFile=Engine_Access.choose_access_engine(self.arrayFileName)
         matrixFile.compare_HDF5(arrayFile,self.chr)
 
 
@@ -90,7 +90,7 @@ class TestHDF5_access(ProcessTestCase):
 
     def __init__(self,methodName='runTest'):
         ProcessTestCase.__init__(self,methodName)
-        self.hdf5=HDF5Engine_access("vcf/hdf5_test.h5")
+        self.hdf5=Engine_Access.choose_access_engine("vcf/hdf5_test.h5")
         self.chr="/chr22"
 
     def test_load_HDF5(self):
