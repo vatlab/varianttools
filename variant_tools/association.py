@@ -23,7 +23,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import sys, os, re
+import sys, os, re, glob
 from multiprocessing import Process, Queue, Pipe, Value, Array, Lock
 import time
 import random
@@ -1044,6 +1044,10 @@ def runAssociation(args,asso,proj,results):
         # use SQLite DB 
 
         if not args.HDF5:
+            if not os.path.isfile(asso.proj.name + '_genotype.DB') or os.stat(asso.proj.name + '_genotype.DB').st_size == 0:
+                env.logger.error("The genotype DB is not generated, please run vtools import without --HDF5 tag to generate sqlite genotype DB first.")
+                sys.exit()
+          
             for i in range(nLoaders):
                 loader = GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples)
                 loader.start()
@@ -1204,11 +1208,20 @@ def associate(args):
                             cur.execute(query, grp)
                         proj.db.commit()
             
-            if args.HDF5 and args.force:
-                nJobs = max(args.jobs, 1)
-                # generateHDFbyGroup_update(asso,nJobs)
-                # generate HDF5 with variants grouped by gene name.
-                generateHDFbyGroup(asso,nJobs)
+            if args.HDF5:
+                HDFfileNames=glob.glob("tmp*_genotypes.h5")
+                if len(HDFfileNames)==0:
+                    env.logger.error("No HDF5 file found. Please run vtools import with --HDF5 tag first.")
+                    sys.exit()
+                HDFfileNames=glob.glob("tmp*_multi_genes.h5")
+                if len(HDFfileNames)==0 or args.force:
+                    nJobs = max(args.jobs, 1)
+                    
+                    # generateHDFbyGroup_update(asso,nJobs)
+                    # generate HDF5 with variants grouped by gene name.
+                    generateHDFbyGroup(asso,nJobs)
+                else:
+                    env.logger.warning("Temp files are not regenerated!")
             
             runAssociation(args,asso,proj,results)
 

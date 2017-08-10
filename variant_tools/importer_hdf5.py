@@ -51,7 +51,7 @@ import tables as tb
 import HDF5_storage as storage
 import glob
 from shutil import copyfile
-from .HDF5_accessor import *
+from .accessor import *
 
 try:
     from variant_tools.cgatools import normalize_variant
@@ -68,18 +68,24 @@ from .preprocessor import *
 
 
 class HDF5GenotypeImportWorker(Process):
-    '''This class starts a process, import genotype to a temporary genotype database.'''
+    '''This class starts a process, import genotype to a temporary HDF5 file.
+        Args
+
+            processor: a processor to parse the row 
+            readQueue: a Queue of vcf rows
+            variantIndex: a dictionary that returns ID for each variant.
+            start_sample: the sample id of sample in the first column
+            end_sample: the sample id of sample in the last column
+            sample_ids: a list of sample IDS
+            variant_count: count of variants
+            proc_index: the index of process
+            geno_info: genotype info other than GT
+            dbLocation: the HDF5 file name 
+
+    '''
     def __init__(self, processor,readQueue,variantIndex, start_sample,end_sample,sample_ids,variant_count, 
         proc_index,geno_info,dbLocation):
-        '''
-        variantIndex: a dictionary that returns ID for each variant.
-        filelist: files from which variantIndex is created. If the passed filename
-            is not in this list, this worker will suicide so that it can be replaced 
-            by a worker with more variants.
-        encoding, genotypefield, genotype_info, ranges:  parameters to import data
-        geno_count:  a shared variable to report number of genotype imported
-        status:      an ImportStatus object to monitor the progress
-        '''
+
         Process.__init__(self, name='GenotypeImporter')
         # self.daemon=True
         self.processor=processor
@@ -110,19 +116,18 @@ class HDF5GenotypeImportWorker(Process):
         self.variant_count.value = self.variant_count.value + len(self.indptr)
         shape=(self.variant_count.value,self.end_sample-self.start_sample)
 
-        #If file doesn't exist, create file
-        #if file exists but chromosome does not exist, create chr group
-        #if file exists and chromosome exists, append to file
- 
-        # hdf5=HDF5Engine_storage(self.dbLocation)
         storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
+        # make a HMatrix object which is a matrix with rownames and colnames
         hmatrix=HMatrix(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames)
+        # write GT into file
         storageEngine.store(hmatrix,chr)
+        # write geno info into HDF5 if exists
         if len(self.geno_info)>0:
                 for key,value in self.info.items():
                     hmatrix=HMatrix(value[2],value[1],value[0],shape,value[3],self.colnames)
                     storageEngine.store(hmatrix,chr,key) 
         
+        # clean up
         self.indptr=[]
         self.indices=[]
         self.data=[]
@@ -151,26 +156,24 @@ class HDF5GenotypeImportWorker(Process):
         self.processor.reset(import_sample_range=[self.start_sample,self.end_sample])
         while True:
             line=self.readQueue.get()
-      
             if line is None:
                 self.writeIntoFile(pre_chr)
                 break
             for bins,rec in self.processor.process(line):
-                # if self.dbLocation.split("_")[1]=="1":
-                #      print(rec)
+          
                 variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
                 if pre_variant_ID==variant_id:
                     continue
                 else:
                     pre_variant_ID=variant_id
-
+                #deal with variant of multiple chromosome in one vcf file
                 if firstLine:
                     pre_chr=rec[0]
                     firstLine=False
-                
                 if pre_chr!=rec[0]:
                     self.writeIntoFile(pre_chr)
                     pre_chr=rec[0]
+
 
                 numSamples=self.end_sample-self.start_sample
                 
@@ -242,8 +245,7 @@ def updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDF5
 
 
 def manageHDF5(importer,allNames={}):
-    # for f in glob.glob("*h5"):
-    #     os.remove(f)
+
     cur=importer.db.cursor()
     sql="ALTER TABLE sample ADD COLUMN HDF5 CHAR(25)"
     try:
@@ -265,8 +267,6 @@ def manageHDF5(importer,allNames={}):
 
 def importGenotypesInParallel(importer,num_sample=0):
 
-
-   
     allNames=manageHDF5(importer)
     
     for count, input_filename in enumerate(importer.files):
@@ -289,15 +289,11 @@ def importGenotypesInParallel(importer,num_sample=0):
         allNames=manageHDF5(importer,allNames)
         sample_ids=[int(allNames[name]) for name in names]
        
-
-        # for name in names:
-        #     if name not in allNames:
-        #         allNames[name]=sample_count
-        #         sample_count+=1
         workload=None
        
         #determine number of samples to be processed in each process
         if num_sample>0:
+            #if number of samples in each HDF5 is determined
             num_files=int(len(sample_ids)/num_sample)
             workload=[num_sample]*num_files
             if len(sample_ids)%num_sample!=0:
@@ -322,8 +318,6 @@ def importGenotypesInParallel(importer,num_sample=0):
         importers=[None]*importer.jobs
         variant_import_count = [Value('L', 0) for x in range(numTasks)]
 
-        # we should have file line count from importVariant
-        num_of_lines = importer.count[0] 
 
         for i in range(len(importer.count)):
             importer.total_count[i] += importer.count[i]
@@ -359,6 +353,7 @@ def importGenotypesInParallel(importer,num_sample=0):
   
         
         task=None
+        # This size of cache
         chunckOfLines=20000
         with openFile(input_filename) as input_file:
             for line in input_file:

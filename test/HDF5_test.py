@@ -12,7 +12,7 @@ import sys
 import unittest
 import subprocess
 from testUtils import ProcessTestCase 
-from variant_tools.HDF5_accessor import *
+from variant_tools.accessor import *
 
 
 class TestHDF5_storage(ProcessTestCase):

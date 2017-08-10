@@ -145,26 +145,46 @@ class HMatrix:
 
 
 class Engine_Storage(object):
-
-
+    """A factory to make storage engine object
+    """
+    @staticmethod
     def choose_storage_engine(dbPath):
+        """A function to choose which storage engine to start
+
+            Args:
+
+                dbPath: the path to database file
+        """
         if dbPath.split(".")[-1]=="h5":
             return HDF5Engine_storage(dbPath)
 
-    choose_storage_engine=staticmethod(choose_storage_engine)
+    # choose_storage_engine=staticmethod(choose_storage_engine)
 
 
 
 
 class Base_Storage(object):
+    """An interface for storage APIs
+    """
 
     def __init__(self,dbLocation):
         self.dbPath=dbLocation
 
     def store(self,data,chr,groupName):
+        """The implementation of store API
+
+            Args:
+
+               - data
+               - chr (string): the chromosome 
+               - groupName (string): the group name, for example gene name
+        """
         raise NotImplementError()
 
     def close(self):
+        """This function closes db file
+        """
+
         raise NotImplementError()
 
 
@@ -181,6 +201,8 @@ class HDF5Engine_storage(Base_Storage):
 
 
     def store(self,hmatrix,chr,groupName=""):
+
+        
         self.file=tb.open_file(self.dbPath,"a")
         if not self.checkGroup(chr,groupName):
             self.store_HDF5(hmatrix,chr,groupName) 
@@ -191,14 +213,13 @@ class HDF5Engine_storage(Base_Storage):
 
 
     def store_HDF5(self,hmatrix,chr,groupName=""):
-        """This function accepts a HMatrix object and stores it into HDF5 file. 
+        """The implementation of store API
 
             Args:
 
                - hmatrix (HMatrix): An object contains matrix, rownames,colnames
                - chr (string): the chromosome 
                - groupName (string): the group name, for example gene name
-
         """
         
         filters = tb.Filters(complevel=9, complib='blosc')       
@@ -396,24 +417,6 @@ class HDF5Engine_storage(Base_Storage):
 
         msg = "This code only works for csr matrices"
         assert(m.__class__ == csr_matrix), msg
-        # filters = tb.Filters(complevel=9, complib='blosc')
-        # group=self.getGroup(chr,groupName)
-        # for par in ('data', 'indices', 'indptr', 'shape'):
-        #     try:
-        #         n = getattr(group, par)
-        #         n._f_remove()
-        #     except AttributeError:
-        #         pass
-        #     arr = np.array(getattr(m, par))
-        #     # atom = tb.Atom.from_dtype(arr.dtype)
-        #     atom=tb.Atom.from_dtype(np.dtype(np.int32))
-        #     if (arr is not None):
-        #         ds = self.file.create_earray(group, par, atom, (0,),filters=filters)
-        #         ds.append(arr)
-        # ds = self.file.create_earray(group, "rownames", atom, (0,),filters=filters)
-        # ds.append(rownames)
-        # ds = self.file.create_earray(group, "colnames", atom, (0,),filters=filters)
-        # ds.append(colnames)
         h5matrix=HMatrix(m.data,m.indices,m.indptr,m.shape,rownames,colnames)
         self.store_HDF5(h5matrix,chr,groupName)
 
@@ -505,38 +508,116 @@ class HDF5Engine_storage(Base_Storage):
 
 
 class Engine_Access(object):
-
-
+    """A factory to make data access engine
+    """
+    @staticmethod
     def choose_access_engine(dbPath):
+        """A function to choose which access engine to start
+
+            Args:
+
+                dbPath: the path to database file
+        """
         if dbPath.split(".")[-1]=="h5":
             return HDF5Engine_access(dbPath)
 
 
-    choose_access_engine=staticmethod(choose_access_engine)
-
-
 
 class Base_Access(object):
+    """An interface for data access APIs
+    """
 
     def __init__(self,dbLocation):
         self.dbPath=dbLocation
 
     def get_geno_info_by_variant_IDs(self,variant_ids,chr,groupName):
+        """This function gets a slice of genotype info specified by a list of variant ids. 
+            **The position of these variants should be consecutive.**  
+
+            Args:
+                
+                - rowIDs (list): a list of variant ids. 
+                - chr (string): the chromosome 
+                - groupName (string): the group name, if not specified, default is genotype
+
+            Returns:
+
+                - A HMatrix object
+
+        """
         raise NotImplementError()
 
     def get_geno_info_by_sample_ID(self,sample_id,chr,groupName):
+        """This function gets the genotype info of a sample specified by the sample ID in the colnames. 
+
+            Args:
+
+                - sampleID : the sample ID stored in colnames
+                - chr (string): the chromosome 
+                - groupName (string): the group which variants are in, for example gene name
+
+            Returns:
+
+                - dict: snpdict[variant_id]=genotype value
+
+        """
         raise NotImplementError()
 
     def get_geno_info_by_group(self,groupName,chr):
+        """This function gets the genotype info of specified group into a dictionary
+
+            Args:
+
+                - chr (string): the chromosome
+                - groupName (string): the group which variants are in, for example gene name
+
+            Returns:
+
+                - dict : snpdict[sample_id][variant_id]=genotype value
+
+        """
         raise NotImplementError();
 
     def get_geno_info_by_variant_ID(self,variant_id,chr,groupname):
+        """This function gets the genotype info of a variant specified by the variant_id stored in rownames. 
+
+            Args:
+
+                - variantID : the variant ID stored in rownames 
+                - chr (string): the chromosome  
+                - groupName (string): the group which variants are in, for example gene name
+
+            Returns:
+
+                - variant_id (string): the variant_id of the variant
+                - indices (list): the position of samples
+                - data (list): the genotype info
+
+        """
         raise NotImplementError()
 
     def get_geno_info_by_row_pos(self,rowPos,chr,grouopName):
+        """This function gets the genotype info of a variant specified by the position of the variant in the matrix. 
+
+            Args:
+                - rowpos (int): the position of the variant in the matrix
+                - chr (string): the chromosome
+                - groupName (string): the group which variants are in, for example gene name
+
+            Returns:
+
+                - variant_id (string): the variant_id of the variant
+                - indices (list): the position of samples
+                - data (list): the genotype info
+
+        """
+
         raise NotImplementError()
 
     def close(self):
+        """This function closes the HDF5 file.
+
+        """
         raise NotImplementError()
 
 
@@ -655,18 +736,7 @@ class HDF5Engine_access(Base_Access):
 
 
     def get_geno_info_by_group(self,groupName,chr=None):
-        """This function gets the genotype info of specified group into a dictionary
-
-            Args:
-
-                - chr (string): the chromosome
-                - groupName (string): the group which variants are in, for example gene name
-
-            Returns:
-
-                - dict : snpdict[sample_id][variant_id]=genotype value
-
-        """
+       
         if chr is None:
             #raise error
             pass
@@ -688,20 +758,6 @@ class HDF5Engine_access(Base_Access):
 
     
     def get_geno_info_by_row_pos(self,rowpos,chr,groupName=""):
-        """This function gets the genotype info of a variant specified by the position of the variant in the matrix. 
-
-            Args:
-                - rowpos (int): the position of the variant in the matrix
-                - chr (string): the chromosome
-                - groupName (string): the group which variants are in, for example gene name
-
-            Returns:
-
-                - variant_id (string): the variant_id of the variant
-                - indices (list): the position of samples
-                - data (list): the genotype info
-
-        """
 
         # if self.indices is None:
         #     self.load_HDF5_by_chr(chr,groupName)
@@ -737,20 +793,7 @@ class HDF5Engine_access(Base_Access):
 
 
     def get_geno_info_by_variant_IDs(self,rowIDs,chr,groupName=""):
-        """This function gets a slice of genotype info specified by a list of variant ids. 
-            **The position of these variants should be consecutive.**  
-
-            Args:
-                
-                - rowIDs (list): a list of variant ids. 
-                - chr (string): the chromosome 
-                - groupName (string): the group name, if not specified, default is genotype
-
-            Returns:
-
-                - A HMatrix object
-
-        """
+        
         # if not sorted?
         #                  for id in ids:
         #                     try:
@@ -792,21 +835,7 @@ class HDF5Engine_access(Base_Access):
 
 
     def get_geno_info_by_variant_ID(self,variantID,chr,groupName=""):
-        """This function gets the genotype info of a variant specified by the variant_id stored in rownames. 
 
-            Args:
-
-                - variantID : the variant ID stored in rownames 
-                - chr (string): the chromosome  
-                - groupName (string): the group which variants are in, for example gene name
-
-            Returns:
-
-                - variant_id (string): the variant_id of the variant
-                - indices (list): the position of samples
-                - data (list): the genotype info
-
-        """
         group=self.getGroup(chr)
         rownames=group.rownames[:].tolist()
         try:
@@ -817,19 +846,7 @@ class HDF5Engine_access(Base_Access):
 
 
     def get_geno_info_by_sample_ID(self,sampleID,chr,groupName=""):
-        """This function gets the genotype info of a sample specified by the sample ID in the colnames. 
-
-            Args:
-
-                - sampleID : the sample ID stored in colnames
-                - chr (string): the chromosome 
-                - groupName (string): the group which variants are in, for example gene name
-
-            Returns:
-
-                - dict: snpdict[variant_id]=genotype value
-
-        """
+        
         self.__load_HDF5_by_group(chr,groupName)
         colnames=self.colnames[:].tolist()
         try:
@@ -966,9 +983,9 @@ class HDF5Engine_access(Base_Access):
 
 
     def close(self):
-        """This function closes the HDF5 file.
-
+        """This function closes db file
         """
+
         self.file.close()
 
 
