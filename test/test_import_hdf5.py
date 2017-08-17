@@ -31,7 +31,7 @@ import subprocess
 from testUtils import ProcessTestCase 
 import tables as tb
 import sys
-#from variant_tools.HDF5_accessor import *
+from variant_tools.accessor import *
 import logging
 
 
@@ -140,7 +140,7 @@ class TestImportHDF5(ProcessTestCase):
         'Test command vtools import *.vcf'
 
         # use the default vcf format
-        self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18 --HDF5 --force')
+        self.assertSucc('vtools import vcf/SAMP1.vcf --build hg19 --HDF5 --force')
         self.assertProj(numOfSamples= 1, numOfVariants=289, sampleNames=['SAMP1'])
         self.assertSucc('vtools import vcf/SAMP2.vcf --HDF5')
         self.assertProj(numOfSamples= 2, numOfVariants=289+121, sampleNames=['SAMP1', 'SAMP2'])
