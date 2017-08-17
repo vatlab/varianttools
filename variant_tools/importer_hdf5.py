@@ -48,7 +48,7 @@ from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
 import numpy as np
 from scipy.sparse import csr_matrix,csc_matrix,rand,coo_matrix,hstack
 import tables as tb
-import HDF5_storage as storage
+#import HDF5_storage as storage
 import glob
 from shutil import copyfile
 from .accessor import *

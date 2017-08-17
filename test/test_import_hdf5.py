@@ -31,7 +31,7 @@ import subprocess
 from testUtils import ProcessTestCase 
 import tables as tb
 import sys
-from variant_tools.HDF5_accessor import *
+#from variant_tools.HDF5_accessor import *
 import logging
 
 
