@@ -1304,8 +1304,7 @@ def metaAnalysis(args):
         # sys.stderr.write("Done!\n")
    
 
-if __name__ == '__main__':
-    #
+def main():
     master_parser = argparse.ArgumentParser(description='''A collection of functions that
         analyze data using vtools and generate various reports''',
         prog='vtools_report',

@@ -56,7 +56,7 @@ def addCommonArgs(parser):
         help='''Output error and warning (0), info (1), debug (2) and trace (3) 
             information to standard output (default to 1).'''),
 
-if __name__ == '__main__':
+def main():
     #
     master_parser = argparse.ArgumentParser(description='''A variant calling, 
         processing, annotation and analysis tool for next-generation sequencing
