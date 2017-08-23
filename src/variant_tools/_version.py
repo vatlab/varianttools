@@ -23,3 +23,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
+import sys
+
+VTOOLS_VERSION='3.0.0dev'
+
+pyver = sys.version_info
+VTOOLS_FULL_VERSION='{} for Python {}.{}.{}'.format(VTOOLS_VERSION, pyver.major, pyver.minor, pyver.micro)
+VTOOLS_COPYRIGHT = '''variant tools {} : Copyright (c) 2011 - 2016 Bo Peng'''.format(VTOOLS_VERSION)
+VTOOLS_CONTACT = '''Please visit http://varianttools.sourceforge.net for more information.'''

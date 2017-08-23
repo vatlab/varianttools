@@ -45,7 +45,6 @@ import variant_tools.annotation as annotation
 import variant_tools.variant as variant
 import variant_tools.compare as compare
 import variant_tools.exporter as exporter
-import variant_tools.pipeline as pipeline
 
 if sys.platform != 'win32':
     import variant_tools.liftOver as liftOver
@@ -216,18 +215,6 @@ def main():
         addCommonArgs(parser)
         parser.set_defaults(func=association.associate)
     #
-    # command simulate
-    # 
-    parser = subparsers.add_parser('simulate',
-        help='''Simulate sequencing data using specified simulation
-            models.''',
-        description='''Simulate case control or family-based samples using
-            specified simulation models.''')
-    pipeline.simulateArguments(parser)
-    addCommonArgs(parser)
-    parser.set_defaults(func=pipeline.simulate)
-    #
-    # 
     # command admin
     #
     parser = subparsers.add_parser('admin',
@@ -240,12 +227,12 @@ def main():
     parser.set_defaults(func=project.admin)
     #
     # command execute
-    parser = subparsers.add_parser('execute',
-        help='Execute a SQL query',
-        description='''Execute arbitrary SQL query against the project database.''')
-    pipeline.executeArguments(parser)
-    addCommonArgs(parser)
-    parser.set_defaults(func=pipeline.execute)
+    #parser = subparsers.add_parser('execute',
+    #    help='Execute a SQL query',
+    #    description='''Execute arbitrary SQL query against the project database.''')
+    #pipeline.executeArguments(parser)
+    #addCommonArgs(parser)
+    #parser.set_defaults(func=pipeline.execute)
     #
     # getting args, some commands accept arbitrary arguments so we need to
     # separate them into argv
@@ -269,7 +256,7 @@ def main():
     # commands that accepts format and other subparsers can pass arbitrary
     # parameter to subparsers
     if args.func in [association.associate, importer.importVariants,
-        update.update, exporter.export, pipeline.execute, pipeline.simulate]:
+        update.update, exporter.export]:
         args.unknown_args = argv
     elif len(argv) > 0:
         master_parser.print_usage(sys.stderr)

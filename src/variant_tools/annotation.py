@@ -26,14 +26,9 @@
 
 import sys
 import os
-try:
-    # Python 3
-    import ConfigParser
-except ImportError:
-    # Python 2
-    import configparser as ConfigParser
+import configparser 
 import shutil
-import urlparse
+import urllib.parse
 import gzip
 import tarfile
 import re
@@ -122,7 +117,7 @@ class AnnoDBConfiger:
         if '-' in self.name:
             self.version = self.name.split('-', 1)[1]
             self.name = self.name.split('-')[0]
-        parser = ConfigParser.SafeConfigParser()
+        parser = configparser.SafeConfigParser()
         # this allows python3 to read .fmt file with non-ascii characters, but there is no
         # simple way to make it python2 compatible.
         #with open(filename, 'r', encoding='UTF-8') as inputfile:
@@ -257,7 +252,7 @@ class AnnoDBConfiger:
                     else:
                         tempFile = os.path.join(self.path, URL)
                 elif URL.upper().startswith('SQL:'):
-                    res = urlparse.urlparse(URL)
+                    res = urllib.parse.urlparse(URL)
                     user = res.user
                     password = res.password
                     query = res.netloc
@@ -517,7 +512,7 @@ def use(args):
                 if os.path.isfile(args.source + '.ann'):
                     annoDB = args.source + '.ann'
             if annoDB is None:
-                res = urlparse.urlsplit(args.source)
+                res = urllib.parse.urlsplit(args.source)
                 if not res.scheme:
                     # if this is a versioned annotation string, use the version
                     res = ResourceManager()

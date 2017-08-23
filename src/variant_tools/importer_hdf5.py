@@ -32,7 +32,7 @@ import time
 from heapq import heappush, heappop, heappushpop
 from multiprocessing import Process, Pipe, Value, Lock, Manager,Array
 from multiprocessing import Queue as mpQueue
-import Queue
+import queue
 if sys.version_info.major == 2:
     from itertools import izip, repeat
 else:
@@ -330,7 +330,7 @@ def importGenotypesInParallel(importer,num_sample=0):
         num_lines=0    
         readQueue=[]
 
-        taskQueue=Queue.Queue()
+        taskQueue=queue.Queue()
         input_prefix=os.path.basename(input_filename).replace(".vcf","")
         
         #Put tasks in the queue first

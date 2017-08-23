@@ -39,8 +39,8 @@ namespace std
 }
 
 
-//%include "cgatools/core.hpp"
-//%include "cgatools/util/Streams.hpp"
+//%include "../cgatools/core.hpp"
+//%include "../cgatools/util/Streams.hpp"
 %ignore cgatools::util::operator==;
 %ignore cgatools::util::operator!=;
 %ignore cgatools::util::Md5Digest::Md5Digest();
@@ -58,10 +58,10 @@ namespace std
 
 
 %implicitconv Location;
-%include "cgatools/util/Md5.hpp"
-%include "cgatools/reference/range.hpp"
-%include "cgatools/reference/CompactDnaSequence.hpp"
-%include "cgatools/reference/CrrFile.hpp"
+%include "../cgatools/util/Md5.hpp"
+%include "../cgatools/reference/range.hpp"
+%include "../cgatools/reference/CompactDnaSequence.hpp"
+%include "../cgatools/reference/CrrFile.hpp"
 
 
 %inline %{

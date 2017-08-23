@@ -26,7 +26,7 @@
 import sys, os, re
 from multiprocessing import Process, Queue, Pipe, Value, Array, Lock, Manager
 from multiprocessing import Queue as mpQueue
-import Queue
+import queue
 import time
 import random
 import math
@@ -116,7 +116,7 @@ def generateHDFbyGroup(testManager,njobs):
     HDFfileNames=glob.glob("tmp*_genotypes.h5")
     groupGenerators=[]
     fileQueue=mpQueue()
-    taskQueue=Queue.Queue()
+    taskQueue=queue.Queue()
     start=time.time()
     groupGenerators=[None]*min(njobs,len(HDFfileNames))
     for HDFfileName in HDFfileNames:
@@ -291,7 +291,7 @@ def generateHDFbyGroup_update(testManager,njobs):
     HDFfileNames=glob.glob("tmp*_genotypes.h5")
 
     fileQueue=mpQueue()
-    taskQueue=Queue.Queue()
+    taskQueue=queue.Queue()
     start=time.time()
     groupGenerators=[None]*min(njobs,len(HDFfileNames))
     geneDict,geneSet=getGroupDict(testManager)

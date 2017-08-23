@@ -34,7 +34,7 @@ import tempfile
 import shutil
 import argparse
 import threading
-import Queue
+import queue
 import signal
 import time
 import re
@@ -43,26 +43,25 @@ import urllib
 import inspect
 import pydoc
 
-from ucsctools import showTrack
-from cgatools import fasta2crr
+from .ucsctools import showTrack
+from .cgatools import fasta2crr
 from configparser import ConfigParser, RawConfigParser
 from io import StringIO
 
 from multiprocessing import Process
 from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
-from .__init__ import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, \
-    VTOOLS_CONTACT
-from .utils import DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction, \
-    RefGenome, filesInURL, downloadFile, getMaxUcscBin, env, sizeExpr, \
-    getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName, \
-    PrettyPrinter, determineSexOfSamples, getVariantsOnChromosomeX, \
-    getVariantsOnChromosomeY, getTermWidth, matchName, ProgressFileObj, \
-    substituteVars, calculateMD5, dehtml, default_user_options, RuntimeFiles
+from ._version import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CONTACT
+from .utils import (DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction,
+    RefGenome, filesInURL, downloadFile, getMaxUcscBin, env, sizeExpr,
+    getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName,
+    PrettyPrinter, determineSexOfSamples, getVariantsOnChromosomeX,
+    getVariantsOnChromosomeY, getTermWidth, matchName, ProgressFileObj,
+    substituteVars, calculateMD5, dehtml, default_user_options, RuntimeFiles)
 
 
 try:
-    from cgatools import normalize_variant
+    from .cgatools import normalize_variant
 except ImportError as e:
     sys.exit('Failed to import module ({})\n'
         'Please verify if you have installed variant tools successfully (using command '
@@ -3903,12 +3902,12 @@ class ProjectsMerger:
         status.add('__copySamples', {'completed': 0, 'scheduled': False,
             'total_count': sum([len(status.get(proj, 'old_ids')) for proj in self.projects])})
         # start all variant cachers
-        self.vcQueue = Queue.Queue()
+        self.vcQueue = queue.Queue()
         for j in range(nJobs):
             VariantProcessor(self.vcQueue, status).start()
         #
         # start all sample cachers
-        self.scQueue = Queue.Queue()
+        self.scQueue = queue.Queue()
         for j in range(nJobs):
             SampleProcessor(self.scQueue, status).start()
         #

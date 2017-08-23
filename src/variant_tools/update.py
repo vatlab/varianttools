@@ -26,9 +26,7 @@
 import sys
 import os
 import re
-import ConfigParser
 import shutil
-import urlparse
 import gzip
 import zipfile
 from collections import defaultdict

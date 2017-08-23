@@ -23,8 +23,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from distutils.core import setup, Extension
 from distutils.ccompiler import new_compiler
+from setuptools import find_packages, setup, Extension
 
 try:
    from distutils.command.build_py import build_py_2to3 as build_py
@@ -81,30 +81,29 @@ SDIST = 'sdist' in sys.argv
 try:
     import argparse
 except ImportError:
-    sys.exit('variant tools requires Python 2.7.2 or higher, or Python 3.2 or higher. Please upgrade your version (%s) of Python and try again.' % (sys.version.split()[0]))
+    sys.exit('variant tools requires Python 3.2 or higher. Please upgrade your version (%s) of Python and try again.' % (sys.version.split()[0]))
 
 # do not import variant_tools because __init__ might not be imported properly 
 # before installation
-with open('src/variant_tools/__init__.py') as init:
+with open('src/variant_tools/_version.py') as init:
     for line in init:
         if line.startswith('VTOOLS_VERSION='):
             VTOOLS_VERSION = line[15:].strip().strip('"').strip("'")
             break
 
-EMBEDDED_BOOST = os.path.isdir('src/boost_1_49_0')
 SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511', '-w-509',
-    '-outdir', 'variant_tools', '-py3']
+    '-outdir', 'build/variant_tools', '-py3']
 
 ASSO_WRAPPER_CPP_FILE = 'build/variant_tools/assoTests_wrap.cpp'
-ASSO_WRAPPER_PY_FILE = 'build/variant_tools/assoTests.py'
-ASSO_INTERFACE_FILE = 'build/variant_tools/assoTests.i'
+ASSO_WRAPPER_PY_FILE = 'src/variant_tools/assoTests.py'
+ASSO_INTERFACE_FILE = 'src/variant_tools/assoTests.i'
 CGATOOLS_WRAPPER_CPP_FILE = 'build/variant_tools/cgatools_wrap.cpp'
-CGATOOLS_WRAPPER_PY_FILE = 'build/variant_tools/cgatools.py'
-CGATOOLS_INTERFACE_FILE = 'build/variant_tools/cgatools.i'
+CGATOOLS_WRAPPER_PY_FILE = 'src/variant_tools/cgatools.py'
+CGATOOLS_INTERFACE_FILE = 'src/variant_tools/cgatools.i'
 UCSCTOOLS_WRAPPER_CPP_FILE = 'build/variant_tools/ucsctools_wrap.cpp'
-UCSCTOOLS_WRAPPER_PY_FILE = 'build/variant_tools/ucsctools.py'
-UCSCTOOLS_INTERFACE_FILE = 'build/variant_tools/ucsctools.i'
-SQLITE_PY_FILE = 'build/variant_tools/vt_sqlite3.py'
+UCSCTOOLS_WRAPPER_PY_FILE = 'src/variant_tools/ucsctools.py'
+UCSCTOOLS_INTERFACE_FILE = 'src/variant_tools/ucsctools.i'
+SQLITE_PY_FILE = 'src/variant_tools/vt_sqlite3.py'
 
 
 ASSOC_HEADER = [
@@ -527,6 +526,7 @@ LIB_UCSC_FILES = [
     
 LIB_STAT = ['src/variant_tools/fisher2.c']
 
+EMBEDDED_BOOST = os.path.isdir('build/boost_1_49_0')
 if not EMBEDDED_BOOST:
     def downloadProgress(count, blockSize, totalSize):
         perc = count * blockSize * 100 // totalSize
@@ -544,11 +544,11 @@ if not EMBEDDED_BOOST:
         BOOST_URL = 'http://downloads.sourceforge.net/project/boost/boost/1.49.0/boost_1_49_0.tar.gz?r=&ts=1435893980&use_mirror=iweb'
         sys.stdout.write('Downloading boost C++ library 1.49.0 ')
         sys.stdout.flush()
-        if not os.path.isfile('boost_1_49_0.tar.gz'):
-            urlretrieve(BOOST_URL, 'boost_1_49_0.tar.gz', downloadProgress)
+        if not os.path.isfile('build/boost_1_49_0.tar.gz'):
+            urlretrieve(BOOST_URL, 'build/boost_1_49_0.tar.gz', downloadProgress)
         sys.stdout.write('\n')
         # extract needed files
-        with tarfile.open('boost_1_49_0.tar.gz', 'r:gz') as tar:
+        with tarfile.open('build/boost_1_49_0.tar.gz', 'r:gz') as tar:
             files = [h for h in tar.getmembers() if h.name.startswith('boost_1_49_0/boost') \
                 or h.name.startswith('boost_1_49_0/libs/iostreams') \
                 or h.name.startswith('boost_1_49_0/libs/regex') \
@@ -556,7 +556,7 @@ if not EMBEDDED_BOOST:
                 or h.name.startswith('boost_1_49_0/libs/detail') \
                 or h.name.startswith('boost_1_49_0/libs/system') ]
             sys.stdout.write('Extracting %d files\n' % len(files))
-            tar.extractall(members=files)
+            tar.extractall(path='build', members=files)
         EMBEDDED_BOOST = True
     except Exception as e:
         print(e)
@@ -569,7 +569,7 @@ if not EMBEDDED_BOOST:
 #
 if not os.path.isfile('build/swigpyrun.h'):
     try:
-       ret = subprocess.call(['swig -python -external-runtime src/variant_tools/swigpyrun.h -o build'], shell=True)
+       ret = subprocess.call(['swig -python -external-runtime build/swigpyrun.h -o build'], shell=True)
        if ret != 0: sys.exit('Failed to generate swig runtime header file.')
     except OSError as e:
         sys.exit('Failed to generate wrapper file. Please install swig (www.swig.org).')
@@ -582,10 +582,11 @@ if not os.path.isfile('build/swigpyrun.h'):
 if (not os.path.isfile(ASSO_WRAPPER_PY_FILE) or not os.path.isfile(ASSO_WRAPPER_CPP_FILE) \
   or os.path.getmtime(ASSO_WRAPPER_CPP_FILE) < max([os.path.getmtime(x) for x in ASSOC_HEADER + ASSOC_FILES])):
     print('Generating {}'.format(ASSO_WRAPPER_CPP_FILE))
+    print('swig ' + ' '.join(SWIG_OPTS + ['-o', ASSO_WRAPPER_CPP_FILE, ASSO_INTERFACE_FILE]))
     ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', ASSO_WRAPPER_CPP_FILE, ASSO_INTERFACE_FILE]), shell=True)
     if ret != 0:
         sys.exit('Failed to generate wrapper file for association module.')
-    os.rename('variant_tools/assoTests.py', ASSO_WRAPPER_PY_FILE)
+    os.rename('build/variant_tools/assoTests.py', ASSO_WRAPPER_PY_FILE)
 #
 if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE)) or (not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE)) \
   or os.path.getmtime(CGATOOLS_WRAPPER_CPP_FILE) < os.path.getmtime(CGATOOLS_INTERFACE_FILE):
@@ -593,7 +594,7 @@ if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE)) or (not os.path.isfile(CGATOOL
     ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', CGATOOLS_WRAPPER_CPP_FILE, CGATOOLS_INTERFACE_FILE]), shell=True)
     if ret != 0:
         sys.exit('Failed to generate wrapper file for cgatools.')
-    os.rename('variant_tools/cgatools.py', CGATOOLS_WRAPPER_PY_FILE)
+    os.rename('build/variant_tools/cgatools.py', CGATOOLS_WRAPPER_PY_FILE)
 #
 if (not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE)) or (not os.path.isfile(UCSCTOOLS_WRAPPER_CPP_FILE)) \
   or os.path.getmtime(UCSCTOOLS_WRAPPER_CPP_FILE) < os.path.getmtime(UCSCTOOLS_INTERFACE_FILE):
@@ -601,7 +602,7 @@ if (not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE)) or (not os.path.isfile(UCSCTO
     ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', UCSCTOOLS_WRAPPER_CPP_FILE, UCSCTOOLS_INTERFACE_FILE]), shell=True)
     if ret != 0:
         sys.exit('Failed to generate wrapper file for ucsctools.')
-    os.rename('variant_tools/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE)
+    os.rename('build/variant_tools/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE)
          
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.
 if sys.platform in 'linux2':
@@ -656,8 +657,6 @@ for files, incs, macs, libname in [
         sys.exit("Failed to build embedded {} library: {}".format(libname, e))
 
 
-
-
 setup(name = "variant_tools",
     version = VTOOLS_VERSION,
     description = "Variant tools: an integrated annotation and analysis package for next-generation sequencing data",
@@ -681,9 +680,9 @@ setup(name = "variant_tools",
             'Programming Language :: Python :: 3',
             'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
-    install_requires=[
-       'varstore'
-    ],
+    #install_requires=[
+    #   'varstore'
+    #],
     packages = find_packages('src'),
     package_dir = {'': 'src'},
     entry_points = '''
@@ -703,7 +702,7 @@ vtools_report = variant_tools.vtools_report:main
             # stop warning message ucsctools because it is written by us.
             extra_compile_args=['-w'],
             sources = [UCSCTOOLS_WRAPPER_CPP_FILE],
-            include_dirs = ['.', 'ucsc/inc', 'ucsc/tabix', 'ucsc/samtools'],
+            include_dirs = ['.', 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools'],
             library_dirs = ["build"],
             define_macros =  [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
                 ('_USE_KNETFILE', None), ('BGZF_CACHE', None)],
@@ -713,13 +712,13 @@ vtools_report = variant_tools.vtools_report:main
             # stop warning message ucsctools because it is written by us.
             extra_compile_args=['-w'],
             sources = LIB_PLINKIO,
-            include_dirs = ['libplinkio'],
+            include_dirs = ['src/libplinkio'],
         ),
         Extension('variant_tools._vt_sqlite3_ext',
             # stop warning message for sqlite because it is written by us.
-            sources = ['sqlite/vt_sqlite3_ext.cpp'],
-            include_dirs = [".", 'ucsc/inc', 'ucsc/tabix', 'ucsc/samtools',
-                'sqlite', "variant_tools", "gsl", "cgatools", "boost_1_49_0"],
+            sources = ['src/sqlite/vt_sqlite3_ext.cpp'],
+            include_dirs = ["src/", 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools',
+                'src/sqlite', "src/variant_tools", "src/gsl", "src/cgatools", "build/boost_1_49_0"],
             library_dirs = ["build"],
             libraries = ['sqlite_gsl', 'stat', 'ucsc', 'cgatools'] + \
                 (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']) + \
@@ -741,7 +740,7 @@ vtools_report = variant_tools.vtools_report:main
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
             extra_compile_args = gccargs,
             swig_opts = ['-O', '-shadow', '-c++', '-keyword'],
-            include_dirs = [".", "cgatools", "boost_1_49_0"],
+            include_dirs = ["src", "src/cgatools", "build/boost_1_49_0"],
             library_dirs = ["build"],
         ),
         Extension('variant_tools._assoTests',
@@ -749,7 +748,7 @@ vtools_report = variant_tools.vtools_report:main
             extra_compile_args = gccargs,
             libraries = libs + ['gsl', 'stat', 'blas'],
             library_dirs = ["build"],
-            include_dirs = [".", "variant_tools", "gsl"],
+            include_dirs = ["src", "src/variant_tools", "src/gsl"],
         )
       ] 
 )

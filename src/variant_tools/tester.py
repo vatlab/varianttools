@@ -29,7 +29,7 @@ import zipfile
 import platform
 import argparse
 import stat
-import assoTests as t
+from .assoTests import *
 from .project import Field
 from .utils import env, downloadFile, hasCommand, runCommand
 
@@ -208,44 +208,44 @@ class CaseCtrlBurdenTest(NullTest):
         self.__dict__.update(vars(args))
 
     def _determine_algorithm(self):
-        algorithm = t.AssoAlgorithm([
+        algorithm = assoTests.AssoAlgorithm([
             # calculate sample MAF
-            t.SetMaf(),
+            assoTests.SetMaf(),
             # code genotype matrix by MOI being 0 1 or 2
-            t.CodeXByMOI(),
+            assoTests.CodeXByMOI(),
             # filter out variants having MAF > mafupper or MAF <= maflower
-            t.SetSites(self.mafupper, self.maflower)
+            assoTests.SetSites(self.mafupper, self.maflower)
             ])
 
         # Now write implementation of each association methods separately.
         # association testing using analytic p-value
         if self.permutations == 0:
             if self.aggregation_theme == 'CMC':
-                algorithm.extend([t.BinToX(),
-                    t.Fisher2X2(self.alternative, self.midp)])
+                algorithm.extend([assoTests.BinToX(),
+                    assoTests.Fisher2X2(self.alternative, self.midp)])
             elif self.aggregation_theme == 'WSS':
-                a_permutationtest = t.FixedPermutator(
+                a_permutationtest = assoTests.FixedPermutator(
                         'Y',
                         1,
                         1000,
                         1,
-                        [t.WeightedGenotypeTester(
+                        [assoTests.WeightedGenotypeTester(
                             self.alternative,
                             self.extern_weight,
-                            [t.BrowningWeight(self.alternative),
-                            t.MannWhitneyu(alternative=self.alternative, store=True)]
+                            [assoTests.BrowningWeight(self.alternative),
+                            assoTests.MannWhitneyu(alternative=self.alternative, store=True)]
                             )]
                         )
                 algorithm.extend([
                     a_permutationtest,
-                    t.WSSPvalue(self.alternative)
+                    assoTests.WSSPvalue(self.alternative)
                     ])
             elif self.aggregation_theme == 'Calpha':
                 # this has to be a two-sided test
                 # the analytical version of Calpha is not reliable
                 # implemented here to reflect its original publication
-                algorithm.extend([t.CalphaTest(),
-                    t.GaussianPval(1)])
+                algorithm.extend([assoTests.CalphaTest(),
+                    assoTests.GaussianPval(1)])
             else:
                 raise ValueError('Please specify number of permutations for {0} test'.format(self.aggregation_theme))
 
@@ -254,16 +254,16 @@ class CaseCtrlBurdenTest(NullTest):
             if self.aggregation_theme == 'WSS':
                 # the rank test version of WSS only supports one-sided test
                 # this has to be a one-sided test
-                a_permutationtest = t.FixedPermutator(
+                a_permutationtest = assoTests.FixedPermutator(
                         'Y',
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.WeightedGenotypeTester(
+                        [assoTests.WeightedGenotypeTester(
                             1,
                             self.extern_weight,
-                            [t.BrowningWeight(1),
-                            t.MannWhitneyu()]
+                            [assoTests.BrowningWeight(1),
+                            assoTests.MannWhitneyu()]
                             )]
                         )
                 algorithm.append(a_permutationtest)
@@ -271,77 +271,77 @@ class CaseCtrlBurdenTest(NullTest):
                 #FIXME now disable FillGMissing for type I error problem
                 # but have to think of a way to impute better to save some power
 #                algorithm.append(t.FillGMissing(method="mlg"))
-                algorithm.append(t.FindGenotypePattern())
-                a_permutationtest = t.FixedPermutator(
+                algorithm.append(assoTests.FindGenotypePattern())
+                a_permutationtest = assoTests.FixedPermutator(
                         'Y',
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.KBACtest(alternative=self.alternative, weightOnly=False)]
+                        [assoTests.KBACtest(alternative=self.alternative, weightOnly=False)]
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'RBT':
 #                algorithm.append(t.FillGMissing(method="mlg"))
-                a_permutationtest = t.FixedPermutator(
+                a_permutationtest = assoTests.FixedPermutator(
                         'Y',
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.RBTtest(self.alternative, weightOnly=False)]
+                        [assoTests.RBTtest(self.alternative, weightOnly=False)]
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'aSum':
-                a_permutationtest = t.FixedPermutator(
+                a_permutationtest = assoTests.FixedPermutator(
                         'Y',
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.AdaptiveRvSum(),
-                            t.SimpleLogisticRegression()]
+                        [assoTests.AdaptiveRvSum(),
+                            assoTests.SimpleLogisticRegression()]
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'VT_Fisher':
                 algorithm.extend([
-                    t.FindVariantPattern(),
-                    t.VTFisher(self.adaptive, alternative=self.alternative, midp=self.midp)
+                    assoTests.FindVariantPattern(),
+                    assoTests.VTFisher(self.adaptive, alternative=self.alternative, midp=self.midp)
                     ])
-                a_permutationtest = t.FixedPermutator(
+                a_permutationtest = assoTests.FixedPermutator(
                         'Y',
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.VTFisher(self.adaptive, alternative=self.alternative, midp=self.midp)]
+                        [assoTests.VTFisher(self.adaptive, alternative=self.alternative, midp=self.midp)]
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'VT':
-                algorithm.append(t.FindVariantPattern())
-                a_permutationtest = t.FixedPermutator(
+                algorithm.append(assoTests.FindVariantPattern())
+                a_permutationtest = assoTests.FixedPermutator(
                         'Y',
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.VTTest(alternative=self.alternative)]
+                        [assoTests.VTTest(alternative=self.alternative)]
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'RareCover':
                 # this has to be a two-sided test
-                a_permutationtest = t.FixedPermutator(
+                a_permutationtest = assoTests.FixedPermutator(
                         'Y',
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.RareCoverTest(difQ = 0.5)]
+                        [assoTests.RareCoverTest(difQ = 0.5)]
                         )
                 algorithm.append(a_permutationtest)
             elif self.aggregation_theme == 'Calpha':
 #                algorithm.append(t.FillGMissing(method="mlg"))
                 # this has to be a two-sided test
-                a_permutationtest = t.FixedPermutator(
+                a_permutationtest = assoTests.FixedPermutator(
                         'Y',
                         1,
                         self.permutations,
                         self.adaptive,
-                        [t.CalphaTest(permutation=True)]
+                        [assoTests.CalphaTest(permutation=True)]
                         )
                 algorithm.append(a_permutationtest)
             else:
@@ -486,12 +486,12 @@ class GLMBurdenTest(NullTest):
 
     def _determine_algorithm(self):
         # define aggregation method and regression method
-        a_scoregene = t.BinToX() if self.use_indicator else t.SumToX()
-        a_analyticP = t.StudentPval(self.alternative) if self.trait_type == 'quantitative' else t.GaussianPval(self.alternative)
+        a_scoregene = assoTests.BinToX() if self.use_indicator else assoTests.SumToX()
+        a_analyticP = assoTests.StudentPval(self.alternative) if self.trait_type == 'quantitative' else assoTests.GaussianPval(self.alternative)
         if self.ncovariates > 0:
-            a_regression = t.MultipleRegression(self.permutations == 0, self.regression_model[self.trait_type])
+            a_regression = assoTests.MultipleRegression(self.permutations == 0, self.regression_model[self.trait_type])
         else:
-            a_regression = t.SimpleLinearRegression() if self.trait_type == 'quantitative' else t.SimpleLogisticRegression()
+            a_regression = assoTests.SimpleLinearRegression() if self.trait_type == 'quantitative' else assoTests.SimpleLogisticRegression()
         if self.use_indicator:
             if not (self.weight == 'None' and len(self.extern_weight) == 0):
                 env.logger.warning("Cannot use weights in loci indicator coding. Setting weights to None.")
@@ -505,14 +505,14 @@ class GLMBurdenTest(NullTest):
         a_wtheme = None
         a_wtimes = self.alternative
         if self.weight == 'Browning_all':
-            a_wtheme = t.BrowningWeight(0)
+            a_wtheme = assoTests.BrowningWeight(0)
             a_wtimes = 1
         elif self.weight == 'Browning':
-            a_wtheme = t.BrowningWeight(self.alternative)
+            a_wtheme = assoTests.BrowningWeight(self.alternative)
         elif self.weight == 'KBAC':
-            a_wtheme = t.KBACtest(alternative=self.alternative, weightOnly=True)
+            a_wtheme = assoTests.KBACtest(alternative=self.alternative, weightOnly=True)
         elif self.weight == 'RBT':
-            a_wtheme = t.RBTtest(alternative=self.alternative, weightOnly=True)
+            a_wtheme = assoTests.RBTtest(alternative=self.alternative, weightOnly=True)
         elif self.weight == 'None':
             pass
         else:
@@ -524,28 +524,28 @@ class GLMBurdenTest(NullTest):
         if self.weight in ['Browning_all', 'None']:
             w_alternative = self.alternative
         # data pre-processing
-        algorithm = t.AssoAlgorithm([
+        algorithm = assoTests.AssoAlgorithm([
             # calculate sample MAF
-            t.SetMaf(),
+            assoTests.SetMaf(),
             # code genotype matrix by MOI being 0 1 or 2
-            t.CodeXByMOI(),
+            assoTests.CodeXByMOI(),
             # filter out variants having MAF > mafupper or MAF <= maflower
-            t.SetSites(self.mafupper, self.maflower)
+            assoTests.SetSites(self.mafupper, self.maflower)
             ])
         # special actions for KBAC and RBT weighting themes
 #        if self.weight in ['KBAC', 'RBT']:
 #            if not self.NA_adjust:
 #                env.logger.warning("In order to use weighting theme {0}, missing genotypes will be replaced by the most likely genotype based on MAF".format(self.weight))
-#            algorithm.append(t.FillGMissing(method="mlg"))
+#            algorithm.append(assoTests.FillGMissing(method="mlg"))
         if self.weight == 'KBAC':
-            algorithm.append(t.FindGenotypePattern())
+            algorithm.append(assoTests.FindGenotypePattern())
         # recode missing data
         if self.NA_adjust:
-            algorithm.append(t.FillGMissing(method="maf"))
+            algorithm.append(assoTests.FillGMissing(method="maf"))
         # prepare the weighted sum tester
         a_wtester = None
         if a_wtheme:
-            a_wtester = t.WeightedGenotypeTester(
+            a_wtester = assoTests.WeightedGenotypeTester(
                         a_wtimes,
                         self.extern_weight,
                         [a_wtheme, a_regression]
@@ -558,7 +558,7 @@ class GLMBurdenTest(NullTest):
                 # not using any weighting themes
                 algorithm.extend([
                     # weight by var_info/geno_info
-                    t.WeightByInfo(self.extern_weight),
+                    assoTests.WeightByInfo(self.extern_weight),
                     # calculate genotype score for a set of variants
                     a_scoregene,
                     # fit regression model
@@ -577,11 +577,11 @@ class GLMBurdenTest(NullTest):
         #
         else:
             if not a_wtester:
-                algorithm.append(t.WeightByInfo(self.extern_weight))
+                algorithm.append(assoTests.WeightByInfo(self.extern_weight))
             if not self.variable_thresholds:
                 if not a_wtester:
                     algorithm.append(a_scoregene)
-                a_permutationtest = t.FixedPermutator(
+                a_permutationtest = assoTests.FixedPermutator(
                         self.permute_by,
                         w_alternative,
                         self.permutations,
@@ -590,7 +590,7 @@ class GLMBurdenTest(NullTest):
                         )
                 algorithm.append(a_permutationtest)
             else:
-                a_permutationtest = t.VariablePermutator(
+                a_permutationtest = assoTests.VariablePermutator(
                         self.permute_by,
                         w_alternative,
                         self.permutations,
