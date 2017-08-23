@@ -94,13 +94,13 @@ with open('src/variant_tools/_version.py') as init:
 SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511', '-w-509',
     '-outdir', 'build/variant_tools', '-py3']
 
-ASSO_WRAPPER_CPP_FILE = 'build/variant_tools/assoTests_wrap.cpp'
+ASSO_WRAPPER_CPP_FILE = 'src/variant_tools/assoTests_wrap.cpp'
 ASSO_WRAPPER_PY_FILE = 'src/variant_tools/assoTests.py'
 ASSO_INTERFACE_FILE = 'src/variant_tools/assoTests.i'
-CGATOOLS_WRAPPER_CPP_FILE = 'build/variant_tools/cgatools_wrap.cpp'
+CGATOOLS_WRAPPER_CPP_FILE = 'src/variant_tools/cgatools_wrap.cpp'
 CGATOOLS_WRAPPER_PY_FILE = 'src/variant_tools/cgatools.py'
 CGATOOLS_INTERFACE_FILE = 'src/variant_tools/cgatools.i'
-UCSCTOOLS_WRAPPER_CPP_FILE = 'build/variant_tools/ucsctools_wrap.cpp'
+UCSCTOOLS_WRAPPER_CPP_FILE = 'src/variant_tools/ucsctools_wrap.cpp'
 UCSCTOOLS_WRAPPER_PY_FILE = 'src/variant_tools/ucsctools.py'
 UCSCTOOLS_INTERFACE_FILE = 'src/variant_tools/ucsctools.i'
 SQLITE_PY_FILE = 'src/variant_tools/vt_sqlite3.py'
@@ -564,12 +564,12 @@ if not EMBEDDED_BOOST:
 
 
 #
-# Generate wrapper files (only in development mode)
+# During development, if an interface file needs to be re-generated, please
+# remove these files and they will be re-generated with SWIG
 #
-#
-if not os.path.isfile('build/swigpyrun.h'):
+if not os.path.isfile('src/swigpyrun.h'):
     try:
-       ret = subprocess.call(['swig -python -external-runtime build/swigpyrun.h -o build'], shell=True)
+       ret = subprocess.call(['swig -python -external-runtime src/swigpyrun.h -o build'], shell=True)
        if ret != 0: sys.exit('Failed to generate swig runtime header file.')
     except OSError as e:
         sys.exit('Failed to generate wrapper file. Please install swig (www.swig.org).')
@@ -579,8 +579,7 @@ if not os.path.isfile('build/swigpyrun.h'):
 #
 # we re-generate wrapper files for all versions of python only for
 # source distribution
-if (not os.path.isfile(ASSO_WRAPPER_PY_FILE) or not os.path.isfile(ASSO_WRAPPER_CPP_FILE) \
-  or os.path.getmtime(ASSO_WRAPPER_CPP_FILE) < max([os.path.getmtime(x) for x in ASSOC_HEADER + ASSOC_FILES])):
+if not os.path.isfile(ASSO_WRAPPER_PY_FILE) or not os.path.isfile(ASSO_WRAPPER_CPP_FILE):
     print('Generating {}'.format(ASSO_WRAPPER_CPP_FILE))
     print('swig ' + ' '.join(SWIG_OPTS + ['-o', ASSO_WRAPPER_CPP_FILE, ASSO_INTERFACE_FILE]))
     ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', ASSO_WRAPPER_CPP_FILE, ASSO_INTERFACE_FILE]), shell=True)
