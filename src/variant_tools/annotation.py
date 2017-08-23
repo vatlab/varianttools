@@ -95,8 +95,8 @@ class AnnoDBConfiger:
         if len(self.build) == 0:
             raise ValueError('No reference genome is specified for database {}'.format(annoDB))
         if not proj.build is None:
-            if (not self.build.keys()[0] == '*') and (not proj.build in self.build.keys()) and (proj.alt_build is None or \
-                proj.alt_build not in self.build.keys()):
+            if (not list(self.build.keys())[0] == '*') and (not proj.build in list(self.build.keys())) and (proj.alt_build is None or \
+                proj.alt_build not in list(self.build.keys())):
                 raise ValueError('Annotation database cannot be used because it is based on a reference '
                     'genome that is different from the one used by the project. Please use a version of '
                     'annotation databse for the project (vtools show annotations), or liftover the existing '
@@ -297,7 +297,7 @@ class AnnoDBConfiger:
     def importTxtRecords(self, db, source_files):
         #
         build_info = []
-        for key,items in self.build.items():
+        for key,items in list(self.build.items()):
             if key == '*':
                 continue
             try:
@@ -518,7 +518,7 @@ def use(args):
                     res = ResourceManager()
                     res.getLocalManifest()
                     res.selectFiles(resource_type='annotation')
-                    avail_annoDBs = [x for x in res.manifest.keys() if x.endswith('.ann')]
+                    avail_annoDBs = [x for x in list(res.manifest.keys()) if x.endswith('.ann')]
                     if '-' in args.source:
                         if 'annoDB/' + args.source in avail_annoDBs:
                             args.source = 'annoDB/{}'.format(args.source)

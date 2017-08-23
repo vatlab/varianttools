@@ -28,7 +28,7 @@ elif _swig_python_version_info >= (2, 6, 0):
         try:
             fp, pathname, description = imp.find_module('_assoTests', [dirname(__file__)])
         except ImportError:
-            import _assoTests
+            from . import _assoTests
             return _assoTests
         try:
             _mod = imp.load_module('_assoTests', fp, pathname, description)
@@ -39,7 +39,7 @@ elif _swig_python_version_info >= (2, 6, 0):
     _assoTests = swig_import_helper()
     del swig_import_helper
 else:
-    import _assoTests
+    from . import _assoTests
 del _swig_python_version_info
 
 try:
@@ -50,7 +50,7 @@ except NameError:
 try:
     import builtins as __builtin__
 except ImportError:
-    import __builtin__
+    import builtins
 
 def _swig_setattr_nondynamic(self, class_type, name, value, static=1):
     if (name == "thisown"):
@@ -84,7 +84,7 @@ def _swig_getattr(self, class_type, name):
 def _swig_repr(self):
     try:
         strthis = "proxy of " + self.this.__repr__()
-    except __builtin__.Exception:
+    except builtins.Exception:
         strthis = ""
     return "<%s.%s; %s >" % (self.__class__.__module__, self.__class__.__name__, strthis,)
 

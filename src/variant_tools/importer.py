@@ -32,7 +32,7 @@ import time
 from heapq import heappush, heappop, heappushpop
 from multiprocessing import Process, Pipe, Value, Lock, Manager
 if sys.version_info.major == 2:
-    from itertools import izip, repeat
+    from itertools import repeat
 else:
     izip = zip
     from itertools import repeat
@@ -154,10 +154,10 @@ class LineProcessor:
                         if ':' in x:
                             # a slice
                             if x.count(':') == 1:
-                                start,end = map(str.strip, x.split(':'))
+                                start,end = list(map(str.strip, x.split(':')))
                                 step = None
                             else:
-                                start,end,step = map(str.strip, x.split(':'))
+                                start,end,step = list(map(str.strip, x.split(':')))
                                 step = int(step) if step else None
                             start = int(start) - 1 if start else None
                             if end.strip():
@@ -191,7 +191,7 @@ class LineProcessor:
                     # case of index=8::2
                     elif len(indexes) == 1:
                         # single slice
-                        cols = range(len(tokens))[indexes[0]]
+                        cols = list(range(len(tokens)))[indexes[0]]
                         if self.import_sample_range is not None:
                             # limiting the columns to import
                             if self.import_sample_range[0] >= len(cols) or self.import_sample_range[1] > len(cols):
@@ -208,9 +208,9 @@ class LineProcessor:
                         cIdx += len(cols)
                     else:
                         # we need to worry about mixing integer and slice
-                        expanded_indexes = [repeat(s, len(tokens)) if type(s) == int else range(len(tokens))[s] for s in indexes]
+                        expanded_indexes = [repeat(s, len(tokens)) if type(s) == int else list(range(len(tokens)))[s] for s in indexes]
                         count = 0
-                        for idx, c in enumerate(izip(*expanded_indexes)):
+                        for idx, c in enumerate(zip(*expanded_indexes)):
                             if self.import_sample_range is not None:
                                 if idx < self.import_sample_range[0] or idx >= self.import_sample_range[1]:
                                     continue
@@ -633,7 +633,7 @@ class MultiGenotypeWriter(BaseGenotypeWriter):
             self.cache[id] = [rec]
     
     def commit_remaining(self):
-        for id, val in self.cache.iteritems():
+        for id, val in self.cache.items():
             if len(val) > 0:
                 self.cur[self.dispatcher[id]].executemany(self.query.format(id), val)
         for db in self.db:
@@ -699,7 +699,7 @@ class InPlaceGenotypeWriter(BaseGenotypeWriter):
             self.db.commit()
     
     def commit_remaining(self):
-        for id, val in self.cache.iteritems():
+        for id, val in self.cache.items():
             if len(val) > 0:
                 self.cur.executemany(self.query.format(id), val)
         self.db.commit()
@@ -864,7 +864,7 @@ class ImportStatus:
 
     def pendingImport(self):
         # return waiting (queued, to be imported) and ongoing import
-        return sum([x == 0 for x in self.tasks.values()]), sum([x == 1 for x in self.tasks.values()])
+        return sum([x == 0 for x in list(self.tasks.values())]), sum([x == 1 for x in list(self.tasks.values())])
 
     def addDedupItem(self, geno_file, geno_status, IDs):
         self.lock.acquire()
@@ -896,7 +896,7 @@ class ImportStatus:
             ret = None
         else:
             # return any item
-            key = self.pending_copied.keys()[0]
+            key = list(self.pending_copied.keys())[0]
             ret = key[0], key[1], self.pending_copied.pop(key)
         self.lock.release()
         return ret
@@ -1559,7 +1559,7 @@ class Importer:
         loci_count = 0
         with open(to_be_mapped, 'w') as output:
             for key in self.variantIndex:
-                for pos, status in self.variantIndex[key].iteritems():
+                for pos, status in self.variantIndex[key].items():
                     if status[1] == 1:
                         output.write('{0}\t{1}\t{2}\t{3}/{4}/{5}\n'.format(key[0] if len(key[0]) > 2 else 'chr' + key[0],
                            pos - 1, pos, key[1], key[2], status[0]))
@@ -1885,7 +1885,7 @@ def importVariants(args):
             importer = Importer(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
-            print(env.temp_dir)
+            print((env.temp_dir))
             if args.jobs <= 1 and not args.HDF5:
                 # if jobs == 1, use the old algorithm that insert variant and
                 # genotype together ...

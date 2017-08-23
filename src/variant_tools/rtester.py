@@ -31,7 +31,7 @@ from .utils import env, downloadFile, runCommand, mkdir_p, flatten, pairwise, ma
 from .project import Field
 from .tester import freq, ExternTest
 if sys.version_info.major == 2:
-    from ConfigParser import SafeConfigParser as RCP
+    from configparser import SafeConfigParser as RCP
 else:
     from configparser import SafeConfigParser as RCP
 from collections import OrderedDict
@@ -41,7 +41,7 @@ import io
 from types import *
 if sys.version < '2.3': 
 	set = frozenset = tuple
-	basestring = str
+	str = str
 elif sys.version < '2.4':
 	from sets import Set as set, ImmutableSet as frozenset
 
@@ -49,7 +49,7 @@ if sys.version < '3.0':
 	_mystr = _mybytes = lambda s:s
 else:
 	from functools import reduce
-	long, basestring, unicode = int, str, str
+	int, str, str = int, str, str
 	_mybytes = lambda s:bytes(s, 'utf8') #'ascii')
 	_mystr = lambda s:str(s, 'utf8')
 	StringType = str
@@ -84,13 +84,13 @@ def SeqStr(obj, method='c(', tail=')'):
         return (method + ','.join(list(map(Str4R, obj))) + tail)
     obj0 = obj_not_none[0]
     tp0 = type(obj0)
-    simple_types = [str, bool, int, long, float, complex]
-    num_types = [int, long, float, complex]
-    is_int = tp0 in (int, long) 
+    simple_types = [str, bool, int, int, float, complex]
+    num_types = [int, int, float, complex]
+    is_int = tp0 in (int, int) 
     if tp0 not in simple_types and method == 'c(':
         method = 'list('
     else:
-        tps = isinstance(obj0, basestring) and [StringType] or num_types
+        tps = isinstance(obj0, str) and [StringType] or num_types
         for i in obj_not_none[1:]:
             tp = type(i)
             if tp not in tps:
@@ -98,7 +98,7 @@ def SeqStr(obj, method='c(', tail=')'):
                     method = 'list('
                 is_int = False
                 break
-            elif is_int and tp not in (int, long):
+            elif is_int and tp not in (int, int):
                 is_int = False
     # convert
     return (is_int and 'as.integer(' or '') + \
@@ -116,9 +116,9 @@ def OtherStr(obj):
             return SeqStr(list(obj))
     return repr(obj)
 
-base_tps = [type(None), bool, int, long, float, complex, str, unicode, list, tuple, set, frozenset, dict] # use type(None) instead of NoneType since the latter cannot be found in the types module in Python 3
+base_tps = [type(None), bool, int, int, float, complex, str, str, list, tuple, set, frozenset, dict] # use type(None) instead of NoneType since the latter cannot be found in the types module in Python 3
 base_tps.reverse()
-str_func = {type(None):NoneStr, bool:BoolStr, long:LongStr, int:repr, float:repr, complex:ComplexStr, str:repr, unicode:repr, list:SeqStr, tuple:SeqStr, set:SeqStr, frozenset:SeqStr, dict:DictStr}
+str_func = {type(None):NoneStr, bool:BoolStr, int:LongStr, int:repr, float:repr, complex:ComplexStr, str:repr, str:repr, list:SeqStr, tuple:SeqStr, set:SeqStr, frozenset:SeqStr, dict:DictStr}
 
 def Str4R(obj, method = 'c'):
     '''
@@ -413,7 +413,7 @@ class RTest(ExternTest):
         #
         flds = []; tps = []; comments = []
         for var in self.outconf:
-            for k, item in self.outconf[var].items():
+            for k, item in list(self.outconf[var].items()):
                 if k == 'name':
                     fld = item
                 elif k == 'type':
@@ -480,7 +480,7 @@ class RTest(ExternTest):
         # Variant information matrix
         if len(self.pydata['var_info']):
                 self.Rdata.append('''{0}@V = as.data.frame({1})'''.\
-                                    format(self.datvar, Str4R(zip(*self.pydata['var_info']), method = 'cbind')))            
+                                    format(self.datvar, Str4R(list(zip(*self.pydata['var_info'])), method = 'cbind')))            
                 self.Rdata.append('''rownames({0}@V) = {1}'''.\
                                     format(self.datvar, Str4R([':'.join(x) for x in self.pydata['coordinate']])))                                    
                 self.Rdata.append('''colnames({0}@V) = {1}'''.\

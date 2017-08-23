@@ -31,7 +31,7 @@ import sys
 import glob
 import logging
 import subprocess
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import getpass
 import time
 import tempfile
@@ -133,7 +133,7 @@ else:
     _user_options = {x:y for x,y,z in default_user_options}
 #
 # overriding site option with local setting
-for k, v in _user_options.items():
+for k, v in list(_user_options.items()):
     if not hasattr(site_options, k):
         setattr(site_options, k, v)
                
@@ -158,7 +158,7 @@ except ImportError as e:
 
 try:
     # fake import to make this sqlite module bundled by pyinstaller
-    import _vt_sqlite3_ext
+    from . import _vt_sqlite3_ext
 except ImportError as e:
     pass
 
@@ -840,7 +840,7 @@ class PrettyPrinter:
     #
     def direct_print(self, data):
         '''print data directly using specified delimiter'''
-        print(self.delimiter.join([self.formatter(x) for x in data]))
+        print((self.delimiter.join([self.formatter(x) for x in data])))
 
     def direct_print_rest(self):
         '''No cache so do nothing'''
@@ -853,12 +853,12 @@ class PrettyPrinter:
         '''Use cache, figure out column width'''
         data = [self.formatter(x) for x in raw_data]
         trimmed = {}
-        for c,m in self.max_width.items():
+        for c,m in list(self.max_width.items()):
             if len(data[c]) > m:
                 trimmed[c] = data[c][: m // 3] + '...' + data[c][ - (m - m // 3 - 3):]
         if trimmed:
             trimmed_data = [x for x in data]
-            for c,txt in trimmed.items():
+            for c,txt in list(trimmed.items()):
                 trimmed_data[c] = txt
         else:
             trimmed_data = data
@@ -887,28 +887,28 @@ class PrettyPrinter:
         # at the end of each line
         self.width[-1] = 0
         # print everything in cache
-        print('\n'.join([
+        print(('\n'.join([
             self.delimiter.join(
                 [col.ljust(width) for col, width in zip(row, self.width)])
-            for row in self.rows]))
+            for row in self.rows])))
         # clear cache
         self.rows = []
 
     def uncached_trim_print(self, raw_data):
         data = [self.formatter(x) for x in raw_data]
         trimmed = {}
-        for c,m in self.max_width.items():
+        for c,m in list(self.max_width.items()):
             if len(data[c]) > m:
                 trimmed[c] = data[c][: m // 3] + '...' + data[c][ - (m - m // 3 - 3):]
         if trimmed:
             trimmed_data = [x for x in data]
-            for c,txt in trimmed.items():
+            for c,txt in list(trimmed.items()):
                 trimmed_data[c] = txt
         else:
             trimmed_data = data
         #
-        print(self.delimiter.join(
-            [col.ljust(width) for col, width in zip(trimmed_data, self.width)]))
+        print((self.delimiter.join(
+            [col.ljust(width) for col, width in zip(trimmed_data, self.width)])))
 
     #
     # MODE 3: cached, untrimmed print
@@ -937,15 +937,15 @@ class PrettyPrinter:
         # do not ljust the last column. This avoids unnecessary spaces
         # at the end of each line
         self.width[-1] = 0
-        print('\n'.join([
+        print(('\n'.join([
             self.delimiter.join(
                 [col.ljust(width) for col, width in zip(row, self.width)])
-            for row in self.rows]))
+            for row in self.rows])))
         self.rows = []
     
     def uncached_print(self, data):
-        print(self.delimiter.join(
-            [col.ljust(width) for col, width in zip(data, self.width)]))
+        print((self.delimiter.join(
+            [col.ljust(width) for col, width in zip(data, self.width)])))
 
 
 def hasCommand(cmd):
@@ -1016,11 +1016,11 @@ def typeOfValues(vals):
         # a good default value?
         return 'VARCHAR(255)'
     try:
-        map(int, vals)
+        list(map(int, vals))
         return 'INT'
     except:
         try:
-            map(float, vals)
+            list(map(float, vals))
             return 'FLOAT'
         except:
             return 'VARCHAR({})'.format(max([len(x) for x in vals]))
@@ -1055,7 +1055,7 @@ class delayedAction:
 
 def filesInURL(URL, ext=''):
     '''directory listing of a URL'''
-    fh = urllib.urlopen(URL)
+    fh = urllib.request.urlopen(URL)
     files = []
     for line in fh.readlines():
         m = re.search('href="(.*){}"'.format(ext), line.decode())
@@ -1346,7 +1346,7 @@ def getSnapshotInfo(name):
     try:
         with tarfile.open(snapshot_file, mode) as snapshot:
             while True:
-                tarinfo = snapshot.next()
+                tarinfo = next(snapshot)
                 if tarinfo.name in ['.snapshot.info', 'README']:
                     readme = snapshot.extractfile(tarinfo)
                     break
@@ -1700,7 +1700,7 @@ class ResourceManager:
             elif os.path.isdir(env.local_resource):
                 dest_file = os.path.join(env.local_resource, 'MANIFEST_ALL.txt')
         #
-        keys = self.manifest.keys()
+        keys = list(self.manifest.keys())
         keys.sort()
         env.logger.trace('Write manifect to {}'.format(dest_file))
         with open(dest_file, 'w') as manifest:
@@ -1844,7 +1844,7 @@ class ResourceManager:
                     servers[path] = 1
             #
             env.logger.trace('{} mirrors are identified.'.format(len(servers)))
-            for server in servers.keys():
+            for server in list(servers.keys()):
                 try:
                     # try to download from a local or online repository
                     if '://' not in server:
@@ -1891,30 +1891,30 @@ class ResourceManager:
                 for root, dirs, files in os.walk(env.local_resource):
                     filenames |= set([os.path.relpath(os.path.join(root, f), env.local_resource) for f in files])
             #
-            self.manifest = {x:y for x,y in self.manifest.iteritems() if x in filenames}
+            self.manifest = {x:y for x,y in self.manifest.items() if x in filenames}
             return
         elif resource_type == 'format':
-            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('format/')}
+            self.manifest = {x:y for x,y in self.manifest.items() if x.startswith('format/')}
         elif resource_type == 'snapshot':
-            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('snapshot/')}
+            self.manifest = {x:y for x,y in self.manifest.items() if x.startswith('snapshot/')}
         elif resource_type in ['annotation', 'annoDB']:
-            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('annoDB/')}
+            self.manifest = {x:y for x,y in self.manifest.items() if x.startswith('annoDB/')}
         elif resource_type == 'pipeline':
-            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('pipeline/') and not x.endswith('.py')}
+            self.manifest = {x:y for x,y in self.manifest.items() if x.startswith('pipeline/') and not x.endswith('.py')}
         elif resource_type == 'simulation':
-            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('simulation/')}
+            self.manifest = {x:y for x,y in self.manifest.items() if x.startswith('simulation/')}
         elif resource_type == 'reference':
-            self.manifest = {x:y for x,y in self.manifest.iteritems() if x.startswith('reference/')}
+            self.manifest = {x:y for x,y in self.manifest.items() if x.startswith('reference/')}
         elif resource_type == 'hg18':
-            self.manifest = {x:y for x,y in self.manifest.iteritems() if '*' in y[2] or 'hg18' in y[2]}
+            self.manifest = {x:y for x,y in self.manifest.items() if '*' in y[2] or 'hg18' in y[2]}
         elif resource_type == 'hg19':
-            self.manifest = {x:y for x,y in self.manifest.iteritems() if '*' in y[2] or 'hg19' in y[2]}
+            self.manifest = {x:y for x,y in self.manifest.items() if '*' in y[2] or 'hg19' in y[2]}
         elif resource_type == 'hg38':
-            self.manifest = {x:y for x,y in self.manifest.iteritems() if '*' in y[2] or 'hg38' in y[2]}
+            self.manifest = {x:y for x,y in self.manifest.items() if '*' in y[2] or 'hg38' in y[2]}
         # remove obsolete annotation databases 
         if resource_type in ('hg18', 'hg19', 'hg38', 'current', 'annotation'):
             # y[2] is reference genome
-            annoDBs = [(x.split('-', 1), y[2]) for x,y in self.manifest.iteritems() if x.startswith('annoDB/') and not x.endswith('.ann')]
+            annoDBs = [(x.split('-', 1), y[2]) for x,y in self.manifest.items() if x.startswith('annoDB/') and not x.endswith('.ann')]
             # find the latest version of each db
             versions = {}
             for db, refGenome in annoDBs:
@@ -1930,7 +1930,7 @@ class ResourceManager:
                 else:
                     versions[refGenome][db[0]] = db[1]
             # only keep the latest version
-            self.manifest = {x:y for x,y in self.manifest.iteritems() if not x.startswith('annoDB/') or x.endswith('.ann') or \
+            self.manifest = {x:y for x,y in self.manifest.items() if not x.startswith('annoDB/') or x.endswith('.ann') or \
                 (x.split('-', 1)[1] if '-' in x else None) == versions[y[2]][x.split('-', 1)[0]]}
 
     def excludeExistingLocalFiles(self, resource_dir):
@@ -1961,7 +1961,7 @@ class ResourceManager:
         changed = []
         added = 0
         start_time = time.time()
-        for cnt, filename in enumerate(sorted(self.manifest.keys())):
+        for cnt, filename in enumerate(sorted(list(self.manifest.keys()))):
             fileprop = self.manifest[filename]
             dest_dir = os.path.join(env.local_resource, os.path.split(filename)[0])
             if not os.path.isdir(dest_dir):
@@ -1981,7 +1981,7 @@ class ResourceManager:
     def downloadResources(self, dest_dir=None):
         '''Download resources'''
         excluded = []
-        for cnt, filename in enumerate(sorted(self.manifest.keys())):
+        for cnt, filename in enumerate(sorted(list(self.manifest.keys()))):
             fileprop = self.manifest[filename]
             #
             try:
@@ -2198,7 +2198,7 @@ def downloadURL(URL, dest, quiet, message=None):
     if not quiet:
         prog = ProgressBar(message)
     try:
-        urllib.URLopener().open(URL)
+        urllib.request.URLopener().open(URL)
     except IOError as error_code:
         if error_code[1] == 404:
             raise RuntimeError('ERROR 404: Not Found.')
@@ -2206,7 +2206,7 @@ def downloadURL(URL, dest, quiet, message=None):
             raise RuntimeError('Unknown error has happend: {}'.format(error_code[1]))
     else:
         dest_tmp = TEMP(dest)
-        urllib.urlretrieve(URL, dest_tmp, reporthook=None if quiet else prog.urllibUpdate)
+        urllib.request.urlretrieve(URL, dest_tmp, reporthook=None if quiet else prog.urllibUpdate)
         os.rename(dest_tmp, dest)
     if not quiet:
         prog.done()
@@ -2518,7 +2518,7 @@ def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
                     continue
                 # we do not check if f is one of _ifiles or _ofiles because presentation
                 # of files might differ
-                if not any([os.path.realpath(f) == x for x in ifiles_checked.keys()]):
+                if not any([os.path.realpath(f) == x for x in list(ifiles_checked.keys())]):
                     if not any([os.path.realpath(f) == os.path.realpath(x) for x in _ofiles]):
                         env.logger.warning('{} in exe_info is not an required input or putput file.'.format(f))
                 else:
@@ -2545,7 +2545,7 @@ def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
                 md5matched.append(f)
             #
             if not all(ifiles_checked.values()):
-                env.logger.error('Input or dependent file {} is not recorded in exe_info file.'.format(', '.join([x for x,y in ifiles_checked.items() if not y])))
+                env.logger.error('Input or dependent file {} is not recorded in exe_info file.'.format(', '.join([x for x,y in list(ifiles_checked.items()) if not y])))
                 return False
         if len(nFiles) != 2 or nFiles[1] == 0:
             env.logger.warning('Incomplete runtime information for output file {} due to interrupted execution.'.format(os.path.basename(md5file).rsplit('.',1)[0]))
@@ -3228,7 +3228,7 @@ def consolidateFieldName(proj, table, clause_or_list, alt_build=False):
                 crrFile = downloadFile('reference/{}.crr'.format(build))
             except Exception as e:
                 raise ValueError('Cannot find reference genome for build {}: {}'.format(build, e))
-        for k,v in ref_tokens.items():
+        for k,v in list(ref_tokens.items()):
             if v == '__MUTSEQ__':
                 query = re.sub(r'{}\s*\('.format(v), " {}('{}', chr, pos, ref, alt, ".format(k, crrFile), query)
             else:

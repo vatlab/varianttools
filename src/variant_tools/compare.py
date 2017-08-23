@@ -101,12 +101,12 @@ def countVariantDifference(proj, args):
         variants.append(set([x[0] for x in cur.fetchall()]))
     #
     env.logger.info('Number of variants in A but not B, B but not A, A and B, and A or B')
-    print('{}\t{}\t{}\t{}'.format(
+    print(('{}\t{}\t{}\t{}'.format(
         len(variants[0] - variants[1]), 
         len(variants[1] - variants[0]),
         len(variants[0] & variants[1]),
         len(variants[0] | variants[1])
-        ))
+        )))
 
 def countSiteDifference(proj, args):
     cur = proj.db.cursor()
@@ -144,7 +144,7 @@ def countSiteDifference(proj, args):
     env.logger.info(site_counts)
     env.logger.info('Number of variants in both tables with locations in '
         'A only, B only, in A and B, and in A or B')
-    print('{}\t{}\t{}\t{}'.format(
+    print(('{}\t{}\t{}\t{}'.format(
         # variants in A, with location not in B
         sum([len(sites[0][x]) for x in site0 - site1]),
         # variants in B, with location not in A
@@ -153,7 +153,7 @@ def countSiteDifference(proj, args):
         sum([len(sites[0][x] | sites[1][x]) for x in site0 & site1]),
         # variants with location in either A or B
         len(all_variants)
-    ))
+    )))
 
 
 def countGenotypeDifference(proj, args):
@@ -190,12 +190,12 @@ def countGenotypeDifference(proj, args):
     )
     env.logger.info(geno_counts)
     env.logger.info('Number of variants with genotypes in A only, B only, in A and B, and in A or B')
-    print('{}\t{}\t{}\t{}'.format(
+    print(('{}\t{}\t{}\t{}'.format(
         len(set([x[0] for x in (geno[0] - geno[1])])),
         len(set([x[0] for x in (geno[1] - geno[0])])),
         len(set([x[0] for x in (geno[0] & geno[1])])),
         len(set([x[0] for x in (geno[0] | geno[1])]))
-    ))
+    )))
 
 
 def compareTables(proj, args):
@@ -276,36 +276,36 @@ def compareTables(proj, args):
             else:
                 if args.difference is not None:
                     # in diff but not in v
-                    site_diff = {x:y for x,y in site_diff.items() if x not in v}
+                    site_diff = {x:y for x,y in list(site_diff.items()) if x not in v}
                 if args.union is not None:
                     # in any of them
-                    site_union = {x:(y if x not in v else (y|v[x])) for x,y in site_union.items()}
-                    site_union.update({x:y for x,y in v.items() if x not in site_union})
+                    site_union = {x:(y if x not in v else (y|v[x])) for x,y in list(site_union.items())}
+                    site_union.update({x:y for x,y in list(v.items()) if x not in site_union})
                 if args.intersection is not None:
                     # in both, need to combine ids
-                    site_intersect = {x:(y|v[x]) for x,y in site_intersect.items() if x in v}
+                    site_intersect = {x:(y|v[x]) for x,y in list(site_intersect.items()) if x in v}
                 if args.expression is not None:
                     sites.append(v)
         #
         if args.difference is not None:
             env.logger.info('Unique sites in table {} only: {}'
                 .format(args.tables[0], len(site_diff)))
-            for k in site_diff.values():
+            for k in list(site_diff.values()):
                 var_diff |= k
         if args.union is not None:
             env.logger.info('Sites in any of the tables: {}'
                 .format(len(site_union)))
-            for k in site_union.values():
+            for k in list(site_union.values()):
                 var_union |= k
         if args.intersection is not None:
             env.logger.info('Sites in all tables: {}'
                 .format(len(site_intersect)))
-            for k in site_intersect.values():
+            for k in list(site_intersect.values()):
                 var_intersect |= k
         if args.expression is not None:
             site_dict = {}
             for idx, s in enumerate(sites):
-                site_dict['_{}'.format(idx+1)] = s.keys()
+                site_dict['_{}'.format(idx+1)] = list(s.keys())
             # evaluate the expression
             try:
                 site_expr = eval(args.eval_expr, site_dict, site_dict)
@@ -409,13 +409,13 @@ def compareTables(proj, args):
         proj.db.commit()
     # count by default
     if args.difference is not None:
-        print(len(var_diff))
+        print((len(var_diff)))
     if args.union is not None:
-        print(len(var_union))
+        print((len(var_union)))
     if args.intersection is not None:
-        print(len(var_intersect))
+        print((len(var_intersect)))
     if args.expression is not None:
-        print(len(var_expression))
+        print((len(var_expression)))
 
 def parseExpression(expr, passed_tables):
     pieces = re.split(r'''("[^"]+"|'[^']+'|[a-zA-Z0-9_]+|\(|\)|\^|\||\&|-|=)''', expr)

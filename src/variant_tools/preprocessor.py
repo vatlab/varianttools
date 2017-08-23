@@ -1266,7 +1266,7 @@ class PlinkBinaryToVariants:
         if giter is None: giter = self.cur
         try:
             locus = next(viter)
-            genotypes = giter.next()
+            genotypes = next(giter)
         except StopIteration:
             giter.close()
             return False, None

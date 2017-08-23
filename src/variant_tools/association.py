@@ -574,7 +574,7 @@ class GenotypeLoader(Process):
                         cur_group = grp
                     else:
                         data[grp][rec[0]] = rec[1:-lenGrp]
-                for grp,val in data.iteritems():
+                for grp,val in data.items():
                     shelf.add('{},{}'.format(id, grp), val)
                 # report progress, and tells the master process who owns the data
                 self.cached_samples[id] = 1 + self.index
@@ -728,7 +728,7 @@ class AssoTestsWorker(Process):
 
     def __del__(self):
         self.db.close()
-        for val in self.shelves.values():
+        for val in list(self.shelves.values()):
             val.close()
 
     def getVarInfo(self, group, where_clause):
@@ -745,7 +745,7 @@ class AssoTestsWorker(Process):
             data = {x[0]:[] for x in cur.fetchall()}
         else:
             data = {x[0]:x[1:] for x in cur.fetchall()}
-        variant_id = sorted(data.keys(), key=int)
+        variant_id = sorted(list(data.keys()), key=int)
         for idx, key in enumerate(self.var_info):
             if key not in ['variant.chr', 'variant.pos']:
                 var_info[key] = [data[x][idx] if (type(data[x][idx]) in [int, float]) else float('NaN') for x in variant_id]
@@ -829,10 +829,10 @@ class AssoTestsWorker(Process):
             for idx in range(len(genotype)):
                 # filter genotype and geno_info
                 genotype[idx] = [i for i, j in zip(genotype[idx], keep_loci) if j]
-                for k in geno_info.keys():
+                for k in list(geno_info.keys()):
                     geno_info[k][idx] = [i for i, j in zip(geno_info[k][idx], keep_loci) if j]
             # filter var_info
-            for k in var_info.keys():
+            for k in list(var_info.keys()):
                 var_info[k] = [i for i, j in zip(var_info[k], keep_loci) if j]
             #
             env.logger.debug('In {}, {} out of {} loci will be removed due to '
@@ -848,7 +848,7 @@ class AssoTestsWorker(Process):
         geno = [x for idx, x in enumerate(data) if which[idx]]
         self.data.setGenotype(geno)
         self.data.setVar("gname", str(grpname))
-        for field in info.keys():
+        for field in list(info.keys()):
             self.data.setVar('__geno_' + field, [x for idx, x in enumerate(info[field]) if which[idx]])
 
     def setPhenotype(self, which):
@@ -864,7 +864,7 @@ class AssoTestsWorker(Process):
           self.data.setPhenotype(phen)
 
     def setVarInfo(self, data):
-        for field in data.keys():
+        for field in list(data.keys()):
             if field not in ['chr', 'pos']:
                 self.data.setVar('__var_' + field, data[field])
 
@@ -895,15 +895,15 @@ class AssoTestsWorker(Process):
         # var_info
         self.pydata['var_info'] = []
         self.pydata['var_info_header'] = []
-        for k, item in var_info.items():
+        for k, item in list(var_info.items()):
              if k != 'variant.chr' and k != 'variant.pos':
                  self.pydata['var_info_header'].append(k)
-                 self.pydata['var_info'].append(map(fstr, item))
-        self.pydata['var_info'] = zip(*self.pydata['var_info'])
+                 self.pydata['var_info'].append(list(map(fstr, item)))
+        self.pydata['var_info'] = list(zip(*self.pydata['var_info']))
         # geno_info
         self.pydata['geno_info'] = []
         self.pydata['geno_info_header'] = []
-        for k, item in geno_info.items():
+        for k, item in list(geno_info.items()):
             self.pydata['geno_info_header'].append(k)
             if recode_missing:
                 self.pydata['geno_info'].append([[missing_code if math.isnan(e) else e for e in x] for idx, x in enumerate(item) if which[idx]])
@@ -913,8 +913,8 @@ class AssoTestsWorker(Process):
         # D1: samples
         # D2: variants
         # D3: geno_info 
-        self.pydata['geno_info'] = zip(*self.pydata['geno_info'])
-        self.pydata['geno_info'] = [zip(*item) for item in self.pydata['geno_info']]
+        self.pydata['geno_info'] = list(zip(*self.pydata['geno_info']))
+        self.pydata['geno_info'] = [list(zip(*item)) for item in self.pydata['geno_info']]
         unique_names = self.sample_names
         if len(self.sample_names) != len(set(self.sample_names)):
             env.logger.warning("Duplicated sample names found. Using 'sample_ID.sample_name' as sample names") 
@@ -1231,7 +1231,7 @@ def associate(args):
 
 def getAllTests():
     '''List all tests (all classes that subclasses of NullTest/GLMBurdenTest) in this module'''
-    return sorted([(name, obj) for name, obj in globals().iteritems() \
+    return sorted([(name, obj) for name, obj in globals().items() \
         if type(obj) == type(NullTest) and issubclass(obj, NullTest) \
             and name not in ('NullTest', 'ExternTest', 'GLMBurdenTest',
                              'CaseCtrlBurdenTest', 'ScoreSeq')], key=lambda x: x[0])

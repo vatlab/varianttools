@@ -134,7 +134,7 @@ def generateHDFbyGroup(testManager,njobs):
                 break
     for groupHDFGenerator in groupGenerators:
         groupHDFGenerator.join()
-    print("group time: ",time.time()-start)
+    print(("group time: ",time.time()-start))
 
 
 
@@ -191,7 +191,7 @@ class GroupHDFGenerator_memory(Process):
                           
                     except:
                         pass
-                for key,value in genoDict.items():
+                for key,value in list(genoDict.items()):
                     hdf5matrix=HMatrix(value[2],value[1],value[0],(len(value[3]),len(colnames)),value[3],colnames)
                     storageEngine.store(hdf5matrix,chr,key) 
                 accessEngine.close()
@@ -279,7 +279,7 @@ def getGroupDict(testManager):
                 geneDict[id]=[]
             geneDict[id].append(geneSymbol)
     shareDict=Manager().dict()
-    for key,value in geneDict.items():
+    for key,value in list(geneDict.items()):
         shareDict[key]=value
 
     return shareDict,geneSet
@@ -310,7 +310,7 @@ def generateHDFbyGroup_update(testManager,njobs):
                 break
     for groupHDFGenerator in groupGenerators:
         groupHDFGenerator.join()
-    print("group time: ",time.time()-start)
+    print(("group time: ",time.time()-start))
 
 
 

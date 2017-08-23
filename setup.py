@@ -26,11 +26,6 @@
 from distutils.ccompiler import new_compiler
 from setuptools import find_packages, setup, Extension
 
-try:
-   from distutils.command.build_py import build_py_2to3 as build_py
-except ImportError:
-   from distutils.command.build_py import build_py
-
 # parallel compilation
 import multiprocessing, multiprocessing.pool
 
@@ -382,40 +377,40 @@ LIB_GSL = [
     ]
 
 LIB_BOOST = [
-    'build/boost_1_49_0/libs/iostreams/src/bzip2.cpp',
-    'build/boost_1_49_0/libs/iostreams/src/file_descriptor.cpp',
-    'build/boost_1_49_0/libs/iostreams/src/gzip.cpp',
-    'build/boost_1_49_0/libs/iostreams/src/mapped_file.cpp',
-    'build/boost_1_49_0/libs/iostreams/src/zlib.cpp',
-    'build/boost_1_49_0/libs/regex/src/c_regex_traits.cpp',
-    'build/boost_1_49_0/libs/regex/src/cpp_regex_traits.cpp',
-    'build/boost_1_49_0/libs/regex/src/cregex.cpp',
-    'build/boost_1_49_0/libs/regex/src/fileiter.cpp',
-    'build/boost_1_49_0/libs/regex/src/icu.cpp',
-    'build/boost_1_49_0/libs/regex/src/instances.cpp',
-    'build/boost_1_49_0/libs/regex/src/posix_api.cpp',
-    'build/boost_1_49_0/libs/regex/src/regex.cpp',
-    'build/boost_1_49_0/libs/regex/src/regex_debug.cpp',
-    'build/boost_1_49_0/libs/regex/src/regex_raw_buffer.cpp',
-    'build/boost_1_49_0/libs/regex/src/regex_traits_defaults.cpp',
-    'build/boost_1_49_0/libs/regex/src/static_mutex.cpp',
-    'build/boost_1_49_0/libs/regex/src/usinstances.cpp',
-    'build/boost_1_49_0/libs/regex/src/w32_regex_traits.cpp',
-    'build/boost_1_49_0/libs/regex/src/wc_regex_traits.cpp',
-    'build/boost_1_49_0/libs/regex/src/wide_posix_api.cpp',
-    'build/boost_1_49_0/libs/regex/src/winstances.cpp',
-    'build/boost_1_49_0/libs/filesystem/v3/src/codecvt_error_category.cpp',
-    'build/boost_1_49_0/libs/filesystem/v3/src/operations.cpp',
-    'build/boost_1_49_0/libs/filesystem/v3/src/path.cpp',
-    'build/boost_1_49_0/libs/filesystem/v3/src/path_traits.cpp',
-    'build/boost_1_49_0/libs/filesystem/v3/src/portability.cpp',
-    'build/boost_1_49_0/libs/filesystem/v3/src/unique_path.cpp',
-    'build/boost_1_49_0/libs/filesystem/v3/src/utf8_codecvt_facet.cpp',
-    'build/boost_1_49_0/libs/filesystem/v3/src/windows_file_codecvt.cpp',
-    'build/boost_1_49_0/libs/filesystem/v2/src/v2_operations.cpp',
-    'build/boost_1_49_0/libs/filesystem/v2/src/v2_portability.cpp',
-    'build/boost_1_49_0/libs/filesystem/v2/src/v2_path.cpp',
-    'build/boost_1_49_0/libs/system/src/error_code.cpp'
+    'src/boost_1_49_0/libs/iostreams/src/bzip2.cpp',
+    'src/boost_1_49_0/libs/iostreams/src/file_descriptor.cpp',
+    'src/boost_1_49_0/libs/iostreams/src/gzip.cpp',
+    'src/boost_1_49_0/libs/iostreams/src/mapped_file.cpp',
+    'src/boost_1_49_0/libs/iostreams/src/zlib.cpp',
+    'src/boost_1_49_0/libs/regex/src/c_regex_traits.cpp',
+    'src/boost_1_49_0/libs/regex/src/cpp_regex_traits.cpp',
+    'src/boost_1_49_0/libs/regex/src/cregex.cpp',
+    'src/boost_1_49_0/libs/regex/src/fileiter.cpp',
+    'src/boost_1_49_0/libs/regex/src/icu.cpp',
+    'src/boost_1_49_0/libs/regex/src/instances.cpp',
+    'src/boost_1_49_0/libs/regex/src/posix_api.cpp',
+    'src/boost_1_49_0/libs/regex/src/regex.cpp',
+    'src/boost_1_49_0/libs/regex/src/regex_debug.cpp',
+    'src/boost_1_49_0/libs/regex/src/regex_raw_buffer.cpp',
+    'src/boost_1_49_0/libs/regex/src/regex_traits_defaults.cpp',
+    'src/boost_1_49_0/libs/regex/src/static_mutex.cpp',
+    'src/boost_1_49_0/libs/regex/src/usinstances.cpp',
+    'src/boost_1_49_0/libs/regex/src/w32_regex_traits.cpp',
+    'src/boost_1_49_0/libs/regex/src/wc_regex_traits.cpp',
+    'src/boost_1_49_0/libs/regex/src/wide_posix_api.cpp',
+    'src/boost_1_49_0/libs/regex/src/winstances.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/codecvt_error_category.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/operations.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/path.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/path_traits.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/portability.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/unique_path.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/utf8_codecvt_facet.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/windows_file_codecvt.cpp',
+    'src/boost_1_49_0/libs/filesystem/v2/src/v2_operations.cpp',
+    'src/boost_1_49_0/libs/filesystem/v2/src/v2_portability.cpp',
+    'src/boost_1_49_0/libs/filesystem/v2/src/v2_path.cpp',
+    'src/boost_1_49_0/libs/system/src/error_code.cpp'
 ]
 
 LIB_PLINKIO = [
@@ -526,7 +521,7 @@ LIB_UCSC_FILES = [
     
 LIB_STAT = ['src/variant_tools/fisher2.c']
 
-EMBEDDED_BOOST = os.path.isdir('build/boost_1_49_0')
+EMBEDDED_BOOST = os.path.isdir('src/boost_1_49_0')
 if not EMBEDDED_BOOST:
     def downloadProgress(count, blockSize, totalSize):
         perc = count * blockSize * 100 // totalSize
@@ -544,11 +539,11 @@ if not EMBEDDED_BOOST:
         BOOST_URL = 'http://downloads.sourceforge.net/project/boost/boost/1.49.0/boost_1_49_0.tar.gz?r=&ts=1435893980&use_mirror=iweb'
         sys.stdout.write('Downloading boost C++ library 1.49.0 ')
         sys.stdout.flush()
-        if not os.path.isfile('build/boost_1_49_0.tar.gz'):
-            urlretrieve(BOOST_URL, 'build/boost_1_49_0.tar.gz', downloadProgress)
+        if not os.path.isfile('src/boost_1_49_0.tar.gz'):
+            urlretrieve(BOOST_URL, 'src/boost_1_49_0.tar.gz', downloadProgress)
         sys.stdout.write('\n')
         # extract needed files
-        with tarfile.open('build/boost_1_49_0.tar.gz', 'r:gz') as tar:
+        with tarfile.open('src/boost_1_49_0.tar.gz', 'r:gz') as tar:
             files = [h for h in tar.getmembers() if h.name.startswith('boost_1_49_0/boost') \
                 or h.name.startswith('boost_1_49_0/libs/iostreams') \
                 or h.name.startswith('boost_1_49_0/libs/regex') \
@@ -556,7 +551,8 @@ if not EMBEDDED_BOOST:
                 or h.name.startswith('boost_1_49_0/libs/detail') \
                 or h.name.startswith('boost_1_49_0/libs/system') ]
             sys.stdout.write('Extracting %d files\n' % len(files))
-            tar.extractall(path='build', members=files)
+            tar.extractall(path='src', members=files)
+        os.remove('src/boost_1_49_0.tar.gz')
         EMBEDDED_BOOST = True
     except Exception as e:
         print(e)
@@ -587,16 +583,14 @@ if not os.path.isfile(ASSO_WRAPPER_PY_FILE) or not os.path.isfile(ASSO_WRAPPER_C
         sys.exit('Failed to generate wrapper file for association module.')
     os.rename('build/variant_tools/assoTests.py', ASSO_WRAPPER_PY_FILE)
 #
-if (not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE)) or (not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE)) \
-  or os.path.getmtime(CGATOOLS_WRAPPER_CPP_FILE) < os.path.getmtime(CGATOOLS_INTERFACE_FILE):
+if not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE) or not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE):
     print('Generating {}'.format(CGATOOLS_WRAPPER_CPP_FILE))
     ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', CGATOOLS_WRAPPER_CPP_FILE, CGATOOLS_INTERFACE_FILE]), shell=True)
     if ret != 0:
         sys.exit('Failed to generate wrapper file for cgatools.')
     os.rename('build/variant_tools/cgatools.py', CGATOOLS_WRAPPER_PY_FILE)
 #
-if (not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE)) or (not os.path.isfile(UCSCTOOLS_WRAPPER_CPP_FILE)) \
-  or os.path.getmtime(UCSCTOOLS_WRAPPER_CPP_FILE) < os.path.getmtime(UCSCTOOLS_INTERFACE_FILE):
+if not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE) or not os.path.isfile(UCSCTOOLS_WRAPPER_CPP_FILE):
     print('Generating {}'.format(UCSCTOOLS_WRAPPER_CPP_FILE))
     ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', UCSCTOOLS_WRAPPER_CPP_FILE, UCSCTOOLS_INTERFACE_FILE]), shell=True)
     if ret != 0:
@@ -620,7 +614,7 @@ if EMBEDDED_BOOST:
         if not os.path.isfile(os.path.join('build', c.static_lib_format % ('embedded_boost', c.static_lib_extension))):
             # -w suppress all warnings caused by the use of boost libraries
             objects = c.compile(LIB_BOOST,
-                include_dirs=['boost_1_49_0'],
+                include_dirs=['src/boost_1_49_0'],
                 output_dir='build',
                 extra_preargs = ['-w', '-fPIC'],
                 macros = [('BOOST_ALL_NO_LIB', None)])
@@ -630,16 +624,17 @@ if EMBEDDED_BOOST:
 
 # building other libraries
 for files, incs, macs, libname in [
-    (SQLITE_GSL, ['.', 'gsl'], [], 'sqlite_gsl'),
-    (LIB_STAT, ['.'], [], 'stat'),
-    (LIB_UCSC_FILES, ['ucsc/inc', 'ucsc/tabix', 'ucsc/samtools'], 
+    (SQLITE_GSL, ['src', 'src/gsl'], [], 'sqlite_gsl'),
+    (LIB_STAT, ['src'], [], 'stat'),
+    (LIB_UCSC_FILES, ['src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools'], 
         [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
          ('_USE_KNETFILE', None), ('BGZF_CACHE', None)],
         'ucsc'),
-    (LIB_CGATOOLS, ['.', 'cgatools', 'boost_1_49_0'],
+    (LIB_CGATOOLS, ['src', 'src/cgatools', 'src/boost_1_49_0'],
         [('CGA_TOOLS_IS_PIPELINE', 0), ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
         'cgatools'),
-    (LIB_GSL, ['.', 'gsl'], [], 'gsl')]:
+    (LIB_GSL, ['src', 'src/gsl'], [], 'gsl')]:
+    c = new_compiler()
     if os.path.isfile(os.path.join('build', c.static_lib_format % (libname, c.static_lib_extension))):
         continue
     try:
@@ -717,7 +712,7 @@ vtools_report = variant_tools.vtools_report:main
             # stop warning message for sqlite because it is written by us.
             sources = ['src/sqlite/vt_sqlite3_ext.cpp'],
             include_dirs = ["src/", 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools',
-                'src/sqlite', "src/variant_tools", "src/gsl", "src/cgatools", "build/boost_1_49_0"],
+                'src/sqlite', "src/variant_tools", "src/gsl", "src/cgatools", "src/boost_1_49_0"],
             library_dirs = ["build"],
             libraries = ['sqlite_gsl', 'stat', 'ucsc', 'cgatools'] + \
                 (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']) + \
@@ -739,7 +734,7 @@ vtools_report = variant_tools.vtools_report:main
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
             extra_compile_args = gccargs,
             swig_opts = ['-O', '-shadow', '-c++', '-keyword'],
-            include_dirs = ["src", "src/cgatools", "build/boost_1_49_0"],
+            include_dirs = ["src", "src/cgatools", "src/boost_1_49_0"],
             library_dirs = ["build"],
         ),
         Extension('variant_tools._assoTests',

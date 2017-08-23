@@ -26,7 +26,7 @@
 import argparse, sys, os, re
 try:
     # python 2 has pickle and cPickle
-    import cPickle as pickle
+    import pickle as pickle
 except:
     # python 3 has pickle
     import pickle
@@ -305,7 +305,7 @@ class PlotAssociation:
             self.a.font_size = self.a.font_size / 2.5
         # processing chroms
         if hasattr(self.a, 'chrom'):
-            allchroms = list(map(str, range(1,23))) + ['X','Y','Un']
+            allchroms = list(map(str, list(range(1,23)))) + ['X','Y','Un']
             userange = [idx for idx, item in enumerate(self.a.chrom) if ':' in item and len(item.split(":")) == 2]
             for item in userange:
                 start, end = self.a.chrom[item].split(':')

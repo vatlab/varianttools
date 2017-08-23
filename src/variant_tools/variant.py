@@ -191,7 +191,7 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
             # if no real header is given, use output_fields, but replace things like (, ), and , to space
             prt.write([validFieldName(x) for x in output_fields])
         elif args.header == ['-']:
-            print(sys.stdin.read().rstrip())
+            print((sys.stdin.read().rstrip()))
         else:
             # other wise, use the user-provided header
             prt.write(args.header)

@@ -206,10 +206,10 @@ def avgDepthArguments(parser):
         help='''Variant table for which average depth are calculated.''')
 
 def avgDepth(args):
-    print('{}num_of_variant\taverage_depth'.format(''.join([x+'\t' for x in args.group_by])))
-    print(getoutput(['vtools', 'output', args.table] + args.group_by + 
+    print(('{}num_of_variant\taverage_depth'.format(''.join([x+'\t' for x in args.group_by]))))
+    print((getoutput(['vtools', 'output', args.table] + args.group_by + 
         ['COUNT(1)', 'SUM({0}*{1})/SUM({0})'.format(args.num_field, args.depth_field)] +
-        (['--group_by'] + args.group_by if args.group_by else [])))
+        (['--group_by'] + args.group_by if args.group_by else []))))
 
 #
 # Command variant_stat
@@ -232,9 +232,9 @@ def variantStatArguments(parser):
 def variantStat(args):
     # 1) Get samples based on the conditional parameter --samples
     #    Exit the report if there are no samples to analyze.
-    print('\t'.join(list(args.group_by) + ['num_sample', 'num_snps', 'num_insertions', 'num_deletions', 
+    print(('\t'.join(list(args.group_by) + ['num_sample', 'num_snps', 'num_insertions', 'num_deletions', 
         'num_substitutions', 'min_insertion_size', 'avg_insertion_size', 'max_insertion_size',
-        'min_deletion_size', 'avg_deletion_size', 'max_deletion_size']))
+        'min_deletion_size', 'avg_deletion_size', 'max_deletion_size'])))
     if not args.samples and not args.group_by:   # no sample is specified:
         # 2a) Get the counts for snps and substitutions:
         #     command: vtools select __tmp_vs "ref != '-' and alt != '-' and (length(ref) = 1 and length(alt) = 1)" --samples 'sample_id in $sample_ids' --count
@@ -256,9 +256,9 @@ def variantStat(args):
             '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t')     
         num_samples = getoutput(['vtools', 'execute', 'SELECT COUNT(sample_id) FROM sample'])
         #
-        print('\t'.join([num_samples, num_snps, num_insertions, num_deletions,
+        print(('\t'.join([num_samples, num_snps, num_insertions, num_deletions,
             num_substitutions, min_insertion_size, avg_insertion_size, max_insertion_size,
-            min_deletion_size, avg_deletion_size, max_deletion_size]))
+            min_deletion_size, avg_deletion_size, max_deletion_size])))
     else:
         for group, sample_ids, sample_names in getSamples(args.samples, args.group_by):
             #
@@ -281,9 +281,9 @@ def variantStat(args):
                 ['vtools', 'select', args.table, "alt='-'", '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)),
                 '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t')     
             #
-            print('\t'.join(list(group) + [str(len(sample_ids)), num_snps, num_insertions, num_deletions,
+            print(('\t'.join(list(group) + [str(len(sample_ids)), num_snps, num_insertions, num_deletions,
                 num_substitutions, min_insertion_size, avg_insertion_size, max_insertion_size,
-                min_deletion_size, avg_deletion_size, max_deletion_size]))
+                min_deletion_size, avg_deletion_size, max_deletion_size])))
     
 
 #
@@ -310,7 +310,7 @@ def discordanceRate(args):
     #   SELECT count(a.variant_id) FROM genotype_1 a, genotype_2 b ON a.variant_id = b.variant_id;
     # 
     for grp, sample_ids, sample_names in getSamples(args.samples):
-        print('\t'.join(sample_names))
+        print(('\t'.join(sample_names)))
         # get list of variant for each sample
         rates = []
         treat_missing_as_wildtype = getoutput(['vtools', 'show', 'runtime_option', 'treat_missing_as_wildtype'])
@@ -337,21 +337,21 @@ def discordanceRate(args):
                     var_j = genotypeOfSample(ID=id_j, cond=geno_condition)
                     if treat_missing_as_wildtype == 'False':
                         # find variant that exist in both samples
-                        exist_in_both = [item for item in var_i.keys() if item in var_j]
+                        exist_in_both = [item for item in list(var_i.keys()) if item in var_j]
                         # find variant that has different variant
                         differ_in_two = [item for item in exist_in_both if var_i[item] != var_j[item]]
                         rates[i][j] = (len(differ_in_two), len(exist_in_both))
                     else:
                         exist_in_any = set(var_i.keys()) | set(var_j.keys())
                         # remove 0 items to facilitate search
-                        var_i = {x:y for x,y in var_i.items() if y != 0}
-                        var_j = {x:y for x,y in var_j.items() if y != 0}
+                        var_i = {x:y for x,y in list(var_i.items()) if y != 0}
+                        var_j = {x:y for x,y in list(var_j.items()) if y != 0}
                         #
                         differ_in_two = [item for item in exist_in_any if (not item in var_i) \
                             or (not item in var_j) or (var_i[item] != var_j[item])]
                         rates[i][j] = (len(differ_in_two), len(exist_in_any))
                     output_items.append('{}/{}'.format(rates[i][j][0], rates[i][j][1]))
-            print('\t'.join(output_items))
+            print(('\t'.join(output_items)))
 
 #
 # command transcript
@@ -398,26 +398,26 @@ def printRNAInfo(args, regions):
                 if args.verbosity == '0':
                     print(strand)
                 else:
-                    print('{}\t{}'.format(gene, strand))
+                    print(('{}\t{}'.format(gene, strand)))
             else:
                 coding = structure['coding']
                 if not coding:
                     if args.verbosity is None or int(args.verbosity) > 0:
-                        print('>mRNA|{}|Non-coding'.format(gene))
+                        print(('>mRNA|{}|Non-coding'.format(gene)))
                     continue
                 else:
                     chr = coding[0][0]
                 if args.verbosity is None or int(args.verbosity) > 0:
                     if strand == '+':
-                        print('>mRNA|{}|{}:{} ({} bp)'.format(gene,
+                        print(('>mRNA|{}|{}:{} ({} bp)'.format(gene,
                             chr if chr.startswith('chr') else 'chr' + chr,
                             ','.join(['{}-{}'.format(x,y) for ch,x,y in coding]),
-                            sum([y-x+1 for ch,x,y in coding])))
+                            sum([y-x+1 for ch,x,y in coding]))))
                     else:
-                        print('>mRNA|{}|{}:{} ({} bp on reverse strand)'.format(gene,
+                        print(('>mRNA|{}|{}:{} ({} bp on reverse strand)'.format(gene,
                             chr if chr.startswith('chr') else 'chr' + chr,
                             ','.join(['{}-{}'.format(y,x) for ch,x,y in coding[::-1]]),
-                            sum([y-x+1 for ch,x,y in coding])))
+                            sum([y-x+1 for ch,x,y in coding]))))
             if args.first_transcript:
                 break
 
@@ -589,9 +589,9 @@ def printDNASequence(args, regions):
                 seq = seq.replace(comprev.upper(), comprev.lower())
         unmatched = not any([x.islower() for x in seq])
         if args.verbosity is None or int(args.verbosity) > 1:
-            print('>ref|{}|{}:{}-{} {} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr,
+            print(('>ref|{}|{}:{}-{} {} {}'.format(args.build, chr if chr.startswith('chr') else 'chr' + chr,
                 start, end, '({})'.format(comment) if comment else '',
-                'unmatched' if unmatched and args.hide_unmatched else ''))
+                'unmatched' if unmatched and args.hide_unmatched else '')))
         if unmatched and args.hide_unmatched:
             continue
         # break into pieces of 70 bp
@@ -602,19 +602,19 @@ def printDNASequence(args, regions):
                 raise ValueError('char_per_line should be a multiple of 10 in numbered format')
             if args.numbered == 'left':
                 fmt = '{{:>{0}}} '.format(len(str(end)))
-                print('\n'.join([
+                print(('\n'.join([
                     fmt.format(end - i if reversed_seq else start + i) + ' '.join([
                         markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)])
-                    for i in range(0, len(seq), char_per_line)]))
+                    for i in range(0, len(seq), char_per_line)])))
             else:
                 fmt = ' {{:>{0}}}'.format(len(str(end)))
                 last_line = len(seq) // char_per_line * char_per_line
                 residue = last_line + char_per_line - len(seq)
-                print('\n'.join([
+                print(('\n'.join([
                     ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) + 
                     ((' ' * residue + fmt.format(start if reversed_seq else end)) if i == last_line \
                         else fmt.format(end - i - char_per_line + 1 if reversed_seq else start + i + char_per_line - 1)) \
-                    for i in range(0, len(seq), char_per_line)]))
+                    for i in range(0, len(seq), char_per_line)])))
         elif args.marked_region is not None:
             # find marked regions
             if len(args.marked_region) == 0:
@@ -622,7 +622,7 @@ def printDNASequence(args, regions):
             elif len(args.marked_region) == 1:
                 l = r = int(args.marked_region[0])
             elif len(args.marked_region) == 2:
-                l, r = map(int, args.marked_region)
+                l, r = list(map(int, args.marked_region))
             else:
                 raise ValueError('Value of option marked_region should be an integer or a pair of integers')
             import re
@@ -631,12 +631,12 @@ def printDNASequence(args, regions):
             if len(pieces) == 1:
                 print()
             elif len(pieces) == 3:
-                print(('' if l == 0 else pieces[0][-l:]) + pieces[1].upper() + pieces[2][:r])
+                print((('' if l == 0 else pieces[0][-l:]) + pieces[1].upper() + pieces[2][:r]))
             else:
                 raise ValueError('More than one marked region')
         else:
             char_per_line = 70 if args.char_per_line is None else args.char_per_line
-            print('\n'.join([markSequence(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)]))
+            print(('\n'.join([markSequence(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)])))
 
 
 def printRNASequence(args, regions):
@@ -651,7 +651,7 @@ def printRNASequence(args, regions):
             coding = structure['coding']
             if not coding:
                 if args.verbosity is None or int(args.verbosity) > 0:
-                    print('>mRNA|{}|Non-coding'.format(gene))
+                    print(('>mRNA|{}|Non-coding'.format(gene)))
                 continue
             else:
                 chr = coding[0][0]
@@ -671,17 +671,17 @@ def printRNASequence(args, regions):
             unmatch = not any([x.islower() for x in seq])
             if args.verbosity is None or int(args.verbosity) > 0:
                 if strand == '+':
-                    print('>mRNA|{}|{}:{} ({} bp) {}'.format(gene,
+                    print(('>mRNA|{}|{}:{} ({} bp) {}'.format(gene,
                         chr if chr.startswith('chr') else 'chr' + chr,
                         ','.join(['{}-{}'.format(x,y) for ch,x,y in coding]),
                         sum([y-x+1 for ch,x,y in coding]),
-                        'unmatch' if unmatch and args.hide_unmatched else ''))
+                        'unmatch' if unmatch and args.hide_unmatched else '')))
                 else:
-                    print('>mRNA|{}|{}:{} ({} bp on reverse strand) {}'.format(gene,
+                    print(('>mRNA|{}|{}:{} ({} bp on reverse strand) {}'.format(gene,
                         chr if chr.startswith('chr') else 'chr' + chr,
                         ','.join(['{}-{}'.format(y,x) for ch,x,y in coding[::-1]]),
                         sum([y-x+1 for ch,x,y in coding]),
-                        'unmatch' if unmatch and args.hide_unmatched else ''))
+                        'unmatch' if unmatch and args.hide_unmatched else '')))
             if unmatch and args.hide_unmatched:
                 continue
             # break into pieces of 70 bp
@@ -692,18 +692,18 @@ def printRNASequence(args, regions):
                     raise ValueError('char_per_line should be a multiple of 10 in numbered format')
                 if args.numbered == 'left':
                     fmt = '{{:>{0}}} '.format(len(str(len(seq))))
-                    print('\n'.join([
+                    print(('\n'.join([
                         fmt.format(i+1) + ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)])
-                        for i in range(0, len(seq), char_per_line)]))
+                        for i in range(0, len(seq), char_per_line)])))
                 else:
                     fmt = ' {{:>{0}}}'.format(len(str(len(seq))))
                     last_line = len(seq) // char_per_line * char_per_line
                     residue = last_line + char_per_line - len(seq)
-                    print('\n'.join([
+                    print(('\n'.join([
                         ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) + 
                         ((' ' * residue + fmt.format(len(seq))) if i == last_line \
                             else fmt.format(i + char_per_line)) \
-                        for i in range(0, len(seq), char_per_line)]))
+                        for i in range(0, len(seq), char_per_line)])))
             elif args.marked_region is not None:
                 # find marked regions
                 if len(args.marked_region) == 0:
@@ -711,7 +711,7 @@ def printRNASequence(args, regions):
                 elif len(args.marked_region) == 1:
                     l = r = int(args.marked_region[0])
                 elif len(args.marked_region) == 2:
-                    l, r = map(int, args.marked_region)
+                    l, r = list(map(int, args.marked_region))
                 else:
                     raise ValueError('Value of option marked_region should be an integer or a pair of integers')
                 import re
@@ -721,12 +721,12 @@ def printRNASequence(args, regions):
                     if args.show_transcript:
                         print('No marked region')
                 elif len(pieces) == 3:
-                    print((gene.ljust(15) if args.show_transcript else '') + ('' if l == 0 else pieces[0][-l:]) + pieces[1].upper() + pieces[2][:r])
+                    print(((gene.ljust(15) if args.show_transcript else '') + ('' if l == 0 else pieces[0][-l:]) + pieces[1].upper() + pieces[2][:r]))
                 else:
                     raise ValueError('More than one marked region')
             else:
                 char_per_line = 70 if args.char_per_line is None else args.char_per_line
-                print('\n'.join([markSequence(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)]))
+                print(('\n'.join([markSequence(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)])))
             if args.first_transcript:
                 break
 
@@ -742,7 +742,7 @@ def printProteinSequence(args, regions):
             strand = structure['strand']
             coding = structure['coding']
             if not coding:
-                print('>protein|{}|Non-coding'.format(gene))
+                print(('>protein|{}|Non-coding'.format(gene)))
                 continue
             else:
                 chr = coding[0][0]
@@ -751,17 +751,17 @@ def printProteinSequence(args, regions):
                 seq = seq.upper().replace(args.mark_sequence.upper(), args.mark_sequence.lower())
             unmatch = not any([x.islower() for x in seq])
             if strand == '+':
-                print('>protein|{}|{}:{} ({} bp) {}'.format(gene,
+                print(('>protein|{}|{}:{} ({} bp) {}'.format(gene,
                     chr if chr.startswith('chr') else 'chr' + chr,
                     ','.join(['{}-{}'.format(x,y) for ch,x,y in coding]),
                     sum([y-x+1 for ch,x,y in coding]),
-                    'unmatch' if unmatch and args.hide_unmatched else ''))
+                    'unmatch' if unmatch and args.hide_unmatched else '')))
             else:
-                print('>protein|{}|{}:{} ({} bp on reverse strand)'.format(gene,
+                print(('>protein|{}|{}:{} ({} bp on reverse strand)'.format(gene,
                     chr if chr.startswith('chr') else 'chr' + chr,
                     ','.join(['{}-{}'.format(y,x) for ch,x,y in coding[::-1]]),
                     sum([y-x+1 for ch,x,y in coding]),
-                    'unmatch' if unmatch and args.hide_unmatched else ''))
+                    'unmatch' if unmatch and args.hide_unmatched else '')))
             if unmatch and args.hide_unmatched:
                 continue
             # break into pieces of 70 bp
@@ -772,21 +772,21 @@ def printProteinSequence(args, regions):
                     raise ValueError('char_per_line should be a multiple of 10 in numbered format')
                 if args.numbered == 'left':
                     fmt = '{{:>{0}}} '.format(len(str(len(seq))))
-                    print('\n'.join([
+                    print(('\n'.join([
                         fmt.format(i+1) + ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)])
-                        for i in range(0, len(seq), char_per_line)]))
+                        for i in range(0, len(seq), char_per_line)])))
                 else:
                     fmt = ' {{:>{0}}}'.format(len(str(len(seq))))
                     last_line = len(seq) // char_per_line * char_per_line
                     residue = last_line + char_per_line - len(seq)
-                    print('\n'.join([
+                    print(('\n'.join([
                         ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) + 
                         ((' ' * residue + fmt.format(len(seq))) if i == last_line \
                             else fmt.format(i + char_per_line)) \
-                        for i in range(0, len(seq), char_per_line)]))
+                        for i in range(0, len(seq), char_per_line)])))
             else:
                 char_per_line = 70 if args.char_per_line is None else args.char_per_line
-                print('\n'.join([markSequence(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)]))
+                print(('\n'.join([markSequence(seq[i:i+char_per_line]) for i in range(0, len(seq), char_per_line)])))
             if args.first_transcript:
                 break
 
@@ -818,9 +818,9 @@ def inbreedingCoef(args):
     print("sample_name\tF_stat")
     for name in getoutput('vtools phenotype --output sample_name ' + ' '.join(sarg)).split('\n'):
         # geno is a list of sample genotype and MAF, with each element being [chr, pos, GT, MAF]
-        geno = zip(*[x.split() for x in getoutput('''vtools output {0} chr pos "genotype('{1}')" {2} --na -9'''.\
+        geno = list(zip(*[x.split() for x in getoutput('''vtools output {0} chr pos "genotype('{1}')" {2} --na -9'''.\
                                           format(args.table if args.table else 'variant',
-                                                 name, args.maf_field)).split('\n')])
+                                                 name, args.maf_field)).split('\n')]))
         if not args.skip_autosome:
             gt = list(map(int, geno[2]))
             maf = list(map(float, geno[3]))
@@ -831,7 +831,7 @@ def inbreedingCoef(args):
                 if not withinPseudoAutoRegion(geno[0][i], int(geno[1][i]), build):
                     gt.append(int(geno[2][i]))
                     maf.append(float(geno[3][i]))
-        print("{}\t{}".format(name, calculateInbreedingCoef(gt, maf)))
+        print(("{}\t{}".format(name, calculateInbreedingCoef(gt, maf))))
 
 #
 # transmission
@@ -887,13 +887,13 @@ def transmission(args):
         with Project(verbosity=env.verbosity) as proj:
             if args.recessive:
                 # recessive (-1 means heterozygous for two alternative alleles)
-                par1_het = set([x for x,y in par1.items() if y in (1, -1)])
+                par1_het = set([x for x,y in list(par1.items()) if y in (1, -1)])
                 env.logger.info('{} heterozygous variants are found in parent {}'
                     .format(len(par1_het), args.parents[0]))
-                par2_het = set([x for x,y in par2.items() if y in (1, -1)])
+                par2_het = set([x for x,y in list(par2.items()) if y in (1, -1)])
                 env.logger.info('{} heterozygous variants are found in parent {}'
                     .format(len(par2_het), args.parents[1]))
-                off_hom = set([x for x,y in geno.items() if y==2])
+                off_hom = set([x for x,y in list(geno.items()) if y==2])
                 env.logger.info('{} homozygous variants are found in offspring {}'
                     .format(len(off_hom), off))
                 off_recessive = off_hom & par1_het & par2_het
@@ -904,7 +904,7 @@ def transmission(args):
                     message='Recessive variants of sample {} with parents {} and {}'.format(
                         off, args.parents[0], args.parents[1]), save_date=True)
             if args.denovo:
-                off_denovo = set([x for x in geno.keys() if x not in par1 and x not in par2])
+                off_denovo = set([x for x in list(geno.keys()) if x not in par1 and x not in par2])
                 env.logger.info('Writing {} variants to table {}'.format(len(off_denovo), args.denovo[idx]))
                 proj.createVariantTable(encodeTableName(args.denovo[idx]),
                     variants=sorted(off_denovo))
@@ -933,11 +933,11 @@ def transmission(args):
 # 
 # there can be at most 6 variants at a site for 3 individuals.  Let us forget 
 # about these for now.
-                case1 = set([x for x in geno.keys() if x not in par1 and x not in par2])
-                case2 = set([x for x,y in geno.items() if y==2 and (x not in par1 or x not in par2)])
-                case31 = set([x for x,y in par1.items() if y==2 and x not in geno])
-                case32 = set([x for x,y in par2.items() if y==2 and x not in geno])
-                case4 = set([x for x,y in par1.items() if y==2 and x in par2 and par2[x]==2 and (x in geno and geno[x] != 2)])
+                case1 = set([x for x in list(geno.keys()) if x not in par1 and x not in par2])
+                case2 = set([x for x,y in list(geno.items()) if y==2 and (x not in par1 or x not in par2)])
+                case31 = set([x for x,y in list(par1.items()) if y==2 and x not in geno])
+                case32 = set([x for x,y in list(par2.items()) if y==2 and x not in geno])
+                case4 = set([x for x,y in list(par1.items()) if y==2 and x in par2 and par2[x]==2 and (x in geno and geno[x] != 2)])
                 off_inconsistent = case1 | case2 | case31 | case32 | case4
                 env.logger.info('Writing {} variants to table {}'.format(len(off_inconsistent), args.inconsistent[idx]))
                 proj.createVariantTable(encodeTableName(args.inconsistent[idx]),
@@ -1139,13 +1139,13 @@ class PlotAssociationOpt:
         parser.add_argument('--chrom',
                 metavar = 'CHROMOSOME',
                 nargs = '+',
-                default=list(map(str, range(1,23))) + ['X','Y','Un'],
+                default=list(map(str, list(range(1,23)))) + ['X','Y','Un'],
                 help='''Specify the particular chromosome(s) to display. Can be
                 one or multiple in this list: "{}". Slicing syntax "?:?" is 
                 supported. For example "1:22" is equivalent to displaying 
                 all autosomes; "1:Y" is equivalent to displaying 
                 all mapped chromosomes. Default set to all including unmapped 
-                chromosomes.'''.format(' '.join(list(map(str, range(1,23))) + ['X','Y','Un', '?:?'])))
+                chromosomes.'''.format(' '.join(list(map(str, list(range(1,23)))) + ['X','Y','Un', '?:?'])))
         parser.add_argument('--chrom_prefix',
                 metavar = 'PREFIX',
                 type = str,
@@ -1280,7 +1280,7 @@ def metaAnalysis(args):
     se = None if args.se is 0 else args.se - 1
     ma = MetaAnalysis(fs, beta, pval, se, size, linker, args.method) 
     # calculate p_meta and print results
-    print('\t'.join(ma.header))
+    print(('\t'.join(ma.header)))
     if args.to_db:
         ma.createDB(args.to_db)
     res = []

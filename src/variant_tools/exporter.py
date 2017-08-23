@@ -33,7 +33,7 @@ import datetime
 from argparse import SUPPRESS
 from multiprocessing import Process, Pipe, Lock
 if sys.version_info.major == 2:
-    from itertools import izip, repeat
+    from itertools import repeat
 else:
     izip = zip
     from itertools import repeat
@@ -511,8 +511,8 @@ class Exporter:
         #    formatters to process all values
         #
         # get first keys for self.formatter
-        fmt_first_keys = [x.lower() if ',' in x else x.split(',')[0].lower() for x in self.format.formatter.keys()]
-        fmt_keys = [x.lower() for x in self.format.formatter.keys()]
+        fmt_first_keys = [x.lower() if ',' in x else x.split(',')[0].lower() for x in list(self.format.formatter.keys())]
+        fmt_keys = [x.lower() for x in list(self.format.formatter.keys())]
         #
         formatters = []
         i = 0
@@ -608,7 +608,7 @@ class Exporter:
         formatters = [] # formatters that will be used to produce strings from values
         col_adj = []        # adjust functions to combine values to one column.
 
-        default_formatter = PlainFormatter().__call__ if '*' not in self.format.formatter.keys() else self.getAdjFunc(self.format.formatter['*'])
+        default_formatter = PlainFormatter().__call__ if '*' not in list(self.format.formatter.keys()) else self.getAdjFunc(self.format.formatter['*'])
         #
         col_idx = 0  # index of things after formatter.
         for col in self.format.columns:
@@ -620,7 +620,7 @@ class Exporter:
                     indexes = [field_indexes[(id, x.lower())] for x in fields]
                     fmt = self.getFormatters(indexes, fields)
                     formatters.extend(fmt if fmt else [(None, None)])
-                    col_adj.append([self.getAdjFunc(col.adj), col_idx if len(fmt) <= 1 else range(col_idx, col_idx +  len(fmt))])
+                    col_adj.append([self.getAdjFunc(col.adj), col_idx if len(fmt) <= 1 else list(range(col_idx, col_idx +  len(fmt)))])
                     col_idx += max(1, len(fmt))
                     if col_adj[-1][0] is None and type(col_adj[-1][1]) is not int:
                         raise ValueError('Columns with multiple fields must have an adjust function to merge values')
@@ -628,7 +628,7 @@ class Exporter:
                 indexes = [field_indexes[(-1, x.lower())] for x in fields]
                 fmt = self.getFormatters(indexes, fields)
                 formatters.extend(fmt if fmt else [(None, None)])
-                col_adj.append([self.getAdjFunc(col.adj), col_idx if len(fmt) <= 1 else range(col_idx, col_idx + len(fmt))])
+                col_adj.append([self.getAdjFunc(col.adj), col_idx if len(fmt) <= 1 else list(range(col_idx, col_idx + len(fmt)))])
                 col_idx += max(1, len(fmt))
                 if col_adj[-1][0] is None and type(col_adj[-1][1]) is not int:
                     raise ValueError('Columns with multiple fields must have an adjust function to merge values')
@@ -670,7 +670,7 @@ class Exporter:
             # command
             header = header.replace('%(command)s',
                 env.command_line)
-            print >> output, header.rstrip()
+            print(header.rstrip(), file=output)
         global rec_alleles
         for idx, raw_rec in enumerate(reader.records()):
             multi_records = False

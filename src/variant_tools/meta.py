@@ -58,7 +58,7 @@ class MetaAnalysis:
         for idx, d in enumerate(self.data):
             self.header.extend([d[0][i] + '_{}'.format(idx+1) for i in [self.bcol, self.pcol, self.scol]])
         # find overlapping groups
-        self.groups = list(set.intersection(*list(map(set, [d[1].keys() for d in self.data]))))
+        self.groups = list(set.intersection(*list(map(set, [list(d[1].keys()) for d in self.data]))))
         self.sample_size = {}
 
     def read(self, filename):

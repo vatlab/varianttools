@@ -86,7 +86,7 @@ class PlinkFile:
     ##
     # Goes to next row.
     #
-    def next(self):
+    def __next__(self):
         row = cplinkio.next_row( self.handle )
         if not row:
             raise StopIteration

@@ -71,7 +71,7 @@ class NullTest:
         self.pydata = pydata
         if self.data.hasVar("gname"):
             self.gname = self.data.getStringVar("gname")
-        elif "name" in self.pydata.keys():
+        elif "name" in list(self.pydata.keys()):
             self.gname = self.pydata["name"]
         else:
             pass
@@ -119,7 +119,7 @@ class GroupStat(NullTest):
         self.pydata = pydata
         if self.data.hasVar("gname"):
             self.gname = self.data.getStringVar("gname")
-        elif "name" in self.pydata.keys():
+        elif "name" in list(self.pydata.keys()):
             self.gname = self.pydata["name"]
         else:
             pass
@@ -1722,12 +1722,12 @@ class ExternTest(NullTest):
         self.nvar = len(self.pydata['genotype'][0])
         self.nsample = len(self.pydata['genotype'])
         # type convert
-        self.pydata['genotype'] = [map(istr, x) for x in self.pydata['genotype']]
-        self.pydata['phenotype'] = map(istr, self.pydata['phenotype'])
+        self.pydata['genotype'] = [list(map(istr, x)) for x in self.pydata['genotype']]
+        self.pydata['phenotype'] = list(map(istr, self.pydata['phenotype']))
         if len(self.pydata['geno_info']) > 0:
-                self.pydata['geno_info'] = [[map(istr, j) for j in x] for x in self.pydata['geno_info']]
+                self.pydata['geno_info'] = [[list(map(istr, j)) for j in x] for x in self.pydata['geno_info']]
         if 'covariates' in self.pydata: 
-                self.pydata['covariates'] = [map(istr, x) for x in self.pydata['covariates']]
+                self.pydata['covariates'] = [list(map(istr, x)) for x in self.pydata['covariates']]
         # write
         with open(os.path.join(tdir, '{0}_geno.txt'.format(self.gname)), 'w') as f:
             if len(self.pydata['geno_info']) == 0:
@@ -1944,7 +1944,7 @@ class ScoreSeq(ExternTest):
                 self.stats[x] = y
         except IOError:
             fail = 1
-        if not sum([0 if math.isnan(x) else 1 for x in self.stats.values()]) and not fail:
+        if not sum([0 if math.isnan(x) else 1 for x in list(self.stats.values())]) and not fail:
             fail = 2
         # archive or clean up output
         if self.archive:

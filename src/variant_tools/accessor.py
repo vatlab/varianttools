@@ -745,7 +745,7 @@ class HDF5Engine_access(Base_Access):
             self.__load_HDF5_by_group(chr,groupName)
 
         snpdict=dict.fromkeys(self.colnames,{})
-        for key,value in snpdict.iteritems():
+        for key,value in snpdict.items():
             snpdict[key]=dict.fromkeys(self.rownames.tolist(),(0,))
       
         for idx,id in enumerate(self.rownames):
@@ -1002,7 +1002,7 @@ class AccessEachHDF5(Process):
 
     def run(self):
         variant_ID,indices,data=self.hdf5.get_geno_info_by_variant_ID(self.variantID,self.chr,self.groupName)
-        print(variant_ID,len(indices))
+        print((variant_ID,len(indices)))
         colnames=self.hdf5.get_colnames(self.chr,self.groupName)
         for idx,col in enumerate(indices):
             if not math.isnan(data[idx]):

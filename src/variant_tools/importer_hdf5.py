@@ -34,7 +34,7 @@ from multiprocessing import Process, Pipe, Value, Lock, Manager,Array
 from multiprocessing import Queue as mpQueue
 import queue
 if sys.version_info.major == 2:
-    from itertools import izip, repeat
+    from itertools import repeat
 else:
     izip = zip
     from itertools import repeat
@@ -123,7 +123,7 @@ class HDF5GenotypeImportWorker(Process):
         storageEngine.store(hmatrix,chr)
         # write geno info into HDF5 if exists
         if len(self.geno_info)>0:
-                for key,value in self.info.items():
+                for key,value in list(self.info.items()):
                     hmatrix=HMatrix(value[2],value[1],value[0],shape,value[3],self.colnames)
                     storageEngine.store(hmatrix,chr,key) 
         

@@ -28,7 +28,7 @@ import sys
 import threading
 try:
     # python 2.x
-    import Queue as queue
+    import queue as queue
 except ImportError:
     # python 3.x
     import queue
@@ -197,7 +197,7 @@ class Sample:
         with open(filename, 'rU') as input:
             reader = csv.reader(input, dialect=csv_dialect)
             if header is None:
-                headers = reader.next()
+                headers = next(reader)
             if len(set(headers)) != len(headers):
                 for x in set(headers):
                     headers.remove(x)
@@ -273,7 +273,7 @@ class Sample:
             if field.lower() not in [x.lower() for x in cur_fields]:
                 if field.upper() in SQL_KEYWORDS:
                     raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(field))
-                fldtype = typeOfValues([x[idx] for x in records.values()])
+                fldtype = typeOfValues([x[idx] for x in list(records.values())])
                 env.logger.info('Adding phenotype {} of type {}'.format(field, fldtype))
                 env.logger.debug('Executing ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
                 self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
@@ -282,7 +282,7 @@ class Sample:
                 fldtype = self.db.typeOfColumn('sample', field)
                 count[2] += 1  # updated
             null_count = defaultdict(int)
-            for key, rec in records.iteritems():
+            for key, rec in records.items():
                 # by sample_name only
                 if len(key) == 1:
                     # get matching sample
@@ -319,7 +319,7 @@ class Sample:
                             null_count[field] += 1
                             rec[idx] = None
                     cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
-        for f,c in null_count.items():
+        for f,c in list(null_count.items()):
             env.logger.warning('{} missing values are identified for phenotype {}'
                 .format(c, f))
         if invalid_sample_names:
@@ -361,7 +361,7 @@ class Sample:
                 {int: 'INT',
                  float: 'FLOAT',
                  str: 'VARCHAR(255)',
-                 unicode: 'VARCHAR(255)',
+                 str: 'VARCHAR(255)',
                  None: 'FLOAT'}[fldType]))
             count[1] += 1  # new
         else:
@@ -453,16 +453,16 @@ class Sample:
         cur.execute(query)
         if header is not None:
             if len(header) == 0:
-                print(delimiter.join(fields))
+                print((delimiter.join(fields)))
             elif header == ['-']:
                 env.logger.info('Reading header from standard input')
-                print(sys.stdin.read().rstrip())
+                print((sys.stdin.read().rstrip()))
             else:
                 if len(header) != len(fields):
                     env.logger.warning('User-provided header ({}) does not match number of fields ({})'.format(len(header), len(fields)))
-                print(delimiter.join(header))
+                print((delimiter.join(header)))
         for rec in cur:
-            print(delimiter.join([na if x is None else str(x) for x in rec]))
+            print((delimiter.join([na if x is None else str(x) for x in rec])))
 
 
  

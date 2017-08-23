@@ -398,7 +398,7 @@ def setFieldValue(proj, table, items, build):
         type_map = {int: 'INT',
                     float: 'FLOAT',
                     str: 'VARCHAR(255)',
-                    unicode: 'VARCHAR(255)'}
+                    str: 'VARCHAR(255)'}
         for field, fldType in zip([x.split('=', 1)[0] for x in items], fldTypes):
             if field.lower() not in [x.lower() for x in cur_fields]:
                 if fldType is None:
@@ -479,7 +479,7 @@ def setFieldValue(proj, table, items, build):
                     {int: 'INT',
                      float: 'FLOAT',
                      str: 'VARCHAR(255)',
-                     unicode: 'VARCHAR(255)'}[fldType])
+                     str: 'VARCHAR(255)'}[fldType])
                 env.logger.trace(query)
                 cur.execute(query)
                 count[1] += 1  # new
@@ -593,7 +593,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     MIN = 2
     MAX = 3
     operationKeys = {'avg': MEAN, 'sum': SUM, 'min': MIN, 'max': MAX}
-    possibleOperations = operationKeys.keys()
+    possibleOperations = list(operationKeys.keys())
     
     operations = []
     genotypeFields = []
@@ -662,8 +662,8 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         # sex of samples
         if len(var_chrX) > 0 or len(var_chrY) > 0:
             ID_sex = determineSexOfSamples(proj, IDs)
-            numMales = len({x:y for x,y in ID_sex.items() if y == 1})
-            numFemales = len({x:y for x,y in ID_sex.items() if y == 2})
+            numMales = len({x:y for x,y in list(ID_sex.items()) if y == 1})
+            numFemales = len({x:y for x,y in list(ID_sex.items()) if y == 2})
             env.logger.info('{} males and {} females are identified'
                 .format(numMales, numFemales))
     #
@@ -691,7 +691,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
 
     validGenotypeIndices = []
     for index, field in enumerate(genotypeFields):
-        if field.lower() not in [x.lower() for x in genotypeFieldTypes.keys()]:
+        if field.lower() not in [x.lower() for x in list(genotypeFieldTypes.keys())]:
             env.logger.warning("Field {} does not exist in any of the samples.".format(field))
         else:
             if len(fieldInTable[field.lower()]) < len(IDs):
@@ -701,7 +701,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             validGenotypeFields.append(field)
     # check GT field
     if not all([x is None for x in coreDestinations]):
-        if 'gt' not in [x.lower() for x in genotypeFieldTypes.keys()]:
+        if 'gt' not in [x.lower() for x in list(genotypeFieldTypes.keys())]:
             env.logger.warning('Genotype field does not exist in any of the selected samples')
         else:
             if len(fieldInTable['gt']) < len(IDs):
