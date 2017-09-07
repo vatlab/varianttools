@@ -5,7 +5,7 @@
 # for a description of the format of this file.
 #
 
-#time vtools use dbNSFP-h38_3_5a.ann -f ../data/dbNSFPv3.5a.zip --rebuild -j24 
+#time vtools use dbNSFP-hg18_hg19_2_9.ann -f ../data/dbNSFPv2.9.zip --rebuild -j24 
  
 [linked fields] 
 hg38=chr, pos, ref, alt  
@@ -13,20 +13,14 @@ hg19=hg19_chr, hg19_pos, ref, alt
 hg18=hg18_chr, hg18_pos, ref, alt 
 
 [data sources] 
-description=dbNSFP version 3.5a, maintained by Xiaoming Liu from UTSPH. Please cite:
-	Liu X, Jian X, and Boerwinkle E. 2011. dbNSFP: a lightweight database of human 
-		non-synonymous SNPs and their functional predictions. Human Mutation. 32:894-899.
-	Liu X, Wu C, Li C and Boerwinkle E. 2016. dbNSFP v3.0: A One-Stop Database of Functional 
-		Predictions and Annotations for Human Non-synonymous and Splice Site SNVs. 
-		Human Mutation. 37(3):235-241. If you find this database useful.
-
+description=dbNSFP version 2.9, maintained by Xiaoming Liu from UTSPH. Please cite "Liu X, Jian X, and Boerwinkle E. 2011. dbNSFP: a lightweight database of human non-synonymous SNPs and their functional predictions. Human Mutation. 32:894-899" and "Liu X, Jian X, and Boerwinkle E. 2013. dbNSFP v2.0: A Database of Human Nonsynonymous SNVs and Their Functional Predictions and Annotations. Human Mutation. 34:E2393-E2402." if you find this database useful. 
 preprocessor=Dos2Unix() 
-version=hg38_3_5a
+version=hg18_hg19_2_9 
 anno_type=variant 
 source_url=ftp://dbnsfp:dbnsfp@dbnsfp.softgenetics.com/dbNSFPv3.5a.zip
-direct_url=
+direct_url=annoDB/dbNSFP-hg18_hg19_2_9.DB.gz    91df048df0cadf7708c7a7ceb1166c5f 
 source_type=txt 
-source_pattern=
+source_pattern=dbNSFP2.9_variant.chr  
 
 
 [chr]
@@ -98,20 +92,20 @@ comment=physical position on the chromosome as to hg18 (1-based coordinate)
 
 [genename]
 index=12
-type=VARCHAR(48) NULL
+type=VARCHAR(255) NULL
 adj=Nullify('.')
 comment=gene name; if the nsSNV can be assigned to multiple genes, gene names are
 		separated by ";"
 
 [cds_strand]
 index=13
-type=CHAR(1) NULL
+type=VARCHAR(255) NULL
 adj=Nullify('.')
 comment=coding sequence (CDS) strand (+ or -)
 
 [refcodon]
 index=14
-type=VARCHAR(20) NULL
+type=VARCHAR(255) NULL
 adj=Nullify('.')
 comment=reference codon
 
@@ -127,6 +121,12 @@ type=VARCHAR(255) NULL
 adj=Nullify('.')
 comment=degenerate type (0, 2 or 3)
 
+[Ancestral_allele]
+index=17
+type=VARCHAR(255) NULL
+adj=Nullify('.')
+comment=ancestral allele based on 8 primates EPO.
+		Ancestral alleles by Ensembl 84. The following comes from its original README file:
 [Ancestral_allele]
 index=17
 type=VARCHAR(255) NULL
@@ -537,21 +537,21 @@ comment=Number of observed component scores (except the maximum frequency in
 		and MetaLR scores are calculated based on imputed data, the less missing component 
 		scores, the higher the reliability of the scores and predictions. 
 
-[M-CAP_score]
+[M__CAP_score]
 index=67
 type=FLOAT NULL
 adj=Nullify('.')
 comment=M-CAP score (details in DOI: 10.1038/ng.3703). Scores range from 0 to 1. The larger
 		the score the more likely the SNP has damaging effect. 
 
-[M-CAP_rankscore]
+[M__CAP_rankscore]
 index=68
 type=FLOAT NULL
 adj=Nullify('.')
 comment=M-CAP scores were ranked among all M-CAP scores in dbNSFP. The rankscore is
 		the ratio of the rank of the score over the total number of M-CAP scores in dbNSFP.
 
-[M-CAP_pred]
+[M__CAP_pred]
 index=69
 type=VARCHAR(1) NULL
 adj=Nullify('.')
@@ -664,7 +664,7 @@ adj=Nullify('.')
 comment=DANN scores were ranked among all DANN scores in dbNSFP. The rankscore is
 		the ratio of the rank of the score over the total number of DANN scores in dbNSFP.
 
-[fathmm-MKL_coding_score]
+[fathmm__MKL_coding_score]
 index=82
 type=FLOAT NULL
 adj=Nullify('.')
@@ -674,7 +674,7 @@ comment=fathmm-MKL p-values. Scores range from 0 to 1. SNVs with scores >0.5
 		groups of features. More details of the score can be found in 
 		doi: 10.1093/bioinformatics/btv009.
 
-[fathmm-MKL_coding_rankscore]
+[fathmm__MKL_coding_rankscore]
 index=83
 type=FLOAT NULL
 adj=Nullify('.')
@@ -682,14 +682,14 @@ comment=fathmm-MKL coding scores were ranked among all fathmm-MKL coding
 		scores in dbNSFP. The rankscore is the ratio of the rank of the score over the total number 
 		of fathmm-MKL coding scores in dbNSFP.
 
-[fathmm-MKL_coding_pred]
+[fathmm__MKL_coding_pred]
 index=84
 type=VARCHAR(1) NULL
 adj=Nullify('.')
 comment=If a fathmm-MKL_coding_score is >0.5 (or rankscore >0.28317) 
 		the corresponding nsSNV is predicted as "D(AMAGING)"; otherwise it is predicted as "N(EUTRAL)".
 
-[fathmm-MKL_coding_group]
+[fathmm__MKL_coding_group]
 index=85
 type=VARCHAR(255) NULL
 adj=Nullify('.')
@@ -703,7 +703,7 @@ adj=Nullify('.')
 comment=Whether Eigen-raw and Eigen-phred scores are based on coding model
 		or noncoding model.
 
-[Eigen-raw]
+[Eigen__raw]
 index=87
 type=VARCHAR(255) NULL
 adj=Nullify('.')
@@ -711,13 +711,13 @@ comment=Eigen score for coding SNVs. A functional prediction score based on cons
 		allele frequencies, and deleteriousness prediction using an unsupervised learning method 
 		(doi: 10.1038/ng.3477). 
 
-[Eigen-phred]
+[Eigen__phred]
 index=88
 type=VARCHAR(255) NULL
 adj=Nullify('.')
 comment=Eigen score in phred scale.
 
-[Eigen-PC-raw]
+[Eigen__PC__raw]
 index=89
 type=VARCHAR(255) NULL
 adj=Nullify('.')
@@ -726,13 +726,13 @@ comment=Eigen PC score for genome-wide SNVs. A functional prediction score based
 		epigenomic signals (for synonymous and non-coding SNVs) using an unsupervised learning 
 		method (doi: 10.1038/ng.3477). 
 
-[Eigen-PC-phred]
+[Eigen__PC__phred]
 index=90
 type=VARCHAR(255) NULL
 adj=Nullify('.')
 comment=Eigen PC score in phred scale.
 
-[Eigen-PC-raw_rankscore]
+[Eigen__PC__raw_rankscore]
 index=91
 type=FLOAT NULL
 adj=Nullify('.')
@@ -808,7 +808,7 @@ adj=Nullify('.')
 comment=0 - highly significant scores (approx. p<.003); 1 - significant scores
 		(approx. p<.05); 2 - informative scores (approx. p<.25); 3 - other scores (approx. p>=.25).
 
-[H1-hESC_fitCons_score]
+[H1__hESC_fitCons_score]
 index=100
 type=FLOAT NULL
 adj=Nullify('.')
@@ -819,7 +819,7 @@ comment=fitCons score predicts the fraction of genomic positions belonging to
 		pressure, therefore more likely to be functional important. GM12878 fitCons scores are
 		based on cell type H1-hESC. More details can be found in doi:10.1038/ng.3196.
 
-[H1-hESC_fitCons_rankscore]
+[H1__hESC_fitCons_rankscore]
 index=101
 type=FLOAT NULL
 adj=Nullify('.')
@@ -827,7 +827,7 @@ comment=H1-hESC fitCons scores were ranked among all H1-hESC fitCons
 		scores in dbNSFP. The rankscore is the ratio of the rank of the score over the total number 
 		of H1-hESC fitCons scores in dbNSFP.
 
-[H1-hESC_confidence_value]
+[H1__hESC_confidence_value]
 index=102
 type=VARCHAR(255) NULL
 adj=Nullify('.')
@@ -860,20 +860,20 @@ adj=Nullify('.')
 comment=0 - highly significant scores (approx. p<.003); 1 - significant scores
 		(approx. p<.05); 2 - informative scores (approx. p<.25); 3 - other scores (approx. p>=.25).
 
-[GERP++_NR]
+[GERP_plusplus_NR]
 index=106
 type=FLOAT NULL
 adj=Nullify('.')
 comment=GERP++ neutral rate
 
-[GERP++_RS]
+[GERP_plusplus_RS]
 index=107
 type=FLOAT NULL
 adj=Nullify('.')
 comment=GERP++ RS score, the larger the score, the more conserved the site. Scores range from
 		-12.3 to 6.17.
 
-[GERP++_RS_rankscore]
+[GERP_plusplus_RS_rankscore]
 index=108
 type=FLOAT NULL
 adj=Nullify('.')
@@ -1746,8 +1746,3 @@ comment=target gene of the (significant) eQTL SNP
 index=245
 type=VARCHAR(255) NULL
 adj=Nullify('.')
-comment=tissue type of the expression data with which the eQTL/gene pair is detected
-
-	
-	Note 1: Missing data is designated as '.'. 
-
