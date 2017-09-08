@@ -97,20 +97,20 @@ comment=physical position on the chromosome as to hg18 (1-based coordinate)
 
 [genename]
 index=12
-type=VARCHAR(255) NULL
+type=VARCHAR(48) NULL
 adj=Nullify('.')
 comment=gene name; if the nsSNV can be assigned to multiple genes, gene names are
 		separated by ";"
 
 [cds_strand]
 index=13
-type=VARCHAR(255) NULL
+type=CHAR(1) NULL
 adj=Nullify('.')
 comment=coding sequence (CDS) strand (+ or -)
 
 [refcodon]
 index=14
-type=VARCHAR(255) NULL
+type=VARCHAR(20) NULL
 adj=Nullify('.')
 comment=reference codon
 
@@ -1751,3 +1751,4 @@ comment=target gene of the (significant) eQTL SNP
 index=245
 type=VARCHAR(255) NULL
 adj=Nullify('.')
+comment=tissue type of the expression data with which the eQTL/gene pair is detected
