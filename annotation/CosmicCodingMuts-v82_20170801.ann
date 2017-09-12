@@ -12,7 +12,7 @@ description=Cosmic coding mutation database.  This data contains mutations affec
 version=v82_20170801
 anno_type=variant
 #direct_url=annoDB/CosmicCodingMuts-v81_20170801.DB.gz
-source_url=ftp://ftp.sanger.ac.uk/pub/CGP/cosmic/data_export/CosmicCodingMuts_v82_20170801.vcf.gz
+source_url: Please follow the instruction on the website of COSMIC to see how to download the dataset.
 source_type=txt
 source_pattern=
 
