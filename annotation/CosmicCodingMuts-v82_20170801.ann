@@ -69,7 +69,7 @@ comment=Peptide annotation
 [CNT]
 index=8
 adj=ExtractValue('CNT=', ';')
-type=INT
+type=INTEGER
 comment=Number of samples with this mutation
 
 [SNP]
