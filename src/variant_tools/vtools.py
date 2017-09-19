@@ -227,12 +227,12 @@ def main():
     parser.set_defaults(func=project.admin)
     #
     # command execute
-    #parser = subparsers.add_parser('execute',
-    #    help='Execute a SQL query',
-    #    description='''Execute arbitrary SQL query against the project database.''')
-    #pipeline.executeArguments(parser)
-    #addCommonArgs(parser)
-    #parser.set_defaults(func=pipeline.execute)
+    parser = subparsers.add_parser('execute',
+        help='Execute a SQL query',
+        description='''Execute arbitrary SQL query against the project database.''')
+    project.executeArguments(parser)
+    addCommonArgs(parser)
+    parser.set_defaults(func=project.execute)
     #
     # getting args, some commands accept arbitrary arguments so we need to
     # separate them into argv
