@@ -1441,69 +1441,6 @@ class Importer:
                     raise ValueError('{} sample detected but only {} sample names are specified'.format(numSample, len(self.sample_name)))                        
                 return (self.recordFileAndSample(input_filename, self.sample_name), 1 if numSample == 0 else 2,names)
  
-    def importVariantAndGenotype(self, input_filename):
-        '''Input variant and genotype at the same time, appropriate for cases with
-        no or one sample in a file'''
-        self.processor.reset()
-        if self.genotype_field:
-            self.prober.reset()
-        #
-        sample_ids, genotype_status,names = self.getSampleIDs(input_filename)
-        #
-        cur = self.db.cursor()
-        lc = lineCount(input_filename, self.encoding)
-        update_after = min(max(lc//200, 100), 100000)
-        # one process is for the main program, the
-        # other threads will handle input
-        reader = TextReader(self.processor, input_filename, None, False, 
-            self.jobs - 1, self.encoding, self.header, quiet=False)
-        if genotype_status != 0:
-            writer = GenotypeWriter(
-                # write directly to the genotype table
-                '{}_genotype'.format(self.proj.name),
-                self.genotype_info, genotype_status,
-                sample_ids)
-        # preprocess data
-        prog = ProgressBar(os.path.split(input_filename)[-1], lc)
-        last_count = 0
-        fld_cols = None
-        for self.count[0], bins, rec in reader.records():
-            variant_id = self.addVariant(cur, bins + rec[0:self.ranges[2]])
-            if variant_id is None:
-                continue
-            if genotype_status == 2:
-                if fld_cols is None:
-                    col_rngs = [reader.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
-                    fld_cols = []
-                    for idx in range(len(sample_ids)):
-                        fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
-                    if col_rngs[0][1] - col_rngs[0][0] != len(sample_ids):
-                        env.logger.error('Number of genotypes ({}) does not match number of samples ({})'.format(
-                            col_rngs[0][1] - col_rngs[0][0], len(sample_ids)))
-                for idx, id in enumerate(sample_ids):
-                    try:
-                        if rec[self.ranges[2] + idx] is not None:
-                            self.count[1] += 1
-                            writer.write(id, [variant_id] + [rec[c] for c in fld_cols[idx]])
-                    except IndexError:
-                        env.logger.warning('Incorrect number of genotype fields: {} fields found, {} expected for record {}'.format(
-                            len(rec), fld_cols[-1][-1] + 1, rec))
-            elif genotype_status == 1:
-                # should have only one sample
-                for id in sample_ids:
-                    writer.write(id, [variant_id])
-            if (last_count == 0 and self.count[0] > 200) or (self.count[0] - last_count > update_after):
-                self.db.commit()
-                last_count = self.count[0]
-                prog.update(self.count[0])
-        prog.done()
-        self.count[7] = reader.unprocessable_lines
-        # stop writers
-        if genotype_status != 0:
-            writer.commit_remaining()
-            writer.dedup()
-        self.db.commit()
-       
     def importVariant(self, input_filename):
         # reset text processor to allow the input of files with different number of columns
         self.processor.reset(import_var_info=True, import_sample_range=[0,0])
@@ -1608,34 +1545,6 @@ class Importer:
         env.logger.info('Coordinates of {} ({} total, {} failed to map) new variants are updated.'\
             .format(count, total_new, err_count))
             
-    def importFilesSequentially(self):
-        '''import files one by one, adding variants along the way'''
-        sample_in_files = []
-        for count,f in enumerate(self.files):
-            env.logger.info('{} variants and genotypes from {} ({}/{})'.format('Importing', f, count + 1, len(self.files)))
-            self.importVariantAndGenotype(f)
-            total_var = sum(self.count[3:7])
-            env.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported, {}.'\
-                .format(total_var, self.count[2],
-                    ''.join([', {:,} {}'.format(x, y) for x, y in \
-                        zip(self.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'unsupported']) if x > 0]),
-                    self.count[0],
-                    'no sample is created' if len(self.sample_in_file) == 0 else 'with a total of {:,} genotypes from {}'.format(
-                        self.count[1], 'sample {}'.format(self.sample_in_file[0]) if len(self.sample_in_file) == 1 else '{:,} samples'.format(len(self.sample_in_file)))))
-            for i in range(len(self.count)):
-                self.total_count[i] += self.count[i]
-                self.count[i] = 0
-            sample_in_files.extend(self.sample_in_file)
-        if len(self.files) > 1:
-            total_var = sum(self.total_count[3:7])
-            env.logger.info('{:,} variants ({:,} new{}) from {:,} lines are imported, {}.'\
-                .format(total_var, self.total_count[2],
-                    ''.join([', {:,} {}'.format(x, y) for x, y in \
-                        zip(self.total_count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'unsupported']) if x > 0]),
-                    self.total_count[0],
-                    'no sample is created' if len(sample_in_files) == 0 else 'with a total of {:,} genotypes from {}'.format(
-                        self.total_count[1], 'sample {}'.format(sample_in_files[0]) if len(sample_in_files) == 1 else '{:,} samples'.format(len(sample_in_files)))))
-
     def importFilesInParallel(self):
         '''import files in parallel, by importing variants and genotypes separately, and in their own processes. 
         More specifically, suppose that there are three files
@@ -1886,15 +1795,10 @@ def importVariants(args):
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
             print((env.temp_dir))
-            if args.jobs <= 1 and not args.HDF5:
-                # if jobs == 1, use the old algorithm that insert variant and
-                # genotype together ...
-                importer.importFilesSequentially()
+            if args.HDF5:
+                importGenotypesInParallel(importer)
             else:
-                if args.HDF5:
-                    importGenotypesInParallel(importer)
-                else:
-                    importer.importFilesInParallel()
+                importer.importFilesInParallel()
             importer.finalize()
         proj.close()
     except Exception as e:
