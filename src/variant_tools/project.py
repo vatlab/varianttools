@@ -5393,6 +5393,47 @@ x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in list(_user_opt
         env.logger.error(e)
         sys.exit(1)
 
+def executeArguments(parser):
+    parser.add_argument('query', nargs='*',
+        help='''A SQL query that will be executed against the project
+            database.''')
+    parser.add_argument('-d', '--delimiter', default='\t',
+        help='''Delimiter used to output results of a SQL query.''')
+
+def execute(args):
+    # to keep backward compatibility, the vtools execute command
+    # can execute a SQL query and a pipeline
+    try:
+        env.verbosity = args.verbosity
+        env.logger = None
+        with Project(verbosity=args.verbosity) as proj:
+            # if there is no output, 
+            proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
+            # for backward compatibility
+            proj.db.attach('{}_genotype'.format(proj.name))
+            cur = proj.db.cursor()
+            # 
+            query = ' '.join(args.query)
+            if query.upper().startswith('SELECT'):
+                env.logger.trace('Analyze statement: "{}"'.format(query))
+                cur.execute('EXPLAIN QUERY PLAN ' + query)
+                for rec in cur:
+                    env.logger.trace('\t'.join([str(x) for x in rec]))
+            # really execute the query
+            try:
+                cur.execute(query)
+            except Exception as e:
+                raise RuntimeError('Failed to execute SQL query "{}": {}'
+                    .format(query, e))
+            proj.db.commit()
+            sep = args.delimiter
+            for rec in cur:
+                print(sep.join(['{}'.format(x) for x in rec]))
+    except Exception as e:
+        env.unlock_all()
+        env.logger.error(e)
+        sys.exit(1)
+
 if __name__ == '__main__':
     # for testing purposes only. The main interface is provided in vtools
     pass
