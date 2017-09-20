@@ -1540,7 +1540,7 @@ class Project:
             cls._instance = super(Project, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, name=None, mode=[], verbosity=None, **kwargs):
+    def __init__(self, name=None, store='sqlite', mode=[], verbosity=None, **kwargs):
         '''Create a new project or connect to an existing one.'''
         if isinstance(mode, str):
             self.mode = [mode]
@@ -1602,6 +1602,7 @@ class Project:
                 raise ValueError('Another project {} already exists in the current directory'.format(files[0]))
         #
         self.name = name
+        self.store = store
         self.proj_file = self.name + '.proj'
         #
         # create a temporary directory
@@ -1681,6 +1682,7 @@ class Project:
         self.saveProperty('__option_verbosity', env.verbosity)
         self.saveProperty('name', self.name)
         self.saveProperty('creation_date', self.creation_date)
+        self.saveProperty('store', self.store)
         self.saveProperty('build', self.build)
         self.saveProperty('alt_build', self.alt_build)
         self.saveProperty('annoDB', str(self.annoDB))
@@ -1725,6 +1727,7 @@ class Project:
         self.version = self.loadProperty('version', '1.0')
         old_revision = self.loadProperty('revision', None)
         self.build = self.loadProperty('build')
+        self.store = self.loadProperty('store')
         self.alt_build = self.loadProperty('alt_build')
         self.creation_date = self.loadProperty('creation_date', '')
         self.annoDB = []
@@ -2605,6 +2608,7 @@ class Project:
             info +=  'Created on:                  {}\n'.format(self.creation_date)
         info += 'Primary reference genome:    {}\n'.format('' if self.build is None else self.build)
         info += 'Secondary reference genome:  {}\n'.format('' if self.alt_build is None else self.alt_build)
+        info += 'Storage method:              {}\n'.format(self.store)
         #
         # list all runtime options as (name, val) pairs
         opts = [(x, self.loadProperty('__option_{}'.format(x), None)) for x in env.persistent_options] \
@@ -4074,12 +4078,16 @@ def initArguments(parser):
     parser.add_argument('--build',
         help='''Set the build (hg18 or hg19) of the primary reference genome
             of the project.''')
+    parser.add_argument('-s', '--store', default='sqlite', choices=['sqlite', 'hdf5'],
+        help='Storage model used to storage variants and genotype.')
 
 
 def init(args):
     try:
         temp_dirs = []
         if args.parent and not os.path.isdir(args.parent):
+            if args.store != 'sqlite':
+                raise NotImplemented('Option --parent is not supported yet with non-sqlite storage model')
             if (not args.samples) and (not args.genotypes) and args.variants == 'variant':
                 # directly create a project from snapshot
                 parent_path = '.'
@@ -4099,6 +4107,7 @@ def init(args):
             saved_dir = os.getcwd()
             os.chdir(parent_path)
             with Project(name=args.project if parent_path == '.' else os.path.basename(args.parent).split('.')[0],
+                store=args.store,
                 mode=['NEW_PROJ', 'REMOVE_EXISTING'] if args.force else 'NEW_PROJ', 
                 verbosity='1' if parent_path == '.' else '0') as parent_proj:
                 env.logger.info('Extracting snapshot {} to {}'.format(args.parent, parent_path))
@@ -4112,6 +4121,8 @@ def init(args):
                 return
         #
         if args.children:
+            if args.store != 'sqlite':
+                raise NotImplemented('Option --parent is not supported yet with non-sqlite storage model')
             # A default value 4 is given for args.jobs because more threads usually
             # do not improve effiency
             dirs = []
@@ -4137,6 +4148,7 @@ def init(args):
                     os.chdir(child_path)
                     env.logger.info('Extracting snapshot {} to {}'.format(child, child_path))
                     with Project(name=args.project if len(args.children) == 1 else os.path.basename(child).split('.')[0],
+                        store=args.store,
                         mode=['NEW_PROJ', 'REMOVE_EXISTING'] if args.force else 'NEW_PROJ', 
                         verbosity='1' if len(args.children) == 1 else '0') as child_proj:
                         child_proj.loadSnapshot(child_snapshot)
@@ -4151,10 +4163,12 @@ def init(args):
                     dirs.append(child)
             args.children = dirs
         # create a new project
-        with Project(name=args.project,
+        with Project(name=args.project, store=args.store,
             mode=['NEW_PROJ', 'REMOVE_EXISTING'] if args.force else 'NEW_PROJ', 
             verbosity='1' if args.verbosity is None else args.verbosity) as proj:
             if args.parent:
+                if args.store != 'sqlite':
+                    raise NotImplemented('Option --parent is not supported yet with non-sqlite storage model')
                 copier = ProjCopier(proj, args.parent, args.variants,
                     ' AND '.join(['({})'.format(x) for x in args.samples]),
                     ' AND '.join(['({})'.format(x) for x in args.genotypes]))

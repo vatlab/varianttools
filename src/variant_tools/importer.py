@@ -1781,8 +1781,6 @@ def importVariantsArguments(parser):
             parallel, and you can use more or less processes by adjusting this
             parameter. Due to the overhead of inter-process communication, more
             jobs do not automatically lead to better performance.'''),
-    parser.add_argument('--HDF5', action='store_true',
-        help='''Store genotypes into HDF5 files'''),
 
 def importVariants(args):
 
@@ -1795,7 +1793,7 @@ def importVariants(args):
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
             print((env.temp_dir))
-            if args.HDF5:
+            if proj.store == 'hdf5':
                 importGenotypesInParallel(importer)
             else:
                 importer.importFilesInParallel()
