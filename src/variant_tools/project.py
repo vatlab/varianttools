@@ -5189,7 +5189,7 @@ x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in list(_user_opt
         sys.exit(1)
 
 def executeArguments(parser):
-    parser.add_argument('query', nargs='*',
+    parser.add_argument('query', nargs='+',
         help='''A SQL query that will be executed against the project
             database.''')
     parser.add_argument('-d', '--delimiter', default='\t',
