@@ -1503,12 +1503,6 @@ class Project:
                          is provided).
             PHENOTYPE    phenotype might be added by command 'import_phenotype'
 
-    2. Table "genotype_$sample_id" stores variants of each sample
-            variant_id:  ID of variant
-            type:       A numeric (categorical) value
-
-      These tables are stored in a separate database $name_genotype in order to
-      keep the project database small.
 
     '''
     # the following make Project a singleton class
@@ -1542,7 +1536,7 @@ class Project:
             if len(files) > 0:
                 if 'REMOVE_EXISTING' in self.mode:
                     existing_files = glob.glob('*.proj') + glob.glob('*.lck') + \
-                        glob.glob('*.proj-journal') + glob.glob('*_genotype.DB')+glob.glob("tmp*.h5")
+                        glob.glob('*.proj-journal') + glob.glob('*_genotype.DB') + glob.glob("tmp*.h5")
                     for f in existing_files:
                         # if the project was created or updated in the past
                         # 24 hours, do not check for update
@@ -2247,9 +2241,11 @@ class Project:
                 cur.execute('DELETE FROM filename WHERE filename = ?', (f,))
             else:
                 env.logger.info('Removing {} imported from {}'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
+        #
+        store = GenoStore(self)
         for ID in IDs:
             cur.execute('DELETE FROM sample WHERE sample_id = ?;', (ID,))
-            self.db.removeTable('{}_genotype.genotype_{}'.format(self.name, ID))        
+            store.remove_sample(ID)
         self.db.commit()
         
     def removeVariants(self, table):
@@ -4222,7 +4218,6 @@ def remove(args):
             elif args.type == 'samples':
                 if len(args.items) == 0:
                     raise ValueError('Please specify conditions to select samples to be removed')
-                proj.db.attach(proj.name + '_genotype')
                 IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.items]))
                 if len(IDs) == 0:
                     env.logger.warning('No sample is selected by condition {}'

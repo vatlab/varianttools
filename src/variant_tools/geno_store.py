@@ -587,6 +587,10 @@ class Sqlite_Store(Base_Store):
         sampleGenotypeHeader = self.db.getHeaders('genotype_{}'.format(sample_id))
         return sampleGenotypeHeader[1:]  # the first field is variant id, second is GT
 
+    def remove_sample(self, sample_id):
+        self.db.removeTable('genotype_{}'.format(sample_id))
+        self.db.commit()
+
     def importGenotypes(self, importer):
         '''import files in parallel, by importing variants and genotypes separately, and in their own processes. 
         More specifically, suppose that there are three files
