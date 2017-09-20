@@ -1200,26 +1200,9 @@ class PipelineDescription:
             for paragraph in dehtml(self.description).split('\n\n'):
                 print(('\n'.join(textwrap.wrap(paragraph, width=textWidth))))
         #
-        text = 'Available {}: {}'.format(
-            'simulation models' if self.pipeline_type == 'simulation' else 'pipelines',
-            ', '.join(sorted(self.pipelines.keys())))
         print(('\n' + '\n'.join(textwrap.wrap(text, width=textWidth, subsequent_indent=' '*8))))
-        for pname, pipeline in sorted(self.pipelines.items()):
-            paragraphs = dehtml(self.pipeline_descriptions[pname]).split('\n\n')
-            print(('\n' + '\n'.join(textwrap.wrap('{} "{}":  {}'
-                .format(
-                'Model' if self.pipeline_type == 'simulation' else 'Pipeline',
-                pname, paragraphs[0]), width=textWidth))))
-            for paragraph in paragraphs[1:]:
-                print(('\n'.join(textwrap.wrap(paragraph, width=textWidth))))
-            for idx, step in enumerate(pipeline):
-                # hide a step if there is no comment
-                if step.comment:
-                    text = '{:<22}'.format('  {}_{}:'.format(pname, step.index)) + step.comment
-                    print(('\n'.join(textwrap.wrap(text, width=textWidth, subsequent_indent=' '*22))))
         #
         if self.parameters:
-            print(('\n{} parameters:'.format('Model' if self.pipeline_type == 'simulation' else 'Pipeline')))
             for item in self.parameters:
                 #
                 text = '  ' + item[0] + \
@@ -1228,9 +1211,6 @@ class PipelineDescription:
                     ('(default: {})'.format(item[1]) if item[1] else '')
                 print(('\n'.join(textwrap.wrap(text, subsequent_indent=' '*22,
                     width=textWidth))))
-        #else:
-        #    print('\nNo configurable parameter is defined for this {}.\n'
-        #        .format('model' if self.pipeline_type == 'simulation' else 'pipeline'))
 
 
 class AnnoDBWriter:
@@ -4348,9 +4328,7 @@ def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
         'samples', 'phenotypes', 'genotypes', 'fields', 'annotations',
         'annotation', 'track', 'formats', 'format', 'tests', 'test', 
-        'runtime_options', 'runtime_option', 'snapshot', 'snapshots', 
-        'pipeline', 'pipelines', 'simulations', 'simulation', 'actions',
-        'action'],
+        'runtime_options', 'runtime_option', 'snapshot', 'snapshots'],
         nargs='?', default='project',
         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
@@ -4371,15 +4349,7 @@ def showArguments(parser):
             option OPT, 'snapshot' for a particular snapshot by name or
             filename, 'snapshots' for a list of publicly available snapshots,
             and snapshots of the current project saved by command 
-            'vtools admin --save_snapshots', 'pipeline PIPELINE'
-            for details of a particular align and variant calling pipeline, 
-            'pipelines' for a list of available pipelines, 'simulation MODEL' for
-            details of a simulation model, 'simulations' for a list of simulation 
-            models, 'actions' for a list of pipeline actions provided by variant
-            pipeline tools, variant simulation tools, and modules defined for 
-            variant tools pipelines (.py files under the pipeline and simulation
-            directories), and 'action' for details of an action. Only classes derived
-            from class PipelineAction will be displayed. The default parameter of
+            'vtools admin --save_snapshots'. The default parameter of
             this command is 'project'.''')
     parser.add_argument('items', nargs='*',
         help='''Items to display, which can be, for example, name of table for
@@ -4432,7 +4402,6 @@ def show(args):
             elif args.type == 'table':
                 if proj.name is None:
                     raise ValueError('Cannot find any project in the current directory.')
-                proj.db.attach('{}_genotype'.format(proj.name))
                 if not args.items:
                     raise ValueError('Please specify a variant table to display')
                 if len(args.items) > 1:
@@ -4712,38 +4681,6 @@ def show(args):
                         subsequent_indent=' '*15)))))
                 # create an instance of the test and pass -h to it
                 test(1, ['-h']) 
-            elif args.type == 'simulations':
-                # it is very bad idea to use circular import, but I have no choice
-                if args.items:
-                    raise ValueError('Invalid parameter "{}" for command "vtools show simulations"'.format(', '.join(args.items)))
-                res = ResourceManager()
-                res.getRemoteManifest()
-                res.selectFiles(resource_type='simulation')
-                nAll = len(res.manifest)
-                for idx, (simulation, prop) in enumerate(sorted(res.manifest.items())):
-                    if args.limit is not None and idx >= args.limit:
-                        break
-                    if simulation.endswith('.py'):
-                        continue
-                    if args.verbosity == '0':
-                        print((simulation[11:-9]))
-                    else:
-                        text = '{:<23} {}'.format(simulation[11:-9], prop[3])
-                        print(('\n'.join(textwrap.wrap(text, width=textWidth,
-                            subsequent_indent=' '*24))))
-                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
-                    print((omitted.format(nAll - args.limit)))
-            elif args.type == 'simulation':
-                if len(args.items) == 0:
-                    raise ValueError('Please specify the name of a simulation model')
-                if len(args.items) > 1:
-                    raise ValueError('Please specify only one simulation model')
-                try:
-                    pipeline = PipelineDescription(args.items[0], pipeline_type='simulation')
-                except Exception as e:
-                    raise IndexError('Unrecognized simulation model {}: {}'
-                        .format(args.items[0], e))
-                pipeline.describe()
             elif args.type == 'runtime_options':
                 for idx, (opt, (def_value, description)) in enumerate(sorted(env.persistent_options.items())):
                     if args.limit is not None and idx == args.limit:
@@ -4840,151 +4777,6 @@ def show(args):
                 nAll = nLocal + idx
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print((omitted.format(nAll - args.limit)))
-            elif args.type == 'pipelines':
-                if args.items:
-                    raise ValueError('Invalid parameter "{}" for command "vtools show pipelines"'
-                        .format(', '.join(args.items)))
-                res = ResourceManager()
-                res.getRemoteManifest()
-                res.selectFiles(resource_type='pipeline')
-                nAll = len(res.manifest)
-                for idx, (pipeline, prop) in enumerate(sorted(res.manifest.items())):
-                    if args.limit is not None and idx >= args.limit:
-                        break
-                    if args.verbosity == '0':
-                        print((pipeline[9:-9]))
-                    else:
-                        text = '{:<23} {}'.format(pipeline[9:-9], prop[3])
-                        print(('\n'.join(textwrap.wrap(text, width=textWidth,
-                            subsequent_indent=' '*24))))
-                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
-                    print((omitted.format(nAll - args.limit)))
-            elif args.type == 'pipeline':
-                if not args.items:
-                    raise ValueError('Please specify a pipeline to display')
-                elif len(args.items) > 1:
-                    raise ValueError('Please specify only one pipeline to display')
-                try:
-                    pipeline = PipelineDescription(args.items[0])
-                except Exception as e:
-                    raise IndexError('Unrecognized pipeline {}: {}'
-                        .format(args.items[0], e))
-                pipeline.describe()
-            elif args.type == 'actions':
-                if args.items:
-                    raise ValueError('Invalid parameter "{}" for command "vtools show actions"'
-                        .format(', '.join(args.items)))
-                pipeline_members = []
-                # first look into variant_tools.pipeline
-                from variant_tools import pipeline
-                print('Module:\n        pipeline')
-                doc = pipeline.__doc__
-                if doc is not None and doc.strip():
-                    print('Description:')
-                    print(('\n'.join(textwrap.wrap(doc.strip(),
-                        initial_indent=' '*8,
-                        subsequent_indent=' '*8, width=textWidth))))
-                print('Pipeline actions:')
-                actions = []
-                for name, obj in inspect.getmembers(pipeline):
-                    if inspect.isclass(obj) and issubclass(obj, pipeline.PipelineAction):
-                        pipeline_members.append(name)
-                        actions.append(name)
-                #
-                for action in sorted(actions):
-                    print(('        {}'.format(action)))
-                #
-                from variant_tools import simulation
-                print('\nModule:\n        simulation')
-                doc = simulation.__doc__
-                if doc is not None and doc.strip():
-                    print('Description:')
-                    print(('\n'.join(textwrap.wrap(doc.strip(),
-                        initial_indent=' '*8,
-                        subsequent_indent=' '*8, width=textWidth))))
-                print('Pipeline actions:')
-                actions = []
-                for name, obj in inspect.getmembers(simulation):
-                    if name in pipeline_members:
-                        continue
-                    if inspect.isclass(obj) and issubclass(obj, simulation.PipelineAction):
-                        actions.append(name)
-                #
-                for action in sorted(actions):
-                    print(('        {}'.format(action)))
-                # look in resource files
-                res = ResourceManager()
-                res.getRemoteManifest()
-                modules = [x for x in list(res.manifest.keys()) if \
-                    (x.startswith('pipeline/') or x.startswith('simulation/')) and x.endswith('.py')]
-                for mod in modules:
-                    actions = []
-                    mod_file = downloadFile(mod)
-                    p,f = os.path.split(os.path.expanduser(mod_file))
-                    print(('\nModule:\n        {}'.format(f[:-3])))
-                    sys.path.append(p)
-                    local_dict = __import__(f[:-3], globals(), locals())
-                    doc = local_dict.__doc__
-                    if doc is not None and doc.strip():
-                        print('Description:')
-                        print(('\n'.join(textwrap.wrap(doc.strip(),
-                            initial_indent=' '*8,
-                            subsequent_indent=' '*8, width=textWidth))))
-                    for name, obj in inspect.getmembers(local_dict):
-                        if name in pipeline_members:
-                            continue
-                        if inspect.isclass(obj) and issubclass(obj, (simulation.PipelineAction, pipeline.PipelineAction)):
-                            actions.append(name)
-                    if not actions:
-                        print('No pipeline action is defined.')
-                    else:
-                        print('Pipeline actions:')
-                        for action in sorted(actions):
-                            print(('        {}'.format(action)))
-            elif args.type == 'action':
-                if not args.items:
-                    raise ValueError('Please specify a pipeline to display')
-                elif len(args.items) > 1:
-                    raise ValueError('Please specify only one pipeline to display')
-                found = 0
-                if '.' in args.items[0]:
-                    mod_name, action_name = args.items[0].split('.', 1)
-                else:
-                    action_name = args.items[0]
-                    mod_name = None
-                # first look into variant_tools.pipeline
-                from variant_tools import pipeline
-                if mod_name is None or mod_name == 'pipeline':
-                    for name, obj in inspect.getmembers(pipeline):
-                        if inspect.isclass(obj) and issubclass(obj, pipeline.PipelineAction) and name == action_name:
-                            pydoc.help(getattr(pipeline, name))
-                            found += 1
-                #
-                # first look into variant_tools.simulation
-                from variant_tools import simulation
-                if mod_name is None or mod_name == 'simulation':
-                    for name, obj in inspect.getmembers(simulation):
-                        if inspect.isclass(obj) and issubclass(obj, simulation.PipelineAction) and name == action_name:
-                            pydoc.help(getattr(simulation, name))
-                            found += 1
-                # look in resource files
-                res = ResourceManager()
-                res.getLocalManifest()
-                modules = [x for x in list(res.manifest.keys()) if \
-                    (x.startswith('pipeline/') or x.startswith('simulation/')) and x.endswith('.py')]
-                for mod in modules:
-                    if mod_name is not None and mod_name != os.path.basename(mod).split('.')[0]:
-                        continue
-                    mod_file = downloadFile(mod)
-                    p,f = os.path.split(os.path.expanduser(mod_file))
-                    sys.path.append(p)
-                    local_dict = __import__(f[:-3], globals(), locals())
-                    for name, obj in inspect.getmembers(local_dict):
-                        if inspect.isclass(obj) and issubclass(obj, (simulation.PipelineAction, pipeline.PipelineAction)) and name == action_name:
-                            pydoc.help(getattr(local_dict, name))
-                            found += 1
-                if not found:
-                    env.logger.warning('No pipeline action named {} is found'.format(args.items[0]))
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)

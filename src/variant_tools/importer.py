@@ -459,13 +459,6 @@ class Importer:
             if filename in existing_files:
                 if force:
                     env.logger.warning('Re-importing imported file {}, duplicated samples may occur.'.format(filename))
-                    #IDs = proj.selectSampleByPhenotype('filename = "{}"'.format(filename))
-                    #self.proj.db.attach(self.proj.name + '_genotype')
-                    #proj.removeSamples(IDs)
-                    #self.proj.db.detach(self.proj.name + '_genotype')
-                    #cur = self.db.cursor()
-                    #cur.execute('DELETE FROM filename WHERE filename={};'.format(self.db.PH), (filename,))
-                    #self.db.commit()
                     self.files.append(filename)
                 else:
                     env.logger.info('Ignoring imported file {}'.format(filename))
@@ -812,7 +805,6 @@ def importVariants(args):
             importer = Importer(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
-            print((env.temp_dir))
             store = GenoStore(proj)
             store.importGenotypes(importer)
             importer.finalize()
