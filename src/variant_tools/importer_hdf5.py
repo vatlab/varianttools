@@ -33,11 +33,7 @@ from heapq import heappush, heappop, heappushpop
 from multiprocessing import Process, Pipe, Value, Lock, Manager,Array
 from multiprocessing import Queue as mpQueue
 import queue
-if sys.version_info.major == 2:
-    from itertools import repeat
-else:
-    izip = zip
-    from itertools import repeat
+from itertools import repeat
 from collections import defaultdict
 from .project import Project, fileFMT
 from .liftOver import LiftOverTool
