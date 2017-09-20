@@ -45,6 +45,7 @@ import pydoc
 
 from .ucsctools import showTrack
 from .cgatools import fasta2crr
+from .geno_store import GenoStore
 from configparser import ConfigParser, RawConfigParser
 from io import StringIO
 
@@ -4623,12 +4624,6 @@ def show(args):
                     env.logger.warning('Project does not have a sample table.')
                     return
                 cur = proj.db.cursor()
-                try:
-                    proj.db.attach(proj.name + '_genotype') 
-                except Exception as e:
-                    # either the database doesn't exist or it's already been attached (should we add a method proj.db.isAttached(...)? and embedding this in the attach() method?
-                    if not proj.db.hasDatabase(proj.name + '_genotype'):
-                        env.logger.trace('Trying to attach a database that doesn\'t exist' + e)
                 # sample headers are ID, file, sample, FIELDS
                 prt = PrettyPrinter(max_width={} if args.verbosity == '2' else {1:25})
                 prt.write(['sample_name', 'filename', 'num_genotypes', 'sample_genotype_fields'])
@@ -4637,11 +4632,10 @@ def show(args):
                 for rec in records:
                     # now get sample genotype counts and sample specific fields
                     sampleId = rec[0]
-                    cur.execute('SELECT count(*) FROM {}_genotype.genotype_{};'.format(proj.name, sampleId))
-                    numGenotypes = cur.fetchone()[0]
+                    store = GenoStore(proj)
+                    numGenotypes = store.num_variants(sampleId)
                     # get fields for each genotype table
-                    sampleGenotypeHeader = proj.db.getHeaders('{}_genotype.genotype_{}'.format(proj.name, sampleId))
-                    sampleGenotypeFields = ','.join(['{}'.format(x) for x in sampleGenotypeHeader[1:]])  # the first field is variant id, second is GT
+                    sampleGenotypeFields = ','.join(store.geno_fields(sampleId))
                     prt.write([rec[1], rec[2], str(numGenotypes), sampleGenotypeFields])
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')

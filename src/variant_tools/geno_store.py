@@ -575,6 +575,17 @@ class GenotypeImportWorker(Process):
 class Sqlite_Store(Base_Store):
     def __init__(self, proj):
         super(Sqlite_Store, self).__init__(proj)
+        self.db = DatabaseEngine()
+        self.db.connect('{}_genotype.DB'.format(self.proj.name))
+        self.cur = self.db.cursor()
+
+    def num_variants(self, sample_id):
+        self.cur.execute('SELECT count(*) FROM genotype_{};'.format(sample_id))
+        return self.cur.fetchone()[0]
+
+    def geno_fields(self, sample_id):
+        sampleGenotypeHeader = self.db.getHeaders('genotype_{}'.format(sample_id))
+        return sampleGenotypeHeader[1:]  # the first field is variant id, second is GT
 
     def importGenotypes(self, importer):
         '''import files in parallel, by importing variants and genotypes separately, and in their own processes. 
@@ -737,12 +748,12 @@ class Sqlite_Store(Base_Store):
                 new_count = 0
                 for i in range(importer.jobs):
                     if importers[i] is None or not importers[i].is_alive():
-                        importer = GenotypeImportWorker(importer.variantIndex, 
+                        worker = GenotypeImportWorker(importer.variantIndex, 
                             importer.files, importer.processor, importer.encoding, importer.header,
                             importer.genotype_field, importer.genotype_info, importer.ranges,
                             genotype_import_count[i], i, status)
-                        importers[i] = importer
-                        importer.start()
+                        importers[i] = worker
+                        worker.start()
                         new_count += 1
                     if new_count >= queued:
                         break

@@ -40,7 +40,8 @@ from .utils import ProgressBar, downloadFile, lineCount, \
     DatabaseEngine, getMaxUcscBin, delayedAction, decompressGzFile, \
     compressFile, SQL_KEYWORDS, extractField, env, isAnnoDB, \
     calculateMD5, ResourceManager, RefGenome
-from .importer import LineProcessor, TextReader
+from .importer import LineProcessor
+from .text_reader import TextReader
 from .preprocessor import *
   
 class AnnoDBConfiger:
