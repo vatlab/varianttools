@@ -5203,9 +5203,8 @@ def execute(args):
         env.logger = None
         with Project(verbosity=args.verbosity) as proj:
             # if there is no output, 
-            proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
-            # for backward compatibility
-            proj.db.attach('{}_genotype'.format(proj.name))
+            if proj.store == 'sqlite':
+                proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
             cur = proj.db.cursor()
             # 
             query = ' '.join(args.query)
