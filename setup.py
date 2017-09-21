@@ -28,6 +28,10 @@ from setuptools import find_packages, setup, Extension
 
 # parallel compilation
 import multiprocessing, multiprocessing.pool
+import numpy as np
+
+
+
 
 def compile_parallel(
         self,
@@ -743,7 +747,12 @@ vtools_report = variant_tools.vtools_report:main
             libraries = libs + ['gsl', 'stat', 'blas'],
             library_dirs = ["build"],
             include_dirs = ["src", "src/variant_tools", "src/gsl"],
-        )
+        ),
+        Extension('io_vcf_read',
+          # sources=['/Users/jma7/Development/VAT/VariantTools/src/variant_tools/io_vcf_read.c'],
+          sources=['src/variant_tools/io_vcf_read.c'],
+          include_dirs=[np.get_include()],
+          ibrary_dirs = ["build"])
       ] 
 )
 
