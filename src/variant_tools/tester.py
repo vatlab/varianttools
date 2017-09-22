@@ -29,7 +29,7 @@ import zipfile
 import platform
 import argparse
 import stat
-from .assoTests import *
+from . import assoTests
 from .project import Field
 from .utils import env, downloadFile, hasCommand, runCommand
 
