@@ -3935,6 +3935,7 @@ src/variant_tools/assoTests.py
 src/variant_tools/assoTests_wrap.cpp
 src/variant_tools/association.py
 src/variant_tools/association_hdf5.py
+src/variant_tools/association_vcf_to_hdf5.py
 src/variant_tools/cgatools.i
 src/variant_tools/cgatools.py
 src/variant_tools/cgatools_wrap.cpp
@@ -3951,6 +3952,7 @@ src/variant_tools/liftOver.py
 src/variant_tools/lm.cpp
 src/variant_tools/lm.h
 src/variant_tools/meta.py
+src/variant_tools/monitor.py
 src/variant_tools/phenotype.py
 src/variant_tools/plinkfile.py
 src/variant_tools/plot.py

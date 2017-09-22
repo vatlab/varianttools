@@ -8,10 +8,14 @@ import time
 import math
 import os
 import sys
+import h5py
 
 import glob
 from multiprocessing import Process,Manager
 import queue
+
+from .importer_vcf_to_hdf5 import _hdf5_setup_datasets,_hdf5_store_chunk,\
+DEFAULT_ALT_NUMBER,DEFAULT_BUFFER_SIZE,DEFAULT_CHUNK_LENGTH,DEFAULT_CHUNK_WIDTH
 
 class HMatrix:
     """This class accepts three arrays which represent the matrix (or sparse matrix,check below for example), the shape of the matrix,
@@ -156,7 +160,8 @@ class Engine_Storage(object):
                 dbPath: the path to database file
         """
         if dbPath.split(".")[-1]=="h5":
-            return HDF5Engine_storage(dbPath)
+            # return HDF5Engine_storage(dbPath)
+            return H5PYEngine_storage(dbPath)
 
     # choose_storage_engine=staticmethod(choose_storage_engine)
 
@@ -186,6 +191,57 @@ class Base_Storage(object):
         """
 
         raise NotImplementError()
+
+
+class H5PYEngine_storage(Base_Storage):
+    def __init__(self,fileName):
+        # print("HDF5 engine started")
+        Base_Storage.__init__(self,fileName)
+        self.fileName=fileName
+        # self.file=h5py.File(self.dbPath,"a")
+
+    def store(self,chunk,chr,groupName):
+        compression='gzip'
+        compression_opts=1
+        shuffle=False
+        overwrite=False
+        vlen=True
+        fields=None
+        types=None
+        numbers=None
+        alt_number=DEFAULT_ALT_NUMBER
+        fills=None
+        region=None
+        tabix='tabix'
+        samples=None
+        transformers=None
+        buffer_size=DEFAULT_BUFFER_SIZE
+        chunk_length=DEFAULT_CHUNK_LENGTH
+        chunk_width=DEFAULT_CHUNK_WIDTH
+        log=None
+        headers=None
+
+        group="/chr22/"+groupName
+        # print(chunk)
+        with h5py.File(self.fileName, mode='a') as h5f:
+
+            # obtain root group that data will be stored into
+            root = h5f.require_group(group)
+
+            # ensure sub-groups
+            root.require_group('variants')
+            root.require_group('calldata')
+            keys =_hdf5_setup_datasets(
+                    chunk, root, chunk_length, chunk_width,
+                    compression, compression_opts, shuffle,
+                    overwrite, headers, vlen
+                )
+            # store first chunk
+            _hdf5_store_chunk(root, keys, chunk, vlen)
+         
+
+    def close(self):
+        pass
 
 
 
@@ -519,7 +575,10 @@ class Engine_Access(object):
                 dbPath: the path to database file
         """
         if dbPath.split(".")[-1]=="h5":
-            return HDF5Engine_access(dbPath)
+            # return HDF5Engine_access(dbPath)
+            return H5PYEngine_access(dbPath)
+
+
 
 
 
@@ -619,6 +678,84 @@ class Base_Access(object):
 
         """
         raise NotImplementError()
+
+
+class H5PYEngine_access(Base_Access):
+
+    def __init__(self,fileName):
+        # print("HDF5 engine started")
+        Base_Access.__init__(self,fileName)
+        self.fileName=fileName
+        self.chr=None
+        self.file=h5py.File(self.fileName,mode="r")
+        print(self.fileName)
+        # self.rownames=self.file["/chr22/variants/ID"][:].tolist()
+ 
+
+    def get_geno_info_by_variant_IDs(self,rowIDs,chr,groupName):
+        # group=self.getGroup(chr)
+        self.rownames=self.file["/chr22/variants/ID"][:].tolist()
+        if groupName is not None:
+            self.rownames=self.file["/chr22/"+groupName+"/variants/ID"][:].tolist()
+        for id in rowIDs:
+            try:
+                minPos=self.rownames.index(str(id))
+                break
+            except ValueError:
+                continue
+        for id in reversed(rowIDs):
+            try:
+                maxPos=self.rownames.index(str(id))
+                break
+            except ValueError:
+                continue
+        
+        update_rownames=self.rownames[minPos:maxPos+1]
+        subMatrix=self.file["/chr22/calldata/GT"][minPos:maxPos+1,]
+        return {"variants/ID":np.array(update_rownames,dtype=object),"calldata/GT":subMatrix}
+
+
+
+    def get_geno_info_by_sample_ID(self,sample_id,chr,groupName):
+        pass
+
+    def get_geno_info_by_group(self,groupName,chr):
+
+        self.colnames=[i for i in range(1,2505)]
+        if groupName is not None:
+            self.rownames=self.file["/chr22/"+groupName+"/variants/ID"][:]
+        else:
+            self.rownames=self.file["/chr22/variants/ID"][:]
+        
+        snpdict=dict.fromkeys(self.colnames,{})
+        for key,value in snpdict.items():
+            snpdict[key]=dict.fromkeys(self.rownames.tolist(),(0,))
+ 
+        for idx,id in enumerate(self.rownames.tolist()):
+            print(idx,groupName)
+            variant_ID,genos=self.get_geno_info_by_row_pos(idx,chr,groupName)
+            if len(genos)>0:
+                for colidx,samplePos in enumerate(genos):
+                    snpdict[self.colnames[samplePos]][id]=(genos[colidx],)
+    
+        return snpdict
+
+    def __load_HDF5_by_group(self,chr,groupName=""):
+        pass
+
+
+    def get_geno_info_by_variant_ID(self,variant_id,chr,groupname):
+        pass
+
+    def get_geno_info_by_row_pos(self,rowPos,chr,group):
+        # group=self.getGroup(chr,groupName)
+        variant_ID=self.file["/chr22/"+group+"/variants/ID"][rowpos]
+        genos=self.file["/chr22/"+group+"/calldata/GT"][rowpos]
+        print(variant_ID,genos)
+        return variant_ID,genos
+
+    def close(self):
+        pass
 
 
 

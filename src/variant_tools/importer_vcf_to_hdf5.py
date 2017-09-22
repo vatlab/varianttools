@@ -419,16 +419,16 @@ def _hdf5_setup_datasets(chunk, root, chunk_length, chunk_width, compression, co
         )
 
         # copy metadata from VCF headers
-        meta = None
-        if group == 'variants' and name in headers.infos:
-            meta = headers.infos[name]
-        elif group == 'calldata' and name in headers.formats:
-            meta = headers.formats[name]
-        if meta is not None:
-            ds.attrs['ID'] = meta['ID']
-            ds.attrs['Number'] = meta['Number']
-            ds.attrs['Type'] = meta['Type']
-            ds.attrs['Description'] = meta['Description']
+        # meta = None
+        # if group == 'variants' and name in headers.infos:
+        #     meta = headers.infos[name]
+        # elif group == 'calldata' and name in headers.formats:
+        #     meta = headers.formats[name]
+        # if meta is not None:
+        #     ds.attrs['ID'] = meta['ID']
+        #     ds.attrs['Number'] = meta['Number']
+        #     ds.attrs['Type'] = meta['Type']
+        #     ds.attrs['Description'] = meta['Description']
 
     return keys
 
@@ -443,7 +443,7 @@ def _hdf5_store_chunk(root, keys, chunk, vlen):
 
     # new length of all arrays after loading this chunk
     new_length = old_length + current_chunk_length
-
+    
     # load arrays
     for k in keys:
 
@@ -467,6 +467,7 @@ def _hdf5_store_chunk(root, keys, chunk, vlen):
         dataset.resize(new_length, axis=0)
 
         # store the data
+        print(old_length,new_length,len(data))
         dataset[old_length:new_length, ...] = data
 
 
