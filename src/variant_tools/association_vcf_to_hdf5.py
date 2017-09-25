@@ -305,12 +305,12 @@ def getGenotype_HDF5(worker, group):
         accessEngine=Engine_Access.choose_access_engine(fileName)
     
         snpdict=accessEngine.get_geno_info_by_group(geneSymbol,chr)
-        print(snpdict)
         
         # print(geneSymbol,snpdict.keys(),startSample,endSample)
         accessEngine.close()
         for ID in range(startSample,endSample+1):
             data=snpdict[ID]
+            print(data)
             
             gtmp = [data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in variant_id]
             # handle -1 coding (double heterozygotes)     

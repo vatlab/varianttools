@@ -727,17 +727,18 @@ class H5PYEngine_access(Base_Access):
         else:
             self.rownames=self.file["/chr22/variants/ID"][:]
         
+ 
         snpdict=dict.fromkeys(self.colnames,{})
         for key,value in snpdict.items():
             snpdict[key]=dict.fromkeys(self.rownames.tolist(),(0,))
- 
+        
         for idx,id in enumerate(self.rownames.tolist()):
-            print(idx,groupName)
             variant_ID,genos=self.get_geno_info_by_row_pos(idx,chr,groupName)
             if len(genos)>0:
-                for colidx,samplePos in enumerate(genos):
-                    snpdict[self.colnames[samplePos]][id]=(genos[colidx],)
-    
+                for colidx,geno in enumerate(genos):
+                        
+                    snpdict[self.colnames[colidx]][id]=(sum(geno),)
+            # print(snpdict)
         return snpdict
 
     def __load_HDF5_by_group(self,chr,groupName=""):
@@ -749,9 +750,8 @@ class H5PYEngine_access(Base_Access):
 
     def get_geno_info_by_row_pos(self,rowPos,chr,group):
         # group=self.getGroup(chr,groupName)
-        variant_ID=self.file["/chr22/"+group+"/variants/ID"][rowpos]
-        genos=self.file["/chr22/"+group+"/calldata/GT"][rowpos]
-        print(variant_ID,genos)
+        variant_ID=self.file["/chr22/"+group+"/variants/ID"][rowPos]
+        genos=self.file["/chr22/"+group+"/calldata/GT"][rowPos]
         return variant_ID,genos
 
     def close(self):
