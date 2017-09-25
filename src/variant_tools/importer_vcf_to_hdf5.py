@@ -31,7 +31,7 @@ from io_vcf_read import (  # noqa: F401
 
 
 DEFAULT_BUFFER_SIZE = 2**14
-DEFAULT_CHUNK_LENGTH = 2**16
+DEFAULT_CHUNK_LENGTH = 2**13
 DEFAULT_CHUNK_WIDTH = 2**6
 DEFAULT_ALT_NUMBER = 3
 
@@ -437,7 +437,7 @@ def _hdf5_store_chunk(root, keys, chunk, vlen):
 
     # compute length of current chunk
     current_chunk_length = chunk[keys[0]].shape[0]
-
+    print(root[keys[0]])
     # find current length of datasets
     old_length = root[keys[0]].shape[0]
 
@@ -1371,7 +1371,7 @@ def writeIntoSparseHDF(chunk,importer,samples,colnames):
     print(len(indices),len(data),len(indptr),len(rownames))
     shape=(len(indptr),len(samples))
 
-    storageEngine=Engine_Storage.choose_storage_engine("resultFile.h5")
+    storageEngine=Engine_Storage.choose_storage_engine("result.h5")
     # make a HMatrix object which is a matrix with rownames and colnames
     hmatrix=HMatrix(data,indices,indptr,shape,rownames,colnames)
     # write GT into file
@@ -1390,7 +1390,7 @@ def writeIntoFullHDF(chunk,importer,chunk_length, chunk_width,
             variant_id  = importer.variantIndex[tuple((chr, ref, alt[0]))][pos][0]
             chunk["variants/ID"][i]=variant_id
     group="/chr22"
-    output="result.h5"
+    output="tmp_1_2504_genotype.h5"
     import h5py
     with h5py.File(output, mode='a') as h5f:
 
@@ -1407,6 +1407,7 @@ def writeIntoFullHDF(chunk,importer,chunk_length, chunk_width,
             )
         # store first chunk
         _hdf5_store_chunk(root, keys, chunk, vlen)
+        return root,keys,vlen
 
 
 
@@ -1429,7 +1430,7 @@ def readVCF(inputFileName,importer,colnames):
     chunk_length=DEFAULT_CHUNK_LENGTH
     chunk_width=DEFAULT_CHUNK_WIDTH
     log=None
-    starttime=time.time()
+   
     _, samples, headers, it = iter_vcf_chunks(
             inputFileName, fields=fields, types=types, numbers=numbers, alt_number=alt_number,
             buffer_size=buffer_size, chunk_length=chunk_length, fills=fills, region=region,
@@ -1437,20 +1438,39 @@ def readVCF(inputFileName,importer,colnames):
         )
 
     chunk, _, _, _ = next(it)
-    print(time.time()-starttime)
 
-    starttime=time.time()
     # writeIntoSparseHDF(chunk,importer,samples,colnames)
-    writeIntoFullHDF(chunk,importer,chunk_length=chunk_length, chunk_width=chunk_width,
-                compression=compression, compression_opts=compression_opts, shuffle=shuffle,
-                overwrite=overwrite, headers=headers, vlen=vlen)
-    print(time.time()-starttime)
+    for i in range(len(chunk["variants/ID"])):
+        chr=chunk["variants/CHROM"][i]
+        ref=chunk["variants/REF"][i]
+        alt=chunk["variants/ALT"][i]
+        pos=chunk["variants/POS"][i]
+        GT=chunk["calldata/GT"][i]
+        if tuple((chr, ref, alt[0])) in importer.variantIndex:
+            variant_id  = importer.variantIndex[tuple((chr, ref, alt[0]))][pos][0]
+            chunk["variants/ID"][i]=variant_id
+    group="/chr22"
+    output="tmp_1_2504_genotypes.h5"
+    import h5py
+    with h5py.File(output, mode='a') as h5f:
 
-  
-   
+        # obtain root group that data will be stored into
+        root = h5f.require_group(group)
 
-
-
+        # ensure sub-groups
+        root.require_group('variants')
+        root.require_group('calldata')
+        keys = _hdf5_setup_datasets(
+                chunk, root, chunk_length, chunk_width,
+                compression, compression_opts, shuffle,
+                overwrite, headers, vlen
+            )
+        # store first chunk
+        _hdf5_store_chunk(root, keys, chunk, vlen)
+      
+        for chunk, _, _, _ in it:
+            _hdf5_store_chunk(root, keys, chunk, vlen)
+        
 
 
 

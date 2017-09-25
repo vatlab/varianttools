@@ -794,6 +794,7 @@ class HDF5_Store(Base_Store):
 
     def importGenotypes(self, importer,monitor):
         from .importer_hdf5 import importGenotypesInParallel
+        from .importer_vcf_to_hdf5 import importGenotypes
         if monitor:
             monitor_interval = 2
             resource_monitor_interval = 60
@@ -801,7 +802,8 @@ class HDF5_Store(Base_Store):
             m = ProcessMonitor(task_id, monitor_interval=monitor_interval,
                     resource_monitor_interval=resource_monitor_interval)
             m.start()
-        return importGenotypesInParallel(importer)
+        # return importGenotypesInParallel(importer)
+        return importGenotypes(importer)
 
 
 

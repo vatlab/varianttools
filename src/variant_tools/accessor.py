@@ -734,7 +734,7 @@ class H5PYEngine_access(Base_Access):
         
         for idx,id in enumerate(self.rownames.tolist()):
             variant_ID,genos=self.get_geno_info_by_row_pos(idx,chr,groupName)
-            if len(genos)>0:
+            if len(genos)>0 and "rs" not in variant_ID:
                 for colidx,geno in enumerate(genos):
                         
                     snpdict[self.colnames[colidx]][id]=(sum(geno),)
