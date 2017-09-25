@@ -32,17 +32,14 @@ import glob
 import logging
 import subprocess
 import urllib.request, urllib.parse, urllib.error
-import getpass
 import time
 import tempfile
 import tokenize
 import gzip
-import copy
 import threading
 import re
 import shlex
 import stat
-import signal
 import random
 import shutil
 import hashlib
@@ -50,7 +47,6 @@ import configparser
 from html.parser import HTMLParser
 import tarfile
 import binascii
-from collections import namedtuple
 from itertools import chain
 # import site_options
 from . import site_options
@@ -1305,32 +1301,19 @@ class ProgressBar:
         sys.stderr.flush()
 
 
-if sys.version_info.major == 2:
-    class ProgressFileObj(file):
-        '''A wrapper of a file object that update a progress bar
-        during file read.
-        '''
-        def __init__(self, prog, *args, **kwargs):
-            file.__init__(self, *args, **kwargs)
-            self.prog = prog
 
-        def read(self, n, *args):
-            self.prog.progressBy(n)
-            return file.read(self, n, *args)
-else:
-    # FIXME: this curently might not work.
-    from io import FileIO
-    class ProgressFileObj(FileIO):
-        '''A wrapper of a file object that update a progress bar
-        during file read.
-        '''
-        def __init__(self, prog, *args, **kwargs):
-            FileIO.__init__(self, *args, **kwargs)
-            self.prog = prog
+from io import FileIO
+class ProgressFileObj(FileIO):
+    '''A wrapper of a file object that update a progress bar
+    during file read.
+    '''
+    def __init__(self, prog, *args, **kwargs):
+        FileIO.__init__(self, *args, **kwargs)
+        self.prog = prog
 
-        def read(self, n, *args):
-            self.prog.progressBy(n)
-            return FileIO.read(self, n, *args)
+    def read(self, n, *args):
+        self.prog.progressBy(n)
+        return FileIO.read(self, n, *args)
 
 def getSnapshotInfo(name):
     '''return meta information for all snapshots'''

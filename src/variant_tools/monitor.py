@@ -16,8 +16,10 @@ class ProcessMonitor(threading.Thread):
         self.monitor_interval = monitor_interval
         self.resource_monitor_interval=resource_monitor_interval
         self.daemon = True
-        self.pulse_file = os.path.join(os.path.expanduser('~'), '.sos', 'tasks', task_id + '.pulse')
-        print(self.pulse_file)
+
+        # self.pulse_file = os.path.join(os.path.expanduser('~'), '.sos', 'tasks', task_id + '.pulse')
+        self.pulse_file = task_id + '.pulse'
+
         # remove previous status file, which could be readonly if the job is killed
         if os.path.isfile(self.pulse_file):
             if not os.access(self.pulse_file, os.W_OK):
@@ -45,7 +47,7 @@ class ProcessMonitor(threading.Thread):
     def run(self):
         counter = 0
         start_time = time.time()
-        print(self.pid)
+
 
         while True:
             try:
@@ -59,11 +61,8 @@ class ProcessMonitor(threading.Thread):
                 # else:
                 cpu, mem, nch, ch_cpu, ch_mem = self._check()
                 with open(self.pulse_file, 'a') as pd:
-                    pd.write('{}\t{:.2f}\t{}\t{}\t{}\t{}\n'.format(time.time(), cpu, mem, nch, ch_cpu, ch_mem))
-      
-                elapsed = time.time() - start_time
+                    pd.write('{}\t{:.2f}\t{}\t{}\t{}\t{}\n'.format(time.time()-start_time, cpu, mem, nch, ch_cpu, ch_mem))
                 time.sleep(self.monitor_interval)
-                print(elapsed)
                 counter += 1
             except Exception as e:
                 # if the process died, exit the thread
