@@ -43,7 +43,7 @@ import stat
 import random
 import shutil
 import hashlib
-import ConfigParser
+import configparser
 from html.parser import HTMLParser
 import tarfile
 import binascii

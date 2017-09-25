@@ -32,6 +32,8 @@ from .utils import ProgressBar,  delayedAction, \
      DatabaseEngine, env
 
 from .text_reader import TextReader
+from .monitor import ProcessMonitor
+from datetime import datetime
 
 
 class Base_Store(object):
@@ -789,8 +791,15 @@ class HDF5_Store(Base_Store):
     def __init__(self, name):
         super(HDF5_Store, self).__init__(name)
          
-    def importGenotypes(self, importer):
+    def importGenotypes(self, importer,monitor):
         from .importer_hdf5 import importGenotypesInParallel
+        if monitor:
+            monitor_interval = 2
+            resource_monitor_interval = 60
+            task_id=datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+"_import"
+            m = ProcessMonitor(task_id, monitor_interval=monitor_interval,
+                    resource_monitor_interval=resource_monitor_interval)
+            m.start()
         return importGenotypesInParallel(importer)
 
 
