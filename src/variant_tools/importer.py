@@ -807,8 +807,8 @@ def importVariants(args):
             importer = Importer(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
-            store = GenoStore(proj)
-            store.importGenotypes(importer,args.monitor)
+            store = GenoStore(proj,args.monitor)
+            store.importGenotypes(importer)
             importer.finalize()
         proj.close()
     except Exception as e:
