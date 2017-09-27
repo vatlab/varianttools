@@ -14,7 +14,7 @@ from collections import namedtuple
 import warnings
 import time
 import subprocess
-from .utils import env, ProgressBar
+from .utils import env, ProgressBar,RefGenome
 import sys
 import numpy as np
 from .accessor import *
@@ -28,7 +28,12 @@ from io_vcf_read import (  # noqa: F401
     ANN_FIELDS, ANN_GENE_ID_FIELD, ANN_GENE_NAME_FIELD, ANN_HGVS_C_FIELD, ANN_HGVS_P_FIELD,
     ANN_RANK_FIELD, ANN_TRANSCRIPT_BIOTYPE_FIELD
 )
-
+try:
+    from variant_tools.cgatools import normalize_variant
+except ImportError as e:
+    sys.exit('Failed to import module ({})\n'
+        'Please verify if you have installed variant tools successfully (using command '
+        '"python setup.py install")'.format(e))
 
 DEFAULT_BUFFER_SIZE = 2**14
 DEFAULT_CHUNK_LENGTH = 2**16
@@ -1345,68 +1350,105 @@ def writeIntoSparseHDF(chunk,importer,samples,colnames):
     for i in range(len(chunk["variants/ID"])):
         chr=chunk["variants/CHROM"][i]
         ref=chunk["variants/REF"][i]
-        alt=chunk["variants/ALT"][i]
         pos=chunk["variants/POS"][i]
         GT=chunk["calldata/GT"][i].tolist()
-        if tuple((chr, ref, alt[0])) in importer.variantIndex:
-            variant_id  = importer.variantIndex[tuple((chr, ref, alt[0]))][pos][0]
-            starttime=time.time()
-            for idx in range(len(samples)):
     
-                if GT[idx] is not None:
-                    if GT[idx]!=0:
-                        genoCount=genoCount+1
-                        indices.append(idx)
-                        data.append(GT[idx])
+        for altIndex in range(len(chunk["variants/ALT"][i])):
+            alt=chunk["variants/ALT"][i][altIndex]
+     
+            if alt!="":
+                if tuple((chr, ref, alt)) in importer.variantIndex:
+                    variant_id  = importer.variantIndex[tuple((chr, ref, alt))][pos][0]
+                    starttime=time.time()
+                    for idx in range(len(samples)):
+            
+                        if GT[idx] is not None:
+                            if altIndex==0:
+                                if GT[idx]!=0:
+                                    if GT[idx]!=3 and GT[idx]!=4:
+                                        genoCount=genoCount+1
+                                        indices.append(idx)
+                                        data.append(GT[idx])
+                                    else:
+                                        genoCount=genoCount+1
+                                        indices.append(idx)
+                                        data.append(None)  
+                            elif altIndex==1:
+                                    genoCount=genoCount+1
+                                    indices.append(idx)   
+                                    if GT[idx]==3:
+                                        data.append(1)
+                                    elif GT[idx]==4:
+                                        data.append(2)
+                                    else:
+                                        data.append(None)
+                              
+
+                        else:
+                            genoCount=genoCount+1
+                            indices.append(idx)
+                            data.append(np.nan)
+                    print(pos,ref,alt,genoCount)
+                    checktime+=time.time()-starttime
+                    indptr.append(genoCount)
+                    rownames.append(variant_id)
+       
                 else:
-                    genoCount=genoCount+1
-                    indices.append(idx)
-                    data.append(np.nan)
-            checktime+=time.time()-starttime
-            indptr.append(genoCount)
-            rownames.append(variant_id)
+                    # print(chr,pos,ref,alt)
+                    rec=[str(chr),str(pos),ref,alt]  
+                    msg=normalize_variant(RefGenome(importer.build).crr, rec, 0, 1, 2, 3)
+                   
+                    if tuple((rec[0], rec[2], rec[3])) in importer.variantIndex:
+                        variant_id  = importer.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
+                        starttime=time.time()
+                        for idx in range(len(samples)):
+                
+                            if GT[idx] is not None:
+                                if altIndex==0:
+                                    if GT[idx]!=0:
+                                        if GT[idx]!=3 and GT[idx]!=4:
+                                            genoCount=genoCount+1
+                                            indices.append(idx)
+                                            data.append(GT[idx])
+                                        else:
+                                            genoCount=genoCount+1
+                                            indices.append(idx)
+                                            data.append(None)
+
+                                   
+                                elif altIndex==1:
+                                        genoCount=genoCount+1
+                                        indices.append(idx)   
+                                        if GT[idx]==3:
+                                            data.append(1)
+                                        elif GT[idx]==4:
+                                            data.append(2)
+                                        else:
+                                            data.append(None)
+                               
+                            else:
+                                genoCount=genoCount+1
+                                indices.append(idx)
+                                data.append(np.nan)
+                        print(rec[1],rec[2],rec[3],genoCount)
+                        checktime+=time.time()-starttime
+                        indptr.append(genoCount)
+                        rownames.append(variant_id)
+     
+                           
+                    
+
         # print(variant_id)
     print(checktime)
     print(len(indices),len(data),len(indptr),len(rownames))
     shape=(len(indptr),len(samples))
 
-    storageEngine=Engine_Storage.choose_storage_engine("result.h5")
+    storageEngine=Engine_Storage.choose_storage_engine("tmp_1_2504_genotypes.h5")
     # make a HMatrix object which is a matrix with rownames and colnames
     hmatrix=HMatrix(data,indices,indptr,shape,rownames,colnames)
     # write GT into file
     storageEngine.store(hmatrix,"22")
 
-def writeIntoFullHDF(chunk,importer,chunk_length, chunk_width,
-                compression, compression_opts, shuffle,
-                overwrite, headers, vlen):
-    for i in range(len(chunk["variants/ID"])):
-        chr=chunk["variants/CHROM"][i]
-        ref=chunk["variants/REF"][i]
-        alt=chunk["variants/ALT"][i]
-        pos=chunk["variants/POS"][i]
-        GT=chunk["calldata/GT"][i]
-        if tuple((chr, ref, alt[0])) in importer.variantIndex:
-            variant_id  = importer.variantIndex[tuple((chr, ref, alt[0]))][pos][0]
-            chunk["variants/ID"][i]=variant_id
-    group="/chr22"
-    output="tmp_1_2504_genotype.h5"
-    import h5py
-    with h5py.File(output, mode='a') as h5f:
-
-        # obtain root group that data will be stored into
-        root = h5f.require_group(group)
-
-        # ensure sub-groups
-        root.require_group('variants')
-        root.require_group('calldata')
-        keys = _hdf5_setup_datasets(
-                chunk, root, chunk_length, chunk_width,
-                compression, compression_opts, shuffle,
-                overwrite, headers, vlen
-            )
-        # store first chunk
-        _hdf5_store_chunk(root, keys, chunk, vlen)
-        return root,keys,vlen
 
 
 

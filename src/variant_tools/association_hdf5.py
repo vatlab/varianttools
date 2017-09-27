@@ -374,5 +374,6 @@ def getGenotype_HDF5(worker, group):
                 geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
             
     gname = ':'.join(list(map(str, group)))
+  
     return worker.filterGenotype(genotype, geno_info, var_info, gname)
 
