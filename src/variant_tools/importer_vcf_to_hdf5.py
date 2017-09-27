@@ -31,7 +31,7 @@ from io_vcf_read import (  # noqa: F401
 
 
 DEFAULT_BUFFER_SIZE = 2**14
-DEFAULT_CHUNK_LENGTH = 2**13
+DEFAULT_CHUNK_LENGTH = 2**16
 DEFAULT_CHUNK_WIDTH = 2**6
 DEFAULT_ALT_NUMBER = 3
 
@@ -1081,7 +1081,7 @@ default_numbers = {
     'variants/MQ': 1,
     'variants/ANN': 1,
     'calldata/DP': 1,
-    'calldata/GT': 2,
+    'calldata/GT': 1,
     'calldata/GQ': 1,
     'calldata/HQ': 2,
     'calldata/AD': 'R',
@@ -1341,33 +1341,32 @@ def writeIntoSparseHDF(chunk,importer,samples,colnames):
     indptr=[]
     rownames=[]
     genoCount=0
+    checktime=0
     for i in range(len(chunk["variants/ID"])):
         chr=chunk["variants/CHROM"][i]
         ref=chunk["variants/REF"][i]
         alt=chunk["variants/ALT"][i]
         pos=chunk["variants/POS"][i]
-        GT=chunk["calldata/GT"][i]
+        GT=chunk["calldata/GT"][i].tolist()
         if tuple((chr, ref, alt[0])) in importer.variantIndex:
             variant_id  = importer.variantIndex[tuple((chr, ref, alt[0]))][pos][0]
-  
+            starttime=time.time()
             for idx in range(len(samples)):
-                genoCount=genoCount+1
-                indices.append(idx)
-                data.append(0)
-
-                # if GT[idx] is not None:
-                #     if sum(GT[idx])!='0':
-                #         genoCount=genoCount+1
-                #         indices.append(idx)
-                #         data.append(1)
-                # else:
-                #     genoCount=genoCount+1
-                #     indices.append(idx)
-                #     data.append(np.nan)
-
+    
+                if GT[idx] is not None:
+                    if GT[idx]!=0:
+                        genoCount=genoCount+1
+                        indices.append(idx)
+                        data.append(GT[idx])
+                else:
+                    genoCount=genoCount+1
+                    indices.append(idx)
+                    data.append(np.nan)
+            checktime+=time.time()-starttime
             indptr.append(genoCount)
             rownames.append(variant_id)
         # print(variant_id)
+    print(checktime)
     print(len(indices),len(data),len(indptr),len(rownames))
     shape=(len(indptr),len(samples))
 
@@ -1439,37 +1438,37 @@ def readVCF(inputFileName,importer,colnames):
 
     chunk, _, _, _ = next(it)
 
-    # writeIntoSparseHDF(chunk,importer,samples,colnames)
-    for i in range(len(chunk["variants/ID"])):
-        chr=chunk["variants/CHROM"][i]
-        ref=chunk["variants/REF"][i]
-        alt=chunk["variants/ALT"][i]
-        pos=chunk["variants/POS"][i]
-        GT=chunk["calldata/GT"][i]
-        if tuple((chr, ref, alt[0])) in importer.variantIndex:
-            variant_id  = importer.variantIndex[tuple((chr, ref, alt[0]))][pos][0]
-            chunk["variants/ID"][i]=variant_id
-    group="/chr22"
-    output="tmp_1_2504_genotypes.h5"
-    import h5py
-    with h5py.File(output, mode='a') as h5f:
+    writeIntoSparseHDF(chunk,importer,samples,colnames)
+    # for i in range(len(chunk["variants/ID"])):
+    #     chr=chunk["variants/CHROM"][i]
+    #     ref=chunk["variants/REF"][i]
+    #     alt=chunk["variants/ALT"][i]
+    #     pos=chunk["variants/POS"][i]
+    #     GT=chunk["calldata/GT"][i]
+    #     if tuple((chr, ref, alt[0])) in importer.variantIndex:
+    #         variant_id  = importer.variantIndex[tuple((chr, ref, alt[0]))][pos][0]
+    #         chunk["variants/ID"][i]=variant_id
+    # group="/chr22"
+    # output="tmp_1_2504_genotypes.h5"
+    # import h5py
+    # with h5py.File(output, mode='a') as h5f:
 
-        # obtain root group that data will be stored into
-        root = h5f.require_group(group)
+    #     # obtain root group that data will be stored into
+    #     root = h5f.require_group(group)
 
-        # ensure sub-groups
-        root.require_group('variants')
-        root.require_group('calldata')
-        keys = _hdf5_setup_datasets(
-                chunk, root, chunk_length, chunk_width,
-                compression, compression_opts, shuffle,
-                overwrite, headers, vlen
-            )
-        # store first chunk
-        _hdf5_store_chunk(root, keys, chunk, vlen)
+    #     # ensure sub-groups
+    #     root.require_group('variants')
+    #     root.require_group('calldata')
+    #     keys = _hdf5_setup_datasets(
+    #             chunk, root, chunk_length, chunk_width,
+    #             compression, compression_opts, shuffle,
+    #             overwrite, headers, vlen
+    #         )
+    #     # store first chunk
+    #     _hdf5_store_chunk(root, keys, chunk, vlen)
       
-        for chunk, _, _, _ in it:
-            _hdf5_store_chunk(root, keys, chunk, vlen)
+    #     for chunk, _, _, _ in it:
+    #         _hdf5_store_chunk(root, keys, chunk, vlen)
         
 
 

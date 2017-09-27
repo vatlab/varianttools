@@ -793,7 +793,7 @@ class HDF5_Store(Base_Store):
          
 
     def importGenotypes(self, importer,monitor):
-        from .importer_hdf5 import importGenotypesInParallel
+        # from .importer_hdf5 import importGenotypesInParallel
         from .importer_vcf_to_hdf5 import importGenotypes
         if monitor:
             monitor_interval = 2

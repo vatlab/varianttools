@@ -40,8 +40,8 @@ from .rtester import RTest, SKAT
 from variant_tools.vt_sqlite3 import OperationalError
 import argparse
 
-# from .association_hdf5 import generateHDFbyGroup,getGenotype_HDF5,generateHDFbyGroup_update
-from .association_vcf_to_hdf5 import generateHDFbyGroup,getGenotype_HDF5
+from .association_hdf5 import generateHDFbyGroup,getGenotype_HDF5,generateHDFbyGroup_update
+# from .association_vcf_to_hdf5 import generateHDFbyGroup,getGenotype_HDF5
 
 def associateArguments(parser):
     data = parser.add_argument_group('Genotype, phenotype, and covariates')
