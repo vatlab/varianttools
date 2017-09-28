@@ -19,9 +19,9 @@ import sys
 import numpy as np
 from .accessor import *
 
-from io_vcf_read import VCFChunkIterator, FileInputStream
+from variant_tools.io_vcf_read import VCFChunkIterator, FileInputStream
 # expose some names from cython extension
-from io_vcf_read import (  # noqa: F401
+from variant_tools.io_vcf_read import (  # noqa: F401
     ANNTransformer, ANN_AA_LENGTH_FIELD, ANN_AA_POS_FIELD, ANN_ANNOTATION_FIELD,
     ANN_ANNOTATION_IMPACT_FIELD, ANN_CDNA_LENGTH_FIELD, ANN_CDNA_POS_FIELD, ANN_CDS_LENGTH_FIELD,
     ANN_CDS_POS_FIELD, ANN_DISTANCE_FIELD, ANN_FEATURE_ID_FIELD, ANN_FEATURE_TYPE_FIELD, ANN_FIELD,

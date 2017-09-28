@@ -1,4 +1,0 @@
-
-[console_scripts]
-vtools = variant_tools.vtools:main
-vtools_report = variant_tools.vtools_report:main
