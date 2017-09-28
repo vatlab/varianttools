@@ -690,7 +690,7 @@ vtools_report = variant_tools.vtools_report:main
             extra_compile_args=['-w'],
             sources = SQLITE_FILES,
             define_macros = [('MODULE_NAME', '"vt_sqlite3"'), ('HAVE_USLEEP', None)],
-            include_dirs = ['sqlite', SQLITE_FOLDER],
+            include_dirs = ['src/sqlite', SQLITE_FOLDER],
         ),
         Extension('variant_tools._ucsctools',
             # stop warning message ucsctools because it is written by us.
