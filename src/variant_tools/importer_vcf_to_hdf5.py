@@ -36,7 +36,7 @@ except ImportError as e:
         '"python setup.py install")'.format(e))
 
 DEFAULT_BUFFER_SIZE = 2**14
-DEFAULT_CHUNK_LENGTH = 2**16
+DEFAULT_CHUNK_LENGTH = 2**13
 DEFAULT_CHUNK_WIDTH = 2**6
 DEFAULT_ALT_NUMBER = 3
 
@@ -968,7 +968,7 @@ def getGT(samples,variant_id,GT,altIndex,genoCount,indices,data,indptr,rownames)
 
 
 
-def writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount):
+def writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount,storageEngine):
     indices=[]
     data=[]
     indptr=[]
@@ -995,7 +995,7 @@ def writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount):
                         genoCount,indices,data,indptr,rownames=getGT(samples,variant_id,GT,altIndex,genoCount,indices,data,indptr,rownames)
      
     shape=(len(indptr),len(samples))
-    storageEngine=Engine_Storage.choose_storage_engine("tmp_1_"+str(len(samples))+"_genotypes.h5")
+    
     # make a HMatrix object which is a matrix with rownames and colnames
     hmatrix=HMatrix(data,indices,indptr,shape,rownames,colnames)
     # write GT into file
@@ -1032,13 +1032,15 @@ def readVCF(inputFileName,importer,colnames,prog):
 
     chunk, _, _, _ = next(it)
     genoCount=0
-    writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount)
+    storageEngine=Engine_Storage.choose_storage_engine("tmp_1_"+str(len(samples))+"_genotypes.h5")
+    writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount,storageEngine)
     lines=0
-    prog.update(len(samples)*DEFAULT_CHUNK_LENGTH)
+    prog.update(DEFAULT_CHUNK_LENGTH)
     for chunk, _, _, _ in it:
-        writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount)
+        writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount,storageEngine)
         lines+=DEFAULT_CHUNK_LENGTH
-        prog.update(len(samples)*lines)
+        prog.update(lines)
+    storageEngine.close()
 
         
 
@@ -1099,9 +1101,9 @@ def importGenotypes(importer,num_sample=0):
         allNames=manageHDF5(importer,allNames)
         sample_ids=[int(allNames[name]) for name in names]
         colnames=[sample_ids[i] for i in range(len(sample_ids))]
-        total_genotype_count=importer.total_count[2]*len(sample_ids)
-        prog = ProgressBar('Importing genotypes', total_genotype_count,initCount=0)
+  
+        prog = ProgressBar('Importing genotypes', importer.total_count[2],initCount=0)
         readVCF(input_filename,importer,colnames,prog)
-    prog.done()
+        prog.done()
 
         

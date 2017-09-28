@@ -208,12 +208,12 @@ class HDF5Engine_storage(Base_Storage):
     def store(self,hmatrix,chr,groupName=""):
 
         
-        self.file=tb.open_file(self.dbPath,"a")
+        # self.file=tb.open_file(self.dbPath,"a")
         if not self.checkGroup(chr,groupName):
             self.store_HDF5(hmatrix,chr,groupName) 
         else:
             self.append_HDF5(hmatrix,chr,groupName)
-        self.close()       
+        # self.close()       
  
 
 

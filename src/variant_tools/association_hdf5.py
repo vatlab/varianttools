@@ -99,6 +99,7 @@ class GroupHDFGenerator(Process):
                         storageEngine.store(subMatrix,chr,geneSymbol) 
                     # storageEngine.close() 
                 accessEngine.close()
+                storageEngine.close()
                 # 
 
             except KeyboardInterrupt as e:
