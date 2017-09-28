@@ -792,22 +792,20 @@ class HDF5_Store(Base_Store):
         super(HDF5_Store, self).__init__(name)
          
 
-    def importGenotypes(self, importer,monitor):
-        # from .importer_hdf5 import importGenotypesInParallel
-        from .importer_vcf_to_hdf5 import importGenotypes
-        if monitor:
-            monitor_interval = 2
-            resource_monitor_interval = 60
-            task_id=datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+"_import"
-            m = ProcessMonitor(task_id, monitor_interval=monitor_interval,
-                    resource_monitor_interval=resource_monitor_interval)
-            m.start()
-        # return importGenotypesInParallel(importer)
-        return importGenotypes(importer)
+    def importGenotypes(self, importer):
+        from .importer_hdf5 import importGenotypesInParallel
+        return importGenotypesInParallel(importer)
 
 
 
-def GenoStore(proj):
+def GenoStore(proj,monitor):
+    if monitor:
+        monitor_interval = 2
+        resource_monitor_interval = 60
+        task_id=datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+"_import"
+        m = ProcessMonitor(task_id, monitor_interval=monitor_interval,
+                resource_monitor_interval=resource_monitor_interval)
+        m.start()
     if proj.store == 'sqlite':
         return Sqlite_Store(proj)
     elif proj.store == 'hdf5':
