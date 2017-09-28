@@ -45,7 +45,7 @@ from io import StringIO
 
 from multiprocessing import Process
 from collections import namedtuple, defaultdict
-from ._version import VTOOLS_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CONTACT
+from ._version import VTOOLS_VERSION, VTOOLS_FULL_VERSION,VTOOLS_COPYRIGHT, VTOOLS_CONTACT
 from .utils import (DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction,
     RefGenome, downloadFile, env, sizeExpr,
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName,

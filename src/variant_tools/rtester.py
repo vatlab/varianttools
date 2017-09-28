@@ -31,7 +31,7 @@ import argparse
 from .utils import env, downloadFile, runCommand, mkdir_p, pairwise, make_unique, flatten
 from .project import Field
 from .tester import freq, ExternTest
-from ConfigParser import SafeConfigParser as RCP
+from configparser import SafeConfigParser as RCP
 from collections import OrderedDict
 
 import io
