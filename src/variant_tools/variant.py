@@ -26,13 +26,9 @@
 
 import sys
 import re
-import tempfile
-import subprocess
 from .project import Project
-from .utils import ProgressBar, consolidateFieldName, typeOfValues, lineCount,\
-    delayedAction, encodeTableName, decodeTableName, env, validFieldName, \
-    PrettyPrinter, OperationalError
-from .phenotype import Sample
+from .utils import ProgressBar, consolidateFieldName, \
+    encodeTableName, env, validFieldName, PrettyPrinter, OperationalError
 
 
 def outputArguments(parser):
@@ -249,14 +245,14 @@ def select(args, reverse=False):
             if len(args.condition) > 0:    
                 # fields? We need to replace things like sift_score to dbNSFP.sift_score
                 condition, fields = consolidateFieldName(proj, encodeTableName(args.from_table), ' AND '.join(['({})'.format(x) for x in args.condition]))
-                for field in fields:
-                    # indexing fields in annotation databases?
-                    try:
-                        # if table name is specified
-                        db, fld = field.split('.', 1)
-                        annoDB = [x for x in proj.annoDB if x.name.lower() == db.lower()][0]
-                    except:
-                        continue
+#                for field in fields:
+#                    # indexing fields in annotation databases?
+#                    try:
+#                        # if table name is specified
+#                        db, fld = field.split('.', 1)
+#                        annoDB = [x for x in proj.annoDB if x.name.lower() == db.lower()][0]
+#                    except:
+#                        continue
                     #
                     # STOP automatic indexing fields used in vtools select because creating indexes can be 
                     # very time-consuming for sqlite databases, and the performance benefit is uncertain.

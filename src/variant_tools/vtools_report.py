@@ -24,7 +24,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import sys, os, shlex
+import sys
+import shlex
 import argparse
 import subprocess
 from variant_tools.utils import RefGenome, env, OS_ENV, PrettyPrinter, \
@@ -552,7 +553,6 @@ def printDNASequence(args, regions):
         # get reference seq
         seq = ref.getSequence(chr, start, end)
         # right now, we only support marking one locus with chr pos, or chr pos ref alt
-        mut_idx = None
         if args.mark:
             seq = [x for x in seq]
             for m in args.mark:
@@ -565,7 +565,6 @@ def printDNASequence(args, regions):
                         seq[idx] = m[3].lower()
                     else:
                         seq[idx] = seq[idx].lower()
-                    mut_idx = idx
                 else:
                     env.logger.debug('Failed to mark mutant {}'.format(m))
         #
@@ -819,8 +818,7 @@ def inbreedingCoef(args):
     for name in getoutput('vtools phenotype --output sample_name ' + ' '.join(sarg)).split('\n'):
         # geno is a list of sample genotype and MAF, with each element being [chr, pos, GT, MAF]
         geno = list(zip(*[x.split() for x in getoutput('''vtools output {0} chr pos "genotype('{1}')" {2} --na -9'''.\
-                                          format(args.table if args.table else 'variant',
-                                                 name, args.maf_field)).split('\n')]))
+                                          format(table, name, args.maf_field)).split('\n')]))
         if not args.skip_autosome:
             gt = list(map(int, geno[2]))
             maf = list(map(float, geno[3]))

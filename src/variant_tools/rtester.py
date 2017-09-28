@@ -24,35 +24,22 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 # Copyright Gao Wang 2012
-import sys, os, re
+import os
+import re
 import time
 import argparse
-from .utils import env, downloadFile, runCommand, mkdir_p, flatten, pairwise, make_unique
+from .utils import env, downloadFile, runCommand, mkdir_p, pairwise, make_unique, flatten
 from .project import Field
 from .tester import freq, ExternTest
-if sys.version_info.major == 2:
-    from configparser import SafeConfigParser as RCP
-else:
-    from configparser import SafeConfigParser as RCP
+from ConfigParser import SafeConfigParser as RCP
 from collections import OrderedDict
 
 import io
 
 from types import *
-if sys.version < '2.3': 
-	set = frozenset = tuple
-	str = str
-elif sys.version < '2.4':
-	from sets import Set as set, ImmutableSet as frozenset
 
-if sys.version < '3.0':
-	_mystr = _mybytes = lambda s:s
-else:
-	from functools import reduce
-	int, str, str = int, str, str
-	_mybytes = lambda s:bytes(s, 'utf8') #'ascii')
-	_mystr = lambda s:str(s, 'utf8')
-	StringType = str
+_mybytes = lambda s:bytes(s, 'utf8') #'ascii')
+_mystr = lambda s:str(s, 'utf8')
 
 
 def NoneStr(obj):
@@ -90,7 +77,7 @@ def SeqStr(obj, method='c(', tail=')'):
     if tp0 not in simple_types and method == 'c(':
         method = 'list('
     else:
-        tps = isinstance(obj0, str) and [StringType] or num_types
+        tps = isinstance(obj0, str) or num_types
         for i in obj_not_none[1:]:
             tp = type(i)
             if tp not in tps:
@@ -118,7 +105,8 @@ def OtherStr(obj):
 
 base_tps = [type(None), bool, int, int, float, complex, str, str, list, tuple, set, frozenset, dict] # use type(None) instead of NoneType since the latter cannot be found in the types module in Python 3
 base_tps.reverse()
-str_func = {type(None):NoneStr, bool:BoolStr, int:LongStr, int:repr, float:repr, complex:ComplexStr, str:repr, str:repr, list:SeqStr, tuple:SeqStr, set:SeqStr, frozenset:SeqStr, dict:DictStr}
+str_func = {type(None):NoneStr, bool:BoolStr, int:repr, float:repr, complex:ComplexStr,
+        str:repr, list:SeqStr, tuple:SeqStr, set:SeqStr, frozenset:SeqStr, dict:DictStr}
 
 def Str4R(obj, method = 'c'):
     '''
@@ -282,7 +270,7 @@ class RConfig:
                                          "{0}".format(p))                        
                     else:
                         self.vars[section]['type'] = \
-                          flattern([[typermapper(x.strip()) for i in range(n)] for x in tp])
+                          flatten([[typemapper(x.strip()) for i in range(n)] for x in tp])
                 else:
                     self.vars[section]['type'] = ['FLOAT' for i in range(n * p)]
                 if "comment" in options:
@@ -389,7 +377,6 @@ class RTest(ExternTest):
         foo = re.match(r'{0}(\s*)(=|<-)(\s*)function(\s*)\((\s*)(?P<a>.+?)(\s*)\)(\s*){{'.\
                         format(self.basename), foostatement, re.DOTALL)
         if foo:
-            foo_exists = True
             if self.params is not None:
                 updated_params = self._determine_params(foo.group('a'))
                 self.Rscript = [i for j, i in enumerate(self.Rscript) if j < start or j > end]

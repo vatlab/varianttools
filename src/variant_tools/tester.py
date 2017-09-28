@@ -23,7 +23,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import sys, os, re
+import os
 import math
 import zipfile
 import platform
@@ -1691,7 +1691,7 @@ class VATStacking(GLMBurdenTest):
             self.maflower = p
             self.mafupper = q
             a.append(GLMBurdenTest._determine_algorithm(self))
-        algorithm = t.StackingPermutator(a, [True if v == 'Y' else False for v in self.variable_thresholds],
+        algorithm = assoTests.StackingPermutator(a, [True if v == 'Y' else False for v in self.variable_thresholds],
                                          self.permute_by.upper(), n, self.adaptive)
         return algorithm
          
@@ -1973,7 +1973,7 @@ class ScoreSeq(ExternTest):
             self.gSargs += " -ofile {} -vtlog {} ".format(os.path.join(env.temp_dir, '{0}_result.out'.format(self.gname)),
                     os.path.join(env.temp_dir, '{0}_vt.log'.format(self.gname)))
         try:
-            out = runCommand(self.gSargs)
+            runCommand(self.gSargs)
             self._process_output()
             res.extend([x for x in [self.stats[y] for y in self.colnames]])
         except Exception as e:
