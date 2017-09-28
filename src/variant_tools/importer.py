@@ -526,6 +526,7 @@ class Importer:
         self.proj.dropIndexOnMasterVariantTable()
 
 
+
     def __del__(self):
         # remove existing indexes, which will be created when the project is open
         # by a non-import command
@@ -794,6 +795,7 @@ def importVariantsArguments(parser):
             parallel, and you can use more or less processes by adjusting this
             parameter. Due to the overhead of inter-process communication, more
             jobs do not automatically lead to better performance.'''),
+    parser.add_argument('-m','--monitor', action='store_true',help='''Store resources usage statistics'''),
 
 def importVariants(args):
 
@@ -805,7 +807,7 @@ def importVariants(args):
             importer = Importer(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
-            store = GenoStore(proj)
+            store = GenoStore(proj,args.monitor)
             store.importGenotypes(importer)
             importer.finalize()
         proj.close()
