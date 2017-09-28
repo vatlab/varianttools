@@ -173,209 +173,209 @@ _doc_param_log = \
     """A file-like object (e.g., `sys.stderr`) to print progress information."""
 
 
-def read_vcf(input,
-             fields=None,
-             types=None,
-             numbers=None,
-             alt_number=DEFAULT_ALT_NUMBER,
-             fills=None,
-             region=None,
-             tabix='tabix',
-             samples=None,
-             transformers=None,
-             buffer_size=DEFAULT_BUFFER_SIZE,
-             chunk_length=DEFAULT_CHUNK_LENGTH,
-             log=None):
-    """Read data from a VCF file into NumPy arrays.
+# def read_vcf(input,
+#              fields=None,
+#              types=None,
+#              numbers=None,
+#              alt_number=DEFAULT_ALT_NUMBER,
+#              fills=None,
+#              region=None,
+#              tabix='tabix',
+#              samples=None,
+#              transformers=None,
+#              buffer_size=DEFAULT_BUFFER_SIZE,
+#              chunk_length=DEFAULT_CHUNK_LENGTH,
+#              log=None):
+#     """Read data from a VCF file into NumPy arrays.
 
-    Parameters
-    ----------
-    input : string or file-like
-        {input}
-    fields : list of strings, optional
-        {fields}
-    types : dict, optional
-        {types}
-    numbers : dict, optional
-        {numbers}
-    alt_number : int, optional
-        {alt_number}
-    fills : dict, optional
-        {fills}
-    region : string, optional
-        {region}
-    tabix : string, optional
-        {tabix}
-    samples : list of strings
-        {samples}
-    transformers : list of transformer objects, optional
-        {transformers}
-    buffer_size : int, optional
-        {buffer_size}
-    chunk_length : int, optional
-        {chunk_length}
-    log : file-like, optional
-        {log}
+#     Parameters
+#     ----------
+#     input : string or file-like
+#         {input}
+#     fields : list of strings, optional
+#         {fields}
+#     types : dict, optional
+#         {types}
+#     numbers : dict, optional
+#         {numbers}
+#     alt_number : int, optional
+#         {alt_number}
+#     fills : dict, optional
+#         {fills}
+#     region : string, optional
+#         {region}
+#     tabix : string, optional
+#         {tabix}
+#     samples : list of strings
+#         {samples}
+#     transformers : list of transformer objects, optional
+#         {transformers}
+#     buffer_size : int, optional
+#         {buffer_size}
+#     chunk_length : int, optional
+#         {chunk_length}
+#     log : file-like, optional
+#         {log}
 
-    Returns
-    -------
-    data : dict[str, ndarray]
-        A dictionary holding arrays.
+#     Returns
+#     -------
+#     data : dict[str, ndarray]
+#         A dictionary holding arrays.
 
-    """
+#     """
 
-    # samples requested?
-    # noinspection PyTypeChecker
-    store_samples, fields = _prep_fields_param(fields)
+#     # samples requested?
+#     # noinspection PyTypeChecker
+#     store_samples, fields = _prep_fields_param(fields)
 
-    # setup
-    _, samples, _, it = iter_vcf_chunks(
-        input=input, fields=fields, types=types, numbers=numbers, alt_number=alt_number,
-        buffer_size=buffer_size, chunk_length=chunk_length, fills=fills, region=region,
-        tabix=tabix, samples=samples, transformers=transformers
-    )
+#     # setup
+#     _, samples, _, it = iter_vcf_chunks(
+#         input=input, fields=fields, types=types, numbers=numbers, alt_number=alt_number,
+#         buffer_size=buffer_size, chunk_length=chunk_length, fills=fills, region=region,
+#         tabix=tabix, samples=samples, transformers=transformers
+#     )
 
-    # setup progress logging
-    if log is not None:
-        it = _chunk_iter_progress(it, log, prefix='[read_vcf]')
+#     # setup progress logging
+#     if log is not None:
+#         it = _chunk_iter_progress(it, log, prefix='[read_vcf]')
 
-    # read all chunks into a list
-    chunks = [d[0] for d in it]
+#     # read all chunks into a list
+#     chunks = [d[0] for d in it]
 
-    # setup output
-    output = dict()
+#     # setup output
+#     output = dict()
 
-    if len(samples) > 0 and store_samples:
-        output['samples'] = samples
+#     if len(samples) > 0 and store_samples:
+#         output['samples'] = samples
 
-    if chunks:
+#     if chunks:
 
-        # find array keys
-        keys = sorted(chunks[0].keys())
+#         # find array keys
+#         keys = sorted(chunks[0].keys())
 
-        # concatenate chunks
-        for k in keys:
-            output[k] = np.concatenate([chunk[k] for chunk in chunks], axis=0)
+#         # concatenate chunks
+#         for k in keys:
+#             output[k] = np.concatenate([chunk[k] for chunk in chunks], axis=0)
 
-    return output
-
-
-read_vcf.__doc__ = read_vcf.__doc__.format(
-    input=_doc_param_input,
-    fields=_doc_param_fields,
-    types=_doc_param_types,
-    numbers=_doc_param_numbers,
-    alt_number=_doc_param_alt_number,
-    fills=_doc_param_fills,
-    region=_doc_param_region,
-    tabix=_doc_param_tabix,
-    samples=_doc_param_samples,
-    transformers=_doc_param_transformers,
-    buffer_size=_doc_param_buffer_size,
-    chunk_length=_doc_param_chunk_length,
-    log=_doc_param_log,
-)
+#     return output
 
 
-_doc_param_output = \
-    """File-system path to write output to."""
-
-_doc_param_overwrite = \
-    """If False (default), do not overwrite an existing file."""
-
-
-def vcf_to_npz(input, output,
-               compressed=True,
-               overwrite=False,
-               fields=None,
-               types=None,
-               numbers=None,
-               alt_number=DEFAULT_ALT_NUMBER,
-               fills=None,
-               region=None,
-               tabix=True,
-               samples=None,
-               transformers=None,
-               buffer_size=DEFAULT_BUFFER_SIZE,
-               chunk_length=DEFAULT_CHUNK_LENGTH,
-               log=None):
-    """Read data from a VCF file into NumPy arrays and save as a .npz file.
-
-    Parameters
-    ----------
-    input : string
-        {input}
-    output : string
-        {output}
-    compressed : bool, optional
-        If True (default), save with compression.
-    overwrite : bool, optional
-        {overwrite}
-    fields : list of strings, optional
-        {fields}
-    types : dict, optional
-        {types}
-    numbers : dict, optional
-        {numbers}
-    alt_number : int, optional
-        {alt_number}
-    fills : dict, optional
-        {fills}
-    region : string, optional
-        {region}
-    tabix : string, optional
-        {tabix}
-    samples : list of strings
-        {samples}
-    transformers : list of transformer objects, optional
-        {transformers}
-    buffer_size : int, optional
-        {buffer_size}
-    chunk_length : int, optional
-        {chunk_length}
-    log : file-like, optional
-        {log}
-
-    """
-
-    # guard condition
-    if not overwrite and os.path.exists(output):
-        raise ValueError('file exists at path %r; use overwrite=True to replace' % output)
-
-    # read all data into memory
-    data = read_vcf(
-        input=input, fields=fields, types=types, numbers=numbers, alt_number=alt_number,
-        buffer_size=buffer_size, chunk_length=chunk_length, log=log, fills=fills,
-        region=region, tabix=tabix, samples=samples, transformers=transformers
-    )
-
-    # setup save function
-    if compressed:
-        savez = np.savez_compressed
-    else:
-        savez = np.savez
-
-    # save as npz
-    savez(output, **data)
+# read_vcf.__doc__ = read_vcf.__doc__.format(
+#     input=_doc_param_input,
+#     fields=_doc_param_fields,
+#     types=_doc_param_types,
+#     numbers=_doc_param_numbers,
+#     alt_number=_doc_param_alt_number,
+#     fills=_doc_param_fills,
+#     region=_doc_param_region,
+#     tabix=_doc_param_tabix,
+#     samples=_doc_param_samples,
+#     transformers=_doc_param_transformers,
+#     buffer_size=_doc_param_buffer_size,
+#     chunk_length=_doc_param_chunk_length,
+#     log=_doc_param_log,
+# )
 
 
-vcf_to_npz.__doc__ = vcf_to_npz.__doc__.format(
-    input=_doc_param_input,
-    output=_doc_param_output,
-    overwrite=_doc_param_overwrite,
-    fields=_doc_param_fields,
-    types=_doc_param_types,
-    numbers=_doc_param_numbers,
-    alt_number=_doc_param_alt_number,
-    fills=_doc_param_fills,
-    region=_doc_param_region,
-    tabix=_doc_param_tabix,
-    samples=_doc_param_samples,
-    transformers=_doc_param_transformers,
-    buffer_size=_doc_param_buffer_size,
-    chunk_length=_doc_param_chunk_length,
-    log=_doc_param_log,
-)
+# _doc_param_output = \
+#     """File-system path to write output to."""
+
+# _doc_param_overwrite = \
+#     """If False (default), do not overwrite an existing file."""
+
+
+# def vcf_to_npz(input, output,
+#                compressed=True,
+#                overwrite=False,
+#                fields=None,
+#                types=None,
+#                numbers=None,
+#                alt_number=DEFAULT_ALT_NUMBER,
+#                fills=None,
+#                region=None,
+#                tabix=True,
+#                samples=None,
+#                transformers=None,
+#                buffer_size=DEFAULT_BUFFER_SIZE,
+#                chunk_length=DEFAULT_CHUNK_LENGTH,
+#                log=None):
+#     """Read data from a VCF file into NumPy arrays and save as a .npz file.
+
+#     Parameters
+#     ----------
+#     input : string
+#         {input}
+#     output : string
+#         {output}
+#     compressed : bool, optional
+#         If True (default), save with compression.
+#     overwrite : bool, optional
+#         {overwrite}
+#     fields : list of strings, optional
+#         {fields}
+#     types : dict, optional
+#         {types}
+#     numbers : dict, optional
+#         {numbers}
+#     alt_number : int, optional
+#         {alt_number}
+#     fills : dict, optional
+#         {fills}
+#     region : string, optional
+#         {region}
+#     tabix : string, optional
+#         {tabix}
+#     samples : list of strings
+#         {samples}
+#     transformers : list of transformer objects, optional
+#         {transformers}
+#     buffer_size : int, optional
+#         {buffer_size}
+#     chunk_length : int, optional
+#         {chunk_length}
+#     log : file-like, optional
+#         {log}
+
+#     """
+
+#     # guard condition
+#     if not overwrite and os.path.exists(output):
+#         raise ValueError('file exists at path %r; use overwrite=True to replace' % output)
+
+#     # read all data into memory
+#     data = read_vcf(
+#         input=input, fields=fields, types=types, numbers=numbers, alt_number=alt_number,
+#         buffer_size=buffer_size, chunk_length=chunk_length, log=log, fills=fills,
+#         region=region, tabix=tabix, samples=samples, transformers=transformers
+#     )
+
+#     # setup save function
+#     if compressed:
+#         savez = np.savez_compressed
+#     else:
+#         savez = np.savez
+
+#     # save as npz
+#     savez(output, **data)
+
+
+# vcf_to_npz.__doc__ = vcf_to_npz.__doc__.format(
+#     input=_doc_param_input,
+#     output=_doc_param_output,
+#     overwrite=_doc_param_overwrite,
+#     fields=_doc_param_fields,
+#     types=_doc_param_types,
+#     numbers=_doc_param_numbers,
+#     alt_number=_doc_param_alt_number,
+#     fills=_doc_param_fills,
+#     region=_doc_param_region,
+#     tabix=_doc_param_tabix,
+#     samples=_doc_param_samples,
+#     transformers=_doc_param_transformers,
+#     buffer_size=_doc_param_buffer_size,
+#     chunk_length=_doc_param_chunk_length,
+#     log=_doc_param_log,
+# )
 
 
 def _hdf5_setup_datasets(chunk, root, chunk_length, chunk_width, compression, compression_opts,
@@ -438,208 +438,208 @@ def _hdf5_setup_datasets(chunk, root, chunk_length, chunk_width, compression, co
     return keys
 
 
-def _hdf5_store_chunk(root, keys, chunk, vlen):
+# def _hdf5_store_chunk(root, keys, chunk, vlen):
 
-    # compute length of current chunk
-    current_chunk_length = chunk[keys[0]].shape[0]
-    print(root[keys[0]])
-    # find current length of datasets
-    old_length = root[keys[0]].shape[0]
+#     # compute length of current chunk
+#     current_chunk_length = chunk[keys[0]].shape[0]
+#     print(root[keys[0]])
+#     # find current length of datasets
+#     old_length = root[keys[0]].shape[0]
 
-    # new length of all arrays after loading this chunk
-    new_length = old_length + current_chunk_length
+#     # new length of all arrays after loading this chunk
+#     new_length = old_length + current_chunk_length
     
-    # load arrays
-    for k in keys:
+#     # load arrays
+#     for k in keys:
 
-        # data to be loaded
-        data = chunk[k]
+#         # data to be loaded
+#         data = chunk[k]
 
-        # obtain dataset
-        dataset = root[k]
+#         # obtain dataset
+#         dataset = root[k]
 
-        # handle variable length strings
-        if data.dtype.kind == 'O' and not vlen:
-            data = data.astype('S')
-            if data.dtype.itemsize > dataset.dtype.itemsize:
-                warnings.warn(
-                    'found string length %s longer than %s guessed for field %r, values will be '
-                    'truncated; recommend rerunning setting type to at least "S%s"' %
-                    (data.dtype.itemsize, dataset.dtype.itemsize, k, data.dtype.itemsize)
-                )
+#         # handle variable length strings
+#         if data.dtype.kind == 'O' and not vlen:
+#             data = data.astype('S')
+#             if data.dtype.itemsize > dataset.dtype.itemsize:
+#                 warnings.warn(
+#                     'found string length %s longer than %s guessed for field %r, values will be '
+#                     'truncated; recommend rerunning setting type to at least "S%s"' %
+#                     (data.dtype.itemsize, dataset.dtype.itemsize, k, data.dtype.itemsize)
+#                 )
 
-        # ensure dataset is long enough
-        dataset.resize(new_length, axis=0)
+#         # ensure dataset is long enough
+#         dataset.resize(new_length, axis=0)
 
-        # store the data
-        print(old_length,new_length,len(data))
-        dataset[old_length:new_length, ...] = data
+#         # store the data
+#         print(old_length,new_length,len(data))
+#         dataset[old_length:new_length, ...] = data
 
 
 _doc_param_chunk_width = \
     """Width (number of samples) to use when storing chunks in output."""
 
 
-def vcf_to_hdf5(input, output,
-                group='/',
-                compression='gzip',
-                compression_opts=1,
-                shuffle=False,
-                overwrite=False,
-                vlen=True,
-                fields=None,
-                types=None,
-                numbers=None,
-                alt_number=DEFAULT_ALT_NUMBER,
-                fills=None,
-                region=None,
-                tabix='tabix',
-                samples=None,
-                transformers=None,
-                buffer_size=DEFAULT_BUFFER_SIZE,
-                chunk_length=DEFAULT_CHUNK_LENGTH,
-                chunk_width=DEFAULT_CHUNK_WIDTH,
-                log=None):
-    """Read data from a VCF file and load into an HDF5 file.
+# def vcf_to_hdf5(input, output,
+#                 group='/',
+#                 compression='gzip',
+#                 compression_opts=1,
+#                 shuffle=False,
+#                 overwrite=False,
+#                 vlen=True,
+#                 fields=None,
+#                 types=None,
+#                 numbers=None,
+#                 alt_number=DEFAULT_ALT_NUMBER,
+#                 fills=None,
+#                 region=None,
+#                 tabix='tabix',
+#                 samples=None,
+#                 transformers=None,
+#                 buffer_size=DEFAULT_BUFFER_SIZE,
+#                 chunk_length=DEFAULT_CHUNK_LENGTH,
+#                 chunk_width=DEFAULT_CHUNK_WIDTH,
+#                 log=None):
+#     """Read data from a VCF file and load into an HDF5 file.
 
-    Parameters
-    ----------
-    input : string
-        {input}
-    output : string
-        {output}
-    group : string
-        Group within destination HDF5 file to store data in.
-    compression : string
-        Compression algorithm, e.g., 'gzip' (default).
-    compression_opts : int
-        Compression level, e.g., 1 (default).
-    shuffle : bool
-        Use byte shuffling, which may improve compression (default is False).
-    overwrite : bool
-        {overwrite}
-    vlen : bool
-        If True, store variable length strings. Note that there is considerable storage overhead
-        for variable length strings in HDF5, and leaving this option as True (default) may lead
-        to large file sizes. If False, all strings will be stored in the HDF5 file as fixed length
-        strings, even if they are specified as 'object' type. In this case, the string length for
-        any field with 'object' type will be determined based on the maximum length of strings
-        found in the first chunk, and this may cause values to be truncated if longer values are
-        found in later chunks. To avoid truncation and large file sizes, manually set the type for
-        all string fields to an explicit fixed length string type, e.g., 'S10' for a field where
-        you know at most 10 characters are required.
-    fields : list of strings, optional
-        {fields}
-    types : dict, optional
-        {types}
-    numbers : dict, optional
-        {numbers}
-    alt_number : int, optional
-        {alt_number}
-    fills : dict, optional
-        {fills}
-    region : string, optional
-        {region}
-    tabix : string, optional
-        {tabix}
-    samples : list of strings
-        {samples}
-    transformers : list of transformer objects, optional
-        {transformers}
-    buffer_size : int, optional
-        {buffer_size}
-    chunk_length : int, optional
-        {chunk_length}
-    chunk_width : int, optional
-        {chunk_width}
-    log : file-like, optional
-        {log}
+#     Parameters
+#     ----------
+#     input : string
+#         {input}
+#     output : string
+#         {output}
+#     group : string
+#         Group within destination HDF5 file to store data in.
+#     compression : string
+#         Compression algorithm, e.g., 'gzip' (default).
+#     compression_opts : int
+#         Compression level, e.g., 1 (default).
+#     shuffle : bool
+#         Use byte shuffling, which may improve compression (default is False).
+#     overwrite : bool
+#         {overwrite}
+#     vlen : bool
+#         If True, store variable length strings. Note that there is considerable storage overhead
+#         for variable length strings in HDF5, and leaving this option as True (default) may lead
+#         to large file sizes. If False, all strings will be stored in the HDF5 file as fixed length
+#         strings, even if they are specified as 'object' type. In this case, the string length for
+#         any field with 'object' type will be determined based on the maximum length of strings
+#         found in the first chunk, and this may cause values to be truncated if longer values are
+#         found in later chunks. To avoid truncation and large file sizes, manually set the type for
+#         all string fields to an explicit fixed length string type, e.g., 'S10' for a field where
+#         you know at most 10 characters are required.
+#     fields : list of strings, optional
+#         {fields}
+#     types : dict, optional
+#         {types}
+#     numbers : dict, optional
+#         {numbers}
+#     alt_number : int, optional
+#         {alt_number}
+#     fills : dict, optional
+#         {fills}
+#     region : string, optional
+#         {region}
+#     tabix : string, optional
+#         {tabix}
+#     samples : list of strings
+#         {samples}
+#     transformers : list of transformer objects, optional
+#         {transformers}
+#     buffer_size : int, optional
+#         {buffer_size}
+#     chunk_length : int, optional
+#         {chunk_length}
+#     chunk_width : int, optional
+#         {chunk_width}
+#     log : file-like, optional
+#         {log}
 
-    """
+#     """
 
-    import h5py
+#     import h5py
 
-    # samples requested?
-    # noinspection PyTypeChecker
-    store_samples, fields = _prep_fields_param(fields)
+#     # samples requested?
+#     # noinspection PyTypeChecker
+#     store_samples, fields = _prep_fields_param(fields)
 
-    with h5py.File(output, mode='a') as h5f:
+#     with h5py.File(output, mode='a') as h5f:
 
-        # obtain root group that data will be stored into
-        root = h5f.require_group(group)
+#         # obtain root group that data will be stored into
+#         root = h5f.require_group(group)
 
-        # ensure sub-groups
-        root.require_group('variants')
-        root.require_group('calldata')
+#         # ensure sub-groups
+#         root.require_group('variants')
+#         root.require_group('calldata')
 
-        # setup chunk iterator
-        _, samples, headers, it = iter_vcf_chunks(
-            input, fields=fields, types=types, numbers=numbers, alt_number=alt_number,
-            buffer_size=buffer_size, chunk_length=chunk_length, fills=fills, region=region,
-            tabix=tabix, samples=samples, transformers=transformers
-        )
+#         # setup chunk iterator
+#         _, samples, headers, it = iter_vcf_chunks(
+#             input, fields=fields, types=types, numbers=numbers, alt_number=alt_number,
+#             buffer_size=buffer_size, chunk_length=chunk_length, fills=fills, region=region,
+#             tabix=tabix, samples=samples, transformers=transformers
+#         )
 
-        # setup progress logging
-        if log is not None:
-            it = _chunk_iter_progress(it, log, prefix='[vcf_to_hdf5]')
+#         # setup progress logging
+#         if log is not None:
+#             it = _chunk_iter_progress(it, log, prefix='[vcf_to_hdf5]')
 
-        if len(samples) > 0 and store_samples:
-            # store samples
-            name = 'samples'
-            if name in root[group]:
-                if overwrite:
-                    del root[group][name]
-                else:
-                    raise ValueError('dataset exists at path %r; use overwrite=True to replace'
-                                     % name)
-            if samples.dtype.kind == 'O':
-                if vlen:
-                    t = h5py.special_dtype(vlen=str)
-                else:
-                    samples = samples.astype('S')
-                    t = samples.dtype
-            else:
-                t = samples.dtype
-            root[group].create_dataset(name, data=samples, chunks=None, dtype=t)
+#         if len(samples) > 0 and store_samples:
+#             # store samples
+#             name = 'samples'
+#             if name in root[group]:
+#                 if overwrite:
+#                     del root[group][name]
+#                 else:
+#                     raise ValueError('dataset exists at path %r; use overwrite=True to replace'
+#                                      % name)
+#             if samples.dtype.kind == 'O':
+#                 if vlen:
+#                     t = h5py.special_dtype(vlen=str)
+#                 else:
+#                     samples = samples.astype('S')
+#                     t = samples.dtype
+#             else:
+#                 t = samples.dtype
+#             root[group].create_dataset(name, data=samples, chunks=None, dtype=t)
 
-        # read first chunk
-        chunk, _, _, _ = next(it)
+#         # read first chunk
+#         chunk, _, _, _ = next(it)
 
-        # setup datasets
-        # noinspection PyTypeChecker
-        keys = _hdf5_setup_datasets(
-            chunk=chunk, root=root, chunk_length=chunk_length, chunk_width=chunk_width,
-            compression=compression, compression_opts=compression_opts, shuffle=shuffle,
-            overwrite=overwrite, headers=headers, vlen=vlen
-        )
+#         # setup datasets
+#         # noinspection PyTypeChecker
+#         keys = _hdf5_setup_datasets(
+#             chunk=chunk, root=root, chunk_length=chunk_length, chunk_width=chunk_width,
+#             compression=compression, compression_opts=compression_opts, shuffle=shuffle,
+#             overwrite=overwrite, headers=headers, vlen=vlen
+#         )
 
-        # store first chunk
-        _hdf5_store_chunk(root, keys, chunk, vlen)
+#         # store first chunk
+#         _hdf5_store_chunk(root, keys, chunk, vlen)
 
-        # store remaining chunks
-        for chunk, _, _, _ in it:
+#         # store remaining chunks
+#         for chunk, _, _, _ in it:
 
-            _hdf5_store_chunk(root, keys, chunk, vlen)
+#             _hdf5_store_chunk(root, keys, chunk, vlen)
 
 
-vcf_to_hdf5.__doc__ = vcf_to_hdf5.__doc__.format(
-    input=_doc_param_input,
-    output=_doc_param_output,
-    overwrite=_doc_param_overwrite,
-    fields=_doc_param_fields,
-    types=_doc_param_types,
-    numbers=_doc_param_numbers,
-    alt_number=_doc_param_alt_number,
-    fills=_doc_param_fills,
-    region=_doc_param_region,
-    tabix=_doc_param_tabix,
-    samples=_doc_param_samples,
-    transformers=_doc_param_transformers,
-    buffer_size=_doc_param_buffer_size,
-    chunk_length=_doc_param_chunk_length,
-    chunk_width=_doc_param_chunk_width,
-    log=_doc_param_log,
-)
+# vcf_to_hdf5.__doc__ = vcf_to_hdf5.__doc__.format(
+#     input=_doc_param_input,
+#     output=_doc_param_output,
+#     overwrite=_doc_param_overwrite,
+#     fields=_doc_param_fields,
+#     types=_doc_param_types,
+#     numbers=_doc_param_numbers,
+#     alt_number=_doc_param_alt_number,
+#     fills=_doc_param_fills,
+#     region=_doc_param_region,
+#     tabix=_doc_param_tabix,
+#     samples=_doc_param_samples,
+#     transformers=_doc_param_transformers,
+#     buffer_size=_doc_param_buffer_size,
+#     chunk_length=_doc_param_chunk_length,
+#     chunk_width=_doc_param_chunk_width,
+#     log=_doc_param_log,
+# )
 
 
 
@@ -1336,17 +1336,44 @@ def _read_vcf_headers(stream):
     return VCFHeaders(headers, filters, infos, formats, samples)
 
 
+def getGT(samples,variant_id,GT,altIndex,genoCount,indices,data,indptr,rownames):
+    for idx in range(len(samples)):
+        if GT[idx] is not None:
+            if altIndex==0:
+                if GT[idx]!=0:
+                    if GT[idx]!=3 and GT[idx]!=4:
+                        genoCount=genoCount+1
+                        indices.append(idx)
+                        data.append(GT[idx])
+                    else:
+                        genoCount=genoCount+1
+                        indices.append(idx)
+                        data.append(None)  
+            elif altIndex==1:
+                    genoCount=genoCount+1
+                    indices.append(idx)   
+                    if GT[idx]==3:
+                        data.append(1)
+                    elif GT[idx]==4:
+                        data.append(2)
+                    else:
+                        data.append(None)
+        else:
+            genoCount=genoCount+1
+            indices.append(idx)
+            data.append(np.nan)
+    indptr.append(genoCount)
+    rownames.append(variant_id)
+    return genoCount,indices,data,indptr,rownames
 
 
 
-
-def writeIntoSparseHDF(chunk,importer,samples,colnames):
+def writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount):
     indices=[]
     data=[]
     indptr=[]
     rownames=[]
-    genoCount=0
-    checktime=0
+    chr=chunk["variants/CHROM"][0]
     for i in range(len(chunk["variants/ID"])):
         chr=chunk["variants/CHROM"][i]
         ref=chunk["variants/REF"][i]
@@ -1359,100 +1386,25 @@ def writeIntoSparseHDF(chunk,importer,samples,colnames):
             if alt!="":
                 if tuple((chr, ref, alt)) in importer.variantIndex:
                     variant_id  = importer.variantIndex[tuple((chr, ref, alt))][pos][0]
-                    starttime=time.time()
-                    for idx in range(len(samples)):
-            
-                        if GT[idx] is not None:
-                            if altIndex==0:
-                                if GT[idx]!=0:
-                                    if GT[idx]!=3 and GT[idx]!=4:
-                                        genoCount=genoCount+1
-                                        indices.append(idx)
-                                        data.append(GT[idx])
-                                    else:
-                                        genoCount=genoCount+1
-                                        indices.append(idx)
-                                        data.append(None)  
-                            elif altIndex==1:
-                                    genoCount=genoCount+1
-                                    indices.append(idx)   
-                                    if GT[idx]==3:
-                                        data.append(1)
-                                    elif GT[idx]==4:
-                                        data.append(2)
-                                    else:
-                                        data.append(None)
-                              
-
-                        else:
-                            genoCount=genoCount+1
-                            indices.append(idx)
-                            data.append(np.nan)
-                    print(pos,ref,alt,genoCount)
-                    checktime+=time.time()-starttime
-                    indptr.append(genoCount)
-                    rownames.append(variant_id)
-       
+                    genoCount,indices,data,indptr,rownames=getGT(samples,variant_id,GT,altIndex,genoCount,indices,data,indptr,rownames)
                 else:
-                    # print(chr,pos,ref,alt)
                     rec=[str(chr),str(pos),ref,alt]  
                     msg=normalize_variant(RefGenome(importer.build).crr, rec, 0, 1, 2, 3)
-                   
                     if tuple((rec[0], rec[2], rec[3])) in importer.variantIndex:
                         variant_id  = importer.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
-                        starttime=time.time()
-                        for idx in range(len(samples)):
-                
-                            if GT[idx] is not None:
-                                if altIndex==0:
-                                    if GT[idx]!=0:
-                                        if GT[idx]!=3 and GT[idx]!=4:
-                                            genoCount=genoCount+1
-                                            indices.append(idx)
-                                            data.append(GT[idx])
-                                        else:
-                                            genoCount=genoCount+1
-                                            indices.append(idx)
-                                            data.append(None)
-
-                                   
-                                elif altIndex==1:
-                                        genoCount=genoCount+1
-                                        indices.append(idx)   
-                                        if GT[idx]==3:
-                                            data.append(1)
-                                        elif GT[idx]==4:
-                                            data.append(2)
-                                        else:
-                                            data.append(None)
-                               
-                            else:
-                                genoCount=genoCount+1
-                                indices.append(idx)
-                                data.append(np.nan)
-                        print(rec[1],rec[2],rec[3],genoCount)
-                        checktime+=time.time()-starttime
-                        indptr.append(genoCount)
-                        rownames.append(variant_id)
+                        genoCount,indices,data,indptr,rownames=getGT(samples,variant_id,GT,altIndex,genoCount,indices,data,indptr,rownames)
      
-                           
-                    
-
-        # print(variant_id)
-    print(checktime)
-    print(len(indices),len(data),len(indptr),len(rownames))
     shape=(len(indptr),len(samples))
-
-    storageEngine=Engine_Storage.choose_storage_engine("tmp_1_2504_genotypes.h5")
+    storageEngine=Engine_Storage.choose_storage_engine("tmp_1_"+str(len(samples))+"_genotypes.h5")
     # make a HMatrix object which is a matrix with rownames and colnames
     hmatrix=HMatrix(data,indices,indptr,shape,rownames,colnames)
     # write GT into file
-    storageEngine.store(hmatrix,"22")
+    storageEngine.store(hmatrix,chr)
 
 
 
 
-def readVCF(inputFileName,importer,colnames):
+def readVCF(inputFileName,importer,colnames,prog):
     compression='gzip'
     compression_opts=1
     shuffle=False
@@ -1479,38 +1431,15 @@ def readVCF(inputFileName,importer,colnames):
         )
 
     chunk, _, _, _ = next(it)
+    genoCount=0
+    writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount)
+    lines=0
+    prog.update(len(samples)*DEFAULT_CHUNK_LENGTH)
+    for chunk, _, _, _ in it:
+        writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount)
+        lines+=DEFAULT_CHUNK_LENGTH
+        prog.update(len(samples)*lines)
 
-    writeIntoSparseHDF(chunk,importer,samples,colnames)
-    # for i in range(len(chunk["variants/ID"])):
-    #     chr=chunk["variants/CHROM"][i]
-    #     ref=chunk["variants/REF"][i]
-    #     alt=chunk["variants/ALT"][i]
-    #     pos=chunk["variants/POS"][i]
-    #     GT=chunk["calldata/GT"][i]
-    #     if tuple((chr, ref, alt[0])) in importer.variantIndex:
-    #         variant_id  = importer.variantIndex[tuple((chr, ref, alt[0]))][pos][0]
-    #         chunk["variants/ID"][i]=variant_id
-    # group="/chr22"
-    # output="tmp_1_2504_genotypes.h5"
-    # import h5py
-    # with h5py.File(output, mode='a') as h5f:
-
-    #     # obtain root group that data will be stored into
-    #     root = h5f.require_group(group)
-
-    #     # ensure sub-groups
-    #     root.require_group('variants')
-    #     root.require_group('calldata')
-    #     keys = _hdf5_setup_datasets(
-    #             chunk, root, chunk_length, chunk_width,
-    #             compression, compression_opts, shuffle,
-    #             overwrite, headers, vlen
-    #         )
-    #     # store first chunk
-    #     _hdf5_store_chunk(root, keys, chunk, vlen)
-      
-    #     for chunk, _, _, _ in it:
-    #         _hdf5_store_chunk(root, keys, chunk, vlen)
         
 
 
@@ -1572,7 +1501,7 @@ def importGenotypes(importer,num_sample=0):
         colnames=[sample_ids[i] for i in range(len(sample_ids))]
         total_genotype_count=importer.total_count[2]*len(sample_ids)
         prog = ProgressBar('Importing genotypes', total_genotype_count,initCount=0)
-        readVCF(input_filename,importer,colnames)
-        prog.done()
+        readVCF(input_filename,importer,colnames,prog)
+    prog.done()
 
         
