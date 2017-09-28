@@ -97,8 +97,9 @@ class AnnoDBConfiger:
         if len(self.build) == 0:
             raise ValueError(
                 'No reference genome is specified for database {}'.format(annoDB))
-        if not proj.build is None:
-            if (not list(self.build.keys())[0] == '*') and (not proj.build in list(self.build.keys())) and (proj.alt_build is None or
+        if proj.build is not None:
+            if (list(self.build.keys())[0] != '*') and (proj.build not in list(self.build.keys())) \
+                and (proj.alt_build is None or
                                                                                                             proj.alt_build not in list(self.build.keys())):
                 raise ValueError('Annotation database cannot be used because it is based on a reference '
                                  'genome that is different from the one used by the project. Please use a version of '
@@ -213,7 +214,8 @@ class AnnoDBConfiger:
                 continue
             if not section.replace('_', '').isalnum():
                 raise ValueError(
-                    'Illegal field name {}. Field names can only contain alphanumeric characters and underscores'.format(repr(section)))
+                    'Illegal field name {}. Field names can only contain alphanumeric characters and underscores'.format(
+                        repr(section)))
             if section.upper() in SQL_KEYWORDS:
                 raise ValueError(
                     'Illegal field name. {} conflicts with SQL keywords'.format(repr(section)))
@@ -222,7 +224,8 @@ class AnnoDBConfiger:
                 for item in items:
                     if item not in ['index', 'type', 'adj', 'comment']:
                         raise ValueError(
-                            'Incorrect key {} in section {}. Only index, type, adj and comment are allowed.'.format(item, section))
+                            'Incorrect key {} in section {}. Only index, type, adj and comment are allowed.'.format(
+                                item, section))
                 # 'index' - 1 because the input is in 1-based index
                 self.fields.append(Field(name=section, index=parser.get(section, 'index', raw=True),
                                          type=parser.get(
@@ -603,8 +606,8 @@ def use(args):
                                 '\d\d\d\d\d\d\d\d', x).group(0))[-1]
                         else:
                             args.source = sorted(ref_filtered)[-1]
-                        env.logger.info('Choosing version {} from {} available databases.'.format(args.source.split('/')[-1].split('.')[0],
-                                                                                                  len(all_versions)))
+                        env.logger.info('Choosing version {} from {} available databases.'.format(
+                            args.source.split('/')[-1].split('.')[0], len(all_versions)))
                 # download?
                 env.logger.info(
                     'Downloading annotation database {}'.format(args.source))
