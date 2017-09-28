@@ -48,7 +48,7 @@ def remoteDo(cmd):
 
 def deprecateFile(filename, repo):
     'Move a file to the deprecated folder with time stamp'
-    d, f = os.path.split(filename)
+    d, _ = os.path.split(filename)
     remoteDo([
         '[ ! -d deprecated/{0} ] && mkdir -p deprecated/{0}'.format(d),
         '[ -f {0}/{1} ] && mv {0}/{1} deprecated/{1}_{2}'.format(repo, filename, time.strftime('%b%d', time.gmtime()))])

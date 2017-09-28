@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 #
-# $File: ProcessTestCase $
-# $LastChangedDate: 2011-06-16 20:10:41 -0500 (Thu, 16 Jun 2011) $
-# $Rev: 4234 $
+# $File: __init__.py $
+# $LastChangedDate$
+# $Rev$
 #
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
 # Please visit http://varianttools.sourceforge.net for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2013 - 2013 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,27 +23,3 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-import os
-import re
-import unittest
-import sys
-
-def importTests():
-    tests = unittest.TestSuite()
-    for file in os.listdir('.'):
-        # match = re.match("^(test_(.*))\\.py$", file)
-        match = re.match("^(test_import)\\.py$", file)
-        if match:
-            m = match.group(1)
-            print("Adding test cases in %s" % m)
-            module = __import__(m)
-            tests.addTest(unittest.defaultTestLoader.loadTestsFromModule( module ))
-    return tests
-
-if __name__ == '__main__':
-    test_runner = unittest.TextTestRunner(verbosity=2)
-    #test_runner.run(importTests())
-    ret = test_runner.run(importTests())
-    if ret.errors or ret.failures:
-        sys.exit('test fail')

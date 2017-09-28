@@ -1,12 +1,16 @@
 #
 # Docker image for variant tools
 #
-FROM    mdabioinfo/simupop:latest
+FROM    continuumio/miniconda3
 
 MAINTAINER Bo Peng <bpeng@mdanderson.org>
 
+RUN     apt-get update
+RUN     apt-get -y install swig  gcc g++ build-essential bzip2 libbz2-dev libz-dev curl git libblas-dev liblapack-dev
+
+
 WORKDIR /home/bpeng
-RUN     git clone http://github.com/BoPeng/VariantTools VariantTools
+RUN     git clone http://github.com/vatlab/VariantTools VariantTools
 WORKDIR /home/bpeng/VariantTools
 RUN     git pull
 RUN     python setup.py install
