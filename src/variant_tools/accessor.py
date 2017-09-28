@@ -8,7 +8,6 @@ import time
 import math
 import os
 import sys
-import h5py
 
 import glob
 from multiprocessing import Process,Manager

@@ -2728,7 +2728,7 @@ class DatabaseEngine:
                 break
             except Exception as e:
                 env.logger.warning('Retrying to open database: {}'.format(e))
-                sleep(10)
+                time.sleep(10)
         if lock is not None:
             lock.release()
     
