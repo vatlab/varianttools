@@ -26,24 +26,17 @@
 
 import os
 import sys
-import gzip
 import re
 import time
 import datetime
 from argparse import SUPPRESS
 from multiprocessing import Process, Pipe, Lock
-if sys.version_info.major == 2:
-    from itertools import repeat
-else:
-    izip = zip
-    from itertools import repeat
 from .project import Project, fileFMT
-from .liftOver import LiftOverTool
-from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
+from .utils import ProgressBar, delayedAction, \
     consolidateFieldName, DatabaseEngine, env, encodeTableName, decodeTableName, \
     splitField
 
-from .preprocessor import * 
+from .preprocessor import PlainFormatter, SequentialCollector 
 
 MAX_COLUMN = 62
 def VariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
@@ -225,7 +218,6 @@ class BaseVariantReader:
         from_clause = 'FROM {0}'.format(self.table)
         if self.table != 'variant':
             from_clause += ' LEFT OUTER JOIN variant on {0}.variant_id = variant.variant_id '.format(self.table)
-        processed = set()
         for id in IDs:
             from_clause += ' LEFT OUTER JOIN {0}_genotype.genotype_{1} g{1} ON g{1}.variant_id = {2}.variant_id '\
                 .format(self.proj.name, id, self.table)
@@ -616,7 +608,6 @@ class Exporter:
             fields = splitField(col.field)
             if 'GT' in fields:
                 for id in self.IDs:
-                    col_indexes = []
                     indexes = [field_indexes[(id, x.lower())] for x in fields]
                     fmt = self.getFormatters(indexes, fields)
                     formatters.extend(fmt if fmt else [(None, None)])

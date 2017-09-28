@@ -27,21 +27,15 @@
 import os
 import sys
 import glob
-import logging
-import getpass
 import textwrap
-import tempfile
 import shutil
 import argparse
 import threading
 import queue
-import signal
 import time
 import re
 import tarfile
 import urllib.request, urllib.parse, urllib.error
-import inspect
-import pydoc
 
 from .ucsctools import showTrack
 from .cgatools import fasta2crr
@@ -50,11 +44,10 @@ from configparser import ConfigParser, RawConfigParser
 from io import StringIO
 
 from multiprocessing import Process
-from subprocess import Popen, PIPE
 from collections import namedtuple, defaultdict
-from ._version import VTOOLS_VERSION, VTOOLS_FULL_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CONTACT
+from ._version import VTOOLS_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CONTACT
 from .utils import (DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction,
-    RefGenome, filesInURL, downloadFile, getMaxUcscBin, env, sizeExpr,
+    RefGenome, downloadFile, env, sizeExpr,
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName,
     PrettyPrinter, determineSexOfSamples, getVariantsOnChromosomeX,
     getVariantsOnChromosomeY, getTermWidth, matchName, ProgressFileObj,
@@ -331,7 +324,6 @@ class AnnoDB:
             cur.execute('SELECT value FROM {}_info WHERE name="num_records";'.format(self.name))
             num_records = int(cur.fetchone()[0])
             print(('{:<23} {:,}'.format('Number of records:', num_records)))
-            fields = list(self.refGenomes.values())[0]
             
             # Get number of unique keys
             cur.execute('SELECT value FROM {}_info WHERE name="distinct_keys";'.format(self.name))
@@ -449,10 +441,7 @@ class fileFMT:
             self.parseFMT(fmt, defaults=args)
 
     def parseArgs(self, filename, fmt_args):
-        if sys.version_info.major == 2:
-            fmt_parser = SafeConfigParser()
-        else:
-            fmt_parser = ConfigParser(strict=True)
+        fmt_parser = ConfigParser(strict=True)
         fmt_parser.read(filename)
         parameters = fmt_parser.items('DEFAULT')
         parser = argparse.ArgumentParser(prog='vtools CMD --format {}'.format(os.path.split(filename)[-1]),
@@ -473,10 +462,7 @@ class fileFMT:
         return args
 
     def parseFMT(self, filename, defaults):
-        if sys.version_info.major == 2:
-            parser = SafeConfigParser()
-        else:
-            parser = ConfigParser(strict=True)
+        parser = ConfigParser(strict=True)
         # this allows python3 to read .fmt file with non-ascii characters, but there is no
         # simple way to make it python2 compatible.
         #with open(filename, 'r', encoding='UTF-8') as inputfile:
@@ -925,10 +911,7 @@ class PipelineDescription:
         # We used format interpolation in older version 
         try:
             if float(self.pipeline_format) <= 1.0:
-                if sys.version_info.major == 2:
-                    fmt_parser = SafeConfigParser()
-                else:
-                    fmt_parser = ConfigParser(strict=False)
+                fmt_parser = ConfigParser(strict=False)
                 fmt_parser.read(filename)
             else:
                 # and now we only use pipeline variables.
@@ -987,10 +970,7 @@ class PipelineDescription:
     def parsePipeline(self, filename, defaults):
         self.spec_file = filename
         if float(self.pipeline_format) <= 1.0:
-            if sys.version_info.major == 2:
-                parser = SafeConfigParser()
-            else:
-                parser = ConfigParser(strict=False)
+            parser = ConfigParser(strict=False)
             parser.optionxform = str
         else:
             # and now we only use pipeline variables.
@@ -1200,8 +1180,6 @@ class PipelineDescription:
             # separate \n\n 
             for paragraph in dehtml(self.description).split('\n\n'):
                 print(('\n'.join(textwrap.wrap(paragraph, width=textWidth))))
-        #
-        print(('\n' + '\n'.join(textwrap.wrap(text, width=textWidth, subsequent_indent=' '*8))))
         #
         if self.parameters:
             for item in self.parameters:
@@ -1698,9 +1676,7 @@ class Project:
         env.local_resource = self.loadProperty('__option_local_resource', None)
         #
         # existing project
-        cur = self.db.cursor()
         self.version = self.loadProperty('version', '1.0')
-        old_revision = self.loadProperty('revision', None)
         self.build = self.loadProperty('build')
         self.store = self.loadProperty('store')
         self.alt_build = self.loadProperty('alt_build')
@@ -2653,10 +2629,8 @@ class Project:
         #
         if name.endswith('.tar') or name.endswith('.tar.gz') or name.endswith('.tgz'):
             snapshot_file = name
-            mode = 'r' if name.endswith('.tar') else 'r:gz'
         elif name.replace('_', '').isalnum():
             snapshot_file = os.path.join(env.cache_dir, 'snapshot_{}.tar'.format(name))
-            mode = 'r'
         else:
             raise ValueError('Snapshot name should be a filename with extension .tar, .tgz, or .tar.gz, or a name without any special character.')
         #
@@ -3045,7 +3019,7 @@ class ProjCopier:
             raise ValueError('Table {} does not exist in project {}'.format(self.vtable, self.proj_file))
         headers = self.db.getHeaders('__fromDB.{}'.format(self.vtable))
         if headers[0] != 'variant_id':
-            raise ValueError('Table {} is not a variant table'.format(args.table[1]))
+            raise ValueError('Table {} is not a variant table'.format(self.vtable))
         #
         prog = ProgressBar('Copying variant tables {}'.format(self.proj_file), len(tables))
         cur = self.db.cursor()
@@ -3413,7 +3387,7 @@ class SampleProcessor(threading.Thread):
                 if not os.path.isdir(os.path.join(d, 'cache')):
                     os.mkdir(os.path.join(d, 'cache'))
                 if not os.path.isdir(os.path.join(d, 'cache')):
-                    raise RuntimeError('Cannot locate cache directory of project {}'.format(sec_proj))
+                    raise RuntimeError('Cannot locate cache directory of project {}'.format(self.src_proj))
                 self.cache_geno = os.path.join(d, 'cache', p.replace('.proj', '_genotype.DB'))
                 if os.path.isfile(self.cache_geno):
                     os.remove(self.cache_geno)
@@ -3810,13 +3784,11 @@ class ProjectsMerger:
                     duplicated_samples += int(cnt)
                     cur.execute('SELECT file_id FROM filename WHERE filename = ?;', (filename,))
                     new_file_id = cur.fetchone()[0]
-                    duplicate = True
                 else:
                     filenames.append(filename)
                     #
                     cur.execute('INSERT INTO filename (filename) VALUES (?);', (filename, ))
                     new_file_id = cur.lastrowid
-                    duplicate = False
                 # get samples
                 cur.execute('SELECT sample_id FROM __proj.sample WHERE file_id=?;', (old_file_id, ))
                 old_sid = [x[0] for x in cur.fetchall()]
