@@ -2755,7 +2755,7 @@ class DatabaseEngine:
         # trying to load extension
         loaded = False
         for path in sys.path:
-            ext = glob.glob(os.path.join(path, '_vt_sqlite3_ext.*'))
+            ext = glob.glob(os.path.join(path, '_vt_sqlite3_ext*so'))
             if ext:
                 cur = self.database.cursor()
                 try:
@@ -2764,7 +2764,7 @@ class DatabaseEngine:
                     raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
                 loaded = True
                 break
-            ext = glob.glob(os.path.join(path, 'variant_tools', '_vt_sqlite3_ext.*'))
+            ext = glob.glob(os.path.join(path, 'variant_tools', '_vt_sqlite3_ext*so'))
             if ext:
                 cur = self.database.cursor()
                 try:
@@ -2775,7 +2775,7 @@ class DatabaseEngine:
                 break
             #
             # pyinstaller bundle this file as 'variant_tools._vt_sqlite3_ext.so'
-            ext = glob.glob(os.path.join(path, 'variant_tools._vt_sqlite3_ext.*'))
+            ext = glob.glob(os.path.join(path, 'variant_tools._vt_sqlite3_ext*so'))
             if ext:
                 cur = self.database.cursor()
                 try:
