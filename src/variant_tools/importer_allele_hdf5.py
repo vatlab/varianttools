@@ -1289,7 +1289,7 @@ def importGenotypesInParallel(importer,num_sample=0):
             # readQueue.append(mpQueue())
 
         prog = ProgressBar('Importing genotypes', importer.total_count[2],initCount=0)
-        
+        lines=0
         for chunk, _, _, _ in it:                
             start_sample =0
             for job in range(numTasks):
@@ -1313,8 +1313,8 @@ def importGenotypesInParallel(importer,num_sample=0):
                         break 
             for worker in importers:
                 worker.join()
-
-            prog.update(chunk_length)
+            lines+=chunk_length
+            prog.update(lines)
 
         prog.done()
 
