@@ -110,22 +110,51 @@ class HDF5GenotypeImportWorker(Process):
     #             #indptr,indices,data,shape,rownames
     #             self.info[info.name]=[[],[],[],[],[]]
 
+    # def getGT(self,variant_id,GT,altIndex):
+    #     for idx in range(self.start_sample,self.end_sample):
+    #         if GT[idx] is not None:
+    #             if altIndex==0:
+    #                 if GT[idx]!=0:
+    #                     if GT[idx]!=3 and GT[idx]!=4:
+    #                         self.genoCount=self.genoCount+1
+    #                         self.indices.append(idx-self.start_sample)
+    #                         self.data.append(GT[idx])
+    #                     else:
+    #                         self.genoCount=self.genoCount+1
+    #                         self.indices.append(idx-self.start_sample)
+    #                         self.data.append(np.nan)  
+    #             elif altIndex==1:
+    #                     self.genoCount=self.genoCount+1
+    #                     self.indices.append(idx-self.start_sample)   
+    #                     if GT[idx]==3:
+    #                         self.data.append(1)
+    #                     elif GT[idx]==4:
+    #                         self.data.append(2)
+    #                     else:
+    #                         self.data.append(np.nan)
+    #         else:
+    #             self.genoCount=self.genoCount+1
+    #             self.indices.append(idx-self.start_sample)
+    #             self.data.append(np.nan)
+    #     self.indptr.append(self.genoCount)
+    #     self.rownames.append(variant_id)
+
     def getGT(self,variant_id,GT,altIndex):
-        for idx in range(self.start_sample,self.end_sample):
+        for idx in range(self.end_sample-self.start_sample):
             if GT[idx] is not None:
                 if altIndex==0:
                     if GT[idx]!=0:
                         if GT[idx]!=3 and GT[idx]!=4:
                             self.genoCount=self.genoCount+1
-                            self.indices.append(idx-self.start_sample)
+                            self.indices.append(idx)
                             self.data.append(GT[idx])
                         else:
                             self.genoCount=self.genoCount+1
-                            self.indices.append(idx-self.start_sample)
+                            self.indices.append(idx)
                             self.data.append(np.nan)  
                 elif altIndex==1:
                         self.genoCount=self.genoCount+1
-                        self.indices.append(idx-self.start_sample)   
+                        self.indices.append(idx)   
                         if GT[idx]==3:
                             self.data.append(1)
                         elif GT[idx]==4:
@@ -134,7 +163,7 @@ class HDF5GenotypeImportWorker(Process):
                             self.data.append(np.nan)
             else:
                 self.genoCount=self.genoCount+1
-                self.indices.append(idx-self.start_sample)
+                self.indices.append(idx)
                 self.data.append(np.nan)
         self.indptr.append(self.genoCount)
         self.rownames.append(variant_id)
@@ -316,36 +345,42 @@ def importGenotypesInParallel(importer,num_sample=0):
         buffer_size=DEFAULT_BUFFER_SIZE
         chunk_length=DEFAULT_CHUNK_LENGTH
         chunk_width=DEFAULT_CHUNK_WIDTH
-        log=None
-       
-        _, samples, headers, it = iter_vcf_chunks(
+
+        iterList=[]
+        dbList=[]
+        start_sample=0
+        for job in range(numTasks):
+            if workload[job]==0:
+                continue
+            end_sample = min(start_sample + workload[job], len(sample_ids))
+            if end_sample <= start_sample:
+                continue
+            samples=range(start_sample,end_sample)
+            print(start_sample,end_sample)
+            HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
+            _, samples, headers, it = iter_vcf_chunks(
                 input_filename, fields=fields, types=types, numbers=numbers, alt_number=alt_number,
                 buffer_size=buffer_size, chunk_length=chunk_length, fills=fills, region=region,
-                tabix=tabix, samples=samples, transformers=transformers
-            )
-
-        #Put tasks in the queue first
-        for job in range(numTasks):      
-            if workload[job] == 0:
-                continue
-            # readQueue.append(mpQueue())
+                tabix=tabix, samples=samples, transformers=transformers)
+            iterList.append(it)
+            dbList.append(HDFfile_Merge)
+            start_sample=end_sample
 
         prog = ProgressBar('Importing genotypes', importer.total_count[2],initCount=0)
-        
-        for chunk, _, _, _ in it:                
-            start_sample =0
-            for job in range(numTasks):
-                # readQueue[job].put(chunk)
-                if workload[job] == 0:
-                    continue
-                end_sample = min(start_sample + workload[job], len(sample_ids))
-                if end_sample <= start_sample:
-                    continue
-                HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
-              
+
+        while True:
+            for iterID,it in enumerate(iterList):
+                try:
+                    chunk, _, _, _=next(it)
+                except StopIteration:
+                    prog.done()
+                    sys.exit(1)
+                
+                start_sample=int(dbList[iterID].split("_")[1])-1
+                end_sample=int(dbList[iterID].split("_")[2])
+                print(start_sample,end_sample)
                 taskQueue.put(HDF5GenotypeImportWorker(chunk, importer.variantIndex, start_sample, end_sample, 
-                    sample_ids,variant_import_count[job], job, importer.genotype_info,HDFfile_Merge,importer.build))
-                start_sample = end_sample   
+                        sample_ids,variant_import_count[iterID], iterID, importer.genotype_info,dbList[iterID],importer.build))
             while taskQueue.qsize()>0:
                 for i in range(importer.jobs):    
                     if importers[i] is None or not importers[i].is_alive():     
@@ -356,9 +391,58 @@ def importGenotypesInParallel(importer,num_sample=0):
             for worker in importers:
                 worker.join()
 
-            prog.update(num_lines)
+            prog.update(chunk_length)
+
+        
+
+   
 
 
 
-        prog.done()
+
+        # log=None
+       
+        # _, samples, headers, it = iter_vcf_chunks(
+        #         input_filename, fields=fields, types=types, numbers=numbers, alt_number=alt_number,
+        #         buffer_size=buffer_size, chunk_length=chunk_length, fills=fills, region=region,
+        #         tabix=tabix, samples=samples, transformers=transformers
+        #     )
+
+        # #Put tasks in the queue first
+        # for job in range(numTasks):      
+        #     if workload[job] == 0:
+        #         continue
+        #     # readQueue.append(mpQueue())
+
+        # prog = ProgressBar('Importing genotypes', importer.total_count[2],initCount=0)
+        
+        # for chunk, _, _, _ in it:                
+        #     start_sample =0
+        #     for job in range(numTasks):
+        #         # readQueue[job].put(chunk)
+        #         if workload[job] == 0:
+        #             continue
+        #         end_sample = min(start_sample + workload[job], len(sample_ids))
+        #         if end_sample <= start_sample:
+        #             continue
+        #         HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
+              
+        #         taskQueue.put(HDF5GenotypeImportWorker(chunk, importer.variantIndex, start_sample, end_sample, 
+        #             sample_ids,variant_import_count[job], job, importer.genotype_info,HDFfile_Merge,importer.build))
+        #         start_sample = end_sample   
+        #     while taskQueue.qsize()>0:
+        #         for i in range(importer.jobs):    
+        #             if importers[i] is None or not importers[i].is_alive():     
+        #                 task=taskQueue.get()
+        #                 importers[i]=task
+        #                 importers[i].start()           
+        #                 break 
+        #     for worker in importers:
+        #         worker.join()
+
+        #     prog.update(num_lines)
+
+
+
+        # prog.done()
    
