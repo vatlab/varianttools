@@ -36,7 +36,7 @@ except ImportError as e:
         '"python setup.py install")'.format(e))
 
 DEFAULT_BUFFER_SIZE = 2**14
-DEFAULT_CHUNK_LENGTH = 2**13
+DEFAULT_CHUNK_LENGTH = 2**16
 DEFAULT_CHUNK_WIDTH = 2**6
 DEFAULT_ALT_NUMBER = 3
 

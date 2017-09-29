@@ -117,15 +117,15 @@ class HDF5GenotypeImportWorker(Process):
                     if GT[idx]!=0:
                         if GT[idx]!=3 and GT[idx]!=4:
                             self.genoCount=self.genoCount+1
-                            self.indices.append(idx)
+                            self.indices.append(idx-self.start_sample)
                             self.data.append(GT[idx])
                         else:
                             self.genoCount=self.genoCount+1
-                            self.indices.append(idx)
+                            self.indices.append(idx-self.start_sample)
                             self.data.append(np.nan)  
                 elif altIndex==1:
                         self.genoCount=self.genoCount+1
-                        self.indices.append(idx)   
+                        self.indices.append(idx-self.start_sample)   
                         if GT[idx]==3:
                             self.data.append(1)
                         elif GT[idx]==4:
@@ -134,7 +134,7 @@ class HDF5GenotypeImportWorker(Process):
                             self.data.append(np.nan)
             else:
                 self.genoCount=self.genoCount+1
-                self.indices.append(idx)
+                self.indices.append(idx-self.start_sample)
                 self.data.append(np.nan)
         self.indptr.append(self.genoCount)
         self.rownames.append(variant_id)
@@ -170,7 +170,7 @@ class HDF5GenotypeImportWorker(Process):
         # make a HMatrix object which is a matrix with rownames and colnames
         hmatrix=HMatrix(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames)
         # write GT into file
-        print(len(self.data),len(self.indices),len(self.indptr),len(self.rownames),len(self.colnames))
+       
         storageEngine.store(hmatrix,"22")
         storageEngine.close()
       
@@ -188,7 +188,7 @@ class HDF5GenotypeImportWorker(Process):
         # chunk=self.readQueue.get()
         self.writeIntoHDF()
 
-        print(tb.open_file(self.dbLocation))
+      
 
 
 
