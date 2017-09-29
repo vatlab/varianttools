@@ -36,7 +36,7 @@ except ImportError as e:
         '"python setup.py install")'.format(e))
 
 DEFAULT_BUFFER_SIZE = 2**14
-DEFAULT_CHUNK_LENGTH = 2**16
+DEFAULT_CHUNK_LENGTH = 2**13
 DEFAULT_CHUNK_WIDTH = 2**6
 DEFAULT_ALT_NUMBER = 3
 
@@ -936,174 +936,174 @@ def _read_vcf_headers(stream):
     return VCFHeaders(headers, filters, infos, formats, samples)
 
 
-def getGT(samples,variant_id,GT,altIndex,genoCount,indices,data,indptr,rownames):
-    for idx in range(len(samples)):
-        if GT[idx] is not None:
-            if altIndex==0:
-                if GT[idx]!=0:
-                    if GT[idx]!=3 and GT[idx]!=4:
-                        genoCount=genoCount+1
-                        indices.append(idx)
-                        data.append(GT[idx])
-                    else:
-                        genoCount=genoCount+1
-                        indices.append(idx)
-                        data.append(None)  
-            elif altIndex==1:
-                    genoCount=genoCount+1
-                    indices.append(idx)   
-                    if GT[idx]==3:
-                        data.append(1)
-                    elif GT[idx]==4:
-                        data.append(2)
-                    else:
-                        data.append(None)
-        else:
-            genoCount=genoCount+1
-            indices.append(idx)
-            data.append(np.nan)
-    indptr.append(genoCount)
-    rownames.append(variant_id)
-    return genoCount,indices,data,indptr,rownames
+# def getGT(samples,variant_id,GT,altIndex,genoCount,indices,data,indptr,rownames):
+#     for idx in range(len(samples)):
+#         if GT[idx] is not None:
+#             if altIndex==0:
+#                 if GT[idx]!=0:
+#                     if GT[idx]!=3 and GT[idx]!=4:
+#                         genoCount=genoCount+1
+#                         indices.append(idx)
+#                         data.append(GT[idx])
+#                     else:
+#                         genoCount=genoCount+1
+#                         indices.append(idx)
+#                         data.append(None)  
+#             elif altIndex==1:
+#                     genoCount=genoCount+1
+#                     indices.append(idx)   
+#                     if GT[idx]==3:
+#                         data.append(1)
+#                     elif GT[idx]==4:
+#                         data.append(2)
+#                     else:
+#                         data.append(None)
+#         else:
+#             genoCount=genoCount+1
+#             indices.append(idx)
+#             data.append(np.nan)
+#     indptr.append(genoCount)
+#     rownames.append(variant_id)
+#     return genoCount,indices,data,indptr,rownames
 
 
 
-def writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount,storageEngine):
-    indices=[]
-    data=[]
-    indptr=[]
-    rownames=[]
-    chr=chunk["variants/CHROM"][0]
-    for i in range(len(chunk["variants/ID"])):
-        chr=chunk["variants/CHROM"][i]
-        ref=chunk["variants/REF"][i]
-        pos=chunk["variants/POS"][i]
-        GT=chunk["calldata/GT"][i].tolist()
+# def writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount,storageEngine):
+#     indices=[]
+#     data=[]
+#     indptr=[]
+#     rownames=[]
+#     chr=chunk["variants/CHROM"][0]
+#     for i in range(len(chunk["variants/ID"])):
+#         chr=chunk["variants/CHROM"][i]
+#         ref=chunk["variants/REF"][i]
+#         pos=chunk["variants/POS"][i]
+#         GT=chunk["calldata/GT"][i].tolist()
     
-        for altIndex in range(len(chunk["variants/ALT"][i])):
-            alt=chunk["variants/ALT"][i][altIndex]
+#         for altIndex in range(len(chunk["variants/ALT"][i])):
+#             alt=chunk["variants/ALT"][i][altIndex]
      
-            if alt!="":
-                if tuple((chr, ref, alt)) in importer.variantIndex:
-                    variant_id  = importer.variantIndex[tuple((chr, ref, alt))][pos][0]
-                    genoCount,indices,data,indptr,rownames=getGT(samples,variant_id,GT,altIndex,genoCount,indices,data,indptr,rownames)
-                else:
-                    rec=[str(chr),str(pos),ref,alt]  
-                    msg=normalize_variant(RefGenome(importer.build).crr, rec, 0, 1, 2, 3)
-                    if tuple((rec[0], rec[2], rec[3])) in importer.variantIndex:
-                        variant_id  = importer.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
-                        genoCount,indices,data,indptr,rownames=getGT(samples,variant_id,GT,altIndex,genoCount,indices,data,indptr,rownames)
+#             if alt!="":
+#                 if tuple((chr, ref, alt)) in importer.variantIndex:
+#                     variant_id  = importer.variantIndex[tuple((chr, ref, alt))][pos][0]
+#                     genoCount,indices,data,indptr,rownames=getGT(samples,variant_id,GT,altIndex,genoCount,indices,data,indptr,rownames)
+#                 else:
+#                     rec=[str(chr),str(pos),ref,alt]  
+#                     msg=normalize_variant(RefGenome(importer.build).crr, rec, 0, 1, 2, 3)
+#                     if tuple((rec[0], rec[2], rec[3])) in importer.variantIndex:
+#                         variant_id  = importer.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
+#                         genoCount,indices,data,indptr,rownames=getGT(samples,variant_id,GT,altIndex,genoCount,indices,data,indptr,rownames)
      
-    shape=(len(indptr),len(samples))
+#     shape=(len(indptr),len(samples))
     
-    # make a HMatrix object which is a matrix with rownames and colnames
-    hmatrix=HMatrix(data,indices,indptr,shape,rownames,colnames)
-    # write GT into file
-    storageEngine.store(hmatrix,chr)
+#     # make a HMatrix object which is a matrix with rownames and colnames
+#     hmatrix=HMatrix(data,indices,indptr,shape,rownames,colnames)
+#     # write GT into file
+#     storageEngine.store(hmatrix,chr)
 
 
 
 
-def readVCF(inputFileName,importer,colnames,prog):
-    compression='gzip'
-    compression_opts=1
-    shuffle=False
-    overwrite=False
-    vlen=True
-    fields=None
-    types=None
-    numbers=None
-    alt_number=DEFAULT_ALT_NUMBER
-    fills=None
-    region=None
-    tabix='tabix'
-    samples=None
-    transformers=None
-    buffer_size=DEFAULT_BUFFER_SIZE
-    chunk_length=DEFAULT_CHUNK_LENGTH
-    chunk_width=DEFAULT_CHUNK_WIDTH
-    log=None
+# def readVCF(inputFileName,importer,colnames,prog):
+#     compression='gzip'
+#     compression_opts=1
+#     shuffle=False
+#     overwrite=False
+#     vlen=True
+#     fields=None
+#     types=None
+#     numbers=None
+#     alt_number=DEFAULT_ALT_NUMBER
+#     fills=None
+#     region=None
+#     tabix='tabix'
+#     samples=None
+#     transformers=None
+#     buffer_size=DEFAULT_BUFFER_SIZE
+#     chunk_length=DEFAULT_CHUNK_LENGTH
+#     chunk_width=DEFAULT_CHUNK_WIDTH
+#     log=None
    
-    _, samples, headers, it = iter_vcf_chunks(
-            inputFileName, fields=fields, types=types, numbers=numbers, alt_number=alt_number,
-            buffer_size=buffer_size, chunk_length=chunk_length, fills=fills, region=region,
-            tabix=tabix, samples=samples, transformers=transformers
-        )
+#     _, samples, headers, it = iter_vcf_chunks(
+#             inputFileName, fields=fields, types=types, numbers=numbers, alt_number=alt_number,
+#             buffer_size=buffer_size, chunk_length=chunk_length, fills=fills, region=region,
+#             tabix=tabix, samples=samples, transformers=transformers
+#         )
 
-    chunk, _, _, _ = next(it)
-    genoCount=0
-    storageEngine=Engine_Storage.choose_storage_engine("tmp_1_"+str(len(samples))+"_genotypes.h5")
-    writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount,storageEngine)
-    lines=0
-    prog.update(DEFAULT_CHUNK_LENGTH)
-    for chunk, _, _, _ in it:
-        writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount,storageEngine)
-        lines+=DEFAULT_CHUNK_LENGTH
-        prog.update(lines)
-    storageEngine.close()
+#     chunk, _, _, _ = next(it)
+#     genoCount=0
+#     storageEngine=Engine_Storage.choose_storage_engine("tmp_1_"+str(len(samples))+"_genotypes.h5")
+#     writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount,storageEngine)
+#     lines=0
+#     prog.update(DEFAULT_CHUNK_LENGTH)
+#     for chunk, _, _, _ in it:
+#         writeIntoSparseHDF(chunk,importer,samples,colnames,genoCount,storageEngine)
+#         lines+=DEFAULT_CHUNK_LENGTH
+#         prog.update(lines)
+#     storageEngine.close()
 
         
 
 
 
 
-def updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDF5fileName):
-    cur=importer.db.cursor()
+# def updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDF5fileName):
+#     cur=importer.db.cursor()
     
-    for id in range(start_sample,end_sample):
-        sql="UPDATE sample SET HDF5=? WHERE sample_id=? and sample_name=?"
-        # task=(HDF5fileName,allNames[names[id]],sample_ids[id],names[id])
-        task=(HDF5fileName,sample_ids[id],names[id])
-        cur.execute(sql,task)
+#     for id in range(start_sample,end_sample):
+#         sql="UPDATE sample SET HDF5=? WHERE sample_id=? and sample_name=?"
+#         # task=(HDF5fileName,allNames[names[id]],sample_ids[id],names[id])
+#         task=(HDF5fileName,sample_ids[id],names[id])
+#         cur.execute(sql,task)
         
     
 
 
-def manageHDF5(importer,allNames={}):
+# def manageHDF5(importer,allNames={}):
 
-    cur=importer.db.cursor()
-    sql="ALTER TABLE sample ADD COLUMN HDF5 CHAR(25)"
-    try:
-        cur.execute(sql)
-    except:
-        pass
+#     cur=importer.db.cursor()
+#     sql="ALTER TABLE sample ADD COLUMN HDF5 CHAR(25)"
+#     try:
+#         cur.execute(sql)
+#     except:
+#         pass
    
-    sql="SELECT sample_name,sample_id from sample"
+#     sql="SELECT sample_name,sample_id from sample"
 
   
-    for rec in cur.execute(sql):
-        if rec[0] not in allNames:
-            allNames[rec[0]]=int(rec[1])
+#     for rec in cur.execute(sql):
+#         if rec[0] not in allNames:
+#             allNames[rec[0]]=int(rec[1])
      
-    return allNames
+#     return allNames
 
-def importGenotypes(importer,num_sample=0):
+# def importGenotypes(importer,num_sample=0):
 
-    allNames=manageHDF5(importer)
+#     allNames=manageHDF5(importer)
     
-    for count, input_filename in enumerate(importer.files):
+#     for count, input_filename in enumerate(importer.files):
         
-        env.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(importer.files)))
-        importer.importVariant(input_filename)
+#         env.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(importer.files)))
+#         importer.importVariant(input_filename)
 
-        env.logger.info('{:,} new variants {}{}{} from {:,} lines are imported.'\
-            .format(importer.count[2], "(" if importer.count[2] else '', 
-                ', '.join(['{:,} {}'.format(x, y) for x, y in \
-                    zip(importer.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'unsupported']) if x > 0]),
-                    ")" if importer.count[2] else '', importer.count[0]))
-        # genotypes?
-        if importer.genotype_field:
-            importer.prober.reset()
-        # if there are samples?
-        sample_ids, genotype_status,names = importer.getSampleIDs(input_filename)
-        if len(sample_ids) == 0:
-            continue
-        allNames=manageHDF5(importer,allNames)
-        sample_ids=[int(allNames[name]) for name in names]
-        colnames=[sample_ids[i] for i in range(len(sample_ids))]
+#         env.logger.info('{:,} new variants {}{}{} from {:,} lines are imported.'\
+#             .format(importer.count[2], "(" if importer.count[2] else '', 
+#                 ', '.join(['{:,} {}'.format(x, y) for x, y in \
+#                     zip(importer.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'unsupported']) if x > 0]),
+#                     ")" if importer.count[2] else '', importer.count[0]))
+#         # genotypes?
+#         if importer.genotype_field:
+#             importer.prober.reset()
+#         # if there are samples?
+#         sample_ids, genotype_status,names = importer.getSampleIDs(input_filename)
+#         if len(sample_ids) == 0:
+#             continue
+#         allNames=manageHDF5(importer,allNames)
+#         sample_ids=[int(allNames[name]) for name in names]
+#         colnames=[sample_ids[i] for i in range(len(sample_ids))]
   
-        prog = ProgressBar('Importing genotypes', importer.total_count[2],initCount=0)
-        readVCF(input_filename,importer,colnames,prog)
-        prog.done()
+#         prog = ProgressBar('Importing genotypes', importer.total_count[2],initCount=0)
+#         readVCF(input_filename,importer,colnames,prog)
+#         prog.done()
 
         
