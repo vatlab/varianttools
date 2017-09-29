@@ -26,16 +26,10 @@
 
 import sys
 import threading
-try:
-    # python 2.x
-    import queue as queue
-except ImportError:
-    # python 3.x
-    import queue
+import queue
 
 import time
 import tempfile
-import re
 import csv
 import os
 from collections import defaultdict
@@ -192,7 +186,6 @@ class Sample:
             if len(example_lines) >= 4:
                 break
         csv_dialect = csv.Sniffer().sniff(''.join(example_lines))
-        delimiter = csv_dialect.delimiter
         #
         with open(filename, 'rU') as input:
             reader = csv.reader(input, dialect=csv_dialect)
@@ -346,7 +339,7 @@ class Sample:
                 fldType = type(rec[0])
             if type(rec[0]) != fldType:
                 if type(rec[0]) is float and fldType is int:
-                    fltType = float
+                    fldType = float
                 else:
                     raise ValueError('Inconsistent type returned from different samples')
         if expression != 'NULL' and fldType is None:

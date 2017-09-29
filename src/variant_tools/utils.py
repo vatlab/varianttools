@@ -152,13 +152,6 @@ except ImportError as e:
         'Please verify if you have installed variant tools successfully (using command '
         '"python setup.py install")'.format(e))
 
-try:
-    # fake import to make this sqlite module bundled by pyinstaller
-    from . import _vt_sqlite3_ext
-except ImportError as e:
-    pass
-
-
 class ColoredFormatter(logging.Formatter):
     ''' A logging formatter that uses color to differntiate logging messages
     and emphasize texts. Texts that would be empahsized are quoted with
@@ -631,7 +624,7 @@ class RuntimeEnvironments(object):
             return self._null_input
         self._null_input = os.path.join(os.path.expanduser(self._local_resource), 'null_input')
         if not os.path.isfile(self._null_input):
-            with open(self._null_input, 'w') as ni:
+            with open(self._null_input, 'w'):
                 pass
         return self._null_input
     #
@@ -1571,7 +1564,7 @@ class ShelfDB:
     def _add_py2(self, key, value):
         # return value from dumps needs to be converted to buffer (bytes)
         self.cur.execute(self.insert_query, 
-            (key, buffer(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
+            (key, memoryview(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
 
     def _get_py2(self, key):
         msg = 'Retrieve key {} from ShelfDB'.format(key)
@@ -1942,8 +1935,6 @@ class ResourceManager:
         '''Go through the manifest and download at most max_updates small files
         (.ann, .pipeline etc), and take at most max_updates seconds'''
         changed = []
-        added = 0
-        start_time = time.time()
         for cnt, filename in enumerate(sorted(list(self.manifest.keys()))):
             fileprop = self.manifest[filename]
             dest_dir = os.path.join(env.local_resource, os.path.split(filename)[0])
@@ -1963,7 +1954,6 @@ class ResourceManager:
 
     def downloadResources(self, dest_dir=None):
         '''Download resources'''
-        excluded = []
         for cnt, filename in enumerate(sorted(list(self.manifest.keys()))):
             fileprop = self.manifest[filename]
             #
@@ -2197,7 +2187,7 @@ def downloadURL(URL, dest, quiet, message=None):
     if os.path.isfile(dest):
         return dest
     # if all failed
-    raise RuntimeError('Failed to download {}'.format(fileToGet))
+    raise RuntimeError('Failed to download {}'.format(URL))
 
 
 def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
@@ -2567,6 +2557,7 @@ def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
 def physicalMemory():
     '''Get the amount of physical memory in the system'''
     # MacOSX?
+    import platform
     if platform.platform().startswith('Darwin'):
         # FIXME
         return None
@@ -2728,7 +2719,7 @@ class DatabaseEngine:
                 break
             except Exception as e:
                 env.logger.warning('Retrying to open database: {}'.format(e))
-                sleep(10)
+                time.sleep(10)
         if lock is not None:
             lock.release()
     
@@ -2755,7 +2746,7 @@ class DatabaseEngine:
         # trying to load extension
         loaded = False
         for path in sys.path:
-            ext = glob.glob(os.path.join(path, '_vt_sqlite3_ext.*'))
+            ext = glob.glob(os.path.join(path, '_vt_sqlite3_ext*so'))
             if ext:
                 cur = self.database.cursor()
                 try:
@@ -2764,7 +2755,7 @@ class DatabaseEngine:
                     raise SystemError('Failed to load variant tools sqlite extension from {}: {}'.format(ext[0], e))
                 loaded = True
                 break
-            ext = glob.glob(os.path.join(path, 'variant_tools', '_vt_sqlite3_ext.*'))
+            ext = glob.glob(os.path.join(path, 'variant_tools', '_vt_sqlite3_ext*so'))
             if ext:
                 cur = self.database.cursor()
                 try:
@@ -2775,7 +2766,7 @@ class DatabaseEngine:
                 break
             #
             # pyinstaller bundle this file as 'variant_tools._vt_sqlite3_ext.so'
-            ext = glob.glob(os.path.join(path, 'variant_tools._vt_sqlite3_ext.*'))
+            ext = glob.glob(os.path.join(path, 'variant_tools._vt_sqlite3_ext*so'))
             if ext:
                 cur = self.database.cursor()
                 try:
@@ -3851,7 +3842,8 @@ def call_sex(dat):
     sex = 'unknown'
     xhomo = False
     for locus in dat:
-        if withinPseudoAutoRegion(locus[0], int(locus[1]), build):
+        # FIXME: build is fixed to hg19
+        if withinPseudoAutoRegion(locus[0], int(locus[1]), 'hg19'):
             continue
         # call 'M' if '1' on Y chromosome is observed
         # FIXME: will be problematic if XY is coded 24 instead

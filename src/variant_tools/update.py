@@ -26,19 +26,16 @@
 import sys
 import os
 import re
-import shutil
-import gzip
-import zipfile
+import time
 from collections import defaultdict
-from multiprocessing import Process, Pipe
-import math
-from .project import AnnoDB, Project, Field, fileFMT
+from .project import Project, fileFMT
 from .liftOver import LiftOverTool
-from .utils import ProgressBar, lineCount, DatabaseEngine, delayedAction, \
+from .utils import ProgressBar, lineCount, delayedAction, RefGenome,\
     consolidateFieldName, env, encodeTableName, decodeTableName, \
     determineSexOfSamples, getVariantsOnChromosomeX, getVariantsOnChromosomeY,\
     getVariantsOnManifolds
-from .importer import *
+from .importer import LineProcessor, probeSampleName
+from .text_reader import TextReader
 
 #
 #
@@ -386,7 +383,7 @@ def setFieldValue(proj, table, items, build):
                     continue
                 if type(rec[i]) != fldTypes[i]:
                     if type(rec[i]) is float and fldTypes[i] is int:
-                        fltType[i] = float
+                        fldTypes[i] = float
                     else:
                         raise ValueError('Inconsistent type returned from different samples')
             if all([x is not None for x in fldTypes]):
@@ -457,7 +454,7 @@ def setFieldValue(proj, table, items, build):
                     continue
                 if type(res[i]) != fldTypes[i]:
                     if type(res[i]) is float and fldTypes[i] is int:
-                        fltType[i] = float
+                        fldTypes[i] = float
                     else:
                         raise ValueError('Inconsistent type returned from different samples')
             if all([x is not None for x in fldTypes]):
@@ -495,7 +492,6 @@ def setFieldValue(proj, table, items, build):
         prog = ProgressBar('Updating {}'.format(decodeTableName(table)), len(results))
         # this particular query will return a bunch of bogus NULL values for range-based databases,
         # which needs to be filtered out.
-        update_status = {}
         count = 0
         count_multi_value = 0
         last_id = None
@@ -853,7 +849,6 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     prog = ProgressBar('Updating {}'.format(decodeTableName(variant_table)), len(variants))
     update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format('variant', proj.db.PH,
         ' ,'.join(['{}={}'.format(x, proj.db.PH) for x in queryDestinations if x is not None]))
-    warning = False
     count = 0
     for count,id in enumerate(variants):
         value = variants[id]

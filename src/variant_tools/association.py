@@ -24,21 +24,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import sys, os, re, glob
-from multiprocessing import Process, Queue, Pipe, Value, Array, Lock
+from multiprocessing import Process, Queue, Value, Array, Lock
 import time
 import random
 import math
-from copy import copy, deepcopy
 from .project import Project, Field, AnnoDB, AnnoDBWriter, MaintenanceProcess
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, \
      env, executeUntilSucceed, ShelfDB, safeMapFloat, PrettyPrinter, flatten, hasGenoInfo
-from .phenotype import Sample
-from .tester import *
+from .tester import ExternTest, NullTest
 from .assoTests import AssoData
 from .rtester import RTest, SKAT
 
 from variant_tools.vt_sqlite3 import OperationalError
-import argparse
 
 from .association_hdf5 import generateHDFbyGroup,getGenotype_HDF5,generateHDFbyGroup_update
 
@@ -758,7 +755,6 @@ class AssoTestsWorker(Process):
         '''Get genotype for variants in specified group'''
         # get variant_id
         where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
-        cur = self.db.cursor()
         # variant info
         var_info, variant_id = self.getVarInfo(group, where_clause)
         # get genotypes / genotype info
