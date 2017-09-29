@@ -795,8 +795,10 @@ class HDF5_Store(Base_Store):
     def importGenotypes(self, importer):
         # from .importer_hdf5 import importGenotypesInParallel
         # return importGenotypesInParallel(importer)
-        from .importer_vcf_to_hdf5 import importGenotypes
-        return importGenotypes(importer)
+        # from .importer_vcf_to_hdf5 import importGenotypes
+        # return importGenotypes(importer)
+        from .importer_allele_hdf5 import importGenotypesInParallel
+        return importGenotypesInParallel(importer)
 
 
 
