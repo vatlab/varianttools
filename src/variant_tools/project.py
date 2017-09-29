@@ -45,7 +45,7 @@ from io import StringIO
 
 from multiprocessing import Process
 from collections import namedtuple, defaultdict
-from ._version import VTOOLS_VERSION, VTOOLS_FULL_VERSION,VTOOLS_COPYRIGHT, VTOOLS_CONTACT
+from ._version import VTOOLS_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CONTACT
 from .utils import (DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction,
     RefGenome, downloadFile, env, sizeExpr,
     getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName,
@@ -199,9 +199,8 @@ class AnnoDB:
                 'Please specify link fields for attributes {} using parameter --linked_by'
                 .format(','.join(self.build)))
         if self.linked_by:
-            s = delayedAction(env.logger.info, 'Indexing linked field {}'.format(', '.join(self.linked_by)))
-            self.indexLinkedField(proj, linked_by)
-            del s
+            with delayedAction(env.logger.info, 'Indexing linked field {}'.format(', '.join(self.linked_by))):
+                self.indexLinkedField(proj, linked_by)
         if self.anno_type == 'range':
             if self.build is not None:
                 self.db.binningRanges(proj.build, self.build, self.name)
@@ -1271,29 +1270,28 @@ class AnnoDBWriter:
         for rec in cur:
             self.cur_fields.append(Field(*rec))
         # add new fields
-        s = delayedAction(env.logger.info, 'Adding fields to existing result database')
-        for field in self.fields:
-            # name already exist
-            if field.name in [x.name for x in self.cur_fields]:
-                cf = [x for x in self.cur_fields if x.name == field.name][0] 
-                if field.type != cf.type:
-                    raise ValueError('Type mismatch for new field {}: existing {}, new {}'.format(field.name, cf.type, field.type))
-                if overwrite_existing_fields:
-                    env.logger.warning('Results in field {} will be overwritten.'.format(field.name))
-                #else:
-                #    if field.name not in [x for tmp in self.build.values() for x in tmp]: 
-                #        raise ValueError('Cannot modify database {} because field {} already exists. '
-                #            'Please use test option --name to add a new suffix to this field, '
-                #            'write the results to a different database (option --to_db), or use '
-                #            'option --update to force updating the existing fields.'.format(self.name, field.name))
-            else:
-                # add new field
-                cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES (?,?,?,?);'.format(self.name),
-                    (field.name, field.index, field.type, field.comment))
-                cur.execute('ALTER TABLE {} ADD {} {};'.format(self.name, field.name, field.type))
-        #
-        self.db.commit()
-        del s
+        with delayedAction(env.logger.info, 'Adding fields to existing result database'):
+            for field in self.fields:
+                # name already exist
+                if field.name in [x.name for x in self.cur_fields]:
+                    cf = [x for x in self.cur_fields if x.name == field.name][0] 
+                    if field.type != cf.type:
+                        raise ValueError('Type mismatch for new field {}: existing {}, new {}'.format(field.name, cf.type, field.type))
+                    if overwrite_existing_fields:
+                        env.logger.warning('Results in field {} will be overwritten.'.format(field.name))
+                    #else:
+                    #    if field.name not in [x for tmp in self.build.values() for x in tmp]: 
+                    #        raise ValueError('Cannot modify database {} because field {} already exists. '
+                    #            'Please use test option --name to add a new suffix to this field, '
+                    #            'write the results to a different database (option --to_db), or use '
+                    #            'option --update to force updating the existing fields.'.format(self.name, field.name))
+                else:
+                    # add new field
+                    cur.execute('INSERT INTO {0}_field (name, field, type, comment) VALUES (?,?,?,?);'.format(self.name),
+                        (field.name, field.index, field.type, field.comment))
+                    cur.execute('ALTER TABLE {} ADD {} {};'.format(self.name, field.name, field.type))
+            #
+            self.db.commit()
 
     def createFieldsTable(self):
         '''Create table name_fields'''
@@ -1338,91 +1336,88 @@ class AnnoDBWriter:
         '''Create index and get statistics of the database'''
         cur = self.db.cursor()
         # creating indexes
-        s = delayedAction(env.logger.info, 'Creating indexes (this can take quite a while)')
-        # creates index for each link method
-        for key in list(self.build.keys()):
-            if key != '*':
-                if not self.db.hasIndex('{}_idx'.format(key)):
-                    cur.execute('''CREATE INDEX {0}_idx ON {1} ({0}_bin ASC, {2});'''\
-                      .format(key, self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
-            else:
-                if not self.db.hasIndex('{}_idx'.format(self.name)):
-                    cur.execute('''CREATE INDEX {0}_idx ON {0} ({1});'''\
-                        .format(self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
-        del s
+        with delayedAction(env.logger.info, 'Creating indexes (this can take quite a while)'):
+            # creates index for each link method
+            for key in list(self.build.keys()):
+                if key != '*':
+                    if not self.db.hasIndex('{}_idx'.format(key)):
+                        cur.execute('''CREATE INDEX {0}_idx ON {1} ({0}_bin ASC, {2});'''\
+                          .format(key, self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
+                else:
+                    if not self.db.hasIndex('{}_idx'.format(self.name)):
+                        cur.execute('''CREATE INDEX {0}_idx ON {0} ({1});'''\
+                            .format(self.name,  ', '.join(['{} ASC'.format(x) for x in self.build[key]])))
         # binning ranges
         if self.anno_type == 'range':
             for build, keys in list(self.build.items()):
                 self.db.binningRanges(build, keys, self.name)
-        s = delayedAction(env.logger.info, 'Analyzing and tuning database ...')
-        # This is only useful for sqlite
-        self.db.analyze()
-        # calculating database statistics
-        cur.execute('SELECT COUNT(*) FROM (SELECT DISTINCT {} FROM {});'.format(', '.join(list(self.build.values())[0]), self.name))
-        count = cur.fetchone()[0]
-        cur.execute('INSERT INTO {0}_info VALUES (?, ?);'.format(self.name), ('distinct_keys', str(count)))
-        num_records = self.db.numOfRows(self.name)
-        cur.execute('INSERT INTO {0}_info VALUES (?, ?);'.format(self.name), ('num_records', num_records))
-        if num_records == 0:
-            self.db.destroy()
-            raise RuntimeError('Failed to create annotation database: no record has been imported.')
-        del s
+        with delayedAction(env.logger.info, 'Analyzing and tuning database ...'):
+            # This is only useful for sqlite
+            self.db.analyze()
+            # calculating database statistics
+            cur.execute('SELECT COUNT(*) FROM (SELECT DISTINCT {} FROM {});'.format(', '.join(list(self.build.values())[0]), self.name))
+            count = cur.fetchone()[0]
+            cur.execute('INSERT INTO {0}_info VALUES (?, ?);'.format(self.name), ('distinct_keys', str(count)))
+            num_records = self.db.numOfRows(self.name)
+            cur.execute('INSERT INTO {0}_info VALUES (?, ?);'.format(self.name), ('num_records', num_records))
+            if num_records == 0:
+                self.db.destroy()
+                raise RuntimeError('Failed to create annotation database: no record has been imported.')
         for field in self.fields:
-            s = delayedAction(env.logger.info, 'Calculating column statistics for field {}'.format(field.name))
-            # for integer and float types, we need to retrieve the values and check if
-            # they are of specified type
-            cur.execute('SELECT {0} FROM {1};'.format(field.name, self.name))
-            values = [x[0] for x in cur.fetchall()]
-            #
-            missing = values.count(None)
-            nonmissing = len(values) - missing
-            cur.execute('UPDATE {0}_field SET missing_entries=? WHERE name="{1}";'.format(self.name, field.name),
-                (missing,))
-            if missing == num_records:
-                env.logger.warning('Field {} has all missing values'.format(field.name))
-            if 'int' in field.type.lower():
-                isint = [x for x in values if isinstance(x, int)]
-                distinct = set(values) - set([None])
-                if len(isint) != nonmissing:
-                    wrong = [x for x in distinct if not isinstance(x, int)][:100]
-                    env.logger.warning('{} values are not integers for field {}: {}'
-                        .format(len(values) - len(isint), field.name,
-                        ', '.join([str(x) for x in wrong])))
+            with delayedAction(env.logger.info, 'Calculating column statistics for field {}'.format(field.name)):
+                # for integer and float types, we need to retrieve the values and check if
+                # they are of specified type
+                cur.execute('SELECT {0} FROM {1};'.format(field.name, self.name))
+                values = [x[0] for x in cur.fetchall()]
                 #
-                if len(isint) == 0:
-                    env.logger.warning('No valid integer values has been found for field {}'.format(field.name))
-                    cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
-                        self.name, self.db.PH), (len(distinct), None, None, field.name))
+                missing = values.count(None)
+                nonmissing = len(values) - missing
+                cur.execute('UPDATE {0}_field SET missing_entries=? WHERE name="{1}";'.format(self.name, field.name),
+                    (missing,))
+                if missing == num_records:
+                    env.logger.warning('Field {} has all missing values'.format(field.name))
+                if 'int' in field.type.lower():
+                    isint = [x for x in values if isinstance(x, int)]
+                    distinct = set(values) - set([None])
+                    if len(isint) != nonmissing:
+                        wrong = [x for x in distinct if not isinstance(x, int)][:100]
+                        env.logger.warning('{} values are not integers for field {}: {}'
+                            .format(len(values) - len(isint), field.name,
+                            ', '.join([str(x) for x in wrong])))
+                    #
+                    if len(isint) == 0:
+                        env.logger.warning('No valid integer values has been found for field {}'.format(field.name))
+                        cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
+                            self.name, self.db.PH), (len(distinct), None, None, field.name))
+                    else:
+                        cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
+                            self.name, self.db.PH), (len(distinct), min(isint), max(isint), field.name))
+                    del isint
+                    del distinct
+                    del values
+                elif 'float' in field.type.lower():
+                    isfloat = [x for x in values if isinstance(x, float)]
+                    distinct = set(values) - set([None])
+                    if len(isfloat) != nonmissing:
+                        wrong = [x for x in distinct if not isinstance(x, float)][:100]
+                        env.logger.warning('{} values are not integers for field {}: {}'
+                            .format(len(values) - len(isfloat), field.name,
+                            ', '.join([str(x) for x in wrong])))
+                    #
+                    if len(isfloat) == 0:
+                        env.logger.warning('No valid float values has been found for field {}'.format(field.name))
+                        cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
+                            self.name, self.db.PH), (len(distinct), None, None, field.name))
+                    else:
+                        cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
+                            self.name, self.db.PH), (len(distinct), min(isfloat), max(isfloat), field.name))
+                    del isfloat
+                    del distinct
+                    del values
                 else:
-                    cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
-                        self.name, self.db.PH), (len(distinct), min(isint), max(isint), field.name))
-                del isint
-                del distinct
-                del values
-            elif 'float' in field.type.lower():
-                isfloat = [x for x in values if isinstance(x, float)]
-                distinct = set(values) - set([None])
-                if len(isfloat) != nonmissing:
-                    wrong = [x for x in distinct if not isinstance(x, float)][:100]
-                    env.logger.warning('{} values are not integers for field {}: {}'
-                        .format(len(values) - len(isfloat), field.name,
-                        ', '.join([str(x) for x in wrong])))
-                #
-                if len(isfloat) == 0:
-                    env.logger.warning('No valid float values has been found for field {}'.format(field.name))
-                    cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
-                        self.name, self.db.PH), (len(distinct), None, None, field.name))
-                else:
-                    cur.execute('UPDATE {0}_field SET distinct_entries={1}, min_value={1}, max_value={1} WHERE name={1};'.format(
-                        self.name, self.db.PH), (len(distinct), min(isfloat), max(isfloat), field.name))
-                del isfloat
-                del distinct
-                del values
-            else:
-                # for char type
-                cur.execute('UPDATE {0}_field SET distinct_entries={1} WHERE name={1};'.format(
-                    self.name, self.db.PH), (len(set(values) - set([None])) , field.name))
-            del s
+                    # for char type
+                    cur.execute('UPDATE {0}_field SET distinct_entries={1} WHERE name={1};'.format(
+                        self.name, self.db.PH), (len(set(values) - set([None])) , field.name))
         self.db.commit()
 
 #  Project management
@@ -1813,9 +1808,8 @@ class Project:
                 except:
                     analyzed = False
             if force or not analyzed:
-                s = delayedAction(env.logger.info, 'Analyzing {}'.format(tbl))
-                cur.execute('ANALYZE {}'.format(tbl))
-                del s
+                with delayedAction(env.logger.info, 'Analyzing {}'.format(tbl)):
+                    cur.execute('ANALYZE {}'.format(tbl))
         self.db.commit()
         
     def upgrade(self, proj_version):
@@ -1997,73 +1991,68 @@ class Project:
     def createIndexOnMasterVariantTable(self, quiet=False):
         # create indexes
         #
-        if not quiet:
-            s = delayedAction(env.logger.info, 'Creating indexes on master variant table. This might take quite a while.')
-        try:
-            #
-            # Index on the primary reference genome is UNIQUE when there is no alternative reference
-            # genome. If there is, multiple variants from the alternative reference genome might
-            # be mapped to the same coordinates on the primary reference genome. I have tried to 
-            # set some of the coordinates to NULL, but the uniqueness problem becomes a problem
-            # across projects. For example, 
-            #
-            # If c_19 and c_19a both map to c_18 in one project
-            #
-            #   c_18   c_19
-            #   None   c_19a
-            #
-            # another project might have
-            #
-            #   c_18  c_19a
-            #
-            # although they are the same variant. A better solution is therefore to keep
-            #
-            #   c_18   c_19
-            #   c_18   c_19a
-            #
-            # in both projects.
-            #
-            if not self.db.hasIndex('variant_index'):
-                if self.alt_build is not None:
-                    self.db.execute('''CREATE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
-                else:
-                    self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
-        except Exception as e:
-            # the index might already exists, this does not really matter
-            env.logger.debug(e)
-        # the message will not be displayed if index is created within 5 seconds
-        try:
-            if self.alt_build and not self.db.hasIndex('variant_alt_index'):
+        with delayedAction(env.logger.info, 'Creating indexes on master variant table. This might take quite a while.'):
+            try:
                 #
-                # Index on alternative reference genome is not unique because several variants might
-                # be mapped to the same coordinates in the alternative reference genome. 
+                # Index on the primary reference genome is UNIQUE when there is no alternative reference
+                # genome. If there is, multiple variants from the alternative reference genome might
+                # be mapped to the same coordinates on the primary reference genome. I have tried to 
+                # set some of the coordinates to NULL, but the uniqueness problem becomes a problem
+                # across projects. For example, 
                 #
-                self.db.execute('''CREATE INDEX variant_alt_index ON variant (alt_bin ASC, alt_chr ASC, alt_pos ASC, ref ASC, alt ASC);''')
-        except Exception as e:
-            # the index might already exists, this does not really matter
-            env.logger.debug(e)
-        # the message will not be displayed if index is created within 5 seconds
-        if not quiet:
-            del s
+                # If c_19 and c_19a both map to c_18 in one project
+                #
+                #   c_18   c_19
+                #   None   c_19a
+                #
+                # another project might have
+                #
+                #   c_18  c_19a
+                #
+                # although they are the same variant. A better solution is therefore to keep
+                #
+                #   c_18   c_19
+                #   c_18   c_19a
+                #
+                # in both projects.
+                #
+                if not self.db.hasIndex('variant_index'):
+                    if self.alt_build is not None:
+                        self.db.execute('''CREATE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
+                    else:
+                        self.db.execute('''CREATE UNIQUE INDEX variant_index ON variant (bin ASC, chr ASC, pos ASC, ref ASC, alt ASC);''')
+            except Exception as e:
+                # the index might already exists, this does not really matter
+                env.logger.debug(e)
+            # the message will not be displayed if index is created within 5 seconds
+            try:
+                if self.alt_build and not self.db.hasIndex('variant_alt_index'):
+                    #
+                    # Index on alternative reference genome is not unique because several variants might
+                    # be mapped to the same coordinates in the alternative reference genome. 
+                    #
+                    self.db.execute('''CREATE INDEX variant_alt_index ON variant (alt_bin ASC, alt_chr ASC, alt_pos ASC, ref ASC, alt ASC);''')
+            except Exception as e:
+                # the index might already exists, this does not really matter
+                env.logger.debug(e)
 
     def dropIndexOnMasterVariantTable(self):
         # before bulk inputting data, it is recommended to drop index.
         #
-        s = delayedAction(env.logger.info, 'Dropping indexes of master variant table. This might take quite a while.')
-        try:
-            if self.db.hasIndex('variant_index'):
-                self.db.dropIndex('variant_index', 'variant')
-        except Exception as e:
-            # the index might not exist
-            env.logger.debug(e)
-        #
-        try:
-            if self.alt_build and self.db.hasIndex('variant_alt_index'):
-                self.db.dropIndex('variant_alt_index', 'variant')
-        except Exception as e:
-            # the index might not exist
-            env.logger.debug(e)
-        del s
+        with delayedAction(env.logger.info, 'Dropping indexes of master variant table. This might take quite a while.'):
+            try:
+                if self.db.hasIndex('variant_index'):
+                    self.db.dropIndex('variant_index', 'variant')
+            except Exception as e:
+                # the index might not exist
+                env.logger.debug(e)
+            #
+            try:
+                if self.alt_build and self.db.hasIndex('variant_alt_index'):
+                    self.db.dropIndex('variant_alt_index', 'variant')
+            except Exception as e:
+                # the index might not exist
+                env.logger.debug(e)
 
     def createVariantTable(self, table, temporary=False, variants=[]):
         '''Create a variant table with name. Fail if a table already exists.
@@ -3140,10 +3129,9 @@ class ProjCopier:
                 copied_samples = 0
             env.logger.info('{} variants and {} samples are copied'.format(copied_variants, copied_samples))
             # wait for the thread to close
-            s = delayedAction(env.logger.info, 'Create indexes')
-            if thread.is_alive():
-                thread.join()
-            del s
+            with delayedAction(env.logger.info, 'Create indexes'):
+                if thread.is_alive():
+                    thread.join()
         finally:
             # re-connect the main database for proer cleanup
             self.proj.db = DatabaseEngine()
@@ -3658,17 +3646,16 @@ class ProjectsMerger:
                 self.proj.saveProperty('alt_build', self.proj.alt_build)
                 #
                 if self.proj.alt_build is not None:
-                    s = delayedAction(env.logger.info, 
+                    with delayedAction(env.logger.info, 
                         'Adding alternative reference genome {} to the project.'
-                        .format(self.proj.alt_build))
-                    cur = self.db.cursor()
-                    headers = self.db.getHeaders('variant')
-                    for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
-                        if fldName in headers:
-                            continue
-                        self.db.execute('ALTER TABLE variant ADD {} {} NULL;'
-                            .format(fldName, fldType))
-                    del s
+                        .format(self.proj.alt_build)):
+                        cur = self.db.cursor()
+                        headers = self.db.getHeaders('variant')
+                        for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
+                            if fldName in headers:
+                                continue
+                            self.db.execute('ALTER TABLE variant ADD {} {} NULL;'
+                                .format(fldName, fldType))
             elif build[0] != self.proj.build:
                 raise ValueError('Primary reference genome of project ({} of {}) '
                     'does not match that of the current project ({}).'
@@ -4136,6 +4123,10 @@ def init(args):
             except:
                 pass
     except Exception as e:
+        from .utils import get_traceback
+        if args.verbosity and int(args.verbosity) > 2:
+            sys.stderr.write(get_traceback())
+
         env.logger.error(e)
         sys.exit(1)
 
@@ -4198,7 +4189,6 @@ def remove(args):
             elif args.type == 'fields':
                 if len(args.items) == 0:
                     raise ValueError('Please specify conditions to select fields to be removed')
-                from_table = defaultdict(list)
                 for item in args.items:
                     if item.lower() in ['variant_id', 'chr', 'pos', 'alt']:
                         raise ValueError('Fields variant_id, chr, pos and alt cannot be removed')
@@ -4214,12 +4204,11 @@ def remove(args):
                     proj.alt_build = None
                     proj.saveProperty('alt_build', None)
                 # it is possible that new indexes are needed
-                s = delayedAction(env.logger.info, 'Rebuilding indexes')
-                try:
-                    proj.createIndexOnMasterVariantTable()
-                except:
-                    pass
-                del s
+                with delayedAction(env.logger.info, 'Rebuilding indexes'):
+                    try:
+                        proj.createIndexOnMasterVariantTable()
+                    except:
+                        pass
             elif args.type == 'geno_fields':
                 if len(args.items) == 0:
                     raise ValueError('Please specify name of genotype fields to be removed')
@@ -5034,10 +5023,9 @@ x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in list(_user_opt
                     .format(count, err_count))
             elif args.validate_sex:
                 sample_sex = determineSexOfSamples(proj)
-                s = delayedAction(env.logger.info, 'Getting variants on sex chromosomes')
-                var_chrX = getVariantsOnChromosomeX(proj)
-                var_chrY = getVariantsOnChromosomeY(proj)
-                del s
+                with delayedAction(env.logger.info, 'Getting variants on sex chromosomes'):
+                    var_chrX = getVariantsOnChromosomeX(proj)
+                    var_chrY = getVariantsOnChromosomeY(proj)
                 if len(var_chrX) == 0 and len(var_chrY) == 0:
                     env.logger.warning('Failed to validate sample sex: no genotype '
                         'on non-pseudo-autosomal regions of sex chromosomes.')

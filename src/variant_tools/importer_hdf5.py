@@ -24,44 +24,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
-import sys
-import re
-import array
-import time
-from heapq import heappush, heappop, heappushpop
-from multiprocessing import Process, Pipe, Value, Lock, Manager,Array
+from multiprocessing import Process, Value
 from multiprocessing import Queue as mpQueue
 import queue
-from itertools import repeat
-from collections import defaultdict
-from .project import Project, fileFMT
-from .liftOver import LiftOverTool
-from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
-    openFile, DatabaseEngine, hasCommand, \
-    downloadFile, env, RefGenome
+from .utils import ProgressBar, openFile, env
 
 import numpy as np
-from scipy.sparse import csr_matrix,csc_matrix,rand,coo_matrix,hstack
-import tables as tb
-#import HDF5_storage as storage
-import glob
-from shutil import copyfile
-from .accessor import *
-
-try:
-    from variant_tools.cgatools import normalize_variant
-except ImportError as e:
-    sys.exit('Failed to import module ({})\n'
-        'Please verify if you have installed variant tools successfully (using command '
-        '"python setup.py install")'.format(e))
-
-
-# preprocessors
-from .preprocessor import *
-#
-
-
+from .accessor import Engine_Storage, HMatrix
 
 class HDF5GenotypeImportWorker(Process):
     '''This class starts a process, import genotype to a temporary HDF5 file.
@@ -187,8 +156,8 @@ class HDF5GenotypeImportWorker(Process):
                             self.indices.append(idx)
                             self.data.append(np.nan)
                     except IndexError:
-                        env.logger.warning('Incorrect number of genotype fields: {} fields found, {} expected for record {}'.format(
-                            len(rec), fld_cols[-1][-1] + 1, rec))
+                        env.logger.warning('Incorrect number of genotype fields: {} fields found for record {}'.format(
+                            len(rec), rec))
                 self.indptr.append(genoCount)
                 self.rownames.append(variant_id)
 
@@ -216,8 +185,8 @@ class HDF5GenotypeImportWorker(Process):
                                     self.info[info.name][1].append(idx)
                                     self.info[info.name][2].append(np.nan)
                             except IndexError:
-                                env.logger.warning('Incorrect number of genotype fields: {} fields found, {} expected for record {}'.format(
-                                    len(rec), fld_cols[-1][-1] + 1, rec))
+                                env.logger.warning('Incorrect number of genotype fields: {} fields found for record {}'.format(
+                                    len(rec),  rec))
                         self.info[info.name][0].append(genoDict[info.name])
                         self.info[info.name][3].append(variant_id)
 
@@ -327,7 +296,6 @@ def importGenotypesInParallel(importer,num_sample=0):
         readQueue=[]
 
         taskQueue=queue.Queue()
-        input_prefix=os.path.basename(input_filename).replace(".vcf","")
         
         #Put tasks in the queue first
         for job in range(numTasks):      

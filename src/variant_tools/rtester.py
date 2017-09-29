@@ -36,8 +36,6 @@ from collections import OrderedDict
 
 import io
 
-from types import *
-
 _mybytes = lambda s:bytes(s, 'utf8') #'ascii')
 _mystr = lambda s:str(s, 'utf8')
 

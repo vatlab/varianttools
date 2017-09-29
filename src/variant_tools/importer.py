@@ -45,7 +45,7 @@ except ImportError as e:
 
 
 # preprocessors
-from .preprocessor import *
+from .preprocessor import IgnoredRecord, SequentialExtractor
 #
 #
 # Process each line using the above functors
@@ -505,9 +505,8 @@ class Importer:
                 # either insert or update, the fields must be in the master variant table
                 self.proj.checkFieldName(f.name, exclude='variant')
                 if f.name not in headers:
-                    s = delayedAction(env.logger.info, 'Adding column {}'.format(f.name))
-                    cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
-                    del s
+                    with delayedAction(env.logger.info, 'Adding column {}'.format(f.name)):
+                        cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
         #
         if fmt.input_type != 'variant':
             env.logger.info('Only variant input types that specifies fields for chr, pos, ref, alt could be imported.')
@@ -542,14 +541,13 @@ class Importer:
             cur.execute("INSERT INTO filename (filename) VALUES ({0});".format(self.db.PH), (filename,))
             filenameID = cur.lastrowid
         sample_ids = []
-        s = delayedAction(env.logger.info, 'Creating {} genotype tables'.format(len(sampleNames)))
-        #
-        for samplename in sampleNames:
-            cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
-                (filenameID, '' if samplename is None else samplename))
-            sid = cur.lastrowid
-            sample_ids.append(sid)
-        del s
+        with delayedAction(env.logger.info, 'Creating {} genotype tables'.format(len(sampleNames))):
+            #
+            for samplename in sampleNames:
+                cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
+                    (filenameID, '' if samplename is None else samplename))
+                sid = cur.lastrowid
+                sample_ids.append(sid)
         return sample_ids
 
     def addVariant(self, cur, rec):
@@ -718,13 +716,12 @@ class Importer:
             env.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(loci_count, self.proj.build, self.proj.alt_build))
             query = 'UPDATE variant SET alt_bin={0}, alt_chr={0}, alt_pos={0} WHERE variant_id={0};'.format(self.db.PH)
             # this should not really happen, but people (like me) might manually mess up with the database
-            s = delayedAction(env.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build))
-            headers = self.db.getHeaders('variant')
-            for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
-                if fldName in headers:
-                    continue
-                self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
-            del s
+            with delayedAction(env.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build)):
+                headers = self.db.getHeaders('variant')
+                for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
+                    if fldName in headers:
+                        continue
+                    self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
             mapped_file, err_count = tool.mapCoordinates(to_be_mapped, self.proj.build, self.proj.alt_build)
         # update records
         prog = ProgressBar('Updating coordinates', total_new)

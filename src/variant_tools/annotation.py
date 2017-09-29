@@ -39,7 +39,6 @@ from .utils import ProgressBar, downloadFile, lineCount, \
     calculateMD5, ResourceManager, RefGenome
 from .importer import LineProcessor
 from .text_reader import TextReader
-from .preprocessor import *
 
 
 class AnnoDBConfiger:
@@ -271,11 +270,8 @@ class AnnoDBConfiger:
                         tempFile = os.path.join(self.path, URL)
                 elif URL.upper().startswith('SQL:'):
                     res = urllib.parse.urlparse(URL)
-                    user = res.user
-                    password = res.password
                     query = res.netloc
                     db = DatabaseEngine()
-                    cur = db.cursor()
                     res = db.execute(query)
                     filename = os.path.join(
                         env.cache_dir, '{}_sql.txt'.format(self.name))
@@ -307,11 +303,10 @@ class AnnoDBConfiger:
                                   for name in bundle.namelist()])
             elif tempFile.endswith('.tar.gz') or tempFile.endswith('.tgz'):
                 with tarfile.open(tempFile, 'r:gz') as tfile:
-                    s = delayedAction(
-                        env.logger.info, 'Decompressing {}'.format(tempFile))
-                    names = tfile.getnames()
-                    tfile.extractall(env.cache_dir)
-                    del s
+                    with delayedAction(
+                            env.logger.info, 'Decompressing {}'.format(tempFile)):
+                        names = tfile.getnames()
+                        tfile.extractall(env.cache_dir)
                 ret_files.extend([os.path.join(env.cache_dir, name)
                                   for name in names])
             else:
@@ -454,11 +449,10 @@ class AnnoDBConfiger:
                     'Downloading annotation database from {}'.format(self.direct_url))
                 try:
                     dbFile = downloadFile(self.direct_url)
-                    s = delayedAction(
-                        env.logger.info, 'Decompressing {}'.format(dbFile))
-                    dbFile = decompressGzFile(
-                        dbFile, inplace=False, md5=self.db_md5)
-                    del s
+                    with delayedAction(
+                            env.logger.info, 'Decompressing {}'.format(dbFile)):
+                        dbFile = decompressGzFile(
+                            dbFile, inplace=False, md5=self.db_md5)
                     return AnnoDB(self.proj, dbFile, linked_by, anno_type, linked_fields, linked_name)
                 except RuntimeError as e:
                     raise
@@ -537,12 +531,11 @@ def use(args):
                 if args.source.endswith('.ann'):
                     annoDB = args.source
                 elif args.source.endswith('.DB.gz'):
-                    s = delayedAction(
-                        env.logger.info, 'Decompressing {}'.format(args.source))
-                    # do not remove local .gz file. Perhaps this is a script
-                    # and we do not want to break that.
-                    annoDB = decompressGzFile(args.source, inplace=False)
-                    del s
+                    with delayedAction(
+                            env.logger.info, 'Decompressing {}'.format(args.source)):
+                        # do not remove local .gz file. Perhaps this is a script
+                        # and we do not want to break that.
+                        annoDB = decompressGzFile(args.source, inplace=False)
                     if not isAnnoDB(annoDB):
                         annoDB = None
                 elif args.source.endswith('.DB'):
@@ -551,13 +544,12 @@ def use(args):
                         annoDB = None
             if annoDB is None:
                 if os.path.isfile(args.source + '.DB.gz'):
-                    s = delayedAction(
-                        env.logger.info, 'Decompressing {}'.format(args.source + '.DB.gz'))
-                    annoDB = decompressGzFile(
-                        args.source + '.DB.gz', inplace=False)
-                    if not isAnnoDB(annoDB):
-                        annoDB = None
-                    del s
+                    with delayedAction(
+                            env.logger.info, 'Decompressing {}'.format(args.source + '.DB.gz')):
+                        annoDB = decompressGzFile(
+                            args.source + '.DB.gz', inplace=False)
+                        if not isAnnoDB(annoDB):
+                            annoDB = None
             if annoDB is None:
                 if os.path.isfile(args.source + '.DB') and isAnnoDB(args.source + '.DB'):
                     annoDB = args.source + '.DB'
@@ -614,11 +606,10 @@ def use(args):
                 try:
                     annoDB = downloadFile(args.source, None if args.source.endswith(
                         '.ann') else '.', quiet=args.source.endswith('.ann'))
-                    s = delayedAction(
-                        env.logger.info, 'Decompressing {}'.format(annoDB))
-                    # for downloaded file, we decompress inplace
-                    annoDB = decompressGzFile(annoDB, inplace=True)
-                    del s
+                    with delayedAction(
+                            env.logger.info, 'Decompressing {}'.format(annoDB)):
+                        # for downloaded file, we decompress inplace
+                        annoDB = decompressGzFile(annoDB, inplace=True)
                 except Exception as e:
                     raise ValueError(
                         'Database {} not found: {}' .format(args.source, e))

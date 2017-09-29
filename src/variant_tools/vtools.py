@@ -37,6 +37,7 @@ import subprocess
 # save the command line that has been processed by the shell.
 env.command_line = subprocess.list2cmdline(sys.argv[1:])
 
+from variant_tools._version import VTOOLS_FULL_VERSION
 import variant_tools.project as project
 import variant_tools.importer as importer
 import variant_tools.update as update
@@ -65,7 +66,7 @@ def main():
         epilog='''Use 'vtools cmd -h' for details about each command.
         Please contact Bo Peng (bpeng at mdanderson.org) if you have any question.''')
     master_parser.add_argument('--version', action='version',
-        version='%(prog)s {}'.format(project.VTOOLS_FULL_VERSION))
+        version='%(prog)s {}'.format(VTOOLS_FULL_VERSION))
     subparsers = master_parser.add_subparsers(title='subcommands')
     #
     # command init

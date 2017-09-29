@@ -23,27 +23,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import sys, os, re
-from multiprocessing import Process, Queue, Pipe, Value, Array, Lock, Manager
+import os
+import re
+from multiprocessing import Process, Manager
 from multiprocessing import Queue as mpQueue
 import queue
 import time
-import random
-import math
-from copy import copy, deepcopy
-from .project import Project, Field, AnnoDB, AnnoDBWriter, MaintenanceProcess
-from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, \
-     env, executeUntilSucceed, ShelfDB, safeMapFloat, PrettyPrinter, flatten, hasGenoInfo
-from .phenotype import Sample
-from .tester import *
-from .rtester import RTest, SKAT
+from .utils import DatabaseEngine
 
-from variant_tools.vt_sqlite3 import OperationalError
-import argparse
+from .accessor import Engine_Access, Engine_Storage, HMatrix
 
-from .accessor import *
-
-import sqlite3
 import glob
 
 
@@ -219,7 +208,6 @@ class GroupHDFGenerator_append(Process):
     def run(self):
         
         while True:
-            genoDict={}
             HDFfileName=self.fileQueue.get()
             if HDFfileName is None:
                 break
@@ -340,7 +328,6 @@ def getGenotype_HDF5(worker, group):
     # variant info
     var_info, variant_id = worker.getVarInfo(group, where_clause)
     
-    find_chr="SELECT chr from variant where variant_id={0}".format(variant_id[0])
     chr=getChr(variant_id[0],cur)
     # get genotypes / genotype info
     genotype = []

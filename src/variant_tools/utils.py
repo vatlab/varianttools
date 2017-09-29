@@ -36,6 +36,7 @@ import time
 import tempfile
 import tokenize
 import gzip
+import traceback
 import threading
 import re
 import shlex
@@ -1024,7 +1025,7 @@ def safeMapFloat(x, nan = True):
             raise
     return x
         
-class delayedAction:
+class delayedAction(object):
     '''Call the passed function with param after a few seconds. It is most often 
     used to display certain message only if an action takes a long time.
 
@@ -1036,11 +1037,29 @@ class delayedAction:
     '''
     def __init__(self, func, param, delay=5):
         self.timer = threading.Timer(delay, func, (param,))
+
+    def __enter__(self):
         self.timer.start()
 
-    def __del__(self):
+    def __exit__(self, type, value, traceback):
         self.timer.cancel()
 
+def get_traceback():
+    output = StringIO()
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    #print "*** print_tb:"
+    traceback.print_tb(exc_traceback, limit=1, file=output)
+    #print "*** print_exception:"
+    try:
+        traceback.print_exception(exc_type, exc_value, exc_traceback,
+                              limit=5, file=output)
+    except Exception:
+        # the above function call can fail under Python 3.4 for some
+        # exception but we do not really care if that happens
+        pass
+    result = output.getvalue()
+    output.close()
+    return result
 
 def filesInURL(URL, ext=''):
     '''directory listing of a URL'''
@@ -1705,7 +1724,7 @@ class ResourceManager:
     def getCommentFromConfigFile(self, filename, section, option):
         '''Get comment from annotation description file.'''
         try:
-            parser = ConfigParser.SafeConfigParser()
+            parser = configparser.ConfigParser()
             parser.read(filename) 
             return parser.get(section, option)
         except Exception as e:
@@ -1733,7 +1752,7 @@ class ResourceManager:
         else:
             return '*'
         try:
-            parser = ConfigParser.SafeConfigParser()
+            parser = configparser.ConfigParser()
             parser.read(ann_file)
             return ','.join([x[0] for x in parser.items('linked fields')])
         except Exception as e:

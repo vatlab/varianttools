@@ -348,7 +348,7 @@ class Sample:
         cur_fields = self.db.getHeaders('sample')[3:]
         if field.lower() not in [x.lower() for x in cur_fields]:
             if field.upper() in SQL_KEYWORDS:
-                raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(x))
+                raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(field))
             env.logger.info('Adding phenotype {}'.format(field))
             self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field,
                 {int: 'INT',

@@ -276,9 +276,8 @@ class StandaloneVariantReader(BaseVariantReader):
 
     def start(self):
         # the first None, indicating ready to output
-        s = delayedAction(env.logger.info, 'Selecting genotypes...')
-        self.reader.recv()
-        del s
+        with delayedAction(env.logger.info, 'Selecting genotypes...'):
+            self.reader.recv()
         
     def records(self):
         while True:
@@ -308,9 +307,8 @@ class MultiVariantReader(BaseVariantReader):
         self.jobs = max(jobs, len(IDs) // MAX_COLUMN + 2)
         block = len(IDs) // (self.jobs-1) + 1
         #
-        s = delayedAction(env.logger.info, 'Checking indexes')
-        ID_needed_idx = [id for id in IDs if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id))]
-        del s
+        with delayedAction(env.logger.info, 'Checking indexes'):
+            ID_needed_idx = [id for id in IDs if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id))]
         if len(ID_needed_idx) > 0:
             prog = ProgressBar('Creating indexes', len(ID_needed_idx))
             cur = self.proj.db.cursor()

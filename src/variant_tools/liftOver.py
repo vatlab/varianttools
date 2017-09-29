@@ -139,14 +139,13 @@ class LiftOverTool:
         if not chainFile:
             return {}
         # Update the master variant table.
-        s = delayedAction(env.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build))
-        cur = self.db.cursor()
-        headers = self.db.getHeaders('variant')
-        for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
-            if fldName in headers:
-                continue
-            self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
-        del s
+        with delayedAction(env.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build)):
+            cur = self.db.cursor()
+            headers = self.db.getHeaders('variant')
+            for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
+                if fldName in headers:
+                    continue
+                self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
         # export existing variants to a temporary file
         num_variants = self.exportVariantsInBedFormat(os.path.join(env.temp_dir, 'var_in.bed'))
         if num_variants == 0:
