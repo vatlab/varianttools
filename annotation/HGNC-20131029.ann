@@ -1,0 +1,249 @@
+# Copyright (C) 2012 Jerry Fowler (rgfowler@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
+# for a description of the format of this file.
+#
+
+[linked fields]
+*=All_Symbols
+
+[data sources]
+description=The HUGO Gene Nomenclature Committee (HGNC) has assigned unique gene symbols
+	and names to almost 38,000 human loci, of which around 19,000 are protein coding.
+	genenames.org is a curated online repository of HGNC-approved gene nomenclature and
+	associated resources including links to genomic, proteomic and phenotypic information,
+	as well as dedicated gene family pages
+version=20131029
+anno_type=field
+encoding=ISO-8859-1
+source_url=ftp://ftp.ebi.ac.uk/pub/databases/genenames/hgnc_complete_set.txt.gz
+direct_url=annoDB/HGNC-20131029.DB.gz	80bd9bc0697631a6280c39f8e349415d
+source_type=txt
+
+[name]
+index=2
+type=VARCHAR(255)  COLLATE NOCASE
+comment=HGNC Approved Symbol
+
+
+[All_Symbols]
+index=2,7
+type=VARCHAR(255) COLLATE NOCASE
+adj=lambda x: tuple([x[0]] + [z.strip() for z in x[1].split(',')])
+comment=All symbols, including Approved and repvious symbols
+
+[HGNC_ID]
+index=1
+type=INT NOT NULL
+adj=RemoveLeading('HGNC:')
+comment=A unique ID provided by the HGNC. In the HTML results page this ID links to the HGNC Symbol Report for that gene.
+
+[Approved_Symbol]
+index=2
+type=VARCHAR(255)  COLLATE NOCASE
+comment=The official gene symbol that has been approved by the HGNC and is publicly available. Symbols are approved based on specific HGNC nomenclature guidelines. In the HTML results page this ID links to the HGNC Symbol Report for that gene.
+
+[Approved_Name]
+index=3
+type=VARCHAR(255)
+adj=Nullify('.')
+comment=The official gene name that has been approved by the HGNC and is publicly available. Names are approved based on specific HGNC nomenclature guidelines.
+
+[Status]
+index=4
+type=VARCHAR(50)  COLLATE NOCASE
+adj=Nullify('.')
+comment=Indicates whether the gene is classified as:
+    Approved - these genes have HGNC-approved gene symbols
+    Entry withdrawn - these previously approved genes are no longer thought to exist
+    Symbol withdrawn - a previously approved record that has since been merged into a another record
+
+[Locus_Type]
+index=5
+type=VARCHAR(100)
+comment=Specifies the type of locus described by the given entry: gene with protein product, RNA, cluster, etc (http://www.genenames.org/data/gdlw_columndef.html#gd_app_sym)
+
+[Locus_Group]
+index=6
+type=VARCHAR(255)
+comment=Groups locus types together into related sets. See http://www.genenames.org/data/gdlw_columndef.html#gd_app_sym for details.
+
+[Previous_Symbols]
+index=7
+type=VARCHAR(255)
+comment=Symbols previously approved by the HGNC for this gene
+
+
+[Previous_Names]
+index=8
+type=VARCHAR(255)
+comment=Gene names previously approved by the HGNC for this gene
+
+[Synonyms]
+index=9
+type=VARCHAR(255)
+adj=Nullify('.')
+comment=Other symbols used to refer to this gene
+
+[Name_Synonyms]
+index=10
+type=VARCHAR(255)
+adj=Nullify('.')
+comment=Other names used to refer to this gene
+
+[Chromosome]
+index=11
+type=VARCHAR(255)
+adj=Nullify('.')
+comment= Indicates the location of the gene or region on the chromosome
+
+[Date_Approved]
+index=12
+type=VARCHAR(255)
+comment=Date the gene symbol and name were approved by the HGNC
+
+[Date_Modified]
+index=13
+type=VARCHAR(255)
+comment=If applicable, the date the entry was modified by the HGNC
+
+[Date_Symbol_Changed]
+index=14
+type=VARCHAR(255)
+comment=If applicable, the date the gene symbol was last changed by the HGNC from a previously approved symbol. Many genes receive approved symbols and names which are viewed as temporary (eg C2orf#) or are non-ideal when considered in the light of subsequent information. In the case of individual genes a change to the name (and subsequently the symbol) is only made if the original name is seriously misleading.
+
+[Date_Name_Changed]
+index=15
+type=VARCHAR(255)
+comment= If applicable, the date the gene name was last changed by the HGNC from a previously approved name
+
+[Accession_Numbers]
+index=16
+type=VARCHAR(255)
+comment=Accession numbers for each entry selected by the HGNC
+
+[Enzyme_IDs]
+index=17
+type=VARCHAR(255)
+comment=Enzyme entries have Enzyme Commission (EC) numbers associated with them that indicate the hierarchical functional classes to which they belong
+
+[Entrez_Gene_ID]
+index=18
+type=VARCHAR(255)
+comment= Entrez Gene at the NCBI provide curated sequence and descriptive information about genetic loci including official nomenclature, synonyms, sequence accessions, phenotypes, EC numbers, MIM numbers, UniGene clusters, homology, map locations, and related web sites. In the HTML results page this ID links to the Entrez Gene page for that gene. Entrez Gene has replaced LocusLink.
+
+[Ensembl_Gene_ID]
+index=19
+type=VARCHAR(255)
+comment=This column contains a manually curated Ensembl Gene ID
+
+[Mouse_Genome_Database_ID]
+index=20
+type=VARCHAR(255)
+comment= MGI identifier. In the HTML results page this ID links to the MGI Report for that gene.
+
+[Specialist_Database_Links]
+index=21
+type=VARCHAR(255)
+comment=This column contains links to specialist databases with a particular interest in that symbol/gene (also see Specialist Database IDs).
+
+[Specialist_Database_IDs]
+index=22
+type=VARCHAR(255)
+comment=The Specialist Database Links column contains HTML links to the database in question. This column contains the database ID only.
+
+[Pubmed_IDs]
+index=23
+type=VARCHAR(255)
+comment=Identifier that links to published articles relevant to the entry in the NCBI's PubMed database.
+
+[RefSeq_IDs]
+index=24
+type=VARCHAR(255)
+comment=The Reference Sequence (RefSeq) identifier for that entry, provided by the NCBI. As we do not aim to
+    curate all variants of a gene only one selected RefSeq is displayed per gene report. RefSeq aims to provide
+	a comprehensive, integrated, non-redundant set of sequences, including genomic DNA, transcript (RNA),
+	and protein products. RefSeq identifiers are designed to provide a stable reference for gene identification
+	and characterization, mutation analysis, expression studies, polymorphism discovery, and comparative
+	analyses.
+
+[Gene_Family_Tag]
+index=25
+type=VARCHAR(255)
+comment=Tag used to designate a gene family or group the gene has been assigned to, according to either sequence similarity or information from publications, specialist advisors for that family or other databases. Families/groups may be either structural or functional, therefore a gene may belong to more than one family/group. These tags are used to generate gene family or grouping specific pages at genenames.org and do not necessarily reflect an official nomenclature. Each gene family has an associated gene family tag and gene family description. If a particular gene is a member of more than one gene family, the tags and the descriptions will be shown in the same order.
+
+[Gene_family_description]
+index=26
+type=VARCHAR(255)
+comment=Name given to a particular gene family. The gene family description has an associated gene family tag. Gene families are used to group genes according to either sequence similarity or information from publications, specialist advisors for that family or other databases. Families/groups may be either structural or functional, therefore a gene may belong to more than one family/group.
+
+[Record_Type]
+index=27
+type=VARCHAR(255)
+comment=
+
+[Primary_IDs]
+index=28
+type=VARCHAR(255)
+comment=
+
+[Secondary_IDs]
+index=29
+type=VARCHAR(255)
+comment=
+
+[CCDS_IDs]
+index=30
+type=VARCHAR(255)
+comment=The Consensus CDS (CCDS) project is a collaborative effort to identify a core set of human and mouse protein coding regions that are consistently annotated and of high quality. The long term goal is to support convergence towards a standard set of gene annotations.
+
+[VEGA_IDs]
+index=31
+type=VARCHAR(255)
+comment=This contains a curated VEGA gene ID
+
+[Locus_Specific_Databases]
+index=32
+type=VARCHAR(255)
+comment= This contains a list of links to databases or database entries pertinent to the gene
+
+[Entrez_Gene_ID_NCBI]
+index=33
+type=VARCHAR(255)
+comment=Entrez Gene at the NCBI provide curated sequence and descriptive information about genetic loci including official nomenclature, synonyms, sequence accessions, phenotypes, EC numbers, MIM numbers, UniGene clusters, homology, map locations, and related web sites. In the HTML results page this ID links to the Entrez Gene page for that gene. Entrez Gene has replaced LocusLink.
+
+[OMIM_ID_NCBI]
+index=34
+type=VARCHAR(255)
+comment=Identifier provided by Online Mendelian Inheritance in Man (OMIM) at the NCBI. This database is described as a catalog of human genes and genetic disorders containing textual information and links to MEDLINE and sequence records in the Entrez system, and links to additional related resources at NCBI and elsewhere. In the HTML results page this ID links to the OMIM page for that entry.
+
+[RefSeq_NCBI]
+index=35
+type=VARCHAR(255)
+comment=The Reference Sequence (RefSeq) identifier for that entry, provided by the NCBI. As we do not aim to curate all variants of a gene only one mapped RefSeq is displayed per gene report. RefSeq aims to provide a comprehensive, integrated, non-redundant set of sequences, including genomic DNA, transcript (RNA), and protein products. RefSeq identifiers are designed to provide a stable reference for gene identification and characterization, mutation analysis, expression studies, polymorphism discovery, and comparative analyses. In the HTML results page this ID links to the RefSeq page for that entry.
+
+[UniProt_ID]
+index=36
+type=VARCHAR(255)
+comment= The UniProt identifier, provided by the EBI. The UniProt Protein Knowledgebase is described as a curated protein sequence database that provides a high level of annotation, a minimal level of redundancy and high level of integration with other databases. In the HTML results page this ID links to the UniProt page for that entry.
+
+[Ensembl_ID_Ensembl]
+index=37
+type=VARCHAR(255)
+comment=The Ensembl ID is derived from the current build of the Ensembl database and provided by the Ensembl team.
+
+[UCSC_ID]
+index=38
+type=VARCHAR(255)
+comment=The UCSC ID is derived from the current build of the UCSC database
+
+[Mouse_Genome_Database_ID_MGI]
+index=39
+type=VARCHAR(255)
+comment=MGI identifier. In the HTML results page this ID links to the MGI Report for that gene.
+
+[Rat_Genome_Database_ID_RGD]
+index=40
+type=VARCHAR(255)
+comment=RGD identifier. In the HTML results page this ID links to the RGD Report for that gene.
