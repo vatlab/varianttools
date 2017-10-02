@@ -39,6 +39,7 @@ from .utils import ProgressBar, downloadFile, lineCount, \
     calculateMD5, ResourceManager, RefGenome
 from .importer import LineProcessor
 from .text_reader import TextReader
+from .preprocessor import *
 
 
 class AnnoDBConfiger:

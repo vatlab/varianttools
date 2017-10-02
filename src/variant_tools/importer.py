@@ -45,7 +45,7 @@ except ImportError as e:
 
 
 # preprocessors
-from .preprocessor import IgnoredRecord, SequentialExtractor
+from .preprocessor import *
 #
 #
 # Process each line using the above functors
