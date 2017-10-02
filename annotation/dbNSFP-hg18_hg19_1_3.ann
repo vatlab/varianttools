@@ -1,0 +1,382 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+# 
+# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+# for a description of the format of this file.
+#
+# ChangeLog:
+#   2011-7-15: Initial import.
+#   2011-8-20: Add citation to Liu et al.
+#   2011-9-1: separate allele frequency in 1000genomes low and high coverage data
+#             into several fields.
+#   2011-9-1: separate dbSNP frequency data and gene ids.
+#
+
+[linked fields]
+hg18=chr, hg18pos, ref, alt
+hg19=chr, hg19pos, ref, alt
+
+[data sources]
+description=dbNSFP version 1.3, maintained by Xiaoming Liu from UTSPH. Please cite "Liu X, Jian X, and Boerwinkle E. 2011. dbNSFP: a lightweight database of human non-synonymous SNPs and their functional predictions. Human Mutation. 32:894-899" if you find this database useful.
+version=hg18_hg19_1_3
+anno_type=variant
+direct_url=annoDB/dbNSFP-hg18_hg19_1_3.DB.gz
+source_url=http://dbnsfp.houstonbioinformatics.org/dbNSFPzip/dbNSFP1.3.zip
+source_type=txt
+source_pattern=dbNSFP1.3.ch
+
+[chr]
+index=1
+type=VARCHAR(20) NOT NULL
+
+[hg18pos]
+index=2
+type=INTEGER NOT NULL
+comment=physical position on the chromosome as to hg18 (1-based coordinate)
+
+[ref]
+index=3
+type=CHAR(1) NOT NULL
+comment=Reference nucleotide allele (as on the + strand)
+
+[alt]
+index=4
+type=CHAR(1) NOT NULL
+comment=Alternative nucleotide allele (as on the + strand)
+
+[aaref]
+index=5
+type=CHAR(1) NULL
+comment=reference amino acid
+
+[aaalt]
+index=6
+type=CHAR(1) NULL
+comment=alternative amino acid
+
+[hg19pos]
+index=7
+type=INTEGER NULL
+comment=physical position on the chromosome as to hg19 (1-based coordinate)
+adj=Nullify('NA')
+
+[genename]
+index=8
+type=VARCHAR(48) NULL
+comment=common gene name
+
+[geneid]
+index=9
+type=VARCHAR(48) NULL
+comment=gene Entrez ID
+
+[CCDSid]
+index=10
+type=VARCHAR(48) NULL
+comment=CCDS ID
+
+[refcodon]
+index=11
+type=CHAR(3) NULL
+comment=reference codon
+
+[codonpos]
+index=12
+type=INT
+comment=position on the codon (1, 2 or 3)
+
+[fold_degenerate]
+index=13
+type=INT
+comment=degenerate type (0, 2 or 3)
+
+[aapos]
+index=14
+type=INT
+comment=amino acid position as to the protein
+
+[cds_strand]
+index=15
+type=CHAR(1) NULL
+comment=coding sequence (CDS) strand (+ or ?)
+
+[LRT_Omega]
+index=16
+type=FLOAT NULL
+adj=Nullify('NA')
+comment=estimated nonsynonymous-to-synonymous-rate ratio (reported by LRT)
+
+[PhyloP_score]
+index=17
+type=FLOAT NULL
+comment=PhyloP score, phyloPnew=1-0.5x10^phyloPori if phyloPori>0 or phyloPnew=0.5x10^phyloPori if phyloPori<0
+
+[PlyloP_pred]
+index=18
+type=VARCHAR(2) NULL
+adj=Nullify('NA')
+comment=PhyloP prediction, C(onserved) or N(on-conserved)
+
+[SIFT_score]
+index=19
+type=FLOAT NULL
+comment=SIFT score, SIFTnew=1-SIFTori
+
+[SIFT_pred]
+index=20
+type=VARCHAR(2) NULL
+adj=Nullify('NA')
+comment=SIFT prediction, D(amaging) or T(olerated)
+
+[Polyphen2_score]
+index=21
+type=FLOAT NULL
+comment=Polyphen2 score, i.e. pph2_prob
+
+[Polyphen2_pred]
+index=22
+type=VARCHAR(2) NULL
+adj=Nullify('NA')
+comment=Polyphen2 prediction,  "D" ("probably damaging"), "P" ("possibly damaging") or "B" ("benign") 
+
+[LRT_score]
+index=23
+type=FLOAT NULL
+comment=LRT score, LRTnew=1-LRTorix0.5 if <1, or LRTnew=LRTorix0.5 if >=1
+
+[LRT_pred]
+index=24
+type=VARCHAR(2) NULL
+adj=Nullify('NA')
+comment=LRT prediction, D(eleterious), N(eutral) or U(nknown)
+
+[MutationTaster_score]
+index=25
+type=FLOAT NULL
+comment=MutationTaster score
+
+[MutationTaster_pred]
+index=26
+type=VARCHAR(2) NULL
+adj=Nullify('NA')
+comment=MutationTaster prediction, "A" ("disease_causing_automatic"), "D" ("disease_causing"), "N" ("polymorphism") or "P" ("polymorphism_automatic")
+
+[Ancestral_allele]
+index=27
+type=CHAR(1) NULL
+adj=Nullify('NA')
+comment=Ancestral allele (based on 1000 genomes reference data)
+
+[UniSNP_ids]
+index=28
+adj=Nullify('.')
+type=VARCHAR(128)
+comment=rs numbers from UniSNP, which is a cleaned version of dbSNP build 129, in format: rs number1;rs number2;...
+
+[A_freq]
+index=29
+type=VARCHAR(48)
+adj=Nullify('.'), ExtractValue('A/', ';', default=0)
+comment=frequency of allele A recorded in dbSNP
+
+[C_freq]
+index=29
+type=VARCHAR(48)
+adj=Nullify('.'), ExtractValue('C/', ';', default=0)
+comment=frequency of allele C recorded in dbSNP
+
+[G_freq]
+index=29
+type=VARCHAR(48)
+adj=Nullify('.'), ExtractValue('G/', ';', default=0)
+comment=frequency of allele G recorded in dbSNP
+
+[T_freq]
+index=29
+type=VARCHAR(48)
+adj=Nullify('.'), ExtractValue('T/', ';', default=0)
+comment=frequency of allele T recorded in dbSNP
+
+[Alt_gene_name]
+index=30
+type=VARCHAR(128)
+comment=alternative gene names, separated by bar
+
+[HGNC_id]
+index=31
+adj=ExtractValue('HGNC:', '|')
+type=VARCHAR(64)
+comment=HUGO Gene Nomenclature Committee id
+
+[Ensembl_id]
+index=31
+adj=ExtractValue('Ensembl:', '|')
+type=VARCHAR(64)
+comment=Ensembl id
+
+[HPRD_id]
+index=31
+adj=ExtractValue('HPRD:', '|')
+type=VARCHAR(64)
+comment=Human Protein Reference Database id
+
+[MIM_id]
+index=31
+adj=ExtractValue('MIM:', '|')
+type=VARCHAR(64)
+comment=Human Protein Reference Database id
+
+[Descriptive_gene_name]
+index=32
+type=VARCHAR(128)
+comment=descriptive gene name
+
+[CEU_alt_hc]
+index=33
+adj=Nullify('.'), ExtractValue('CEU:'), ExtractField(1, '/')
+type=INTEGER
+comment=Number of alternative allele in the CEU population, reported by 1000 genome high coverage data
+
+[CEU_total_hc]
+index=33
+adj=Nullify('.'), ExtractValue('CEU:'), ExtractField(2, '/')
+type=INTEGER
+comment=Total number of allele in the CEU population, reported by 1000 genome high coverage data
+
+
+[YRI_alt_hc]
+index=33
+adj=Nullify('.'), ExtractValue('YRI:'), ExtractField(1, '/')
+type=INTEGER
+comment=Number of alternative allele in the YRI population, reported by 1000 genome high coverage data
+
+[YRI_total_hc]
+index=33
+adj=Nullify('.'), ExtractValue('YRI:'), ExtractField(2, '/')
+type=INTEGER
+comment=Total number of allele in the YRI population, reported by 1000 genome high coverage data
+
+
+[LWK_alt_hc]
+index=33
+adj=Nullify('.'), ExtractValue('LWK:'), ExtractField(1, '/')
+type=INTEGER
+comment=Number of alternative allele in the LWK population, reported by 1000 genome high coverage data
+
+[LWK_total_hc]
+index=33
+adj=Nullify('.'), ExtractValue('LWK:'), ExtractField(2, '/')
+type=INTEGER
+comment=Total number of allele in the LWK population, reported by 1000 genome high coverage data
+
+
+[TSI_alt_hc]
+index=33
+adj=Nullify('.'), ExtractValue('TSI:'), ExtractField(1, '/')
+type=INTEGER
+comment=Number of alternative allele in the TSI population, reported by 1000 genome high coverage data
+
+[TSI_total_hc]
+index=33
+adj=Nullify('.'), ExtractValue('TSI:'), ExtractField(2, '/')
+type=INTEGER
+comment=Total number of allele in the TSI population, reported by 1000 genome high coverage data
+
+[CHB_alt_hc]
+index=33
+adj=Nullify('.'), ExtractValue('CHB:'), ExtractField(1, '/')
+type=INTEGER
+comment=Number of alternative allele in the CHB population, reported by 1000 genome high coverage data
+
+[CHB_total_hc]
+index=33
+adj=Nullify('.'), ExtractValue('CHB:'), ExtractField(2, '/')
+type=INTEGER
+comment=Total number of allele in the CHB population, reported by 1000 genome high coverage data
+
+
+[JPT_alt_hc]
+index=33
+adj=Nullify('.'), ExtractValue('JPT:'), ExtractField(1, '/')
+type=INTEGER
+comment=Number of alternative allele in the JPT population, reported by 1000 genome high coverage data
+
+[JPT_total_hc]
+index=33
+adj=Nullify('.'), ExtractValue('JPT:'), ExtractField(2, '/')
+type=INTEGER
+comment=Total number of allele in the JPT population, reported by 1000 genome high coverage data
+
+[CHD_alt_hc]
+index=33
+adj=Nullify('.'), ExtractValue('CHD:'), ExtractField(1, '/')
+type=INTEGER
+comment=Number of alternative allele in the CHD population, reported by 1000 genome high coverage data
+
+[CHD_total_hc]
+index=33
+adj=Nullify('.'), ExtractValue('CHD:'), ExtractField(2, '/')
+type=INTEGER
+comment=Total number of allele in the CHD population, reported by 1000 genome high coverage data
+
+
+[CEU_alt_lc]
+index=34
+adj=Nullify('.'), ExtractValue('CEU:'), ExtractField(1, '/')
+type=INTEGER
+comment=Number of alternative allele in the CEU population, reported by 1000 genome low coverage data
+
+[CEU_total_lc]
+index=34
+adj=Nullify('.'), ExtractValue('CEU:'), ExtractField(2, '/')
+type=INTEGER
+comment=Total number of allele in the CEU population, reported by 1000 genome low coverage data
+
+[YRI_alt_lc]
+index=34
+adj=Nullify('.'), ExtractValue('YRI:'), ExtractField(1, '/')
+type=INTEGER
+comment=Number of alternative allele in the YRI population, reported by 1000 genome low coverage data
+
+[YRI_total_lc]
+index=34
+adj=Nullify('.'), ExtractValue('YRI:'), ExtractField(2, '/')
+type=INTEGER
+comment=Total number of allele in the YRI population, reported by 1000 genome low coverage data
+
+[CHBJPT_alt_lc]
+index=34
+adj=Nullify('.'), ExtractValue('CHBJPT:'), ExtractField(1, '/')
+type=INTEGER
+comment=Number of alternative allele in the CHBJPT population, reported by 1000 genome low coverage data
+
+[CHBJPT_total_lc]
+index=34
+adj=Nullify('.'), ExtractValue('CHBJPT:'), ExtractField(2, '/')
+type=INTEGER
+comment=Total number of allele in the CHBJPT population, reported by 1000 genome low coverage data
+
+[GERP_NR]
+index=35
+type=FLOAT NULL
+comment=GERP++ netral rate
+
+[GERP_RS]
+index=36
+type=FLOAT NULL
+comment=GERP++ RS score
+
+[uniprot_acc]
+index=37
+type=VARCHAR(128) NULL
+comment=Uniprot accession number
+
+[uniprot_id]
+index=38
+type=VARCHAR(64) NULL
+comment=Uniprot ID number
+
+[uniprot_aapos]
+index=39
+type=INTEGER NULL
+comment=amino acid position as to Uniprot
