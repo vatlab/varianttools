@@ -272,7 +272,7 @@ class LineProcessor:
                 for ref_genome, chr_idx, pos_idx, ref_idx, alt_idx in self.build_info:
                     # bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], rec[alt_idx])
                     #env.logger.error('PRE {} {} {} {}'.format(rec[chr_idx], rec[pos_idx], rec[ref_idx], rec[alt_idx]))
-                    msg = normalize_variant(ref_genome, rec, chr_idx, pos_idx, ref_idx, alt_idx)
+                    msg = normalize_variant(ref_genome.crr, rec, chr_idx, pos_idx, ref_idx, alt_idx)
                     #env.logger.error('POST {} {} {} {}'.format(rec[chr_idx], rec[pos_idx], rec[ref_idx], rec[alt_idx]))
                     #
                     if msg:
@@ -280,7 +280,7 @@ class LineProcessor:
                         if msg[0] == 'U':
                             raise ValueError(msg)
                         else:
-                            env.logger.warning(msg)
+                            env.logger.warning('{}: {}'.format(ref_genome.name, msg))
                     # normalization will convert rec[pos_idx] to int if necessary
                     bins.append(getMaxUcscBin(rec[pos_idx] - 1, rec[pos_idx]))
                 yield bins, rec
@@ -491,7 +491,7 @@ class Importer:
         #
         if fmt.input_type == 'variant':
             # process variants, the fields for chr, pos, ref, alt are 0, 1, 2, 3 in fields.
-            self.processor = LineProcessor(fmt.fields, [(RefGenome(self.build).crr, 0, 1, 2, 3)], fmt.delimiter, self.ranges)
+            self.processor = LineProcessor(fmt.fields, [(RefGenome(self.build), 0, 1, 2, 3)], fmt.delimiter, self.ranges)
         else:  # position or range type
             raise ValueError('Can only import data with full variant information (chr, pos, ref, alt)')
         # probe number of samples

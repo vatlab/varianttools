@@ -333,7 +333,7 @@ class AnnoDBConfiger:
                     alt_idx = [i for i, x in enumerate(
                         self.fields) if x.name == extractField(items[3])][0]
                     build_info.append(
-                        (RefGenome(key).crr, chr_idx, pos_idx, ref_idx, alt_idx))
+                        (RefGenome(key), chr_idx, pos_idx, ref_idx, alt_idx))
                 else:
                     build_info.append((pos_idx, ))
             except Exception as e:

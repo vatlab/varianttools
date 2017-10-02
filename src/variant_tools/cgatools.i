@@ -234,11 +234,13 @@ void left_trim(std::vector<std::string>& alleles, uint32_t& pos1, uint32_t& left
 
 std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec, size_t chr_idx, size_t pos_idx, size_t ref_idx, size_t alt_idx)
 {
-#if PY_MAJOR_VERSION >= 3
     //
     PyObject * chr_obj = PyList_GetItem(rec, chr_idx);
-    if (! PyUnicode_Check(chr_obj))
-        return("Incorrect type of passed chromosome");
+    if (! PyUnicode_Check(chr_obj)) {
+        PyObject * chr_str = PyObject_Repr(chr_obj);
+        return (boost::format("Incorrect type of passed chromosome: %s")
+            % PyString_AsString(chr_str)).str();
+    }
 
     char * chr = PyUnicode_AsUTF8(chr_obj);
     if (chr == NULL)
@@ -264,28 +266,7 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
         PyList_SetItem(rec, chr_idx, PyUnicode_FromString(chr + 3));
         chr = PyUnicode_AsUTF8(PyList_GetItem(rec, chr_idx));
     }
-#else
 
-    char * chr = PyString_AsString(PyList_GetItem(rec, chr_idx));
-    PyObject * pos_obj = PyList_GetItem(rec, pos_idx);
-    if (pos_obj == Py_None)
-        return "Unrecognized position";
-    bool int_pos = PyInt_Check(pos_obj);
-    uint32_t pos = int_pos ? PyInt_AsLong(pos_obj) : atol(PyString_AsString(pos_obj));
-    PyObject * ref_obj = PyList_GetItem(rec, ref_idx);
-    PyObject * alt_obj = PyList_GetItem(rec, alt_idx);
-    char * ref = PyString_Check(ref_obj) || PyUnicode_Check(ref_obj) ? PyString_AsString(ref_obj) : PyString_AsString(PyObject_Repr(ref_obj));
-    char * alt = PyString_Check(alt_obj) || PyUnicode_Check(alt_obj) ? PyString_AsString(alt_obj) : PyString_AsString(PyObject_Repr(alt_obj));
-
-    //
-    // first, if chr starts with chr, trim it. This should not be necessary because
-    // the adjust function must have done that.
-    if (strncmp(chr, "chr", 3) == 0) {
-        PyList_SetItem(rec, chr_idx, PyString_FromString(chr + 3));
-        chr = PyString_AsString(PyList_GetItem(rec, chr_idx));
-    }
-
-#endif
 
     int chrIdx = -1;
     std::string msg;
@@ -366,7 +347,6 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
     if (left_extended > 1)
         msg = (boost::format("Variant %s_%d_%s/%s extended %d bp to the left.") % chr % pos % ref % alt % (pos - pos1 + 1)).str();
 
-#if PY_MAJOR_VERSION >= 3
     // change values
     if (pos != pos1 || ! int_pos)
         PyList_SetItem(rec, pos_idx, PyInt_FromLong(pos1));
@@ -384,26 +364,6 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
         if (alleles[1].compare(alt) != 0)
             PyList_SetItem(rec, alt_idx, PyUnicode_FromString(alleles[1].c_str()));
     }
-#else
-    // change values
-    if (pos != pos1 || ! int_pos)
-        PyList_SetItem(rec, pos_idx, PyInt_FromLong(pos1));
-    if (alleles[0].empty()) {
-        if (strlen(ref) != 1 || ref[0] != '-')
-            PyList_SetItem(rec, ref_idx, PyString_FromString("-"));
-    } else {
-        if (alleles[0].compare(ref) != 0)
-            PyList_SetItem(rec, ref_idx, PyString_FromString(alleles[0].c_str()));
-    }
-    if (alleles[1].empty()) {
-        if (strlen(alt) != 1 || alt[0] != '-')
-            PyList_SetItem(rec, alt_idx, PyString_FromString("-"));
-    } else {
-        if (alleles[1].compare(alt) != 0)
-            PyList_SetItem(rec, alt_idx, PyString_FromString(alleles[1].c_str()));
-    }
-
-#endif
 
     // no error message
     return msg;
