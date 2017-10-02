@@ -24,7 +24,6 @@ from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
     openFile, DatabaseEngine, hasCommand, \
     downloadFile, env, RefGenome
-import threading
 
 import numpy as np
 import tables as tb
@@ -966,8 +965,7 @@ def _read_vcf_headers(stream):
 
 
 
-# class HDF5GenotypeImportWorker(Process):
-class HDF5GenotypeImportWorker(threading.Thread):
+class HDF5GenotypeImportWorker(Process):
     '''This class starts a process, import genotype to a temporary HDF5 file.
         Args
 
@@ -986,8 +984,7 @@ class HDF5GenotypeImportWorker(threading.Thread):
     def __init__(self, chunk,variantIndex, start_sample,end_sample,sample_ids,variant_count, 
         proc_index,geno_info,dbLocation,build):
 
-        # Process.__init__(self, name='GenotypeImporter')
-        threading.Thread.__init__(self)
+        Process.__init__(self, name='GenotypeImporter')
         # self.daemon=True
         self.chunk=chunk
         self.variantIndex = variantIndex
@@ -1317,7 +1314,7 @@ def importGenotypesInParallel(importer,num_sample=0):
             for worker in importers:
                 worker.join()
             lines+=chunk_length
-            prog.update(lines)
+            prog.update(chunk_length)
 
         prog.done()
 
