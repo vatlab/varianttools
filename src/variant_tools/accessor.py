@@ -491,6 +491,8 @@ class HDF5Engine_storage(Base_Storage):
         """
         if chr.startswith("/chr"):
             chr=chr.replace("/chr","")
+        elif chr.startswith("chr"):
+            chr=chr.replace("chr","")
         node="/chr"+chr
         if self.checkGroup(chr):
             group=self.file.get_node(node)

@@ -1066,6 +1066,42 @@ class HDF5GenotypeImportWorker(Process):
         self.indptr.append(self.genoCount)
         self.rownames.append(variant_id)
 
+    def getInfo(self,variant_id,infoDict,altIndex):
+        genoDict={}
+        if len(self.geno_info)>0:
+            for info in self.geno_info:
+                genoDict[info.name]=0
+        for name,info in infoDict.items():
+            for idx in range(self.start_sample,self.end_sample):            
+                if info[idx] is not None:
+                    if altIndex==0:
+                        if info[idx]!='0':
+                            if info[idx]!=3 and info[idx]!=4:
+                                genoDict[name]=genoDict[name]+1
+                                self.info[name][1].append(idx)
+                                self.info[name][2].append(info[idx])
+                            else:
+                                genoDict[name]=genoDict[name]+1
+                                self.info[name][1].append(idx)
+                                self.info[name][2].append(np.nan)
+                    elif altIndex==1:
+                        genoDict[name]=genoDict[name]+1
+                        self.info[name][1].append(idx-self.start_sample)   
+                        if info[idx]==3:
+                            self.info[name][2].append(1)
+                        elif info[idx]==4:
+                            self.info[name][2].append(2)
+                        else:
+                            self.info[name][2].append(np.nan)
+                else:
+                    genoDict[name]=genoDict[name]+1
+                    self.info[name][1].append(idx-self.start_sample)   
+                    self.info[name][2].append(np.nan)
+
+            self.info[name][0].append(genoDict[name])
+            self.info[name][3].append(variant_id)
+
+
     # # Used for iterator over set of samples
     # def getGT(self,variant_id,GT,altIndex):
     #     for idx in range(self.end_sample-self.start_sample):
@@ -1102,12 +1138,22 @@ class HDF5GenotypeImportWorker(Process):
     def writeIntoHDF(self):
         storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
         chr=self.chunk["variants/CHROM"][0]
+        
         for i in range(len(self.chunk["variants/ID"])):
+            infoDict={}
             chr=self.chunk["variants/CHROM"][i]
             ref=self.chunk["variants/REF"][i]
             pos=self.chunk["variants/POS"][i]
             GT=self.chunk["calldata/GT"][i].tolist()
-        
+            if len(self.geno_info)>0:
+                DP_geno=self.chunk["calldata/DP"][i]
+                GQ_geno=self.chunk["calldata/GQ"][i]
+                # AD_geno=self.chunk["calldata/AD"][i]
+                # PL_geno=self.chunk["calldata/PL"][i]
+                infoDict["DP_geno"]=DP_geno
+                infoDict["GQ_geno"]=GQ_geno
+                # infoDict["AD_geno"]=AD_geno
+
             for altIndex in range(len(self.chunk["variants/ALT"][i])):
                 alt=self.chunk["variants/ALT"][i][altIndex]
          
@@ -1115,20 +1161,34 @@ class HDF5GenotypeImportWorker(Process):
                     if tuple((chr, ref, alt)) in self.variantIndex:
                         variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
                         self.getGT(variant_id,GT,altIndex)
+                        if len(self.geno_info)>0:
+                            self.getInfo(variant_id,infoDict,altIndex)
                     else:
                         rec=[str(chr),str(pos),ref,alt]  
                         msg=normalize_variant(RefGenome(self.build).crr, rec, 0, 1, 2, 3)
                         if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
                             variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
                             self.getGT(variant_id,GT,altIndex)
-         
+                            if len(self.geno_info)>0:
+                                self.getInfo(variant_id,infoDict,altIndex)
+
+   
+ 
         shape=(len(self.indptr),len(self.colnames))
-        
         # make a HMatrix object which is a matrix with rownames and colnames
         hmatrix=HMatrix(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames)
         # write GT into file
        
-        storageEngine.store(hmatrix,"22")
+        storageEngine.store(hmatrix,chr)
+
+        if len(self.geno_info)>0:
+            for key,value in list(self.info.items()):
+                hmatrix=HMatrix(value[2],value[1],value[0],shape,value[3],self.colnames)
+                storageEngine.store(hmatrix,chr,key) 
+            for info in self.geno_info:
+                #indptr,indices,data,shape,rownames
+                self.info[info.name]=[[],[],[],[],[]]
+
         storageEngine.close()
       
 
@@ -1141,8 +1201,8 @@ class HDF5GenotypeImportWorker(Process):
                 genoDict[info.name]=0
 
         self.start_count = self.variant_count.value
+    
 
-        # chunk=self.readQueue.get()
         self.writeIntoHDF()
 
       
@@ -1264,6 +1324,14 @@ def importGenotypesInParallel(importer,num_sample=0):
         fields=None
         types=None
         numbers=None
+      
+        if (len(importer.genotype_info)>0):
+            fields=['variants/ID','variants/REF','variants/ALT','variants/POS','variants/CHROM','calldata/GT','calldata/GQ','calldata/DP','calldata/AD','calldata/PL']
+            types={'calldata/PL':'i1'}
+            numbers={'calldata/PL':3}
+        else:
+            fields=['variants/ID','variants/REF','variants/ALT','variants/POS','variants/CHROM','calldata/GT']
+
         alt_number=DEFAULT_ALT_NUMBER
         fills=None
         region=None
@@ -1290,7 +1358,9 @@ def importGenotypesInParallel(importer,num_sample=0):
 
         prog = ProgressBar('Importing genotypes', importer.total_count[2],initCount=0)
         lines=0
-        for chunk, _, _, _ in it:                
+
+        for chunk, _, _, _ in it:     
+            print(chunk)      
             start_sample =0
             for job in range(numTasks):
                 # readQueue[job].put(chunk)
