@@ -1072,34 +1072,37 @@ class HDF5GenotypeImportWorker(Process):
             for info in self.geno_info:
                 genoDict[info.name]=0
         for name,info in infoDict.items():
-            for idx in range(self.start_sample,self.end_sample):            
-                if info[idx] is not None:
-                    if altIndex==0:
-                        if info[idx]!='0':
-                            if info[idx]!=3 and info[idx]!=4:
-                                genoDict[name]=genoDict[name]+1
-                                self.info[name][1].append(idx)
+            if name=="GQ_geno" or name=="DP_geno":
+                for idx in range(self.start_sample,self.end_sample):            
+                    if info[idx] is not None:
+                        if altIndex==0:
+                            if info[idx]!='0':
                                 self.info[name][2].append(info[idx])
-                            else:
                                 genoDict[name]=genoDict[name]+1
-                                self.info[name][1].append(idx)
-                                self.info[name][2].append(np.nan)
-                    elif altIndex==1:
+                                self.info[name][1].append(idx-self.start_sample)
+                        elif altIndex==1:   
+                            if info[idx]!="0":
+                                self.info[name][2].append(info[idx])
+                                genoDict[name]=genoDict[name]+1
+                                self.info[name][1].append(idx-self.start_sample)   
+                    else:
                         genoDict[name]=genoDict[name]+1
                         self.info[name][1].append(idx-self.start_sample)   
-                        if info[idx]==3:
-                            self.info[name][2].append(1)
-                        elif info[idx]==4:
-                            self.info[name][2].append(2)
-                        else:
-                            self.info[name][2].append(np.nan)
-                else:
-                    genoDict[name]=genoDict[name]+1
-                    self.info[name][1].append(idx-self.start_sample)   
-                    self.info[name][2].append(np.nan)
+                        self.info[name][2].append(np.nan)
 
-            self.info[name][0].append(genoDict[name])
-            self.info[name][3].append(variant_id)
+                self.info[name][0].append(genoDict[name])
+                self.info[name][3].append(variant_id)
+            else:
+                for idx in range(self.start_sample,self.end_sample):
+                    infoString=",".join([str(x) for x in info[idx]])
+                    self.info[name][2].append(infoString)
+                    genoDict[name]=genoDict[name]+1
+                    self.info[name][1].append(idx-self.start_sample)            
+                self.info[name][0].append(genoDict[name])
+                self.info[name][3].append(variant_id)
+
+
+
 
 
     # # Used for iterator over set of samples
@@ -1148,11 +1151,11 @@ class HDF5GenotypeImportWorker(Process):
             if len(self.geno_info)>0:
                 DP_geno=self.chunk["calldata/DP"][i]
                 GQ_geno=self.chunk["calldata/GQ"][i]
-                # AD_geno=self.chunk["calldata/AD"][i]
+                AD_geno=self.chunk["calldata/AD"][i]
                 # PL_geno=self.chunk["calldata/PL"][i]
                 infoDict["DP_geno"]=DP_geno
                 infoDict["GQ_geno"]=GQ_geno
-                # infoDict["AD_geno"]=AD_geno
+                infoDict["AD_geno"]=AD_geno
 
             for altIndex in range(len(self.chunk["variants/ALT"][i])):
                 alt=self.chunk["variants/ALT"][i][altIndex]
@@ -1360,7 +1363,7 @@ def importGenotypesInParallel(importer,num_sample=0):
         lines=0
 
         for chunk, _, _, _ in it:     
-            print(chunk)      
+            
             start_sample =0
             for job in range(numTasks):
                 # readQueue[job].put(chunk)
