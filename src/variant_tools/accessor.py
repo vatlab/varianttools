@@ -197,6 +197,12 @@ class GenoCallData(tb.IsDescription):
     sample_id=tb.Int16Col(dflt=1,pos=2)
     DP=tb.Int8Col(dflt=1,pos=3)
     GQ=tb.Int8Col(dflt=1,pos=4)
+    AD1=tb.Int8Col(dflt=1,pos=5)
+    AD2=tb.Int8Col(dflt=1,pos=6)
+    PL1=tb.Int8Col(dflt=1,pos=7)
+    PL2=tb.Int8Col(dflt=1,pos=8)
+    PL3=tb.Int8Col(dflt=1,pos=9)
+
 
 
 
@@ -223,23 +229,21 @@ class HDF5Engine_storage(Base_Storage):
             self.append_HDF5(hmatrix,chr,groupName)
         # self.close()    
 
-    def store_table(self,variant_id,DP_geno,GQ_geno,chr="",groupName=""):
-        if not self.checkGroup(chr,groupName):
-            group=self.getGroup(chr,groupName)
-            table=self.file.create_table(group,"genoInfo",GenoCallData)
-        group=self.getGroup(chr,groupName)
+    def store_table(self,data,tableName,chr="",groupName=""):
+        if not self.checkGroup(chr,tableName):
+            group=self.getGroup(chr,tableName)
+            table=self.file.create_table(group,tableName,GenoCallData)
+
+        group=self.getGroup(chr,tableName)
         table=group.genoInfo
         row=table.row
-        for idx,DP in enumerate(DP_geno):
-            GQ=GQ_geno[idx]
-            row["variant_id"]=variant_id
-            row["sample_id"]=idx
-            row['DP']=DP
-            row['GQ']=GQ
-            row.append()
+        for dataRow in data:
+            if (len(dataRow)==9):
+                for idx,var in enumerate(["variant_id","sample_id","DP","GQ","AD1","AD2","PL1","PL2","PL3"]):
+                    row[var]=dataRow[idx]
+                row.append()
         table.flush()
  
-
 
     def store_HDF5(self,hmatrix,chr,groupName=""):
         """The implementation of store API
@@ -837,7 +841,7 @@ class HDF5Engine_access(Base_Access):
         #                 idPos.sort()
 
         #assume rowIDs are sorted by genome position
-        group=self.getGroup(chr)
+        group=self.getGroup(chr,groupName)
         rownames=group.rownames[:].tolist()
         colnames=group.colnames[:]
 
