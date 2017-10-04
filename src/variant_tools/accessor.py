@@ -9,6 +9,7 @@ import math
 import os
 import sys
 
+
 import glob
 from multiprocessing import Process,Manager
 import queue
@@ -191,6 +192,12 @@ class Base_Storage(object):
 
         raise NotImplementError()
 
+class GenoCallData(tb.IsDescription):
+    variant_id=tb.Int32Col(dflt=1,pos=1)
+    sample_id=tb.Int16Col(dflt=1,pos=2)
+    DP=tb.Int8Col(dflt=1,pos=3)
+    GQ=tb.Int8Col(dflt=1,pos=4)
+
 
 
 
@@ -214,7 +221,23 @@ class HDF5Engine_storage(Base_Storage):
             self.store_HDF5(hmatrix,chr,groupName) 
         else:
             self.append_HDF5(hmatrix,chr,groupName)
-        # self.close()       
+        # self.close()    
+
+    def store_table(self,variant_id,DP_geno,GQ_geno,chr="",groupName=""):
+        if not self.checkGroup(chr,groupName):
+            group=self.getGroup(chr,groupName)
+            table=self.file.create_table(group,"genoInfo",GenoCallData)
+        group=self.getGroup(chr,groupName)
+        table=group.genoInfo
+        row=table.row
+        for idx,DP in enumerate(DP_geno):
+            GQ=GQ_geno[idx]
+            row["variant_id"]=variant_id
+            row["sample_id"]=idx
+            row['DP']=DP
+            row['GQ']=GQ
+            row.append()
+        table.flush()
  
 
 

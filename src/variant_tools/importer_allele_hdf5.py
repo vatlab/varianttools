@@ -1140,32 +1140,34 @@ class HDF5GenotypeImportWorker(Process):
 
     def writeIntoHDF(self):
         storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
-        chr=self.chunk["variants/CHROM"][0]
+        chr=self.chunk["variants/CHROM"][0].replace("chr","")
         
         for i in range(len(self.chunk["variants/ID"])):
             infoDict={}
-            chr=self.chunk["variants/CHROM"][i]
+            chr=self.chunk["variants/CHROM"][i].replace("chr","")
+            # if chr.startswith("chr"):
+            #     chr=chr.replace("chr","")
             ref=self.chunk["variants/REF"][i]
             pos=self.chunk["variants/POS"][i]
             GT=self.chunk["calldata/GT"][i].tolist()
             if len(self.geno_info)>0:
-                DP_geno=self.chunk["calldata/DP"][i]
-                GQ_geno=self.chunk["calldata/GQ"][i]
-                AD_geno=self.chunk["calldata/AD"][i]
+                DP_geno=self.chunk["calldata/DP"][i].tolist()
+                GQ_geno=self.chunk["calldata/GQ"][i].tolist()
+                # AD_geno=self.chunk["calldata/AD"][i]
                 # PL_geno=self.chunk["calldata/PL"][i]
                 infoDict["DP_geno"]=DP_geno
                 infoDict["GQ_geno"]=GQ_geno
-                infoDict["AD_geno"]=AD_geno
-
+                # infoDict["AD_geno"]=AD_geno
             for altIndex in range(len(self.chunk["variants/ALT"][i])):
                 alt=self.chunk["variants/ALT"][i][altIndex]
-         
                 if alt!="":
                     if tuple((chr, ref, alt)) in self.variantIndex:
                         variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
                         self.getGT(variant_id,GT,altIndex)
                         if len(self.geno_info)>0:
-                            self.getInfo(variant_id,infoDict,altIndex)
+                            # self.getInfo(variant_id,infoDict,altIndex)
+                         
+                            storageEngine.store_table(variant_id,DP_geno,GQ_geno,chr)
                     else:
                         rec=[str(chr),str(pos),ref,alt]  
                         msg=normalize_variant(RefGenome(self.build).crr, rec, 0, 1, 2, 3)
@@ -1173,7 +1175,8 @@ class HDF5GenotypeImportWorker(Process):
                             variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
                             self.getGT(variant_id,GT,altIndex)
                             if len(self.geno_info)>0:
-                                self.getInfo(variant_id,infoDict,altIndex)
+                                # self.getInfo(variant_id,infoDict,altIndex)
+                                storageEngine.store_table(variant_id,DP_geno,GQ_geno,chr)
 
    
  
@@ -1182,15 +1185,15 @@ class HDF5GenotypeImportWorker(Process):
         hmatrix=HMatrix(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames)
         # write GT into file
        
-        storageEngine.store(hmatrix,chr)
+        storageEngine.store(hmatrix,chr,"GT")
 
-        if len(self.geno_info)>0:
-            for key,value in list(self.info.items()):
-                hmatrix=HMatrix(value[2],value[1],value[0],shape,value[3],self.colnames)
-                storageEngine.store(hmatrix,chr,key) 
-            for info in self.geno_info:
-                #indptr,indices,data,shape,rownames
-                self.info[info.name]=[[],[],[],[],[]]
+        # if len(self.geno_info)>0:
+        #     for key,value in list(self.info.items()):
+        #         hmatrix=HMatrix(value[2],value[1],value[0],shape,value[3],self.colnames)
+        #         storageEngine.store(hmatrix,chr,key) 
+        #     for info in self.geno_info:
+        #         #indptr,indices,data,shape,rownames
+        #         self.info[info.name]=[[],[],[],[],[]]
 
         storageEngine.close()
       
