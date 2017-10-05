@@ -73,6 +73,10 @@ class HMatrix:
     def shape(self):
         return self.__shape
 
+    # @property
+    # def rowMask(self):
+    #     return self.__rowMask
+
     @rownames.setter
     def rownames(self,rownames):
         self.__rownames=rownames
@@ -96,6 +100,10 @@ class HMatrix:
     @shape.setter
     def shape(self,shape):
         self.__shape=shape
+
+    # @rowMask.setter
+    # def rowMask(self,rowMask):
+    #     self.__rowMask=rowMask
 
 
 # class HMatrix(csr_matrix):
@@ -249,33 +257,18 @@ class HDF5Engine_storage(Base_Storage):
     def remove_variant(self,variant_id,chr,groupName=""):
         group=self.file.get_node("/chr"+chr+"/"+groupName)
         # i=self.rownames.index(variant_id)
-        self.indptr=group.indptr
-        self.data=group.data
-        self.rownames=group.rownames
-        self.indices=group.indices
-        self.shape=group.shape
+        rownames=group.rownames[:]
+        i=np.where(rownames==variant_id)[0][0]
+        group.rowMask[i]=True
 
-        i=np.where(self.rownames==variant_id)[0][0]
-        print(i,self.shape,len(self.rownames),len(self.indptr),len(self.data),len(self.indices))
-        n = self.indptr[i+1] - self.indptr[i]
-        print(n)
-        if n > 0:
-            self.data[self.indptr[i]:-n] = self.data[self.indptr[i+1]:]
-            self.data = self.data[:-n]
-            self.indices[self.indptr[i]:-n] = self.indices[self.indptr[i+1]:]
-            self.indices = self.indices[:-n]
-        self.indptr[i:-1] = self.indptr[i+1:]
-        self.indptr[i:] -= n
-        self.indptr =self.indptr[:-1]
-        self.shape = (self.shape[0]-1, self.shape[1])
-        self.rownames[i:-1] = self.rownames[i+1:]
-        self.rownames =self.rownames[:-1]
+    def recover_variant(self,variant_id,chr,groupName=""):
+        group=self.file.get_node("/chr"+chr+"/"+groupName)
+        # i=self.rownames.index(variant_id)
+        rownames=group.rownames[:]
+        i=np.where(rownames==variant_id)[0][0]
+        group.rowMask[i]=False
 
-        print(self.shape,len(self.rownames),len(self.indptr),len(self.data),len(self.indices))
-
-
-        pass
-
+    
     def remove_sample(self):
         pass
 
@@ -299,7 +292,7 @@ class HDF5Engine_storage(Base_Storage):
         if len(hmatrix.indptr)==len(hmatrix.rownames):
             hmatrix.indptr=[0]+hmatrix.indptr
         
-        for par in ('data', 'indices', 'indptr', 'shape',"rownames","colnames"):
+        for par in ('data', 'indices', 'indptr', 'shape',"rownames","colnames","rowMask"):
             arr = None
             atom=tb.Atom.from_dtype(np.dtype(np.int32))
             if (par=='data'):
@@ -318,6 +311,9 @@ class HDF5Engine_storage(Base_Storage):
                 arr=np.array(hmatrix.rownames)
             elif(par=="colnames"):
                 arr=np.array(hmatrix.colnames)
+            elif(par=="rowMask"):
+                arr=np.zeros(len(hmatrix.rownames),dtype=np.bool)
+                atom=tb.Atom.from_dtype(np.dtype(np.bool))
 
             ds = self.file.create_earray(group, par, atom, (0,),filters=filters)
             ds.append(arr)
@@ -359,6 +355,8 @@ class HDF5Engine_storage(Base_Storage):
         if  hmatrix.rownames is not None:
             arr=np.array(hmatrix.rownames,dtype=np.dtype(np.int32))
             group.rownames.append(arr)
+            arr=np.zeros(len(hmatrix.rownames),dtype=np.dtype(np.bool))
+            group.rowMask.append(arr)
         group.shape[1]=hmatrix.shape[1]
         group.shape[0]=len(group.rownames[:])
  
@@ -866,6 +864,23 @@ class HDF5Engine_access(Base_Access):
             data=group.data[start:end]
         return variant_ID,indices,data
 
+    def maskRemovedVariants(self,masked,data,indices,indptr,shape,rownames):
+        for i in masked:   
+            n = indptr[i+1] - indptr[i]
+            print(n)
+            if n > 0:
+                data[indptr[i]:-n] = data[indptr[i+1]:]
+                data = data[:-n]
+                indices[indptr[i]:-n] = indices[indptr[i+1]:]
+                indices = indices[:-n]
+            indptr[i:-1] = indptr[i+1:]
+            indptr[i:] -= n
+            indptr =indptr[:-1]
+            shape = (shape[0]-1, shape[1])
+            rownames[i:-1] = rownames[i+1:]
+            rownames =rownames[:-1]
+        return data,indices,indptr,shape,rownames
+
 
     def get_geno_info_by_variant_IDs(self,rowIDs,chr,groupName=""):
         
@@ -882,6 +897,7 @@ class HDF5Engine_access(Base_Access):
         group=self.getGroup(chr,groupName)
         rownames=group.rownames[:].tolist()
         colnames=group.colnames[:]
+        rowMask=group.rowMask[:]
 
         for id in rowIDs:
             try:
@@ -898,6 +914,7 @@ class HDF5Engine_access(Base_Access):
         
         update_rownames=rownames[minPos:maxPos+1]
         sub_indptr=group.indptr[minPos:maxPos+2]
+
         # print(idPos[0],idPos[-1],len(sub_indptr))
         sub_indices=sub_data=sub_shape=None
         if len(sub_indptr)>0:
@@ -905,6 +922,14 @@ class HDF5Engine_access(Base_Access):
             sub_data=group.data[sub_indptr[0]:sub_indptr[-1]]
             sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(1,len(sub_indptr))]
             sub_shape=(len(sub_indptr)-1,group.shape[1])
+
+
+        update_rowMask=rowMask[minPos:maxPos+1]
+        masked=np.where(update_rowMask==True)[0]
+        if len(masked)>0:
+            print("before",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames))
+            sub_data,sub_indices,sub_indptr,sub_shape,update_rownames=self.maskRemovedVariants(masked,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames)
+            print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames))
         return HMatrix(sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
 
 
@@ -1128,9 +1153,9 @@ class HDF5Engine_access_multi:
 
 if __name__ == '__main__':
     
-    for i in range(1,10):
-        file=HDF5Engine_storage("/Users/jma7/Development/VAT/importTest_13t/tmp_1_313_genotypes.h5")
-        file.remove_variant(i,"22","GT")
+    for i in range(1355,1369):
+        file=HDF5Engine_storage("/Users/jma7/Development/VAT/importTest_13t/tmp_1_2504_genotypes.h5")
+        file.recover_variant(i,"22","GT")
         file.close()
     # files=glob.glob("/Users/jma7/Development/VAT/importTest_12t/tmp*genotypes.h5")
     # testHDF=HDF5Engine_access_multi(files,8)
