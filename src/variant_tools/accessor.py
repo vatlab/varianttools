@@ -243,6 +243,44 @@ class HDF5Engine_storage(Base_Storage):
                     row[var]=dataRow[idx]
                 row.append()
         table.flush()
+
+
+
+    def remove_variant(self,variant_id,chr,groupName=""):
+        group=self.file.get_node("/chr"+chr+"/"+groupName)
+        # i=self.rownames.index(variant_id)
+        self.indptr=group.indptr
+        self.data=group.data
+        self.rownames=group.rownames
+        self.indices=group.indices
+        self.shape=group.shape
+
+        i=np.where(self.rownames==variant_id)[0][0]
+        print(i,self.shape,len(self.rownames),len(self.indptr),len(self.data),len(self.indices))
+        n = self.indptr[i+1] - self.indptr[i]
+        print(n)
+        if n > 0:
+            self.data[self.indptr[i]:-n] = self.data[self.indptr[i+1]:]
+            self.data = self.data[:-n]
+            self.indices[self.indptr[i]:-n] = self.indices[self.indptr[i+1]:]
+            self.indices = self.indices[:-n]
+        self.indptr[i:-1] = self.indptr[i+1:]
+        self.indptr[i:] -= n
+        self.indptr =self.indptr[:-1]
+        self.shape = (self.shape[0]-1, self.shape[1])
+        self.rownames[i:-1] = self.rownames[i+1:]
+        self.rownames =self.rownames[:-1]
+
+        print(self.shape,len(self.rownames),len(self.indptr),len(self.data),len(self.indices))
+
+
+        pass
+
+    def remove_sample(self):
+        pass
+
+    def remove_genotype(self,cond):
+        pass
  
 
     def store_HDF5(self,hmatrix,chr,groupName=""):
@@ -1089,6 +1127,11 @@ class HDF5Engine_access_multi:
 
 
 if __name__ == '__main__':
+    
+    for i in range(1,10):
+        file=HDF5Engine_storage("/Users/jma7/Development/VAT/importTest_13t/tmp_1_313_genotypes.h5")
+        file.remove_variant(i,"22","GT")
+        file.close()
     # files=glob.glob("/Users/jma7/Development/VAT/importTest_12t/tmp*genotypes.h5")
     # testHDF=HDF5Engine_access_multi(files,8)
     # testHDF.get_geno_info_by_variant_ID(2,"22")
@@ -1102,4 +1145,4 @@ if __name__ == '__main__':
     #         else:
     #             result[colnames[col]]=data[idx]
     # print(result)
-    pass
+    
