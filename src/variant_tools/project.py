@@ -4014,12 +4014,23 @@ def initArguments(parser):
     parser.add_argument('--build',
         help='''Set the build (hg18 or hg19) of the primary reference genome
             of the project.''')
-    parser.add_argument('-s', '--store', default='sqlite', choices=['sqlite', 'hdf5'],
-        help='Storage model used to storage variants and genotype.')
+    parser.add_argument('-s', '--store', choices=['sqlite', 'hdf5'],
+        help='''Storage model used to storage variants and genotype. The default value is
+            the value set by environmental variable VTOOLS_GENO_STORE or sqlite if the
+            variable is not set.''')
 
 
 def init(args):
     try:
+        if args.store is None:
+            if 'VTOOLS_GENO_STORE' in os.environ:
+                if os.environ['VTOOLS_GENO_STORE'] not in ['sqlite', 'hdf5']:
+                    env.logger.warning('Ignore incorrect value of variable VTOOLS_GENO_STORE {}'.format(os.environ['VTOOLS_GENO_STORE']))
+                else:
+                    args.store = os.environ['VTOOLS_GENO_STORE']
+            if args.store is None:
+                args.store = 'sqlite'
+
         temp_dirs = []
         if args.parent and not os.path.isdir(args.parent):
             if args.store != 'sqlite':
