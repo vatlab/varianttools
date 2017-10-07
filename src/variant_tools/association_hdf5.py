@@ -353,16 +353,17 @@ def getGenotype_HDF5(worker, group):
     files=sorted(files, key=lambda name: int(name.split("_")[1]))
 
     for fileName in files:
-        startSample=int(fileName.split("_")[1])
-        endSample=int(fileName.split("_")[2])
-        
-       
+        # startSample=int(fileName.split("_")[1])
+        # endSample=int(fileName.split("_")[2])
+         
         accessEngine=Engine_Access.choose_access_engine(fileName)
+        colnames=accessEngine.get_colnames(chr,geneSymbol)
+
         snpdict=accessEngine.get_geno_info_by_group(geneSymbol,chr)
         
         # print(geneSymbol,snpdict.keys(),startSample,endSample)
         accessEngine.close()
-        for ID in range(startSample,endSample+1):
+        for ID in colnames:
             data=snpdict[ID]
             
             gtmp = [data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in variant_id]

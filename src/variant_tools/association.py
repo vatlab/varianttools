@@ -857,7 +857,10 @@ class AssoTestsWorker(Process):
         '''Set phenotype data'''
         if len(self.phenotypes) > 1:
             raise ValueError('Only a single phenotype is allowed at this point')
-
+        print(len(self.phenotypes[0]))
+        for idx, x in enumerate(self.phenotypes[0]):
+            if which[idx]:
+                print(idx,x)
         phen = [x for idx, x in enumerate(self.phenotypes[0]) if which[idx]]
         if self.covariates:
           covt = [[x for idx, x in enumerate(y) if which[idx]] for y in self.covariates]
