@@ -36,9 +36,10 @@ from .phenotype import Sample
 from .tester import *
 from .assoTests import AssoData
 from .rtester import RTest, SKAT
-
+import tables as tb
 from variant_tools.vt_sqlite3 import OperationalError
 import argparse
+import numpy as np
 
 from .association_hdf5 import generateHDFbyGroup,getGenotype_HDF5,generateHDFbyGroup_update
 # from .association_vcf_to_hdf5 import generateHDFbyGroup,getGenotype_HDF5
@@ -857,10 +858,10 @@ class AssoTestsWorker(Process):
         '''Set phenotype data'''
         if len(self.phenotypes) > 1:
             raise ValueError('Only a single phenotype is allowed at this point')
-        print(len(self.phenotypes[0]))
-        for idx, x in enumerate(self.phenotypes[0]):
-            if which[idx]:
-                print(idx,x)
+        # print(len(self.phenotypes[0]))
+        # for idx, x in enumerate(self.phenotypes[0]):
+        #     if which[idx]:
+        #         print(idx,x)
         phen = [x for idx, x in enumerate(self.phenotypes[0]) if which[idx]]
         if self.covariates:
           covt = [[x for idx, x in enumerate(y) if which[idx]] for y in self.covariates]
@@ -1198,8 +1199,8 @@ def associate(args):
                 if len(HDFfileNames)==0:
                     env.logger.error("No HDF5 file found. Please run vtools import with --HDF5 tag first.")
                     sys.exit()
-                HDFfileNames=glob.glob("tmp*_multi_genes.h5")
-                if len(HDFfileNames)==0 or args.force:
+                HDFfileGroupNames=glob.glob("tmp*_multi_genes.h5")
+                if len(HDFfileGroupNames)==0 or args.force:
                     nJobs = max(args.jobs, 1)
                     
                     # generateHDFbyGroup_update(asso,nJobs)
@@ -1207,7 +1208,24 @@ def associate(args):
                     generateHDFbyGroup(asso,nJobs)
                 else:
                     env.logger.warning("Temp files are not regenerated!")
-            
+                
+                for HDFfileName in HDFfileNames:
+                    file=tb.open_file(HDFfileName)
+                    node=file.get_node("/chr22/GT")
+                    sampleMasked=np.where(node.sampleMask[:]==True)[0]+1
+             
+                    keep = ~np.in1d(node.colnames[:], sampleMasked)
+                    asso.sample_names=np.array(asso.sample_names)[keep].tolist()
+                    asso.sample_IDs=np.array(asso.sample_IDs)[keep].tolist()
+                    asso.phenotypes[0]=np.array(asso.phenotypes[0])[keep].tolist()
+                    asso.covariates[0]=np.array(asso.covariates[0])[keep].tolist()
+
+                    print(len(asso.sample_names))
+                    print(len(asso.sample_IDs))
+                    print(len(asso.phenotypes[0]))
+                    print(len(asso.covariates[0]))
+             
+
             runAssociation(args,asso,proj,results)
 
     except Exception as e:

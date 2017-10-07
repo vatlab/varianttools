@@ -922,10 +922,10 @@ class HDF5Engine_access(Base_Access):
         return data,indices,indptr,shape,rownames
 
     def maskRemovedSamples(self,masked,data,indices,indptr,shape,rownames,colnames):
-        print(len(data),data)
-        print(len(indices),indices)
-        print(len(indptr),indptr)
-        print(shape)
+        # print(len(data),data)
+        # print(len(indices),indices)
+        # print(len(indptr),indptr)
+        # print(shape)
         M=csr_matrix((data,indices,indptr),shape=shape)
         C=M.tocoo()
         keep = ~np.in1d(C.col, masked)
@@ -985,15 +985,15 @@ class HDF5Engine_access(Base_Access):
 
         update_rowMask=rowMask[minPos:maxPos+1]
         rowMasked=np.where(update_rowMask==True)[0]
-        sampleMasked=np.where(sampleMask==True)[0]
+        sampleMasked=np.where(sampleMask==True)[0]+1
 
         if len(rowMasked)>0:
             sub_data,sub_indices,sub_indptr,sub_shape,update_rownames=self.maskRemovedVariants(rowMasked,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames)
             # print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames))
         if len(sampleMasked)>0:
-            print("before",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
+            # print("before",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
             sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames=self.maskRemovedSamples(sampleMasked,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
-            print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
+            # print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
         
         return HMatrix(sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
 
