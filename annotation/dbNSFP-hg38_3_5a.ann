@@ -9,8 +9,6 @@
  
 [linked fields] 
 hg38=chr, pos, ref, alt  
-hg19=hg19_chr, hg19_pos, ref, alt 
-hg18=hg18_chr, hg18_pos, ref, alt 
 
 [data sources] 
 description=dbNSFP version 3.5a, maintained by Xiaoming Liu from UTSPH. Please cite:
@@ -20,12 +18,12 @@ description=dbNSFP version 3.5a, maintained by Xiaoming Liu from UTSPH. Please c
 		Predictions and Annotations for Human Non-synonymous and Splice Site SNVs. 
 		Human Mutation. 37(3):235-241." if you find this database useful.
 preprocessor=Dos2Unix() 
-#version=h38_3_5a 
+version=hg38_3_5a 
 anno_type=variant 
 source_url=ftp://dbnsfp:dbnsfp@dbnsfp.softgenetics.com/dbNSFPv3.5a.zip
 #direct_url=
 source_type=txt 
-source_pattern=  
+#source_pattern=  
 
 
 [chr]
@@ -68,32 +66,6 @@ index=7
 type=VARCHAR(255) NULL
 adj=Nullify('.')
 comment=rs number from dbSNP 150
-
-[hg19_chr]
-index=8
-type=VARCHAR(20) NULL
-adj=Nullify('.')
-comment=chromosome as to hg19, "." means missing
-
-[hg19_pos]
-index=9
-type=INTEGER NULL
-adj=Nullify('.')
-comment=physical position on the chromosome as to hg19 (1-based coordinate).
-		For mitochondrial SNV, this position refers to a YRI sequence (GenBank: AF347015)
-
-[hg18_chr]
-index=10
-type=VARCHAR(20) NULL
-adj=Nullify('.')
-comment=chromosome as to hg18, "." means missing
-
-[hg18_pos]
-index=11
-type=INTEGER NULL
-adj=Nullify('.')
-comment=physical position on the chromosome as to hg18 (1-based coordinate)
-		For mitochondrial SNV, this position refers to a YRI sequence (GenBank: AF347015)
 
 [genename]
 index=12
@@ -177,13 +149,19 @@ comment=amino acid position as to the protein.
 		"-1" if the variant is a splicing site SNP (2bp on each end of an intron). 
 		Multiple entries separated by ";", corresponding to Ensembl_proteinid
 
+[SIFT_score_all]
+index=24
+type=VARCHAR(255) NULL
+adj=Nullify('.')
+comment=SIFT score (SIFTori). Scores range from 0 to 1. The smaller the score the
+                more likely the SNP has damaging effect.
+                Multiple scores separated by ";", corresponding to Ensembl_proteinid.
+
 [SIFT_score]
 index=24
 type=FLOAT NULL
-adj=Nullify('.'), lambda x: None if x.strip() == '.' else max([float(z) for z in x.split(';')])
-comment=SIFT score (SIFTori). Scores range from 0 to 1. The smaller the score the
-		more likely the SNP has damaging effect. 
-		Multiple scores separated by ";", corresponding to Ensembl_proteinid.
+adj=Nullify('.'), lambda x: None if x.strip() == '.' else min([float(z) for z in x.split(';')])
+comment=The same as SIFT_score_all but is of type FLOAT and is the minimal score when multiple scores are available.
 
 [SIFT_converted_rankscore]
 index=25
@@ -199,6 +177,12 @@ comment=SIFTori scores were first converted to SIFTnew=1-SIFTori,
 index=26
 type=VARCHAR(1) NULL
 adj=Nullify('.'),  lambda x: None if x.strip() == '.' else ('D' if 'D' in x else ('T' if 'T' in x else '.'))
+comment="D" if "D" appears in SIFT_pred_all, "T" otherwise.
+
+[SIFT_pred_all]
+index=26
+type=VARCHAR(255) NULL
+adj=Nullify('.')
 comment=If SIFTori is smaller than 0.05 (rankscore>0.395) the corresponding nsSNV is
 		predicted as "D(amaging)"; otherwise it is predicted as "T(olerated)". 
 		Multiple predictions separated by ";"
@@ -228,6 +212,12 @@ comment=amino acid position as to Uniprot_acc_Polyphen2.
 index=30
 type=FLOAT NULL
 adj=Nullify('.'), lambda x: None if x.strip() == '.' else max([float(z) for z in x.split(';') if z != '.'])
+comment=The maximum (most damaging) value of Polyphen2 score based on HumDiv, i.e. hdiv_prob. Use Polyphen2_HDIV_score_all to get a list of all scores.
+
+[Polyphen2_HDIV_score_all]
+index=30
+type=VARCHAR(255) NULL
+adj=Nullify('.')
 comment=Polyphen2 score based on HumDiv, i.e. hdiv_prob.
 		The score ranges from 0 to 1. 
 		Multiple entries separated by ";", corresponding to Uniprot_acc_Polyphen2.
@@ -245,6 +235,12 @@ comment=Polyphen2 HDIV scores were first ranked among all HDIV scores
 index=32
 type=VARCHAR(1) NULL
 adj=Nullify('.'),  lambda x: None if x.strip() == '.' else ('D' if 'D' in x else ('T' if 'T' in x else '.'))
+comment="D" if any of the predictions in Polyphen2_HDIV_pred_all is "D". Otherwise it can be "P" is any prediction is "P", or "B" is any prediction if "B".
+
+[Polyphen2_HDIV_pred_all]
+index=32
+type=VARCHAR(255) NULL
+adj=Nullify('.')
 comment=Polyphen2 prediction based on HumDiv, "D" ("probably damaging",
 		HDIV score in [0.957,1] or rankscore in [0.52844,0.89865]), "P" ("possibly damaging", 
 		HDIV score in [0.453,0.956] or rankscore in [0.34282,0.52689]) and "B" ("benign", 
@@ -258,6 +254,12 @@ comment=Polyphen2 prediction based on HumDiv, "D" ("probably damaging",
 index=33
 type=FLOAT NULL
 adj=Nullify('.'), lambda x: None if x.strip() == '.' else max([float(z) for z in x.split(';') if z !='.'])
+comment=The maximum (most damaging) value of all Polyphen2 score based on HumVar, i.e. hvar_prob. Use Polyphen2_HVAR_score_all to get a list of all scores.
+
+[Polyphen2_HVAR_score_all]
+index=33
+type=VARCHAR(255) NULL
+adj=Nullify('.')
 comment=Polyphen2 score based on HumVar, i.e. hvar_prob.
 		The score ranges from 0 to 1. 
 		Multiple entries separated by ";", corresponding to Uniprot_acc_Polyphen2.
@@ -274,6 +276,12 @@ comment=Polyphen2 HVAR scores were first ranked among all HVAR scores
 [Polyphen2_HVAR_pred]
 index=35
 type=VARCHAR(1) NULL
+adj=Nullify('.'), lambda x: None if x.strip() == '.' else ('D' if 'D' in x else ('P' if 'P' in x else ('B' if 'B' in x else '.')))
+comment="D" if any of the predictions in Polyphen2_HVAR_pred_all is "D". Otherwise it can be "P" is any prediction is "P", or "B" is any prediction if "B".
+
+[Polyphen2_HVAR_pred_all]
+index=35
+type=VARCHAR(255) NULL
 adj=Nullify('.'), lambda x: None if x.strip() == '.' else ('D' if 'D' in x else ('P' if 'P' in x else ('B' if 'B' in x else '.')))
 comment=Polyphen2 prediction based on HumVar, "D" ("probablyINTEGER		HVAR score in [0.909,1] or rankscore in [0.62797,0.97092]), "P" ("possibly damaging", 
 		HVAR score in [0.909,1] or rankscore in [0.62797,0.97092]), "P" ("possibly damaging", 
@@ -313,8 +321,16 @@ comment=estimated nonsynonymous-to-synonymous-rate ratio (Omega, reported by LRT
 
 [MutationTaster_score]
 index=40
-type=FLOAT NULL
+type=VARCHAR(255) NULL
 adj=Nullify('.')
+comment=MutationTaster p-value (MTori), ranges from 0 to 1. 
+		Multiple scores are separated by ";". Information on corresponding transcript(s) can 
+		be found by querying http://www.mutationtaster.org/ChrPos.html
+
+[MutationTaster_score_max]
+index=40
+type=FLOAT NULL
+adj=Nullify('.'), lambda x: None if x.strip() == '.' else max([float(z) for z in x.split(';') if z !='.'])
 comment=MutationTaster p-value (MTori), ranges from 0 to 1. 
 		Multiple scores are separated by ";". Information on corresponding transcript(s) can 
 		be found by querying http://www.mutationtaster.org/ChrPos.html
@@ -454,8 +470,19 @@ comment=amino acid change as to Transcript_id_VEST3.
 
 [VEST3_score]
 index=58
-type=FLOAT NULL
+type=VARCHAR(255) NULL
 adj=Nullify('.')
+comment=VEST 3.0 score. Score ranges from 0 to 1. The larger the score the more likely
+		the mutation may cause functional change. 
+		Multiple scores separated by ";", corresponding to Transcript_id_VEST3.
+		Please note this score is free for non-commercial use. For more details please refer to 
+		http://wiki.chasmsoftware.org/index.php/SoftwareLicense. Commercial users should contact 
+		the Johns Hopkins Technology Transfer office.
+
+[VEST3_score_max]
+index=58
+type=FLOAT NULL
+adj=Nullify('.'), lambda x: None if x.strip() == '.' else max([float(z) for z in x.split(';') if z !='.'])
 comment=VEST 3.0 score. Score ranges from 0 to 1. The larger the score the more likely
 		the mutation may cause functional change. 
 		Multiple scores separated by ";", corresponding to Transcript_id_VEST3.
@@ -530,6 +557,7 @@ comment=Prediction of our MetaLR based ensemble prediction score,"T(olerated)" o
 [Reliability_index]
 index=66
 type=INTEGER NULL
+adj=Nullify('.')
 comment=Number of observed component scores (except the maximum frequency in
 		the 1000 genomes populations) for MetaSVM and MetaLR. Ranges from 1 to 10. As MetaSVM 
 		and MetaLR scores are calculated based on imputed data, the less missing component 
@@ -575,7 +603,7 @@ comment=REVEL scores were ranked among all REVEL scores in dbNSFP. The rankscore
 [MutPred_score]
 index=72
 type=FLOAT NULL
-adj=Nullify('.')
+adj=Nullify(['.', '-'])
 comment=General MutPred score. Scores range from 0 to 1. The larger the score the more
 		likely the SNP has damaging effect.
 
@@ -961,77 +989,75 @@ comment=SiPhy score based on 29 mammals genomes. The larger the score,
 index=119
 type=FLOAT NULL
 adj=Nullify('.')
-comment=SiPhy_29way_logOdds scores were ranked among all
-		SiPhy_29way_logOdds scores in dbNSFP. The rankscore is the ratio of the rank 
-		of the score over the total number of SiPhy_29way_logOdds scores in dbNSFP.
+comment=SiPhy_29way_logOdds scores were ranked among all SiPhy_29way_logOdds scores in dbNSFP. The rankscore is the ratio of the rank of the score over the total number of SiPhy_29way_logOdds scores in dbNSFP.
 
-[1000Gp3_AC]
+[n_1000Gp3_AC]
 index=120
-type=INTEGER NULL
+type=VARCHAR(255) NULL
 adj=Nullify('.')
 comment=Alternative allele counts in the whole 1000 genomes phase 3 (1000Gp3) data.
 
-[1000Gp3_AF]
+[n_1000Gp3_AF]
 index=121
 type=FLOAT NULL
 adj=Nullify('.')
 comment=Alternative allele frequency in the whole 1000Gp3 data.
 
-[1000Gp3_AFR_AC]
+[n_1000Gp3_AFR_AC]
 index=122
 type=INTEGER NULL
 adj=Nullify('.')
 comment=Alternative allele counts in the 1000Gp3 African descendent samples.
 
-[1000Gp3_AFR_AF]
+[n_1000Gp3_AFR_AF]
 index=123
 type=FLOAT NULL
 adj=Nullify('.')
 comment=Alternative allele frequency in the 1000Gp3 African descendent samples.
 
-[1000Gp3_EUR_AC]
+[n_1000Gp3_EUR_AC]
 index=124
 type=INTEGER NULL
 adj=Nullify('.')
 comment=Alternative allele counts in the 1000Gp3 European descendent samples.
 
-[1000Gp3_EUR_AF]
+[n_1000Gp3_EUR_AF]
 index=125
 type=FLOAT NULL
 adj=Nullify('.')
 comment=Alternative allele frequency in the 1000Gp3 European descendent samples.
 
-[1000Gp3_AMR_AC]
+[n_1000Gp3_AMR_AC]
 index=126
 type=INTEGER NULL
 adj=Nullify('.')
 comment=Alternative allele counts in the 1000Gp3 American descendent samples.
 
-[1000Gp3_AMR_AF]
+[n_1000Gp3_AMR_AF]
 index=127
 type=FLOAT NULL
 adj=Nullify('.')
 comment=Alternative allele frequency in the 1000Gp3 American descendent samples.
 
-[1000Gp3_EAS_AC]
+[n_1000Gp3_EAS_AC]
 index=128
 type=INTEGER NULL
 adj=Nullify('.')
 comment=Alternative allele counts in the 1000Gp3 East Asian descendent samples.
 
-[1000Gp3_EAS_AF]
+[n_1000Gp3_EAS_AF]
 index=129
 type=FLOAT NULL
 adj=Nullify('.')
 comment=Alternative allele frequency in the 1000Gp3 East Asian descendent samples.
 
-[1000Gp3_SAS_AC]
+[n_1000Gp3_SAS_AC]
 index=130
 type=INTEGER NULL
 adj=Nullify('.')
 comment=Alternative allele counts in the 1000Gp3 South Asian descendent samples.
 
-[1000Gp3_SAS_AF]
+[n_1000Gp3_SAS_AF]
 index=131
 type=FLOAT NULL
 adj=Nullify('.')
