@@ -161,13 +161,7 @@ comment=SIFT score (SIFTori). Scores range from 0 to 1. The smaller the score th
 index=24
 type=FLOAT NULL
 adj=Nullify('.'), lambda x: None if x.strip() == '.' else min([float(z) for z in x.split(';')])
-<<<<<<< HEAD
 comment=The same as SIFT_score_all but is of type FLOAT and is the minimal score when multiple scores are available.
-=======
-comment=SIFT score (SIFTori). Scores range from 0 to 1. The smaller the score the
-		more likely the SNP has damaging effect. 
-		Multiple scores separated by ";", corresponding to Ensembl_proteinid.
->>>>>>> 75799795a4759264df4bd0ba26780c420f8aedd8
 
 [SIFT_converted_rankscore]
 index=25
