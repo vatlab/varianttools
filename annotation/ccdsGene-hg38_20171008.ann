@@ -11,7 +11,7 @@ hg38=chr, cdsStart, cdsEnd
 anno_type=range
 description=High-confidence human gene annotations from the Consensus Coding Sequence (CCDS) project.
 version=hg38_20171008
-source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/ccdsGene.txt.gz
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/ccdsGene.txt.gz
 #direct_url=annoDB/ccdsGene-hg19_20130904.DB.gz	50f2d2e271c7c43beba1b2175ddf62a8
 source_type=txt
 
