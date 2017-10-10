@@ -1208,22 +1208,24 @@ def associate(args):
                     generateHDFbyGroup(asso,nJobs)
                 else:
                     env.logger.warning("Temp files are not regenerated!")
-                
+                allkeep=[]
                 for HDFfileName in HDFfileNames:
                     file=tb.open_file(HDFfileName)
                     node=file.get_node("/chr22/GT")
                     sampleMasked=np.where(node.sampleMask[:]==True)[0]+1
              
                     keep = ~np.in1d(node.colnames[:], sampleMasked)
-                    asso.sample_names=np.array(asso.sample_names)[keep].tolist()
-                    asso.sample_IDs=np.array(asso.sample_IDs)[keep].tolist()
-                    asso.phenotypes[0]=np.array(asso.phenotypes[0])[keep].tolist()
-                    asso.covariates[0]=np.array(asso.covariates[0])[keep].tolist()
+                    allkeep.extend(keep)
+                print(allkeep)
+                asso.sample_names=np.array(asso.sample_names)[allkeep].tolist()
+                asso.sample_IDs=np.array(asso.sample_IDs)[allkeep].tolist()
+                asso.phenotypes[0]=np.array(asso.phenotypes[0])[allkeep].tolist()
+                asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
 
-                    print(len(asso.sample_names))
-                    print(len(asso.sample_IDs))
-                    print(len(asso.phenotypes[0]))
-                    print(len(asso.covariates[0]))
+                print(len(asso.sample_names))
+                print(len(asso.sample_IDs))
+                print(len(asso.phenotypes[0]))
+                print(len(asso.covariates[0]))
              
 
             runAssociation(args,asso,proj,results)
