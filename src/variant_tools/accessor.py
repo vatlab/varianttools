@@ -201,15 +201,16 @@ class Base_Storage(object):
         raise NotImplementError()
 
 class GenoCallData(tb.IsDescription):
-    variant_id=tb.Int32Col(dflt=1,pos=1)
-    sample_id=tb.Int16Col(dflt=1,pos=2)
-    DP=tb.Int8Col(dflt=1,pos=3)
-    GQ=tb.Int8Col(dflt=1,pos=4)
-    AD1=tb.Int8Col(dflt=1,pos=5)
-    AD2=tb.Int8Col(dflt=1,pos=6)
-    PL1=tb.Int8Col(dflt=1,pos=7)
-    PL2=tb.Int8Col(dflt=1,pos=8)
-    PL3=tb.Int8Col(dflt=1,pos=9)
+    entryMask=tb.BoolCol(pos=1)
+    variant_id=tb.Int32Col(dflt=1,pos=2)
+    sample_id=tb.Int16Col(dflt=1,pos=3)
+    DP=tb.Int8Col(dflt=1,pos=4)
+    GQ=tb.Int8Col(dflt=1,pos=5)
+    AD1=tb.Int8Col(dflt=1,pos=6)
+    AD2=tb.Int8Col(dflt=1,pos=7)
+    PL1=tb.Int8Col(dflt=1,pos=8)
+    PL2=tb.Int8Col(dflt=1,pos=9)
+    PL3=tb.Int8Col(dflt=1,pos=10)
 
 
 
@@ -245,6 +246,7 @@ class HDF5Engine_storage(Base_Storage):
         group=self.getGroup(chr,tableName)
         table=group.genoInfo
         row=table.row
+        row["entryMask"]=False
         for dataRow in data:
             if (len(dataRow)==9):
                 for idx,var in enumerate(["variant_id","sample_id","DP","GQ","AD1","AD2","PL1","PL2","PL3"]):
@@ -280,35 +282,36 @@ class HDF5Engine_storage(Base_Storage):
     def remove_genotype(self,cond,chr):
         group=self.file.get_node("/chr"+chr+"/genoInfo")
         table=group.genoInfo
-        result=[(x['variant_id'],x['sample_id']) for x in table.where(cond)]
-
-        result.sort(key=lambda x:x[0])
-        group=self.file.get_node("/chr"+chr+"/GT")
-        indptr=group.indptr
-        indices=group.indices
-        rownames=group.rownames[:]
-        data=group.data
-        pre_id=0
-        pos=None
-        sampleList=None
-        for var_id,sample_id in result:
-            if var_id!=pre_id:
-                pre_id=var_id
-                pos=np.where(rownames==var_id)[0][0]
-                sampleList=indices[indptr[pos]:indptr[pos+1]]
-                # dataList=data[indptr[pos]:indptr[pos+1]]
-                # # if len(sampleList)>0:
-                # #     notNone=np.where(~np.isnan(dataList))[0]
-                # #     sampleList=notNone
-                # #     print(var_id,dataList,notNone)
-            try:
-                if len(sampleList)>0:
-                    samplePos=np.where(sampleList==sample_id)[0][0]
-                    res=[(x['DP'],x['GQ']) for x in table.where('(variant_id=='+str(var_id)+')&(sample_id=='+str(sample_id)+')')]
-                    print("here",var_id,sample_id,data[indptr[pos]+samplePos],res)
-                # data[indptr[pos]+samplePos]=np.nan
-            except Exception as e:
-                    pass
+        for x in table.where(cond):
+            x["entryMask"]=True
+            x.update()
+        
+        # group=self.file.get_node("/chr"+chr+"/GT")
+        # indptr=group.indptr
+        # indices=group.indices
+        # rownames=group.rownames[:]
+        # data=group.data
+        # pre_id=0
+        # pos=None
+        # sampleList=None
+        # for var_id,sample_id in result:
+        #     if var_id!=pre_id:
+        #         pre_id=var_id
+        #         pos=np.where(rownames==var_id)[0][0]
+        #         sampleList=indices[indptr[pos]:indptr[pos+1]]
+        #         # dataList=data[indptr[pos]:indptr[pos+1]]
+        #         # # if len(sampleList)>0:
+        #         # #     notNone=np.where(~np.isnan(dataList))[0]
+        #         # #     sampleList=notNone
+        #         # #     print(var_id,dataList,notNone)
+        #     try:
+        #         if len(sampleList)>0:
+        #             samplePos=np.where(sampleList==sample_id)[0][0]
+        #             res=[(x['DP'],x['GQ']) for x in table.where('(variant_id=='+str(var_id)+')&(sample_id=='+str(sample_id)+')')]
+        #             print("here",var_id,sample_id,data[indptr[pos]+samplePos],res)
+        #         # data[indptr[pos]+samplePos]=np.nan
+        #     except Exception as e:
+        #             pass
                     
                 
            
@@ -938,6 +941,22 @@ class HDF5Engine_access(Base_Access):
             colnames =colnames[:-1]
         return M.data,M.indices,M.indptr,M.shape,rownames,colnames
 
+    def maskRemovedGenotypes(self,masked,data,indices,indptr,shape,rownames,colnames):
+        M=csr_matrix((data,indices,indptr),shape=shape)
+        C=M.tolil()
+        count=0
+        rownames=np.array(rownames)
+        for entry in masked:
+            rowPos=np.where(rownames==entry[0])
+            colPos=np.where(colnames==entry[1])
+            # print(entry,rowPos[0],colPos[0])
+            if len(rowPos[0]>0) and len(colPos[0])>0:
+                # print(rowPos[0][0],colPos[0][0])
+                C[rowPos[0][0],colPos[0][0]]=np.nan
+                count+=1
+        print(len(masked),count)
+        M=C.tocsr()
+        return M.data,M.indices,M.indptr,M.shape
 
 
     def get_geno_info_by_variant_IDs(self,rowIDs,chr,groupName=""):
@@ -957,6 +976,9 @@ class HDF5Engine_access(Base_Access):
         colnames=group.colnames[:]
         rowMask=group.rowMask[:]
         sampleMask=group.sampleMask[:]
+
+        genoInfoNode=self.file.get_node("/chr"+chr+"/genoInfo")
+        table=genoInfoNode.genoInfo
 
         for id in rowIDs:
             try:
@@ -995,6 +1017,15 @@ class HDF5Engine_access(Base_Access):
             sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames=self.maskRemovedSamples(sampleMasked,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
             # print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
         
+        cond="(variant_id>="+str(update_rownames[0])+")&(variant_id<="+str(update_rownames[-1])+")&(entryMask==True)"
+        print(cond)
+        entryMaskList=[]
+        for x in table.where(cond):
+            entryMaskList.append((x["variant_id"],x["sample_id"]))
+        if len(entryMaskList)>0:
+            sub_data,sub_indices,sub_indptr,sub_shape=self.maskRemovedGenotypes(entryMaskList,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
+
+
         return HMatrix(sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
 
 
@@ -1223,13 +1254,13 @@ if __name__ == '__main__':
     #     file.recover_variant(i,"22","GT")
     #     file.close()
 
-    # file=HDF5Engine_storage("/Users/jma7/Development/VAT/genoinfo_allele/tmp_1_123_genotypes.h5")
-    # file.remove_genotype("(DP>10) & (GQ>10)","22")
+    file=HDF5Engine_storage("/Users/jma7/Development/VAT/genoinfo_allele/tmp_1_491_genotypes.h5")
+    file.remove_genotype("(DP<10) & (GQ>10)","22")
 
-    for i in range(1,3):
-        file=HDF5Engine_storage("/Users/jma7/Development/VAT/importTest_13t/tmp_1_2504_genotypes.h5")
-        file.remove_sample(i,"22","GT")
-        file.close()
+    # for i in range(1,3):
+    #     file=HDF5Engine_storage("/Users/jma7/Development/VAT/importTest_13t/tmp_1_2504_genotypes.h5")
+    #     file.remove_sample(i,"22","GT")
+    #     file.close()
 
 
     # files=glob.glob("/Users/jma7/Development/VAT/importTest_12t/tmp*genotypes.h5")

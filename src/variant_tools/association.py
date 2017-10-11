@@ -1216,7 +1216,7 @@ def associate(args):
              
                     keep = ~np.in1d(node.colnames[:], sampleMasked)
                     allkeep.extend(keep)
-                print(allkeep)
+        
                 asso.sample_names=np.array(asso.sample_names)[allkeep].tolist()
                 asso.sample_IDs=np.array(asso.sample_IDs)[allkeep].tolist()
                 asso.phenotypes[0]=np.array(asso.phenotypes[0])[allkeep].tolist()
