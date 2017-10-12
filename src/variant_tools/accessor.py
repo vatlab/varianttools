@@ -8,6 +8,7 @@ import time
 import math
 import os
 import sys
+from .utils import env
 
 
 import glob
@@ -288,14 +289,16 @@ class HDF5Engine_storage(Base_Storage):
 
     def remove_genotype(self,cond):
         for chr in range(1,23):
+            genoNode="/chr"+str(chr)+"/genoInfo"
             try:
-                group=self.file.get_node("/chr"+str(chr)+"/genoInfo")
+                group=self.file.get_node(genoNode)
                 table=group.genoInfo
                 for x in table.where(cond):
                     x["entryMask"]=True
                     x.update()
             except:
-                pass
+                env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
+                
         
         # group=self.file.get_node("/chr"+chr+"/GT")
         # indptr=group.indptr
