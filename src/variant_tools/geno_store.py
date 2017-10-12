@@ -34,6 +34,7 @@ from .utils import ProgressBar,  delayedAction, \
 from .text_reader import TextReader
 from .monitor import ProcessMonitor
 from datetime import datetime
+from .accessor import *
 
 
 class Base_Store(object):
@@ -589,7 +590,7 @@ class Sqlite_Store(Base_Store):
         sampleGenotypeHeader = self.db.getHeaders('genotype_{}'.format(sample_id))
         return sampleGenotypeHeader[1:]  # the first field is variant id, second is GT
 
-    def remove_sample(self, sample_id):
+    def remove_sample(self, sample_id,file=""):
         self.db.removeTable('genotype_{}'.format(sample_id))
         self.db.commit()
 
@@ -824,11 +825,10 @@ class HDF5_Store(Base_Store):
         super(HDF5_Store, self).__init__(name)
 
 
-    def remove_sample(self,sampleID):
-        HDFfileNames=glob.glob("tmp*_genotypes.h5")
-        for HDFfileName in HDFfileNames:
-            storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
-            storageEngine.remove_sample(sampelID)
+    def remove_sample(self,sampleID,HDFfileName):
+        print(sampleID,HDFfileName)
+        storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+        storageEngine.remove_sample(sampleID)
         
 
 
@@ -857,14 +857,7 @@ class HDF5_Store(Base_Store):
 
 
 
-def GenoStore(proj,monitor):
-    if monitor:
-        monitor_interval = 2
-        resource_monitor_interval = 60
-        task_id=datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+"_import"
-        m = ProcessMonitor(task_id, monitor_interval=monitor_interval,
-                resource_monitor_interval=resource_monitor_interval)
-        m.start()
+def GenoStore(proj):
     if proj.store == 'sqlite':
         return Sqlite_Store(proj)
     elif proj.store == 'hdf5':

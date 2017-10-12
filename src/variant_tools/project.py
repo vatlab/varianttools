@@ -45,7 +45,7 @@ import pydoc
 
 from .ucsctools import showTrack
 from .cgatools import fasta2crr
-from .geno_store import GenoStore
+from .geno_store import GenoStore,HDF5_Store
 from configparser import ConfigParser, RawConfigParser
 from io import StringIO
 
@@ -2244,8 +2244,13 @@ class Project:
         #
         store = GenoStore(self)
         for ID in IDs:
+            hdf5file=None
+            if isinstance(store,HDF5_Store):
+                cur.execute('SELECT HDF5 FROM sample WHERE sample_id = ?;', (ID,))
+                res=cur.fetchone()
+                hdf5file=res[0]
             cur.execute('DELETE FROM sample WHERE sample_id = ?;', (ID,))
-            store.remove_sample(ID)
+            store.remove_sample(ID,hdf5file)
         self.db.commit()
         
     def removeVariants(self, table):

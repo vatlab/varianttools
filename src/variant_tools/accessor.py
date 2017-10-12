@@ -274,19 +274,20 @@ class HDF5Engine_storage(Base_Storage):
 
     
     def remove_sample(self,sample_id):
-        for chr in range(1,22):
+        for chr in range(1,23):
             try:
                 group=self.file.get_node("/chr"+str(chr)+"/GT/")
                 # i=self.rownames.index(variant_id)
                 colnames=group.colnames[:]
                 i=np.where(colnames==sample_id)[0][0]
+                print(i,sample_id)
                 group.sampleMask[i]=True
             except:
                 pass
         
 
     def remove_genotype(self,cond):
-        for chr in range(1,22):
+        for chr in range(1,23):
             try:
                 group=self.file.get_node("/chr"+str(chr)+"/genoInfo")
                 table=group.genoInfo
@@ -976,8 +977,7 @@ class HDF5Engine_access(Base_Access):
         rowMask=group.rowMask[:]
         sampleMask=group.sampleMask[:]
 
-        genoInfoNode=self.file.get_node("/chr"+chr+"/genoInfo")
-        table=genoInfoNode.genoInfo
+        
 
         for id in rowIDs:
             try:
@@ -1018,12 +1018,16 @@ class HDF5Engine_access(Base_Access):
             # print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
         
         #check removed genotypes
-        cond="(variant_id>="+str(update_rownames[0])+")&(variant_id<="+str(update_rownames[-1])+")&(entryMask==True)"
-        entryMaskList=[]
-        for x in table.where(cond):
-            entryMaskList.append((x["variant_id"],x["sample_id"]))
-        if len(entryMaskList)>0:
-            sub_data,sub_indices,sub_indptr,sub_shape=self.maskRemovedGenotypes(entryMaskList,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
+        genoNode="/chr"+chr+"/genoInfo"
+        if genoNode in self.file:
+            genoInfoNode=self.file.get_node(genoNode)
+            table=genoInfoNode.genoInfo
+            cond="(variant_id>="+str(update_rownames[0])+")&(variant_id<="+str(update_rownames[-1])+")&(entryMask==True)"
+            entryMaskList=[]
+            for x in table.where(cond):
+                entryMaskList.append((x["variant_id"],x["sample_id"]))
+            if len(entryMaskList)>0:
+                sub_data,sub_indices,sub_indptr,sub_shape=self.maskRemovedGenotypes(entryMaskList,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
 
         return HMatrix(sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
 

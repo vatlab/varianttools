@@ -1209,18 +1209,19 @@ def associate(args):
                 else:
                     env.logger.warning("Temp files are not regenerated!")
 
-                allkeep=[]
-                for HDFfileName in HDFfileNames:
-                    file=tb.open_file(HDFfileName)
-                    node=file.get_node("/chr22/GT")
-                    sampleMasked=np.where(node.sampleMask[:]==True)[0]+1
-                    keep = ~np.in1d(node.colnames[:], sampleMasked)
-                    allkeep.extend(keep)
+                # remove phenotype, not necessary if sample is deleted from sample table
+                # allkeep=[]
+                # for HDFfileName in HDFfileNames:
+                #     file=tb.open_file(HDFfileName)
+                #     node=file.get_node("/chr22/GT")
+                #     sampleMasked=np.where(node.sampleMask[:]==True)[0]+1
+                #     keep = ~np.in1d(node.colnames[:], sampleMasked)
+                #     allkeep.extend(keep)
         
-                asso.sample_names=np.array(asso.sample_names)[allkeep].tolist()
-                asso.sample_IDs=np.array(asso.sample_IDs)[allkeep].tolist()
-                asso.phenotypes[0]=np.array(asso.phenotypes[0])[allkeep].tolist()
-                asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
+                # asso.sample_names=np.array(asso.sample_names)[allkeep].tolist()
+                # asso.sample_IDs=np.array(asso.sample_IDs)[allkeep].tolist()
+                # asso.phenotypes[0]=np.array(asso.phenotypes[0])[allkeep].tolist()
+                # asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
 
                 # print(len(asso.sample_names))
                 # print(len(asso.sample_IDs))

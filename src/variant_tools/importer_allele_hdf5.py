@@ -1400,7 +1400,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                 if end_sample <= start_sample:
                     continue
                 HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
-              
+                updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge)
                 taskQueue.put(HDF5GenotypeImportWorker(chunk, importer.variantIndex, start_sample, end_sample, 
                     sample_ids,variant_import_count[job], job, importer.genotype_info,HDFfile_Merge,importer.build))
                 start_sample = end_sample   
