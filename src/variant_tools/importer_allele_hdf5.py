@@ -1106,7 +1106,7 @@ class HDF5GenotypeImportWorker(Process):
         for idx in range(self.start_sample,self.end_sample):
             rowData=[variant_id,idx]
             rowID=idx-self.start_sample
-            for name in ["DP_geno","GQ_geno","AD_geno","PL_geno"]:
+            for name in infoDict.keys():
                 if name=="DP_geno" or name=="GQ_geno":
                     rowData.append(infoDict[name][rowID])
                 elif name=="AD_geno" and altIndex==0:
@@ -1175,14 +1175,18 @@ class HDF5GenotypeImportWorker(Process):
             pos=self.chunk["variants/POS"][i]
             GT=self.chunk["calldata/GT"][i].tolist()
             if len(self.geno_info)>0:
-                DP_geno=self.chunk["calldata/DP"][i].tolist()
-                GQ_geno=self.chunk["calldata/GQ"][i].tolist()
-                AD_geno=self.chunk["calldata/AD"][i].tolist()
-                PL_geno=self.chunk["calldata/PL"][i]
-                infoDict["DP_geno"]=DP_geno
-                infoDict["GQ_geno"]=GQ_geno
-                infoDict["AD_geno"]=AD_geno
-                infoDict["PL_geno"]=PL_geno
+                if "calldata/DP" in self.chunk:
+                    DP_geno=self.chunk["calldata/DP"][i].tolist()
+                    infoDict["DP_geno"]=DP_geno
+                if "calldata/GQ" in self.chunk:
+                    GQ_geno=self.chunk["calldata/GQ"][i].tolist()
+                    infoDict["GQ_geno"]=GQ_geno
+                if "calldata/AD" in self.chunk:
+                    AD_geno=self.chunk["calldata/AD"][i].tolist()
+                    infoDict["AD_geno"]=AD_geno
+                if "calldata/PL" in self.chunk:
+                    PL_geno=self.chunk["calldata/PL"][i]
+                    infoDict["PL_geno"]=PL_geno
             for altIndex in range(len(self.chunk["variants/ALT"][i])):
                 alt=self.chunk["variants/ALT"][i][altIndex]
                 if alt!="":

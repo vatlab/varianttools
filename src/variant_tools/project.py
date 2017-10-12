@@ -4624,9 +4624,14 @@ def show(args):
                     # now get sample genotype counts and sample specific fields
                     sampleId = rec[0]
                     store = GenoStore(proj)
-                    numGenotypes = store.num_variants(sampleId)
+                    hdf5file=None
+                    if isinstance(store,HDF5_Store):
+                        cur.execute('SELECT HDF5 FROM sample WHERE sample_id = ?;', (sampleId,))
+                        res=cur.fetchone()
+                        hdf5file=res[0]
+                    numGenotypes = store.num_variants(sampleId,hdf5file)
                     # get fields for each genotype table
-                    sampleGenotypeFields = ','.join(store.geno_fields(sampleId))
+                    sampleGenotypeFields = ','.join(store.geno_fields(sampleId,hdf5file))
                     prt.write([rec[1], rec[2], str(numGenotypes), sampleGenotypeFields])
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')

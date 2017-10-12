@@ -256,6 +256,35 @@ class HDF5Engine_storage(Base_Storage):
         table.flush()
 
 
+    def num_variants(self,sampleID):
+        totalNum=0
+        for chr in range(1,23):
+            try:
+                group=self.file.get_node("/chr"+str(chr)+"/GT/")
+                indices=group.indices[:]
+                numVariants=len(group.rownames[:])
+                colPos=np.where(indices==sampleID)
+                data=group.data[colPos]
+                numNan=np.where(np.isnan(data))
+                numMone=np.where(data==-1)
+                print(len(numNan[0]))
+                totalNum+=numVariants-len(numNan[0])-len(numMone[0])
+            except:
+                pass
+        return totalNum
+
+    def geno_fields(self,sampleID):
+        for chr in range(1,23):
+            try:
+                group=self.file.get_node("/chr"+str(chr)+"/genoInfo/")
+                table=group.genoInfo
+                return ["GT","DP","GQ","AD","PL"]
+                break
+            except:
+                return ["GT"]
+                break
+                pass
+
 
     def remove_variants(self,variantIDs):
         preChr=None

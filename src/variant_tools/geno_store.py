@@ -585,11 +585,11 @@ class Sqlite_Store(Base_Store):
         self.projdb.connect('{}.proj'.format(self.proj.name))
         self.projcur=self.projdb.cursor()
 
-    def num_variants(self, sample_id):
+    def num_variants(self, sample_id,file=""):
         self.cur.execute('SELECT count(*) FROM genotype_{};'.format(sample_id))
         return self.cur.fetchone()[0]
 
-    def geno_fields(self, sample_id):
+    def geno_fields(self, sample_id,file=""):
         sampleGenotypeHeader = self.db.getHeaders('genotype_{}'.format(sample_id))
         return sampleGenotypeHeader[1:]  # the first field is variant id, second is GT
 
@@ -832,9 +832,10 @@ class HDF5_Store(Base_Store):
 
 
     def remove_sample(self,sampleID,HDFfileName):
-        print(sampleID,HDFfileName)
         storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
         storageEngine.remove_sample(sampleID)
+        storageEngine.close()
+
         
 
 
@@ -843,6 +844,7 @@ class HDF5_Store(Base_Store):
         for HDFfileName in HDFfileNames:
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
             storageEngine.remove_variants(variantIDs)
+            storageEngine.close()
 
 
     def remove_genotype(self,cond):
@@ -850,9 +852,21 @@ class HDF5_Store(Base_Store):
         for HDFfileName in HDFfileNames:
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
             storageEngine.remove_genotype(cond)
-    
+            storageEngine.close()
 
-         
+    def num_variants(self, sampleID,HDFfileName):
+        storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+        num=storageEngine.num_variants(sampleID)
+        storageEngine.close()
+        return num
+
+    def geno_fields(self, sampleID,HDFfileName):
+        storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+        genoFields=storageEngine.geno_fields(sampleID)
+        storageEngine.close()
+        return genoFields
+
+    
     def importGenotypes(self, importer):
         # from .importer_hdf5 import importGenotypesInParallel
         # return importGenotypesInParallel(importer)
