@@ -593,6 +593,38 @@ class Sqlite_Store(Base_Store):
         self.db.removeTable('genotype_{}'.format(sample_id))
         self.db.commit()
 
+    def remove_variants(self,variantIDs):
+         # get sample_ids
+        self.cur.execute('SELECT sample_id, sample_name FROM sample;')
+        samples = self.cur.fetchall()
+        for ID, name in samples:
+            if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.name, ID)):
+                self.cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'
+                    .format(self.name, ID))
+            self.cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
+                .format(self.name, ID, table))
+            env.logger.info('{} genotypes are removed from sample {}'.format(self.cur.rowcount, name))
+        # remove the table itself
+        env.logger.info('Removing table {} itself'.format(decodeTableName(table)))
+        self.db.removeTable(table)
+
+    def remove_genotype(self,cond):
+        # get sample_ids
+        cur = self.db.cursor()
+        cur.execute('SELECT sample_id, sample_name FROM sample;')
+        samples = cur.fetchall()
+        env.logger.info('Removing genotypes from {} samples using criteria "{}"'.format(len(samples), cond))
+        for ID, name in samples:
+            try:
+                cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE {};'\
+                    .format(self.name, ID, cond))
+            except Exception as e:
+                env.logger.warning('Failed to remove genotypes from sample {}: {}'
+                    .format(name, e))
+                continue
+            env.logger.info('{} genotypes are removed from sample {}'.format(cur.rowcount, name))
+
+    
     def importGenotypes(self, importer):
         '''import files in parallel, by importing variants and genotypes separately, and in their own processes. 
         More specifically, suppose that there are three files
@@ -790,8 +822,31 @@ class Sqlite_Store(Base_Store):
 class HDF5_Store(Base_Store):
     def __init__(self, name):
         super(HDF5_Store, self).__init__(name)
-         
 
+
+    def remove_sample(self,sampleID):
+        HDFfileNames=glob.glob("tmp*_genotypes.h5")
+        for HDFfileName in HDFfileNames:
+            storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+            storageEngine.remove_sample(sampelID)
+        
+
+
+    def remove_variants(self,variantIDs):
+        HDFfileNames=glob.glob("tmp*_genotypes.h5")
+        for HDFfileName in HDFfileNames:
+            storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+            storageEngine.remove_variants(variantIDs)
+
+
+    def remove_genotype(self,cond):
+        HDFfileNames=glob.glob("tmp*_genotypes.h5")
+        for HDFfileName in HDFfileNames:
+            storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+            storageEngine.remove_genotype(cond)
+    
+
+         
     def importGenotypes(self, importer):
         # from .importer_hdf5 import importGenotypesInParallel
         # return importGenotypesInParallel(importer)

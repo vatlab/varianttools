@@ -256,12 +256,14 @@ class HDF5Engine_storage(Base_Storage):
 
 
 
-    def remove_variant(self,variant_id,chr,groupName=""):
-        group=self.file.get_node("/chr"+chr+"/"+groupName)
-        # i=self.rownames.index(variant_id)
+    def remove_variants(self,variantIDs):
+        chr="22"
+        group=self.file.get_node("/chr"+chr+"/GT/")
         rownames=group.rownames[:]
-        i=np.where(rownames==variant_id)[0][0]
-        group.rowMask[i]=True
+        for variantID in variantIDs:
+            # i=self.rownames.index(variant_id)
+            i=np.where(rownames==variant_id)[0][0]
+            group.rowMask[i]=True
 
     def recover_variant(self,variant_id,chr,groupName=""):
         group=self.file.get_node("/chr"+chr+"/"+groupName)
@@ -271,20 +273,28 @@ class HDF5Engine_storage(Base_Storage):
         group.rowMask[i]=False
 
     
-    def remove_sample(self,sample_id,chr,groupName=""):
-        group=self.file.get_node("/chr"+chr+"/"+groupName)
-        # i=self.rownames.index(variant_id)
-        colnames=group.colnames[:]
-        i=np.where(colnames==sample_id)[0][0]
-        group.sampleMask[i]=True
+    def remove_sample(self,sample_id):
+        for chr in range(1,22):
+            try:
+                group=self.file.get_node("/chr"+str(chr)+"/GT/")
+                # i=self.rownames.index(variant_id)
+                colnames=group.colnames[:]
+                i=np.where(colnames==sample_id)[0][0]
+                group.sampleMask[i]=True
+            except:
+                pass
         
 
-    def remove_genotype(self,cond,chr):
-        group=self.file.get_node("/chr"+chr+"/genoInfo")
-        table=group.genoInfo
-        for x in table.where(cond):
-            x["entryMask"]=True
-            x.update()
+    def remove_genotype(self,cond):
+        for chr in range(1,22):
+            try:
+                group=self.file.get_node("/chr"+str(chr)+"/genoInfo")
+                table=group.genoInfo
+                for x in table.where(cond):
+                    x["entryMask"]=True
+                    x.update()
+            except:
+                pass
         
         # group=self.file.get_node("/chr"+chr+"/GT")
         # indptr=group.indptr
@@ -944,7 +954,6 @@ class HDF5Engine_access(Base_Access):
     def maskRemovedGenotypes(self,masked,data,indices,indptr,shape,rownames,colnames):
         M=csr_matrix((data,indices,indptr),shape=shape)
         C=M.tolil()
-        count=0
         rownames=np.array(rownames)
         for entry in masked:
             rowPos=np.where(rownames==entry[0])
@@ -953,22 +962,12 @@ class HDF5Engine_access(Base_Access):
             if len(rowPos[0]>0) and len(colPos[0])>0:
                 # print(rowPos[0][0],colPos[0][0])
                 C[rowPos[0][0],colPos[0][0]]=np.nan
-                count+=1
-        print(len(masked),count)
+        # print(len(masked),count)
         M=C.tocsr()
         return M.data,M.indices,M.indptr,M.shape
 
 
     def get_geno_info_by_variant_IDs(self,rowIDs,chr,groupName=""):
-        
-        # if not sorted?
-        #                  for id in ids:
-        #                     try:
-        #                         pos=rownames.index(id)
-        #                         idPos.append(pos)
-        #                     except ValueError:
-        #                         continue    
-        #                 idPos.sort()
 
         #assume rowIDs are sorted by genome position
         group=self.getGroup(chr,groupName)
@@ -1008,23 +1007,23 @@ class HDF5Engine_access(Base_Access):
         update_rowMask=rowMask[minPos:maxPos+1]
         rowMasked=np.where(update_rowMask==True)[0]
         sampleMasked=np.where(sampleMask==True)[0]+1
-
+        # check removed variants
         if len(rowMasked)>0:
             sub_data,sub_indices,sub_indptr,sub_shape,update_rownames=self.maskRemovedVariants(rowMasked,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames)
             # print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames))
+        #check removed samples
         if len(sampleMasked)>0:
             # print("before",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
             sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames=self.maskRemovedSamples(sampleMasked,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
             # print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
         
+        #check removed genotypes
         cond="(variant_id>="+str(update_rownames[0])+")&(variant_id<="+str(update_rownames[-1])+")&(entryMask==True)"
-        print(cond)
         entryMaskList=[]
         for x in table.where(cond):
             entryMaskList.append((x["variant_id"],x["sample_id"]))
         if len(entryMaskList)>0:
             sub_data,sub_indices,sub_indptr,sub_shape=self.maskRemovedGenotypes(entryMaskList,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
-
 
         return HMatrix(sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
 

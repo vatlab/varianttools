@@ -2270,36 +2270,26 @@ class Project:
                 continue
             cur.execute('DELETE FROM {} WHERE variant_id IN (SELECT variant_id FROM {});'.format(t, table))
             env.logger.info('{} variants are removed from table {}'.format(cur.rowcount, decodeTableName(t)))
-        # get sample_ids
-        cur.execute('SELECT sample_id, sample_name FROM sample;')
-        samples = cur.fetchall()
-        for ID, name in samples:
-            if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.name, ID)):
-                cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'
-                    .format(self.name, ID))
-            cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
-                .format(self.name, ID, table))
-            env.logger.info('{} genotypes are removed from sample {}'.format(cur.rowcount, name))
-        # remove the table itself
-        env.logger.info('Removing table {} itself'.format(decodeTableName(table)))
-        self.db.removeTable(table)
+
+        cur.execute("SELECT variant_id from {};").format(table)
+        result=cur.fetchall()
+        variantIDs=[]
+        for variantID in result:
+            variantIDs.append(variantID)
+        
+        store = GenoStore(self)
+        store.remove_variants(variantIDs)
+
+
 
     def removeGenotypes(self, cond):
         '''Remove genotype according to certain conditions'''
-        # get sample_ids
-        cur = self.db.cursor()
-        cur.execute('SELECT sample_id, sample_name FROM sample;')
-        samples = cur.fetchall()
-        env.logger.info('Removing genotypes from {} samples using criteria "{}"'.format(len(samples), cond))
-        for ID, name in samples:
-            try:
-                cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE {};'\
-                    .format(self.name, ID, cond))
-            except Exception as e:
-                env.logger.warning('Failed to remove genotypes from sample {}: {}'
-                    .format(name, e))
-                continue
-            env.logger.info('{} genotypes are removed from sample {}'.format(cur.rowcount, name))
+        
+        store = GenoStore(self)
+        store.remove_genotype(cond)
+
+
+        
 
     def renameSamples(self, cond, name1, name2=None):
         '''If name2 is none, rename selected samples to specified name1. 
