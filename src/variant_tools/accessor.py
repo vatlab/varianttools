@@ -258,12 +258,17 @@ class HDF5Engine_storage(Base_Storage):
 
 
     def remove_variants(self,variantIDs):
-        chr="22"
-        group=self.file.get_node("/chr"+chr+"/GT/")
-        rownames=group.rownames[:]
-        for variantID in variantIDs:
+        preChr=None
+        rownames=None
+        group=None
+        for res in variantIDs:
+            chr=res[1]
+            if chr!=preChr:
+                preChr=chr
+                group=self.file.get_node("/chr"+str(chr)+"/GT/")
+                rownames=group.rownames[:]
             # i=self.rownames.index(variant_id)
-            i=np.where(rownames==variant_id)[0][0]
+            i=np.where(rownames==res[0])[0][0]
             group.rowMask[i]=True
 
     def recover_variant(self,variant_id,chr,groupName=""):

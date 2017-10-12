@@ -2099,7 +2099,8 @@ class Project:
             env.logger.warning('Existing table {} is renamed to {}.'
                 .format(decodeTableName(table), decodeTableName(new_table)))
         self.db.execute('''CREATE {0} TABLE {1} (
-                variant_id INTEGER PRIMARY KEY
+                variant_id INTEGER PRIMARY KEY,
+                chr INTEGER
             );'''.format('TEMPORARY' if temporary else '', table))
         if variants:
             # this feature is used by vtools_report
@@ -2276,11 +2277,11 @@ class Project:
             cur.execute('DELETE FROM {} WHERE variant_id IN (SELECT variant_id FROM {});'.format(t, table))
             env.logger.info('{} variants are removed from table {}'.format(cur.rowcount, decodeTableName(t)))
 
-        cur.execute("SELECT variant_id from {};").format(table)
+        cur.execute("SELECT variant_id,chr from {};".format(table))
         result=cur.fetchall()
         variantIDs=[]
-        for variantID in result:
-            variantIDs.append(variantID)
+        for res in result:
+            variantIDs.append((res[0],res[1]))
         
         store = GenoStore(self)
         store.remove_variants(variantIDs)
