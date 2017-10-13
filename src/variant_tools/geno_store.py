@@ -602,11 +602,11 @@ class Sqlite_Store(Base_Store):
         self.projcur.execute('SELECT sample_id, sample_name FROM sample;')
         samples = self.projcur.fetchall()
         for ID, name in samples:
-            if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.name, ID)):
+            if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, ID)):
                 self.cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'
-                    .format(self.name, ID))
+                    .format(self.proj.name, ID))
             self.cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
-                .format(self.name, ID, table))
+                .format(self.proj.name, ID, table))
             env.logger.info('{} genotypes are removed from sample {}'.format(self.cur.rowcount, name))
         # remove the table itself
         env.logger.info('Removing table {} itself'.format(decodeTableName(table)))
