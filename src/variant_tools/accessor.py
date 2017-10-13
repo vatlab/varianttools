@@ -262,12 +262,14 @@ class HDF5Engine_storage(Base_Storage):
             try:
                 group=self.file.get_node("/chr"+str(chr)+"/GT/")
                 indices=group.indices[:]
+                colnames=group.colnames[:]
+                
                 numVariants=len(group.rownames[:])
-                colPos=np.where(indices==sampleID)
+                samplePos=np.where(colnames==sampleID)
+                colPos=np.where(indices==samplePos[0][0])
                 data=group.data[colPos]
                 numNan=np.where(np.isnan(data))
                 numMone=np.where(data==-1)
-                print(len(numNan[0]))
                 totalNum+=numVariants-len(numNan[0])-len(numMone[0])
             except:
                 pass
