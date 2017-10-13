@@ -33,6 +33,7 @@ comment=Reference sequence chromosome or scaffold
 
 [chr_start]
 index=3
+adj=IncreaseBy(1)
 type=INTEGER
 comment=Start position in chromosome
 
