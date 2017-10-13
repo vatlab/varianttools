@@ -37,7 +37,7 @@ adj=IncreaseBy(1)
 type=INTEGER
 comment=Start position in chromosome
 
-[chr_end]
+[position]
 index=4
 type=INTEGER
 comment=End position in chromosome
