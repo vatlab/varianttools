@@ -1,0 +1,169 @@
+# Copyright (C) 2017 Man Chong Leong (henryleong@rice.edu)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
+# for a description of the format of this file.
+#
+[linked fields]
+hg38=chr, start, end
+
+[data sources]
+anno_type=range
+description=Duplications of >1000 Bases of Non-RepeatMasked Sequence (>90 percent similar).
+version=hg38_20141028
+#direct_url=annoDB/genomicSuperDups-hg19_20130626.DB.gz	2bf334b2edafeba116ebd50d0981e8b1
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/genomicSuperDups.txt.gz
+source_type=txt
+
+[bin]
+index=1
+type=INTEGER
+comment=Indexing field to speed chromosome range queries.
+
+[chr]
+index=2
+adj=RemoveLeading('chr')
+type=VARCHAR(20)
+comment=Reference sequence chromosome or scaffold
+
+[chr_start]
+index=3
+type=INTEGER
+adj=IncreaseBy(1)
+comment=Start position in chromosome
+
+[chr_end]
+index=4
+type=INTEGER
+comment=End position in chromosome
+
+[name]
+index=5
+type=VARCHAR(225)
+comment=Other chromosome involved
+
+[score]
+index=6
+type=INTEGER
+comment=Score based on the raw BLAST alignment score. Set to 0 and not used in later versions.
+
+[strand]
+index=7
+type=char(1)
+comment=Value should be + or -
+
+[otherChr]
+index=8
+adj=RemoveLeading('chr')
+type=VARCHAR(20)
+comment=Other chromosome or scaffold
+
+[otherStart]
+index=9
+type=INTEGER
+comment=Start position of other region
+
+[otherEnd]
+index=10
+type=INTEGER
+comment=End position in chromosome
+
+[otherSize]
+index=11
+type=INTEGER
+comment=Total size of other chromosome
+
+[uid]
+index=12
+type=INTEGER
+comment=Unique id shared by the query and subject
+
+[posBasesHit]
+index=13
+type=INTEGER
+comment=For future use
+
+[testResult]
+index=14
+type=VARCHAR(255)
+comment=For future use
+
+[verdict]
+index=15
+type=VARCHAR(255)
+comment=For future use
+
+[chits]
+index=16
+type=VARCHAR(255)
+comment=For future use
+
+[ccov]
+index=17
+type=VARCHAR(255)
+comment=For future use
+
+[alignfile]
+index=18
+type=VARCHAR(255)
+comment=alignment file path
+
+[alignL]
+index=19
+type=INTEGER
+comment=spaces/positions in alignment
+
+[indelN]
+index=20
+type=INTEGER
+comment=number of indels
+
+[indelS]
+index=21
+type=INTEGER
+comment=indel spaces
+
+[alignB]
+index=22
+type=INTEGER
+comment=bases Aligned
+
+[matchB]
+index=23
+type=INTEGER
+comment=aligned bases that match
+
+[mismatchB]
+index=24
+type=INTEGER
+comment=aligned bases that do not match
+
+[transitionsB]
+index=25
+type=INTEGER
+comment=number of transitions
+
+[transversionsB]
+index=26
+type=INTEGER
+comment=number of transversions
+
+[fracMatch]
+index=27
+type=FLOAT
+comment=fraction of matching bases
+
+[fracMatchIndel]
+index=28
+type=FLOAT
+comment=fraction of matching bases with indels
+
+[jcK]
+index=29
+type=FLOAT
+comment=K-value calculated with Jukes-Cantor
+
+[k2K]
+index=30
+type=FLOAT
+comment=Kimura K
