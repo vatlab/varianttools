@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 import stat
 import subprocess
-
+import sys
 
 
 class ProcessMonitor(threading.Thread):
@@ -77,11 +77,13 @@ class ProcessMonitor(threading.Thread):
 def main():
     monitor_interval = 2
     resource_monitor_interval = 60
-    task_id=datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+"_import"
+    task_id=datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     m = ProcessMonitor(task_id, monitor_interval=monitor_interval,
              resource_monitor_interval=resource_monitor_interval)
     m.start()
-    subprocess.call("/Users/jma7/Development/VAT/importTest_13t/asso_run.sh",shell=True)
+    command=sys.argv[1]
+    print(command)
+    subprocess.call(command,shell=True)
     
 
 if __name__ == "__main__":
