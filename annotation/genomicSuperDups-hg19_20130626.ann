@@ -1,0 +1,115 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
+# for a description of the format of this file.
+#
+[linked fields]
+hg19=chr, start, end
+
+[data sources]
+anno_type=range
+description=Duplications of >1000 Bases of Non-RepeatMasked Sequence (>90 percent similar).
+version=hg19_20130626
+direct_url=annoDB/genomicSuperDups-hg19_20130626.DB.gz	2bf334b2edafeba116ebd50d0981e8b1
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/genomicSuperDups.txt.gz
+source_type=txt
+
+[chr]
+index=2
+adj=RemoveLeading('chr')
+type=VARCHAR(20)
+comment=Reference sequence chromosome or scaffold
+
+[start]
+index=3
+type=INTEGER
+adj=IncreaseBy(1)
+comment=Start position in chromosome
+
+[end]
+index=4
+type=INTEGER
+comment=End position in chromosome
+
+[name]
+index=5
+type=VARCHAR(225)
+comment=Other chromosome involved
+
+[otherChr]
+index=8
+adj=RemoveLeading('chr')
+type=VARCHAR(20)
+comment=Other chromosome or scaffold
+
+[otherStart]
+index=9
+type=INTEGER
+comment=Start position of other region
+
+[otherEnd]
+index=10
+type=INTEGER
+comment=End position in chromosome
+
+[otherSize]
+index=11
+type=INTEGER
+comment=Total size of other chromosome
+
+[alignL]
+index=19
+type=INTEGER
+comment=spaces/positions in alignment
+
+[indelN]
+index=20
+type=INTEGER
+comment=number of indels
+
+
+[indelS]
+index=21
+type=INTEGER
+comment=indel spaces
+
+[matchB]
+index=22
+type=INTEGER
+comment=aligned bases that match
+
+[mismatchB]
+index=23
+type=INTEGER
+comment=aligned bases that do not match
+
+[transitionsB]
+index=24
+type=INTEGER
+comment=number of transitions
+
+[transversionsB]
+index=25
+type=INTEGER
+comment=number of transversions
+
+[fracMatch]
+index=26
+type=FLOAT
+comment=fraction of matching bases
+
+[fracMatchIndel]
+index=27
+type=FLOAT
+comment=fraction of matching bases with indels
+
+[jcK]
+index=28
+type=FLOAT
+comment=K-value calculated with Jukes-Cantor
+
+[k2K]
+index=29
+type=FLOAT
+comment=Kimura K

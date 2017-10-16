@@ -26,19 +26,16 @@
 import sys
 import os
 import re
-import shutil
-import gzip
-import zipfile
+import time
 from collections import defaultdict
-from multiprocessing import Process, Pipe
-import math
-from .project import AnnoDB, Project, Field, fileFMT
+from .project import Project, fileFMT
 from .liftOver import LiftOverTool
-from .utils import ProgressBar, lineCount, DatabaseEngine, delayedAction, \
+from .utils import ProgressBar, lineCount, delayedAction, RefGenome,\
     consolidateFieldName, env, encodeTableName, decodeTableName, \
     determineSexOfSamples, getVariantsOnChromosomeX, getVariantsOnChromosomeY,\
     getVariantsOnManifolds
-from .importer import *
+from .importer import LineProcessor, probeSampleName
+from .text_reader import TextReader
 
 #
 #
@@ -128,7 +125,7 @@ class Updater:
         #
         if fmt.input_type == 'variant':
             # process variants, the fields for chr, pos, ref, alt are 0, 1, 2, 3 in fields.
-            self.processor = LineProcessor(fmt.fields, [(RefGenome(self.build).crr, 0, 1, 2, 3)], fmt.delimiter, self.ranges)
+            self.processor = LineProcessor(fmt.fields, [(RefGenome(self.build), 0, 1, 2, 3)], fmt.delimiter, self.ranges)
         else:  # position or range type
             self.processor = LineProcessor(fmt.fields, [(1,)], fmt.delimiter, self.ranges)
         # probe number of sample
@@ -142,9 +139,8 @@ class Updater:
                 # either insert or update, the fields must be in the master variant table
                 self.proj.checkFieldName(f.name, exclude='variant')
                 if f.name.upper() not in [x.upper() for x in headers]:
-                    s = delayedAction(env.logger.info, 'Adding column {}'.format(f.name))
-                    cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
-                    del s
+                    with delayedAction(env.logger.info, 'Adding column {}'.format(f.name)):
+                        cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
         #if len(self.variant_info) == 0 and len(self.genotype_info == 0:
         #    raise ValueError('No field could be updated using this input file')
         #
@@ -277,26 +273,25 @@ class Updater:
         #
         # do we need to add extra columns to the genotype tables
         if sample_ids:
-            s = delayedAction(env.logger.info, 'Preparing genotype tables (adding needed fields and indexes)...')
-            cur = self.db.cursor()
-            for id in sample_ids:
-                if id == -1:
-                    continue
-                headers = [x.upper() for x in self.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
-                if 'GT' not in headers:  # for genotype
-                    env.logger.trace('Adding column GT to table genotype_{}'.format(id))
-                    cur.execute('ALTER TABLE {}_genotype.genotype_{} ADD {} {};'.format(self.proj.name, id, 'GT', 'INT'))
-                for field in self.genotype_info:
-                    if field.name.upper() not in headers:
-                        env.logger.trace('Adding column {} to table genotype_{}'.format(field.name, id))
-                        cur.execute('ALTER TABLE {}_genotype.genotype_{} ADD {} {};'.format(self.proj.name, id, field.name, field.type))
-            # if we are updating by variant_id, we will need to create an index for it
-            for id in sample_ids:
-                if id == -1:
-                    continue
-                if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id)):
-                    cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
-            del s
+            with delayedAction(env.logger.info, 'Preparing genotype tables (adding needed fields and indexes)...'):
+                cur = self.db.cursor()
+                for id in sample_ids:
+                    if id == -1:
+                        continue
+                    headers = [x.upper() for x in self.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
+                    if 'GT' not in headers:  # for genotype
+                        env.logger.trace('Adding column GT to table genotype_{}'.format(id))
+                        cur.execute('ALTER TABLE {}_genotype.genotype_{} ADD {} {};'.format(self.proj.name, id, 'GT', 'INT'))
+                    for field in self.genotype_info:
+                        if field.name.upper() not in headers:
+                            env.logger.trace('Adding column {} to table genotype_{}'.format(field.name, id))
+                            cur.execute('ALTER TABLE {}_genotype.genotype_{} ADD {} {};'.format(self.proj.name, id, field.name, field.type))
+                # if we are updating by variant_id, we will need to create an index for it
+                for id in sample_ids:
+                    if id == -1:
+                        continue
+                    if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id)):
+                        cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
             genotype_update_query = {id: 'UPDATE {0}_genotype.genotype_{1} SET {2} WHERE variant_id = {3};'\
                 .format(self.proj.name, id,
                 ', '.join(['{}={}'.format(x, self.db.PH) for x in [y.name for y in self.genotype_info]]),
@@ -386,7 +381,7 @@ def setFieldValue(proj, table, items, build):
                     continue
                 if type(rec[i]) != fldTypes[i]:
                     if type(rec[i]) is float and fldTypes[i] is int:
-                        fltType[i] = float
+                        fldTypes[i] = float
                     else:
                         raise ValueError('Inconsistent type returned from different samples')
             if all([x is not None for x in fldTypes]):
@@ -444,9 +439,8 @@ def setFieldValue(proj, table, items, build):
         env.logger.trace('Running {}'.format(query))
         cur.execute(query)
         fldTypes = [None] * len(items)
-        s = delayedAction(env.logger.info, 'Evaluating all expressions')
-        results = cur.fetchall()
-        del s
+        with delayedAction(env.logger.info, 'Evaluating all expressions'):
+            results = cur.fetchall()
         #
         for res in results:
             for i in range(len(items)):
@@ -457,7 +451,7 @@ def setFieldValue(proj, table, items, build):
                     continue
                 if type(res[i]) != fldTypes[i]:
                     if type(res[i]) is float and fldTypes[i] is int:
-                        fltType[i] = float
+                        fldTypes[i] = float
                     else:
                         raise ValueError('Inconsistent type returned from different samples')
             if all([x is not None for x in fldTypes]):
@@ -495,7 +489,6 @@ def setFieldValue(proj, table, items, build):
         prog = ProgressBar('Updating {}'.format(decodeTableName(table)), len(results))
         # this particular query will return a bunch of bogus NULL values for range-based databases,
         # which needs to be filtered out.
-        update_status = {}
         count = 0
         count_multi_value = 0
         last_id = None
@@ -853,7 +846,6 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     prog = ProgressBar('Updating {}'.format(decodeTableName(variant_table)), len(variants))
     update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format('variant', proj.db.PH,
         ' ,'.join(['{}={}'.format(x, proj.db.PH) for x in queryDestinations if x is not None]))
-    warning = False
     count = 0
     for count,id in enumerate(variants):
         value = variants[id]

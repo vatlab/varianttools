@@ -36,6 +36,7 @@ import time
 import tempfile
 import tokenize
 import gzip
+import traceback
 import threading
 import re
 import shlex
@@ -151,13 +152,6 @@ except ImportError as e:
     sys.exit('Failed to import module ({})\n'
         'Please verify if you have installed variant tools successfully (using command '
         '"python setup.py install")'.format(e))
-
-try:
-    # fake import to make this sqlite module bundled by pyinstaller
-    from . import _vt_sqlite3_ext
-except ImportError as e:
-    pass
-
 
 class ColoredFormatter(logging.Formatter):
     ''' A logging formatter that uses color to differntiate logging messages
@@ -631,7 +625,7 @@ class RuntimeEnvironments(object):
             return self._null_input
         self._null_input = os.path.join(os.path.expanduser(self._local_resource), 'null_input')
         if not os.path.isfile(self._null_input):
-            with open(self._null_input, 'w') as ni:
+            with open(self._null_input, 'w'):
                 pass
         return self._null_input
     #
@@ -1031,7 +1025,7 @@ def safeMapFloat(x, nan = True):
             raise
     return x
         
-class delayedAction:
+class delayedAction(object):
     '''Call the passed function with param after a few seconds. It is most often 
     used to display certain message only if an action takes a long time.
 
@@ -1043,11 +1037,29 @@ class delayedAction:
     '''
     def __init__(self, func, param, delay=5):
         self.timer = threading.Timer(delay, func, (param,))
+
+    def __enter__(self):
         self.timer.start()
 
-    def __del__(self):
+    def __exit__(self, type, value, traceback):
         self.timer.cancel()
 
+def get_traceback():
+    output = StringIO()
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    #print "*** print_tb:"
+    traceback.print_tb(exc_traceback, limit=1, file=output)
+    #print "*** print_exception:"
+    try:
+        traceback.print_exception(exc_type, exc_value, exc_traceback,
+                              limit=5, file=output)
+    except Exception:
+        # the above function call can fail under Python 3.4 for some
+        # exception but we do not really care if that happens
+        pass
+    result = output.getvalue()
+    output.close()
+    return result
 
 def filesInURL(URL, ext=''):
     '''directory listing of a URL'''
@@ -1571,7 +1583,7 @@ class ShelfDB:
     def _add_py2(self, key, value):
         # return value from dumps needs to be converted to buffer (bytes)
         self.cur.execute(self.insert_query, 
-            (key, buffer(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
+            (key, memoryview(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
 
     def _get_py2(self, key):
         msg = 'Retrieve key {} from ShelfDB'.format(key)
@@ -1712,7 +1724,7 @@ class ResourceManager:
     def getCommentFromConfigFile(self, filename, section, option):
         '''Get comment from annotation description file.'''
         try:
-            parser = ConfigParser.SafeConfigParser()
+            parser = configparser.ConfigParser()
             parser.read(filename) 
             return parser.get(section, option)
         except Exception as e:
@@ -1740,7 +1752,7 @@ class ResourceManager:
         else:
             return '*'
         try:
-            parser = ConfigParser.SafeConfigParser()
+            parser = configparser.ConfigParser()
             parser.read(ann_file)
             return ','.join([x[0] for x in parser.items('linked fields')])
         except Exception as e:
@@ -1942,8 +1954,6 @@ class ResourceManager:
         '''Go through the manifest and download at most max_updates small files
         (.ann, .pipeline etc), and take at most max_updates seconds'''
         changed = []
-        added = 0
-        start_time = time.time()
         for cnt, filename in enumerate(sorted(list(self.manifest.keys()))):
             fileprop = self.manifest[filename]
             dest_dir = os.path.join(env.local_resource, os.path.split(filename)[0])
@@ -1963,7 +1973,6 @@ class ResourceManager:
 
     def downloadResources(self, dest_dir=None):
         '''Download resources'''
-        excluded = []
         for cnt, filename in enumerate(sorted(list(self.manifest.keys()))):
             fileprop = self.manifest[filename]
             #
@@ -2197,7 +2206,7 @@ def downloadURL(URL, dest, quiet, message=None):
     if os.path.isfile(dest):
         return dest
     # if all failed
-    raise RuntimeError('Failed to download {}'.format(fileToGet))
+    raise RuntimeError('Failed to download {}'.format(URL))
 
 
 def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
@@ -2567,6 +2576,7 @@ def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
 def physicalMemory():
     '''Get the amount of physical memory in the system'''
     # MacOSX?
+    import platform
     if platform.platform().startswith('Darwin'):
         # FIXME
         return None
@@ -3851,7 +3861,8 @@ def call_sex(dat):
     sex = 'unknown'
     xhomo = False
     for locus in dat:
-        if withinPseudoAutoRegion(locus[0], int(locus[1]), build):
+        # FIXME: build is fixed to hg19
+        if withinPseudoAutoRegion(locus[0], int(locus[1]), 'hg19'):
             continue
         # call 'M' if '1' on Y chromosome is observed
         # FIXME: will be problematic if XY is coded 24 instead

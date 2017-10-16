@@ -24,25 +24,24 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import sys, os, re, glob
-from multiprocessing import Process, Queue, Pipe, Value, Array, Lock
+from multiprocessing import Process, Queue, Value, Array, Lock
 import time
 import random
 import math
-from copy import copy, deepcopy
 from .project import Project, Field, AnnoDB, AnnoDBWriter, MaintenanceProcess
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, \
      env, executeUntilSucceed, ShelfDB, safeMapFloat, PrettyPrinter, flatten, hasGenoInfo
-from .phenotype import Sample
+
+from .assoTests import *
 from .tester import *
-from .assoTests import AssoData
 from .rtester import RTest, SKAT
 import tables as tb
 from variant_tools.vt_sqlite3 import OperationalError
+
 import argparse
 import numpy as np
-
 from .association_hdf5 import generateHDFbyGroup,getGenotype_HDF5,generateHDFbyGroup_update
-# from .association_vcf_to_hdf5 import generateHDFbyGroup,getGenotype_HDF5
+
 
 def associateArguments(parser):
     data = parser.add_argument_group('Genotype, phenotype, and covariates')
@@ -463,13 +462,12 @@ class AssociationTestManager:
         # This will be the tmp table to extract variant_id by groups (ignored is 0)
         query = 'INSERT INTO __asso_tmp SELECT DISTINCT {}.variant_id, 0, {} FROM {} {};'.\
           format(self.table, group_fields, self.from_clause, self.where_clause)
-        s = delayedAction(env.logger.info, "Grouping variants by '{}', please be patient ...".\
-                          format(':'.join(group_by)))
-        env.logger.debug('Running query {}'.format(query))
-        cur.execute(query)
-        cur.execute('CREATE INDEX __asso_tmp_index ON __asso_tmp ({});'.\
+        with delayedAction(env.logger.info, "Grouping variants by '{}', please be patient ...".\
+                format(':'.join(group_by))):
+            env.logger.debug('Running query {}'.format(query))
+            cur.execute(query)
+            cur.execute('CREATE INDEX __asso_tmp_index ON __asso_tmp ({});'.\
                     format(','.join(['{} ASC'.format(x) for x in field_names])))
-        del s
         # get group by
         cur.execute('SELECT DISTINCT {} FROM __asso_tmp;'.\
                     format(', '.join(field_names)))
@@ -760,7 +758,6 @@ class AssoTestsWorker(Process):
         '''Get genotype for variants in specified group'''
         # get variant_id
         where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
-        cur = self.db.cursor()
         # variant info
         var_info, variant_id = self.getVarInfo(group, where_clause)
         # get genotypes / genotype info
@@ -1041,13 +1038,12 @@ def runAssociation(args,asso,proj,results):
                 # None will kill the workers
                 sampleQueue.put(None)
             #
-            s = delayedAction(env.logger.info, "Starting {} processes to load genotypes".format(nLoaders))
-            while True:
-                if all(ready_flags):
-                    break
-                else:
-                    time.sleep(random.random()*2)
-            del s
+            with delayedAction(env.logger.info, "Starting {} processes to load genotypes".format(nLoaders)):
+                while True:
+                    if all(ready_flags):
+                        break
+                    else:
+                        time.sleep(random.random()*2)
             # progress bar...
             prog = ProgressBar('Loading genotypes', len(asso.sample_IDs))
             try:
@@ -1105,13 +1101,12 @@ def runAssociation(args,asso,proj,results):
             grpQueue.put(None)
         #
         count = 0
-        s = delayedAction(env.logger.info, "Starting {} association test workers".format(nJobs))
-        while True:
-            if all(ready_flags):
-                break
-            else:
-                time.sleep(random.random()*2)
-        del s
+        with delayedAction(env.logger.info, "Starting {} association test workers".format(nJobs)):
+            while True:
+                if all(ready_flags):
+                    break
+                else:
+                    time.sleep(random.random()*2)
         prog = ProgressBar('Testing for association', len(asso.groups))
         try:
             while True:
@@ -1143,10 +1138,9 @@ def runAssociation(args,asso,proj,results):
         # tells the maintenance process to stop
         maintenance_flag.value = 0
         # wait for the maitenance process to stop
-        s = delayedAction(env.logger.info,
-                          "Maintaining database. This might take a few minutes.", delay=10)
-        maintenance.join()
-        del s
+        with delayedAction(env.logger.info,
+                "Maintaining database. This might take a few minutes.", delay=10):
+            maintenance.join()
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)

@@ -23,16 +23,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import argparse, sys, os, re
-try:
-    # python 2 has pickle and cPickle
-    import pickle as pickle
-except:
-    # python 3 has pickle
-    import pickle
+import sys
+import os
+import pickle
 from collections import OrderedDict
 from .utils import env, runCommand, mkdir_p, downloadFile, whereisRPackage
 from .rtester import Str4R
+import subprocess
 
 def size(bytes):
     system = [
@@ -94,7 +91,8 @@ def RdeviceFromFilename(filename, width=800, height=600):
             device = 'postscript'
             params = ', width={}/90, height={}/90'.format(width, height)
     except Exception as e:
-        logger.warning('Can not determine which device to use to save file {}. A postscript driver is used: {}'.format(name, e))
+        env.logger.warning('Can not determine which device to use to save file {}. A postscript driver is used: {}'.format(
+            filename, e))
         device = 'postscript'
     return '{}("{}" {})'.format(device, filename, params)
 
@@ -109,15 +107,15 @@ def resolvePlotFilename(name, fields):
     
 def executeRScript(script):
     # write script to log file for debugging and customization purposes
-    logger.info('Running R script (complete script available in vtools_report.log)'.format(script))
-    logger.debug(script)
+    env.logger.info('Running R script (complete script available in vtools_report.log)'.format(script))
+    env.logger.debug(script)
     # start R
     process = subprocess.Popen(['R', '--slave', '--no-save', '--no-restore'], 
         stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     # send script and get standard output and error
     out, err = process.communicate(script)
     if err.strip():
-        logger.warning(err)
+        env.logger.warning(err)
     return process.wait()
 
 def loadGgplot(script):
@@ -284,7 +282,7 @@ def plotAssociation(args):
             data_size += len(x)
         data.append(x.rstrip().split())
     env.logger.info("Processing {} of input data ...".format(size(len(data) + data_size)))
-    p = PlotAssociation(args, data)
+    PlotAssociation(args, data)
     pinput = eval(args.method.upper() + '_FOO') + eval('p.{}'.format(args.method if args.method == 'qq' else 'manhattan'))() + eval(args.method.upper() + '_MAIN')
     pinput = loadGgplot(pinput)
     env.logger.info("Generating graph(s) ...")

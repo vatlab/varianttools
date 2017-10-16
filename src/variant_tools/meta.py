@@ -23,7 +23,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import sys, os, time
+import os
+import time
 from math import sqrt
 from variant_tools.utils import openFile
 from variant_tools.project import AnnoDBWriter, Field

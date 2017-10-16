@@ -93,16 +93,6 @@ class PlinkFile:
         return row
 
     ##
-    # For python 3.x.
-    #
-    def __next__(self):
-        row = cplinkio.next_row( self.handle )
-        if not row:
-            raise StopIteration
-
-        return row
-    
-    ##
     # Closes the file.
     #
     def close(self):

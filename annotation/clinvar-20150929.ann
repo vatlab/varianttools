@@ -1,0 +1,424 @@
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
+# for a description of the format of this file.
+
+[linked fields]
+hg19=chr,pos,ref,alt
+
+[data sources]
+description=ClinVar is a freely accessible, public archive of reports of the relationships among human variations and phenotypes, with supporting evidence. ClinVar thus facilitates access to and communication about the relationships asserted between human variation and observed health status, and the history of that interpretation. ClinVar collects reports of variants found in patient samples, assertions made regarding their clinical significance, information about the submitter, and other supporting data. The alleles described in submissions are mapped to reference sequences, and reported according to the HGVS standard. ClinVar then presents the data for interactive users as well as those wishing to use ClinVar in daily workflows and other local applications. This database is created from clinvar_20150929.vcf.gz
+version=20150929
+anno_type=variant
+direct_url=annoDB/clinvar-20150929.DB.gz	5c0d47a5d91e135e9c32a2bec0758f5e
+source_url=ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/clinvar_20150929.vcf.gz
+source_type=txt
+source_pattern=
+
+# Version                 VCF v4.0
+# Number of fields:       8
+# Header: (excluding INFO and FORMAT lines)
+#                         ##fileDate=20150930
+#                         ##source=ClinVar and dbSNP
+#                         ##dbSNP_BUILD_ID=144
+#                         ##reference=GRCh37.p13
+#                         ##phasing=partial
+#                         ##variationPropertyDocumentationUrl=ftp://ftp.ncbi.nlm.nih.gov/snp/specs/dbSNP_BitField_latest.pdf
+#                         ##FILTER=<ID=NC,Description="Inconsistent Genotype Submission For At Least One Sample">
+
+[chr]
+index=1
+type=VARCHAR(255)
+adj=RemoveLeading('chr')
+comment=Chromosome
+
+[pos]
+index=2
+type=INTEGER
+comment=Position (1-based)
+
+[name]
+index=3
+type=VARCHAR(24) NULL
+comment=DB SNP ID
+
+[ref]
+index=4
+type=CHAR(1) NOT NULL
+comment=Reference allele (as on the + strand)
+
+[alt]
+index=5
+type=VARCHAR(48) NOT NULL
+adj=CheckSplit()
+comment=Alternative allele (as on the + strand)
+
+[qual]
+index=6
+type=VARCHAR(255) NOT NULL
+comment=Quality
+
+[filter]
+index=7
+type=VARCHAR(255) NOT NULL
+comment=Filter
+
+[RS]
+index=8
+type=INTEGER
+adj=ExtractValue('RS=', ';')
+comment=dbSNP ID (i.e. rs number)
+
+[RSPOS]
+index=8
+type=INTEGER
+adj=ExtractValue('RSPOS=', ';')
+comment=Chr position reported in dbSNP
+
+[RV]
+index=8
+type=INTEGER
+adj=ExtractFlag('RV', ';')
+comment=RS orientation is reversed
+
+[VP]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('VP=', ';')
+comment=Variation Property.  Documentation is at ftp://ftp.ncbi.nlm.nih.gov/snp/specs/dbSNP_BitField_latest.pdf
+
+[GENEINFO]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('GENEINFO=', ';')
+comment=Pairs each of gene symbol:gene id.  The gene symbol and id are delimited by a colon (:) and each pair is delimited by a vertical bar (|)
+
+[dbSNPBuildID]
+index=8
+type=INTEGER
+adj=ExtractValue('dbSNPBuildID=', ';')
+comment=First dbSNP Build for RS
+
+[SAO]
+index=8
+type=INTEGER
+adj=ExtractValue('SAO=', ';')
+comment=Variant Allele Origin: 0 - unspecified, 1 - Germline, 2 - Somatic, 3 - Both
+
+[SSR]
+index=8
+type=INTEGER
+adj=ExtractValue('SSR=', ';')
+comment=Variant Suspect Reason Codes (may be more than one value added together) 0 - unspecified, 1 - Paralog, 2 - byEST, 4 - oldAlign, 8 - Para_EST, 16 - 1kg_failed, 1024 - other
+
+[WGT]
+index=8
+type=INTEGER
+adj=ExtractValue('WGT=', ';')
+comment=Weight, 00 - unmapped, 1 - weight 1, 2 - weight 2, 3 - weight 3 or more
+
+[VC]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('VC=', ';')
+comment=Variation Class
+
+[PM]
+index=8
+type=INTEGER
+adj=ExtractFlag('PM', ';')
+comment=Variant is Precious(Clinical,Pubmed Cited)
+
+[TPA]
+index=8
+type=INTEGER
+adj=ExtractFlag('TPA', ';')
+comment=Provisional Third Party Annotation(TPA) (currently rs from PHARMGKB who will give phenotype data)
+
+[PMC]
+index=8
+type=INTEGER
+adj=ExtractFlag('PMC', ';')
+comment=Links exist to PubMed Central article
+
+[S3D]
+index=8
+type=INTEGER
+adj=ExtractFlag('S3D', ';')
+comment=Has 3D structure - SNP3D table
+
+[SLO]
+index=8
+type=INTEGER
+adj=ExtractFlag('SLO', ';')
+comment=Has SubmitterLinkOut - From SNP->SubSNP->Batch.link_out
+
+[NSF]
+index=8
+type=INTEGER
+adj=ExtractFlag('NSF', ';')
+comment=Has non-synonymous frameshift A coding region variation where one allele in the set changes all downstream amino acids. FxnClass = 44
+
+[NSM]
+index=8
+type=INTEGER
+adj=ExtractFlag('NSM', ';')
+comment=Has non-synonymous missense A coding region variation where one allele in the set changes protein peptide. FxnClass = 42
+
+[NSN]
+index=8
+type=INTEGER
+adj=ExtractFlag('NSN', ';')
+comment=Has non-synonymous nonsense A coding region variation where one allele in the set changes to STOP codon (TER). FxnClass = 41
+
+[REF_flag]
+index=8
+type=INTEGER
+adj=ExtractFlag('REF', ';')
+comment=Has reference A coding region variation where one allele in the set is identical to the reference sequence. FxnCode = 8
+
+[SYN]
+index=8
+type=INTEGER
+adj=ExtractFlag('SYN', ';')
+comment=Has synonymous A coding region variation where one allele in the set does not change the encoded amino acid. FxnCode = 3
+
+[U3]
+index=8
+type=INTEGER
+adj=ExtractFlag('U3', ';')
+comment=In 3' UTR Location is in an untranslated region (UTR). FxnCode = 53
+
+[U5]
+index=8
+type=INTEGER
+adj=ExtractFlag('U5', ';')
+comment=In 5' UTR Location is in an untranslated region (UTR). FxnCode = 55
+
+[ASS]
+index=8
+type=INTEGER
+adj=ExtractFlag('ASS', ';')
+comment=In acceptor splice site FxnCode = 73
+
+[DSS]
+index=8
+type=INTEGER
+adj=ExtractFlag('DSS', ';')
+comment=In donor splice-site FxnCode = 75
+
+[INT_flag]
+index=8
+type=INTEGER
+adj=ExtractFlag('INT', ';')
+comment=In Intron FxnCode = 6
+
+[R3]
+index=8
+type=INTEGER
+adj=ExtractFlag('R3', ';')
+comment=In 3' gene region FxnCode = 13
+
+[R5]
+index=8
+type=INTEGER
+adj=ExtractFlag('R5', ';')
+comment=In 5' gene region FxnCode = 15
+
+[OTH]
+index=8
+type=INTEGER
+adj=ExtractFlag('OTH', ';')
+comment=Has other variant with exactly the same set of mapped positions on NCBI refernce assembly.
+
+[CFL]
+index=8
+type=INTEGER
+adj=ExtractFlag('CFL', ';')
+comment=Has Assembly conflict. This is for weight 1 and 2 variant that maps to different chromosomes on different assemblies.
+
+[ASP]
+index=8
+type=INTEGER
+adj=ExtractFlag('ASP', ';')
+comment=Is Assembly specific. This is set if the variant only maps to one assembly
+
+[MUT]
+index=8
+type=INTEGER
+adj=ExtractFlag('MUT', ';')
+comment=Is mutation (journal citation, explicit fact): a low frequency variation that is cited in journal and other reputable sources
+
+[VLD]
+index=8
+type=INTEGER
+adj=ExtractFlag('VLD', ';')
+comment=Is Validated.  This bit is set if the variant has 2+ minor allele count based on frequency or genotype data.
+
+[G5A]
+index=8
+type=INTEGER
+adj=ExtractFlag('G5A', ';')
+comment=>5% minor allele frequency in each and all populations
+
+[G5]
+index=8
+type=INTEGER
+adj=ExtractFlag('G5', ';')
+comment=>5% minor allele frequency in 1+ populations
+
+[HD]
+index=8
+type=INTEGER
+adj=ExtractFlag('HD', ';')
+comment=Marker is on high density genotyping kit (50K density or greater).  The variant may have phenotype associations present in dbGaP.
+
+[GNO]
+index=8
+type=INTEGER
+adj=ExtractFlag('GNO', ';')
+comment=Genotypes available. The variant has individual genotype (in SubInd table).
+
+[KGPhase1]
+index=8
+type=INTEGER
+adj=ExtractFlag('KGPhase1', ';')
+comment=1000 Genome phase 1 (incl. June Interim phase 1)
+
+[KGPhase3]
+index=8
+type=INTEGER
+adj=ExtractFlag('KGPhase3', ';')
+comment=1000 Genome phase 3
+
+[CDA]
+index=8
+type=INTEGER
+adj=ExtractFlag('CDA', ';')
+comment=Variation is interrogated in a clinical diagnostic assay
+
+[LSD]
+index=8
+type=INTEGER
+adj=ExtractFlag('LSD', ';')
+comment=Submitted from a locus-specific database
+
+[MTP]
+index=8
+type=INTEGER
+adj=ExtractFlag('MTP', ';')
+comment=Microattribution/third-party annotation(TPA:GWAS,PAGE)
+
+[OM]
+index=8
+type=INTEGER
+adj=ExtractFlag('OM', ';')
+comment=Has OMIM/OMIA
+
+[NOC]
+index=8
+type=INTEGER
+adj=ExtractFlag('NOC', ';')
+comment=Contig allele not present in variant allele list. The reference sequence allele at the mapped position is not present in the variant allele list, adjusted for orientation.
+
+[WTD]
+index=8
+type=INTEGER
+adj=ExtractFlag('WTD', ';')
+comment=Is Withdrawn by submitter If one member ss is withdrawn by submitter, then this bit is set.  If all member ss' are withdrawn, then the rs is deleted to SNPHistory
+
+[NOV]
+index=8
+type=INTEGER
+adj=ExtractFlag('NOV', ';')
+comment=Rs cluster has non-overlapping allele sets. True when rs set has more than 2 alleles from different submissions and these sets share no alleles in common.
+
+[CAF]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('CAF=', ';')
+comment=An ordered, comma delimited list of allele frequencies based on 1000Genomes, starting with the reference allele followed by alternate alleles as ordered in the ALT column. Where a 1000Genomes alternate allele is not in the dbSNPs alternate allele set, the allele is added to the ALT column.  The minor allele is the second largest value in the list, and was previuosly reported in VCF as the GMAF.  This is the GMAF reported on the RefSNP and EntrezSNP pages and VariationReporter
+
+[CAF_ref]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('CAF=', ';'), lambda x: x.split(',')[0]
+comment=Reference allele frequencies based on 1000Genomes
+
+[CAF_alt]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('CAF=', ';'), lambda x: tuple(x.split(',')[1:])
+comment=An ordered, comma delimited list of allele frequencies based on 1000Genomes, starting with the reference allele followed by alternate alleles as ordered in the ALT column. Where a 1000Genomes alternate allele is not in the dbSNPs alternate allele set, the allele is added to the ALT column.  The minor allele is the second largest value in the list, and was previuosly reported in VCF as the GMAF.  This is the GMAF reported on the RefSNP and EntrezSNP pages and VariationReporter
+
+
+
+[COMMON]
+index=8
+type=INTEGER
+adj=ExtractValue('COMMON=', ';')
+comment=RS is a common SNP.  A common SNP is one that has at least one 1000Genomes population with a minor allele of frequency >= 1% and for which 2 or more founders contribute to that minor allele frequency.
+
+[CLNHGVS]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('CLNHGVS=', ';')
+comment=Variant names from HGVS.    The order of these variants corresponds to the order of the info in the other clinical  INFO tags.
+
+[CLNALLE]
+index=8
+type=INTEGER
+adj=ExtractValue('CLNALLE=', ';'), lambda x: tuple(x.split(',')[1:])
+comment=Variant alleles from REF or ALT columns.  0 is REF, 1 is the first ALT allele, etc.  This is used to match alleles with other corresponding clinical (CLN) INFO tags.  A value of -1 indicates that no allele was found to match a corresponding HGVS allele name.
+
+[CLNSRC]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('CLNSRC=', ';')
+comment=Variant Clinical Chanels
+
+[CLNORIGIN]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('CLNORIGIN=', ';')
+comment=Allele Origin. One or more of the following values may be added: 0 - unknown; 1 - germline; 2 - somatic; 4 - inherited; 8 - paternal; 16 - maternal; 32 - de-novo; 64 - biparental; 128 - uniparental; 256 - not-tested; 512 - tested-inconclusive; 1073741824 - other
+
+[CLNSRCID]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('CLNSRCID=', ';')
+comment=Variant Clinical Channel IDs
+
+[CLNSIG]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('CLNSIG=', ';')
+comment=Variant Clinical Significance, 0 - Uncertain significance, 1 - not provided, 2 - Benign, 3 - Likely benign, 4 - Likely pathogenic, 5 - Pathogenic, 6 - drug response, 7 - histocompatibility, 255 - other
+
+[CLNDSDB]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('CLNDSDB=', ';')
+comment=Variant disease database name
+
+[CLNDSDBID]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('CLNDSDBID=', ';')
+comment=Variant disease database ID
+
+[CLNDBN]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('CLNDBN=', ';')
+comment=Variant disease name
+
+[CLNREVSTAT]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('CLNREVSTAT=', ';')
+comment=ClinVar Review Status, mult - Classified by multiple submitters, single - Classified by single submitter, not - Not classified by submitter, exp - Reviewed by expert panel, prof - Reviewed by professional society
+
+[CLNACC]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('CLNACC=', ';'), lambda x: tuple(x.split(','))
+comment=Variant Accession and Versions

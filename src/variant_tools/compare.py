@@ -368,7 +368,7 @@ def compareTables(proj, args):
                 .format(len(geno_intersect)))
             var_intersect = set([x[0] for x in geno_intersect])
         if args.expression is not None:
-            var_dict = {}
+            geno_dict = {}
             for idx, g in enumerate(geno):
                 geno_dict['_{}'.format(idx+1)] = g
             # evaluate the expression

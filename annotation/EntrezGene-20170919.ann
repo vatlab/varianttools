@@ -1,0 +1,138 @@
+# Copyright (C) 2017 Man Chong Leong (henryleong@rice.edu)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
+# for a description of the format of this file.
+#
+
+[linked fields]
+hg19=chr,start,end
+
+[data sources]
+description=Entrez Gene (www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=gene) is NCBI's database
+	for gene-specific information. It does not include all known or predicted genes; instead
+	Entrez Gene focuses on the genomes that have been completely sequenced, that have an active
+	research community to contribute gene-specific information, or that are scheduled for
+	intense sequence analysis. This database contains Entrez gene info database for Homo Sapiens,
+	downloaded from ftp://ftp.ncbi.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz.
+version=20170919
+anno_type=range
+source_url=ftp://ftp.ncbi.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
+#direct_url=annoDB/EntrezGene-20131028.DB.gz	9f547ad64e7623a2c1c74ceaa8dcdb2f
+source_type=txt
+header=1
+
+
+[chr]
+index=7
+type=VARCHAR(255) NOT NULL
+comment=chromosome name, the same as field chromosome
+
+[start]
+index=2
+type=INT NOT NULL
+# get start loctions from the gene2refseq database
+adj=FieldFromDB("EntrezGene2RefSeq.DB", 'start_position_on_the_genomic_accession', 'GeneID')
+comment=Start location of the gene, retrieved from EntrezGene2RefSeq.
+
+[end]
+index=2
+type=INT NOT NULL
+# get end loctions from the gene2refseq database, this will repeat the record for each
+# isoform of the gene
+adj=FieldFromDB("EntrezGene2RefSeq.DB", 'end_position_on_the_genomic_accession', 'GeneID')
+comment=End location of the gene, retrieved from EntrezGene2RefSeq.
+
+[tax_id]
+index=1
+adj=DiscardRecord('9606', keepMatched=True)
+type=VARCHAR(255)
+comment=the unique identifier provided by NCBI Taxonomy for the species or strain/isolate
+
+[GeneID]
+index=2
+type=INT NOT NULL
+comment=the unique identifier for a gene (ASN1: geneid)
+
+[Symbol]
+index=3
+type=VARCHAR(255)
+adj=Nullify('-')
+comment=the default symbol for the gene (ASN1: gene->locus)
+
+[LocusTag]
+index=4
+type=VARCHAR(255)
+adj=Nullify('-')
+comment=the LocusTag value (ASN1:  gene->locus-tag)
+
+[Synonyms]
+index=5
+type=VARCHAR(255)
+adj=Nullify('-')
+comment=bar-delimited set of unofficial symbols for the gene
+
+[dbXrefs]
+index=6
+type=VARCHAR(255)
+adj=Nullify('-')
+comment=bar-delimited set of identifiers in other databases for this gene.  The unit of the set is database:value.
+
+[chromosome]
+index=7
+type=VARCHAR(255)
+comment=the chromosome on which this gene is placed. for mitochondrial genomes, the value 'MT' is used.
+
+[map_location]
+index=8
+type=VARCHAR(255)
+adj=Nullify('-')
+comment=the map location for this gene
+
+[description]
+index=9
+type=VARCHAR(255)
+adj=Nullify('-')
+comment=a descriptive name for this gene
+
+[type_of_gene]
+index=10
+type=VARCHAR(255)
+adj=Nullify('-')
+comment=the type assigned to the gene according to the list of options. provided in http://www.ncbi.nlm.nih.gov/IEB/ToolBox/CPP_DOC/lxr/source/src/objects/entrezgene/entrezgene.asn
+
+[Symbol_from_nomenclature_authority]
+index=11
+type=VARCHAR(255)
+adj=Nullify('-')
+comment=If exists (not NULL), indicates that this symbol is from a nomenclature authority
+
+[Full_name_from_nomenclature_authority]
+index=12
+type=VARCHAR(255)
+adj=Nullify('-')
+comment=If exists (not NULL), indicates that this full name is from a nomenclature authority
+
+[Nomenclature_status]
+index=13
+type=VARCHAR(255)
+adj=Nullify('-')
+comment=If exists (not NULL), indicates the status of the name from the nomenclature authority (O for official, I for interim)
+
+[Other_designations]
+index=14
+type=VARCHAR(255)
+adj=Nullify('-')
+comment=pipe-delimited set of some alternate descriptions that have been assigned to a GeneID '-' indicates none is being reported.
+
+[Modification_date]
+index=15
+type=VARCHAR(10)
+adj=Nullify('-')
+comment=the last date a gene record was updated, in YYYYMMDD format
+
+[Feature_type]
+index=16
+type=VARCHAR(255)
+adj=Nullify('-')
+comment=pipe-delimited set of annotated features and their classes or controlled vocabularies, displayed as feature_type:feature_class or feature_type:controlled_vocabulary, when appropriate; derived from select feature annotations on RefSeq(s) associated with the GeneID

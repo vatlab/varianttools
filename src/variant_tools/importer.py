@@ -272,7 +272,7 @@ class LineProcessor:
                 for ref_genome, chr_idx, pos_idx, ref_idx, alt_idx in self.build_info:
                     # bin, pos, ref, alt = normalizeVariant(int(rec[pos_idx]) if rec[pos_idx] else None, rec[ref_idx], rec[alt_idx])
                     #env.logger.error('PRE {} {} {} {}'.format(rec[chr_idx], rec[pos_idx], rec[ref_idx], rec[alt_idx]))
-                    msg = normalize_variant(ref_genome, rec, chr_idx, pos_idx, ref_idx, alt_idx)
+                    msg = normalize_variant(ref_genome.crr, rec, chr_idx, pos_idx, ref_idx, alt_idx)
                     #env.logger.error('POST {} {} {} {}'.format(rec[chr_idx], rec[pos_idx], rec[ref_idx], rec[alt_idx]))
                     #
                     if msg:
@@ -280,7 +280,7 @@ class LineProcessor:
                         if msg[0] == 'U':
                             raise ValueError(msg)
                         else:
-                            env.logger.warning(msg)
+                            env.logger.warning('{}: {}'.format(ref_genome.name, msg))
                     # normalization will convert rec[pos_idx] to int if necessary
                     bins.append(getMaxUcscBin(rec[pos_idx] - 1, rec[pos_idx]))
                 yield bins, rec
@@ -491,7 +491,7 @@ class Importer:
         #
         if fmt.input_type == 'variant':
             # process variants, the fields for chr, pos, ref, alt are 0, 1, 2, 3 in fields.
-            self.processor = LineProcessor(fmt.fields, [(RefGenome(self.build).crr, 0, 1, 2, 3)], fmt.delimiter, self.ranges)
+            self.processor = LineProcessor(fmt.fields, [(RefGenome(self.build), 0, 1, 2, 3)], fmt.delimiter, self.ranges)
         else:  # position or range type
             raise ValueError('Can only import data with full variant information (chr, pos, ref, alt)')
         # probe number of samples
@@ -505,9 +505,8 @@ class Importer:
                 # either insert or update, the fields must be in the master variant table
                 self.proj.checkFieldName(f.name, exclude='variant')
                 if f.name not in headers:
-                    s = delayedAction(env.logger.info, 'Adding column {}'.format(f.name))
-                    cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
-                    del s
+                    with delayedAction(env.logger.info, 'Adding column {}'.format(f.name)):
+                        cur.execute('ALTER TABLE variant ADD {} {};'.format(f.name, f.type))
         #
         if fmt.input_type != 'variant':
             env.logger.info('Only variant input types that specifies fields for chr, pos, ref, alt could be imported.')
@@ -542,14 +541,13 @@ class Importer:
             cur.execute("INSERT INTO filename (filename) VALUES ({0});".format(self.db.PH), (filename,))
             filenameID = cur.lastrowid
         sample_ids = []
-        s = delayedAction(env.logger.info, 'Creating {} genotype tables'.format(len(sampleNames)))
-        #
-        for samplename in sampleNames:
-            cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
-                (filenameID, '' if samplename is None else samplename))
-            sid = cur.lastrowid
-            sample_ids.append(sid)
-        del s
+        with delayedAction(env.logger.info, 'Creating {} genotype tables'.format(len(sampleNames))):
+            #
+            for samplename in sampleNames:
+                cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
+                    (filenameID, '' if samplename is None else samplename))
+                sid = cur.lastrowid
+                sample_ids.append(sid)
         return sample_ids
 
     def addVariant(self, cur, rec):
@@ -718,13 +716,12 @@ class Importer:
             env.logger.info('Mapping new variants at {} loci from {} to {} reference genome'.format(loci_count, self.proj.build, self.proj.alt_build))
             query = 'UPDATE variant SET alt_bin={0}, alt_chr={0}, alt_pos={0} WHERE variant_id={0};'.format(self.db.PH)
             # this should not really happen, but people (like me) might manually mess up with the database
-            s = delayedAction(env.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build))
-            headers = self.db.getHeaders('variant')
-            for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
-                if fldName in headers:
-                    continue
-                self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
-            del s
+            with delayedAction(env.logger.info, 'Adding alternative reference genome {} to the project.'.format(self.proj.alt_build)):
+                headers = self.db.getHeaders('variant')
+                for fldName, fldType in [('alt_bin', 'INT'), ('alt_chr', 'VARCHAR(20)'), ('alt_pos', 'INT')]:
+                    if fldName in headers:
+                        continue
+                    self.db.execute('ALTER TABLE variant ADD {} {} NULL;'.format(fldName, fldType))
             mapped_file, err_count = tool.mapCoordinates(to_be_mapped, self.proj.build, self.proj.alt_build)
         # update records
         prog = ProgressBar('Updating coordinates', total_new)

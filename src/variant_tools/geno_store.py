@@ -35,6 +35,7 @@ from .text_reader import TextReader
 from .monitor import ProcessMonitor
 from datetime import datetime
 from .accessor import *
+import glob
 
 
 class Base_Store(object):
@@ -197,15 +198,14 @@ class MultiGenotypeWriter(BaseGenotypeWriter):
         else:
             self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'.format(self.db[0].PH)
         #
-        s = delayedAction(env.logger.debug, 'Creating {} genotype tables'
-            .format(len(self.sample_ids)))
-        for idx, sid in enumerate(self.sample_ids):
-            self.dispatcher[sid] = idx % nDBs
-            # create table
-            self._createNewSampleVariantTable(self.cur[idx % nDBs],
-                'genotype_{0}'.format(sid), self.geno_status == 2)
-            self.db[idx % nDBs].commit()
-        del s
+        with delayedAction(env.logger.debug, 'Creating {} genotype tables'
+                .format(len(self.sample_ids))):
+            for idx, sid in enumerate(self.sample_ids):
+                self.dispatcher[sid] = idx % nDBs
+                # create table
+                self._createNewSampleVariantTable(self.cur[idx % nDBs],
+                    'genotype_{0}'.format(sid), self.geno_status == 2)
+                self.db[idx % nDBs].commit()
         #
         # number of genotype batches that has been written
         self.count = 0
@@ -263,14 +263,13 @@ class InPlaceGenotypeWriter(BaseGenotypeWriter):
         else:
             self.query = 'INSERT INTO genotype_{{}} VALUES ({0});'.format(self.db.PH)
         self.cur = self.db.cursor()
-        s = delayedAction(env.logger.info, 'Creating {} genotype tables'
-            .format(len(self.sample_ids)))
-        for idx, sid in enumerate(self.sample_ids):
-            # create table
-            self._createNewSampleVariantTable(self.cur,
-                'genotype_{0}'.format(sid), self.geno_status == 2)
-        self.db.commit()
-        del s
+        with delayedAction(env.logger.info, 'Creating {} genotype tables'
+                .format(len(self.sample_ids))):
+            for idx, sid in enumerate(self.sample_ids):
+                # create table
+                self._createNewSampleVariantTable(self.cur,
+                    'genotype_{0}'.format(sid), self.geno_status == 2)
+            self.db.commit()
         #
         # number of genotype batches that has been written
         self.count = 0

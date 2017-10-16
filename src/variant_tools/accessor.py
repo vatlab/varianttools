@@ -1,19 +1,16 @@
 #!/usr/bin/env python
-from scipy.sparse import csr_matrix,rand,coo_matrix,csc_matrix
+from scipy.sparse import csr_matrix
 import tables as tb
 import numpy as np
-import pandas as pd
-from numpy import array
-import time
 import math
+
 import os
 import sys
 from .utils import env
 
-
-import glob
 from multiprocessing import Process,Manager
 import queue
+
 
 # from .importer_vcf_to_hdf5 import _hdf5_setup_datasets,_hdf5_store_chunk,\
 # DEFAULT_ALT_NUMBER,DEFAULT_BUFFER_SIZE,DEFAULT_CHUNK_LENGTH,DEFAULT_CHUNK_WIDTH
@@ -193,13 +190,13 @@ class Base_Storage(object):
                - chr (string): the chromosome 
                - groupName (string): the group name, for example gene name
         """
-        raise NotImplementError()
+        raise NotImplementedError()
 
     def close(self):
         """This function closes db file
         """
 
-        raise NotImplementError()
+        raise NotImplementedError()
 
 class GenoCallData(tb.IsDescription):
     entryMask=tb.BoolCol(pos=1)
@@ -711,7 +708,7 @@ class Base_Access(object):
                 - A HMatrix object
 
         """
-        raise NotImplementError()
+        raise NotImplementedError()
 
     def get_geno_info_by_sample_ID(self,sample_id,chr,groupName):
         """This function gets the genotype info of a sample specified by the sample ID in the colnames. 
@@ -727,7 +724,7 @@ class Base_Access(object):
                 - dict: snpdict[variant_id]=genotype value
 
         """
-        raise NotImplementError()
+        raise NotImplementedError()
 
     def get_geno_info_by_group(self,groupName,chr):
         """This function gets the genotype info of specified group into a dictionary
@@ -742,7 +739,7 @@ class Base_Access(object):
                 - dict : snpdict[sample_id][variant_id]=genotype value
 
         """
-        raise NotImplementError();
+        raise NotImplementedError();
 
     def get_geno_info_by_variant_ID(self,variant_id,chr,groupname):
         """This function gets the genotype info of a variant specified by the variant_id stored in rownames. 
@@ -760,7 +757,7 @@ class Base_Access(object):
                 - data (list): the genotype info
 
         """
-        raise NotImplementError()
+        raise NotImplementedError()
 
     def get_geno_info_by_row_pos(self,rowPos,chr,grouopName):
         """This function gets the genotype info of a variant specified by the position of the variant in the matrix. 
@@ -778,13 +775,13 @@ class Base_Access(object):
 
         """
 
-        raise NotImplementError()
+        raise NotImplementedError()
 
     def close(self):
         """This function closes the HDF5 file.
 
         """
-        raise NotImplementError()
+        raise NotImplementedError()
 
 
 
