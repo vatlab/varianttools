@@ -31,8 +31,9 @@ import math
 from .project import Project, Field, AnnoDB, AnnoDBWriter, MaintenanceProcess
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, \
      env, executeUntilSucceed, ShelfDB, safeMapFloat, PrettyPrinter, flatten, hasGenoInfo
-from .tester import ExternTest, NullTest
-from .assoTests import AssoData
+
+from .assoTests import *
+from .tester import *
 from .rtester import RTest, SKAT
 
 from variant_tools.vt_sqlite3 import OperationalError
