@@ -15,11 +15,6 @@ source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/refGene.txt.gz
 #direct_url=annoDB/refGene-hg38_20130904.DB.gz	f3ae8c8baf11b1e32344ee3c7b64edb6
 source_type=txt
 
-[bin]
-index=1
-type=INTEGER
-comment=Indexing field to speed chromosome range queries.
-
 [name]
 index=2
 type=VARCHAR(255)
