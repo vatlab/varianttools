@@ -28,6 +28,11 @@ from setuptools import find_packages, setup, Extension
 
 # parallel compilation
 import multiprocessing, multiprocessing.pool
+import numpy as np
+from Cython.Build import cythonize
+
+
+
 
 def compile_parallel(
         self,
@@ -650,41 +655,7 @@ for files, incs, macs, libname in [
     except Exception as e:
         sys.exit("Failed to build embedded {} library: {}".format(libname, e))
 
-
-setup(name = "variant_tools",
-    version = VTOOLS_VERSION,
-    description = "Variant tools: an integrated annotation and analysis package for next-generation sequencing data",
-    author = 'Bo Peng',
-    url = 'http://varianttools.sourceforge.net',
-    author_email = 'bpeng@mdanderson.org',
-    maintainer = 'Bo Peng',
-    maintainer_email = 'varianttools-devel@lists.sourceforge.net',
-    license = 'GPL3',
-    classifiers = [
-            'Development Status :: 5 - Production/Stable',
-            'Environment :: Console',
-            'Intended Audience :: Education',
-            'Intended Audience :: Science/Research',
-            'License :: OSI Approved :: GNU General Public License (GPL)',
-            'Natural Language :: English',
-            'Operating System :: POSIX :: Linux',
-            'Operating System :: MacOS :: MacOS X',
-            'Programming Language :: C++',
-            'Programming Language :: Python',
-            'Programming Language :: Python :: 3',
-            'Topic :: Scientific/Engineering :: Bio-Informatics',
-        ],
-    #install_requires=[
-    #   'varstore'
-    #],
-    packages = find_packages('src'),
-    package_dir = {'': 'src'},
-    entry_points = '''
-[console_scripts]
-vtools = variant_tools.vtools:main
-vtools_report = variant_tools.vtools_report:main
-''',
-    ext_modules = [
+ext_modules=[
         Extension('variant_tools._vt_sqlite3',
             # stop warning message for sqlite because it is written by us.
             extra_compile_args=['-w'],
@@ -745,5 +716,46 @@ vtools_report = variant_tools.vtools_report:main
             include_dirs = ["src", "src/variant_tools", "src/gsl"],
         )
       ] 
+ext_modules+=cythonize([Extension('variant_tools.io_vcf_read',
+    # sources=['/Users/jma7/Development/VAT/VariantTools/src/variant_tools/io_vcf_read.c'],
+    sources=['src/variant_tools/io_vcf_read.pyx'],
+    include_dirs=[np.get_include()],
+    library_dirs = ["build"])])
+
+
+setup(name = "variant_tools",
+    version = VTOOLS_VERSION,
+    description = "Variant tools: an integrated annotation and analysis package for next-generation sequencing data",
+    author = 'Bo Peng',
+    url = 'http://varianttools.sourceforge.net',
+    author_email = 'bpeng@mdanderson.org',
+    maintainer = 'Bo Peng',
+    maintainer_email = 'varianttools-devel@lists.sourceforge.net',
+    license = 'GPL3',
+    classifiers = [
+            'Development Status :: 5 - Production/Stable',
+            'Environment :: Console',
+            'Intended Audience :: Education',
+            'Intended Audience :: Science/Research',
+            'License :: OSI Approved :: GNU General Public License (GPL)',
+            'Natural Language :: English',
+            'Operating System :: POSIX :: Linux',
+            'Operating System :: MacOS :: MacOS X',
+            'Programming Language :: C++',
+            'Programming Language :: Python',
+            'Programming Language :: Python :: 3',
+            'Topic :: Scientific/Engineering :: Bio-Informatics',
+        ],
+    #install_requires=[
+    #   'varstore'
+    #],
+    packages = find_packages('src'),
+    package_dir = {'': 'src'},
+    entry_points = '''
+[console_scripts]
+vtools = variant_tools.vtools:main
+vtools_report = variant_tools.vtools_report:main
+''',
+    ext_modules = ext_modules
 )
 
