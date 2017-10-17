@@ -1,0 +1,9 @@
+before_install:
+        - sudo apt-get install swig zlibc zlib1g zlib1g-dev libblas-dev liblapack-dev
+install: "python setup.py install"
+before_script: cd test
+
+testScript:
+        script:
+          - python run_tests.py
+   
