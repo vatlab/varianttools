@@ -1,4 +1,4 @@
-image: gitlab-runner.alpine
+image: gitlab/gitlab-runner:latest
 
 #before_script:
 #       - sudo apt-get install swig zlibc zlib1g zlib1g-dev libblas-dev liblapack-dev
