@@ -1,4 +1,4 @@
-image: gitlab/gitlab-runner:latest
+#image: gitlab/gitlab-runner:latest
 
 #stages:
 #        - setup
