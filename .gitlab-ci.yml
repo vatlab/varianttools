@@ -1,4 +1,4 @@
-image: vtools_hdf5:latest
+image: gitlab-runner.alpine
 
 #before_script:
 #       - sudo apt-get install swig zlibc zlib1g zlib1g-dev libblas-dev liblapack-dev
