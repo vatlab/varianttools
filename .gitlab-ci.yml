@@ -1,18 +1,22 @@
-#image: gitlab/gitlab-runner:latest
+image: gitlab/gitlab-runner:latest
 
-stages:
-        - setup
-        - test       
-#services: 
-#        - bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5:test
-setup:
-        stage: setup
-        script:
-                - cd ~/Development/VAT/VariantTools/
-                - python setup.py install 
-                - cd test
+#stages:
+#        - setup
+#        - test       
+#services:
+#        - vtools_hdf5:latest 
+        #        - bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5:test
+#setup:
+#        stage: setup
+#        script:
+#                - cd ~/Development/VAT/VariantTools/
+#                - python setup.py install 
+#                - cd test
+
+#before_script:
+#        -
 
 test:
         script:
-          - python test_init.py
+          - python ./test/test_init.py
    
