@@ -1,7 +1,6 @@
 image: gitlab/gitlab-runner:latest
 
-services:
-   - vtools_hdf5:latest
+services: bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5:test
 #before_script:
 #       - sudo apt-get install swig zlibc zlib1g zlib1g-dev libblas-dev liblapack-dev
 #       - python setup.py install 
