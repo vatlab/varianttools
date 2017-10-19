@@ -1,9 +1,11 @@
-before_script:
-        - sudo apt-get install swig zlibc zlib1g zlib1g-dev libblas-dev liblapack-dev
-        - python setup.py install 
-        - cd test
+image: vtools_hdf5:latest
+
+#before_script:
+#       - sudo apt-get install swig zlibc zlib1g zlib1g-dev libblas-dev liblapack-dev
+#       - python setup.py install 
+#       - cd test
 
 testScript:
         script:
-          - python run_tests.py
+          - python test_init.py
    
