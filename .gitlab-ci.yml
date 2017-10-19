@@ -18,5 +18,5 @@
 
 test:
         script:
-          - python ./test/test_init.py
+          - python /Users/jma7/Development/VAT/VariantTools/test/test_init.py
    
