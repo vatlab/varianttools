@@ -19,10 +19,9 @@ test:
         script:
                 #            - docker exec -t VariantTools_HDF5 /bin/bash
             - echo $PWD
-            - vtools init -h  
-              #- git fetch
-              #- git checkout v3
-              #- python setup.py install
-              #- cd test
-              #- python test_init.py
+            - git fetch
+            - git checkout v3
+            - python setup.py install
+            - cd test
+            - python test_init.py
    
