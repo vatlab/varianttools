@@ -18,7 +18,7 @@
 
 test:
         script:
-            - docker exec VariantTools_HDF5 /bin/bash
+            - docker exec -t VariantTools_HDF5 /bin/bash
             - cd VariantTools
             - git fetch
             - git checkout v3
