@@ -19,5 +19,6 @@
 test:
         script:
             - source activate VariantTools
-            - python ./test/test_init.py
+            - cd test
+            - python test_init.py
    
