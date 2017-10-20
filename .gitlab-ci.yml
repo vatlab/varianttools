@@ -1,4 +1,4 @@
-#image: gitlab/gitlab-runner:latest
+image:  vtools_hdf5:latest 
 #stages:
 #        - setup
 #        - test       
