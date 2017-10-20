@@ -32,7 +32,6 @@ from .utils import ProgressBar,  delayedAction, \
      DatabaseEngine, env
 
 from .text_reader import TextReader
-from .monitor import ProcessMonitor
 from datetime import datetime
 from .accessor import *
 import glob
