@@ -6,9 +6,11 @@ FROM    continuumio/miniconda3
 MAINTAINER Bo Peng <bpeng@mdanderson.org>
 
 RUN     apt-get update
-RUN     apt-get -y install swig  gcc g++ build-essential bzip2 libbz2-dev libz-dev curl git libblas-dev liblapack-dev
+RUN     apt-get -y install swig  gcc g++ build-essential bzip2 libbz2-dev libz-dev curl git vim libblas-dev liblapack-dev
 
-
+RUN	conda update python
+RUN	conda install cython
+RUN	pip install numpy scipy tables
 WORKDIR /home/bpeng
 RUN     git clone http://github.com/vatlab/VariantTools VariantTools
 WORKDIR /home/bpeng/VariantTools
