@@ -1,4 +1,5 @@
 image:  vtools_hdf5:latest 
+
 #stages:
 #        - setup
 #        - test       
@@ -17,11 +18,11 @@ image:  vtools_hdf5:latest
 
 test:
         script:
-                #            - docker exec -t VariantTools_HDF5 /bin/bash
+            - docker exec -t VariantTools_HDF5 /bin/bash
             - echo $PWD
-            - git fetch
-            - git checkout v3
-            - python setup install
-            - cd test
-            - python test_init.py
+              #- git fetch
+              #- git checkout v3
+              #- python setup.py install
+              #- cd test
+              #- python test_init.py
    
