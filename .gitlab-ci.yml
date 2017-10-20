@@ -1,4 +1,4 @@
-image: gitlab/gitlab-runner:latest
+#image: gitlab/gitlab-runner:latest
 
 #stages:
 #        - setup
@@ -18,5 +18,6 @@ image: gitlab/gitlab-runner:latest
 
 test:
         script:
-          - python /Users/jma7/Development/VAT/VariantTools/test/test_init.py
+          - source activate VariantTools
+          - python ./test/test_init.py
    
