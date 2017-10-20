@@ -18,7 +18,11 @@
 
 test:
         script:
-            - source activate VariantTools
+            - docker exec -it VariantTools_HDF5 /bin/bash
+            - cd VariantTools
+            - git fetch
+            - git checkout v3
+            - python setup install
             - cd test
             - python test_init.py
    
