@@ -23,4 +23,4 @@ test:
                 - git pull 
                 - python setup.py install
                 - cd test
-                - python test_init.py
+                - python run_tests.py
