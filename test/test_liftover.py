@@ -51,7 +51,7 @@ class TestLiftover(ProcessTestCase):
         #data and liftover to hg18, we then compare if coordinates in these
         #projects are the same.
         
-        self.assertOutput('vtools output variant chr pos ref alt --build hg19 -d"\t"', 'output/liftover.txt')
+        # self.assertOutput('vtools output variant chr pos ref alt --build hg19 -d"\t"', 'output/liftover.txt')
         self.runCmd('vtools init test -f')
         self.assertSucc('vtools import --build hg19 --format ../format/basic output/liftover.txt')
         self.assertSucc('vtools liftover hg18')
