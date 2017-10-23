@@ -20,10 +20,10 @@ test:
         script:
                 #            - docker exec -t VariantTools_HDF5 /bin/bash
             - echo $PWD
-            - git fetch
-            - git checkout v3
+              # - git fetch
+              # - git checkout v3
             - git pull
             - python setup.py install
             - cd test
-            - python test_init.py
+            - python run_tests.py
    
