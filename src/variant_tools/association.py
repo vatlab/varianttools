@@ -32,7 +32,7 @@ from .project import Project, Field, AnnoDB, AnnoDBWriter, MaintenanceProcess
 from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, \
      env, executeUntilSucceed, ShelfDB, safeMapFloat, PrettyPrinter, flatten, hasGenoInfo
 
-from .assoTests import *
+from .assoTests import AssoData
 from .tester import *
 from .rtester import RTest, SKAT
 import tables as tb
