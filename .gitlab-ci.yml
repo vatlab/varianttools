@@ -9,6 +9,7 @@ before_script:
 
 stages:
         - test
+
 #stages:
 ##        - setup
 ##        - test       
