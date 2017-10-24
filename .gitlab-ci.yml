@@ -3,7 +3,6 @@ image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5:test
 stages:
         - build 
         - test
-
 #stages:
 ##        - setup
 ##        - test       
@@ -20,6 +19,7 @@ stages:
 #        #before_script:
 #        #        -
 #
+
 
 build:
         stage: build
