@@ -26,7 +26,6 @@ build:
         script:
                 #  - git checkout v3
                 #  - git pull
-                 - rm -rf /home/bpeng/VariantTools
                  - cd /home/jma7/VariantTools
                  - python setup.py install
 
