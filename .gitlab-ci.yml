@@ -24,11 +24,11 @@ stages:
 build:
         stage: build
         script:
-                 - git fetch
-                 - git checkout v3
-                 - git pull
+                #  - git checkout v3
+                #  - git pull
                  - python setup.py install
-                 - cd test
+before_script:
+        - cd test
 
 test_admin:
         stage: test
