@@ -1,13 +1,7 @@
 image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5:test
 
-before_script:
-        - git fetch
-        - git checkout v3
-        - git pull
-        - python setup.py install
-        - cd test
-
 stages:
+        - build 
         - test
 
 #stages:
@@ -26,6 +20,16 @@ stages:
 #        #before_script:
 #        #        -
 #
+
+build:
+        stage: build
+        script:
+                 - git fetch
+                 - git checkout v3
+                 - git pull
+                 - python setup.py install
+                 - cd test
+
 test_admin:
         stage: test
         script:
