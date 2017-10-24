@@ -27,12 +27,11 @@ build:
                 #  - git checkout v3
                 #  - git pull
                  - python setup.py install
-before_script:
-        - cd test
 
 test_admin:
         stage: test
         script:
+                - cd test
                 - python test_admin.py
 
 test_associate:
