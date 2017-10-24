@@ -1,5 +1,14 @@
 image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5:test
 
+before_script:
+        - git fetch
+        - git checkout v3
+        - git pull
+        - python setup.py install
+        - cd test
+
+stages:
+        - test
 #stages:
 ##        - setup
 ##        - test       
@@ -16,12 +25,33 @@ image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5:test
 #        #before_script:
 #        #        -
 #
-test:
+test_admin:
+        stage: test
         script:
-                - echo $PWD
-                - git fetch
-                - git checkout v3
-                - git pull 
-                - python setup.py install
-                - cd test
-                - python run_tests.py
+                - python test_admin.py
+
+test_associate:
+        stage: test
+        script:
+                - python test_associate.py
+
+test_avg_depth:
+        stage: test
+        script:
+                - python test_avg_depth.py
+
+test_compare:
+        stage: test
+        script:
+                - python test_compare.py
+
+test_exclude:
+        stage: test
+        script:
+                - python test_exclude.py
+
+test_execute:
+        stage: test
+        script:
+                - python test_execute.py
+
