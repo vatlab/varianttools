@@ -1,7 +1,7 @@
 image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5:test
 
 stages:
-        - build 
+        #        - build 
         - test
 #stages:
 ##        - setup
@@ -21,18 +21,18 @@ stages:
 #
 
 
-build:
-        stage: build
-        script:
+#build:
+#        stage: build
+before_script:
                 #  - git checkout v3
                 #  - git pull
                  - cd /home/jma7/VariantTools
                  - python setup.py install
+                 - cd test
 
 test_admin:
         stage: test
         script:
-                - cd test
                 - python test_admin.py
 
 test_associate:
