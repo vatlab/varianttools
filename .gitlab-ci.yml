@@ -27,7 +27,7 @@ before_script:
                 #  - git checkout v3
                 #  - git pull
                  - cd /home/jma7/VariantTools
-                 - python setup.py install
+                   # - python setup.py install
                  - cd test
 
 test_admin:
@@ -50,13 +50,4 @@ test_compare:
         script:
                 - python test_compare.py
 
-test_exclude:
-        stage: test
-        script:
-                - python test_exclude.py
-
-test_execute:
-        stage: test
-        script:
-                - python test_execute.py
 
