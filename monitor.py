@@ -9,6 +9,7 @@ import subprocess
 import sys
 
 
+
 class ProcessMonitor(threading.Thread):
     def __init__(self, task_id, monitor_interval,resource_monitor_interval):
         threading.Thread.__init__(self)
@@ -29,7 +30,7 @@ class ProcessMonitor(threading.Thread):
         with open(self.pulse_file, 'w') as pd:
             pd.write('#task: {}\n'.format(task_id))
             pd.write('#started at {}\n#\n'.format(datetime.now().strftime("%A, %d. %B %Y %I:%M%p")))
-            pd.write('#time\tproc_cpu\tproc_mem\tchildren\tchildren_cpu\tchildren_mem\n')
+            pd.write('#time\tproc_cpu\tproc_mem\tchildren\tchildren_cpu\tchildren_mem\tdisk_use\n')
 
     def _check(self):
         current_process = psutil.Process(self.pid)
@@ -39,16 +40,25 @@ class ProcessMonitor(threading.Thread):
         ch_mem = 0
         children = current_process.children(recursive=True)
         n_children = len(children)
+        #disk_use = psutil.disk_usage('/Users/manchongleong/Documents/testVariantTools')
+        #disk_use = os.path.getsize('/Users/manchongleong/Documents/testVariantTools/')
         for child in children:
             ch_cpu += child.cpu_percent()
             ch_mem += child.memory_info()[0]
-        return par_cpu, par_mem, n_children, ch_cpu, ch_mem
-
+        return par_cpu, par_mem, n_children, ch_cpu, ch_mem#, disk_use
+    
+    def size(self):
+        #disk_use = 0
+        for root, dirs, files in os.walk(os.getcwd(), topdown=False):
+            #for file in [x for x in files if os.path.splitext(x) in ('.h5', '.DB')]:
+            #disk_use = sum(os.path.getsize(os.path.join(root,file)) for file in [x for x in files if os.path.splitext(x)[1] in ('.h5', '.DB')])
+            #disk_use = sum(os.path.getsize(os.path.join(root,file)) for file in [x for x in files if x.split('.')[1] not in ('.pulse', '.vcf', '.txt', '.log', '.proj')])
+            disk_use = sum(os.path.getsize(os.path.join(root,file)) for file in files)
+        return disk_use
 
     def run(self):
         counter = 0
         start_time = time.time()
-
 
         while True:
             try:
@@ -61,8 +71,9 @@ class ProcessMonitor(threading.Thread):
                 #     os.utime(self.pulse_file, None)
                 # else:
                 cpu, mem, nch, ch_cpu, ch_mem = self._check()
+                disk_use = self.size()
                 with open(self.pulse_file, 'a') as pd:
-                    pd.write('{}\t{:.2f}\t{}\t{}\t{}\t{}\n'.format(time.time()-start_time, cpu, mem, nch, ch_cpu, ch_mem))
+                    pd.write('{}\t{:.2f}\t{}\t{}\t{}\t{}\t{}\n'.format(time.time()-start_time, cpu, mem, nch, ch_cpu, ch_mem, disk_use))
                 time.sleep(self.monitor_interval)
                 counter += 1
             except Exception as e:
