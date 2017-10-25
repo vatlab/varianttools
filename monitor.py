@@ -45,15 +45,13 @@ class ProcessMonitor(threading.Thread):
         for child in children:
             ch_cpu += child.cpu_percent()
             ch_mem += child.memory_info()[0]
-        return par_cpu, par_mem, n_children, ch_cpu, ch_mem#, disk_use
-    
+        return par_cpu, par_mem, n_children, ch_cpu, ch_mem
+
     def size(self):
-        #disk_use = 0
+        disk_use = 0
         for root, dirs, files in os.walk(os.getcwd(), topdown=False):
-            #for file in [x for x in files if os.path.splitext(x) in ('.h5', '.DB')]:
-            #disk_use = sum(os.path.getsize(os.path.join(root,file)) for file in [x for x in files if os.path.splitext(x)[1] in ('.h5', '.DB')])
-            #disk_use = sum(os.path.getsize(os.path.join(root,file)) for file in [x for x in files if x.split('.')[1] not in ('.pulse', '.vcf', '.txt', '.log', '.proj')])
-            disk_use = sum(os.path.getsize(os.path.join(root,file)) for file in files)
+            disk_use += sum(os.path.getsize(os.path.join(root,file)) for file in files if os.path.splitext(file)[1] in ('.h5', '.DB'))
+            dirs = [x for x in dirs if not x.startswith('.')]
         return disk_use
 
     def run(self):
@@ -95,7 +93,6 @@ def main():
     command=sys.argv[1]
     print(command)
     subprocess.call(command,shell=True)
-    
 
 if __name__ == "__main__":
     main()
