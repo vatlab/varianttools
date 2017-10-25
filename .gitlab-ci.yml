@@ -29,7 +29,6 @@ before_script:
                  - cd /home/jma7/VariantTools
                  - python setup.py install
                  - cd test
-
 test_admin:
         stage: test
         script:
