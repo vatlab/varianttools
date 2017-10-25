@@ -1,4 +1,4 @@
-image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5:test
+image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5_ci:test
 
 
 stages:
@@ -28,7 +28,11 @@ before_script:
                 #  - git checkout v3
                 #  - git pull
                 #                 - cd /home/jma7/VariantTools
-                #                 - python setup.py install
+                - git checkout v3
+                - git pull
+                - cp -r /home/bpeng/boost/boost_1_49_0 /home/jma7/VariantTools/src
+                - cp -r /home/bpeng/.variantTools /home/jma7/.variantTools
+                - python setup.py install
                 - cd test
 test_admin:
         stage: test
@@ -40,14 +44,14 @@ test_associate:
         script:
                 - python test_associate.py
 
-test_avg_depth:
-        stage: test
-        script:
-                - python test_avg_depth.py
+# test_avg_depth:
+#         stage: test
+#         script:
+#                 - python test_avg_depth.py
 
-test_compare:
-        stage: test
-        script:
-                - python test_compare.py
+# test_compare:
+#         stage: test
+#         script:
+#                 - python test_compare.py
 
 

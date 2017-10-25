@@ -12,7 +12,7 @@ RUN	conda update python
 RUN	conda install cython
 RUN	pip install numpy scipy tables
 WORKDIR /home/bpeng
-RUN     git clone http://github.com/vatlab/VariantTools VariantTools
+RUN     git clone http://github.com/vatlab/VariantTools  VariantTools
 WORKDIR /home/bpeng/VariantTools
 RUN     git pull
 RUN     python setup.py install
@@ -50,5 +50,6 @@ RUN     rm -rf boost_1_49_0.tar.gz
 
 WORKDIR /home/bpeng
 RUN     rm -rf temp
+RUN 	rm -rf /home/bpeng/VariantTools
 
 
