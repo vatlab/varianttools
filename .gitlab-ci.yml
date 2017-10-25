@@ -1,4 +1,4 @@
-image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5_ci:test
+image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5:test
 
 
 stages:
@@ -30,7 +30,13 @@ before_script:
                 #                 - cd /home/jma7/VariantTools
                 - git checkout v3
                 - git pull
-                - cp -r /home/bpeng/boost/boost_1_49_0 /home/jma7/VariantTools/src
+                - cp -r /home/bpeng/VariantTools/src/boost_1_49_0 /home/jma7/VariantTools/src
+                - cp -r /home/bpeng/VariantTools/src/cgatools /home/jma7/VariantTools/src
+                - cp -r /home/bpeng/VariantTools/src/gsl /home/jma7/VariantTools/src
+                - cp -r /home/bpeng/VariantTools/src/libplinkio /home/jma7/VariantTools/src
+                - cp -r /home/bpeng/VariantTools/src/rext /home/jma7/VariantTools/src
+                - cp -r /home/bpeng/VariantTools/src/sqlite /home/jma7/VariantTools/src
+                - cp -r /home/bpeng/VariantTools/src/ucsc /home/jma7/VariantTools/src
                 - cp -r /home/bpeng/.variant_tools /home/jma7/.variant_tools
                 - python setup.py install
                 - cd test

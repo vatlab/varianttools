@@ -42,14 +42,14 @@ RUN     vtools use refGene
 WORKDIR /home/bpeng
 RUN     rm -rf temp
 
-RUN     mkdir /home/bpeng/temp
-WORKDIR /home/bpeng/boost
-RUN		wget http://downloads.sourceforge.net/project/boost/boost/1.49.0/boost_1_49_0.tar.gz
-RUN		tar -P -xvf boost_1_49_0.tar.gz boost_1_49_0/boost boost_1_49_0/libs/iostreams boost_1_49_0/libs/regex boost_1_49_0/libs/filesystem boost_1_49_0/libs/detail boost_1_49_0/libs/system
-RUN     rm -rf boost_1_49_0.tar.gz
+# RUN     mkdir /home/bpeng/temp
+# WORKDIR /home/bpeng/boost
+# RUN		wget http://downloads.sourceforge.net/project/boost/boost/1.49.0/boost_1_49_0.tar.gz
+# RUN		tar -P -xvf boost_1_49_0.tar.gz boost_1_49_0/boost boost_1_49_0/libs/iostreams boost_1_49_0/libs/regex boost_1_49_0/libs/filesystem boost_1_49_0/libs/detail # boost_1_49_0/libs/system
+# RUN     rm -rf boost_1_49_0.tar.gz
 
-WORKDIR /home/bpeng
-RUN     rm -rf temp
-RUN 	rm -rf /home/bpeng/VariantTools
+# WORKDIR /home/bpeng
+# RUN     rm -rf temp
+
 
 
