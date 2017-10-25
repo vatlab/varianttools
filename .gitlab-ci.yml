@@ -23,12 +23,12 @@ stages:
 
 #build:
 #        stage: build
-#before_script:
+before_script:
                 #  - git checkout v3
                 #  - git pull
                 #                 - cd /home/jma7/VariantTools
                 #                 - python setup.py install
-                #                 - cd test
+                - cd test
 test_admin:
         stage: test
         script:
