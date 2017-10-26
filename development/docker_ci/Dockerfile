@@ -14,6 +14,8 @@ RUN	pip install numpy scipy tables
 WORKDIR /home/bpeng
 RUN     git clone http://github.com/vatlab/VariantTools  VariantTools
 WORKDIR /home/bpeng/VariantTools
+RUN     git fetch
+RUN	git checkout v3
 RUN     git pull
 RUN     python setup.py install
 
