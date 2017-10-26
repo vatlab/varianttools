@@ -15,11 +15,6 @@ version=hg38_20141018
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/genomicSuperDups.txt.gz
 source_type=txt
 
-[bin]
-index=1
-type=INTEGER
-comment=Indexing field to speed chromosome range queries.
-
 [chr]
 index=2
 adj=RemoveLeading('chr')
