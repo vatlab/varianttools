@@ -1,4 +1,4 @@
-image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5:test
+image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5_ci:test
 stages:
         #        - build 
         - test
@@ -26,14 +26,15 @@ before_script:
 
                 - git checkout v3
                 - git pull
-                - cp -r /home/bpeng/VariantTools/boost_1_49_0 ./src
-                - cp -r /home/bpeng/VariantTools/cgatools ./src
-                - cp -r /home/bpeng/VariantTools/gsl ./src
-                - cp -r /home/bpeng/VariantTools/libplinkio ./src
-                - cp -r /home/bpeng/VariantTools/rext ./src
-                - cp -r /home/bpeng/VariantTools/sqlite ./src
-                - cp -r /home/bpeng/VariantTools/ucsc ./src
+                - cp -r /home/bpeng/VariantTools/src/boost_1_49_0 ./src
+                - cp -r /home/bpeng/VariantTools/src/cgatools ./src
+                - cp -r /home/bpeng/VariantTools/src/gsl ./src
+                - cp -r /home/bpeng/VariantTools/src/libplinkio ./src
+                - cp -r /home/bpeng/VariantTools/src/rext ./src
+                - cp -r /home/bpeng/VariantTools/src/sqlite ./src
+                - cp -r /home/bpeng/VariantTools/src/ucsc ./src
                 - cp -r /home/bpeng/.variant_tools ../
+                - cp -r /home/bpeng/VariantTools/build .
                 - python setup.py install
                 - cd test
 test_admin:
