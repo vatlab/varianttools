@@ -566,9 +566,11 @@ class Exporter:
             pass
         # get all fields
         var_fields = [x.strip() for x in self.format.export_by_fields.split(',')] if self.format.export_by_fields else []
+       
         geno_fields = []
         for col in self.format.columns:
             col_fields = splitField(col.field)
+            
             if 'GT' in col_fields:
                 for fld in col_fields:
                     if fld not in geno_fields:

@@ -80,7 +80,7 @@ test_func:
 test_import:
         stage: test
         script:
-                - python test_importh.py
+                - python test_import.py
 
 test_init:
         stage: test
