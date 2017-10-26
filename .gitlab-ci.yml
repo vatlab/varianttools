@@ -1,4 +1,4 @@
-image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5_ci:test
+image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5:test
 stages:
         #        - build 
         - test
@@ -26,17 +26,14 @@ before_script:
 
                 - git checkout v3
                 - git pull
-                # - cp -r /home/bpeng/VariantTools/boost_1_49_0 ./src
-                # - cp -r /home/bpeng/VariantTools/cgatools ./src
-                # - cp -r /home/bpeng/VariantTools/gsl ./src
-                # - cp -r /home/bpeng/VariantTools/libplinkio ./src
-                # - cp -r /home/bpeng/VariantTools/rext ./src
-                # - cp -r /home/bpeng/VariantTools/sqlite ./src
-                # - cp -r /home/bpeng/VariantTools/ucsc ./src
-                # - cp -r /home/bpeng/.variant_tools ../
-                - cp -r ./src/variant_tools /home/bpeng/VariantTools/src
-                - cp -r ./test /home/bpeng/VariantTools
-                - cd /home/bpeng/VariantTools
+                - cp -r /home/bpeng/VariantTools/boost_1_49_0 ./src
+                - cp -r /home/bpeng/VariantTools/cgatools ./src
+                - cp -r /home/bpeng/VariantTools/gsl ./src
+                - cp -r /home/bpeng/VariantTools/libplinkio ./src
+                - cp -r /home/bpeng/VariantTools/rext ./src
+                - cp -r /home/bpeng/VariantTools/sqlite ./src
+                - cp -r /home/bpeng/VariantTools/ucsc ./src
+                - cp -r /home/bpeng/.variant_tools ../
                 - python setup.py install
                 - cd test
 test_admin:
@@ -74,65 +71,65 @@ test_export:
         script:
                 - python test_export.py
 
-# test_func:
-#         stage: test
-#         script:
-#                 - python test_func.py
+test_func:
+        stage: test
+        script:
+                - python test_func.py
 
-# test_import:
-#         stage: test
-#         script:
-#                 - python test_importh.py
+test_import:
+        stage: test
+        script:
+                - python test_importh.py
 
-# test_init:
-#         stage: test
-#         script:
-#                 - python test_init.py
+test_init:
+        stage: test
+        script:
+                - python test_init.py
 
-# test_liftover:
-#         stage: test
-#         script:
-#                 - python test_liftover.py
+test_liftover:
+        stage: test
+        script:
+                - python test_liftover.py
 
-# test_output:
-#         stage: test
-#         script:
-#                 - python test_output.py
+test_output:
+        stage: test
+        script:
+                - python test_output.py
 
-# test_phenotype:
-#         stage: test
-#         script:
-#                 - python test_phenotype.py
+test_phenotype:
+        stage: test
+        script:
+                - python test_phenotype.py
 
-# test_remove:
-#         stage: test
-#         script:
-#                 - python test_remove.py
+test_remove:
+        stage: test
+        script:
+                - python test_remove.py
 
-# test_select:
-#         stage: test
-#         script:
-#                 - python test_select.py
+test_select:
+        stage: test
+        script:
+                - python test_select.py
 
-# test_show:
-#         stage: test
-#         script:
-#                 - python test_show.py
+test_show:
+        stage: test
+        script:
+                - python test_show.py
 
-# test_trans_ratio:
-#         stage: test
-#         script:
-#                 - python test_trans_ratio.py
+test_trans_ratio:
+        stage: test
+        script:
+                - python test_trans_ratio.py
 
-# test_update:
-#         stage: test
-#         script:
-#                 - python test_update.py
+test_update:
+        stage: test
+        script:
+                - python test_update.py
 
-# test_use:
-#         stage: test
-#         script:
-#                 - python test_use.py
+test_use:
+        stage: test
+        script:
+                - python test_use.py
 
 
 
