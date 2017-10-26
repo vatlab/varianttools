@@ -2249,7 +2249,7 @@ class Project:
             variantIDs.append((res[0],res[1]))
         
         store = GenoStore(self)
-        store.remove_variants(variantIDs)
+        store.remove_variants(variantIDs,table)
 
 
 

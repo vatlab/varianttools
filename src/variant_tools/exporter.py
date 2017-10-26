@@ -601,6 +601,7 @@ class Exporter:
         default_formatter = PlainFormatter().__call__ if '*' not in list(self.format.formatter.keys()) else self.getAdjFunc(self.format.formatter['*'])
         #
         col_idx = 0  # index of things after formatter.
+
         for col in self.format.columns:
             # indexes to get values for each column
             fields = splitField(col.field)
@@ -621,7 +622,7 @@ class Exporter:
                 col_idx += max(1, len(fmt))
                 if col_adj[-1][0] is None and type(col_adj[-1][1]) is not int:
                     raise ValueError('Columns with multiple fields must have an adjust function to merge values')
-
+        
         # needs fmt and adj
         count = 0
         failed_count = 0

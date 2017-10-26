@@ -595,7 +595,7 @@ class Sqlite_Store(Base_Store):
         self.db.removeTable('genotype_{}'.format(sample_id))
         self.db.commit()
 
-    def remove_variants(self,variantIDs):
+    def remove_variants(self,variantIDs,table):
          # get sample_ids
         self.projcur.execute('SELECT sample_id, sample_name FROM sample;')
         samples = self.projcur.fetchall()
@@ -603,6 +603,7 @@ class Sqlite_Store(Base_Store):
             if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, ID)):
                 self.cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'
                     .format(self.proj.name, ID))
+
             self.cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
                 .format(self.proj.name, ID, table))
             env.logger.info('{} genotypes are removed from sample {}'.format(self.cur.rowcount, name))

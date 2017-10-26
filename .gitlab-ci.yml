@@ -33,7 +33,7 @@ before_script:
                 - cp -r /home/bpeng/VariantTools/rext ./src
                 - cp -r /home/bpeng/VariantTools/sqlite ./src
                 - cp -r /home/bpeng/VariantTools/ucsc ./src
-                - cp -r /home/bpeng/.variant_tools .
+                - cp -r /home/bpeng/.variant_tools ../
                 - python setup.py install
                 - cd test
 test_admin:
@@ -46,14 +46,91 @@ test_associate:
         script:
                 - python test_associate.py
 
-# test_avg_depth:
-#         stage: test
-#         script:
-#                 - python test_avg_depth.py
+test_avg_depth:
+        stage: test
+        script:
+                - python test_avg_depth.py
 
-# test_compare:
-#         stage: test
-#         script:
-#                 - python test_compare.py
+test_compare:
+        stage: test
+        script:
+                - python test_compare.py
+
+test_exclude:
+        stage: test
+        script:
+                - python test_exclude.py
+
+test_execute:
+        stage: test
+        script:
+                - python test_execute.py
+
+test_export:
+        stage: test
+        script:
+                - python test_export.py
+
+test_func:
+        stage: test
+        script:
+                - python test_func.py
+
+test_import:
+        stage: test
+        script:
+                - python test_importh.py
+
+test_init:
+        stage: test
+        script:
+                - python test_init.py
+
+test_liftover:
+        stage: test
+        script:
+                - python test_liftover.py
+
+test_output:
+        stage: test
+        script:
+                - python test_output.py
+
+test_phenotype:
+        stage: test
+        script:
+                - python test_phenotype.py
+
+test_remove:
+        stage: test
+        script:
+                - python test_remove.py
+
+test_select:
+        stage: test
+        script:
+                - python test_select.py
+
+test_show:
+        stage: test
+        script:
+                - python test_show.py
+
+test_trans_ratio:
+        stage: test
+        script:
+                - python test_trans_ratio.py
+
+test_update:
+        stage: test
+        script:
+                - python test_update.py
+
+test_use:
+        stage: test
+        script:
+                - python test_use.py
+
+
 
 

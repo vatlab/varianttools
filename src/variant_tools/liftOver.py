@@ -51,7 +51,8 @@ class LiftOverTool:
             env.logger.debug('Failed to execute liftOver -h')
             if 'Darwin' in platform.system():
                 # FIXME: Need to test PowerPC for directory macOSX.ppc
-                liftOverDir = 'macOSX.i386'
+                # liftOverDir = 'macOSX.i386'
+                liftOverDir ='macOSX.x86_64'
             elif platform.system() == 'Linux':
                 if platform.architecture()[0] == '64bit':
                     liftOverDir = 'linux.x86_64'

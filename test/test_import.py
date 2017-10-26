@@ -82,33 +82,33 @@ class TestImport(ProcessTestCase):
 
     def testANNOVAR(self):
         'Testing the annovar input format'
-        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR txt/ANNOVAR.txt')
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/ANNOVAR txt/ANNOVAR.txt')
         # one of the variant cannot be imported.
         self.assertProj(numOfSamples= 0, numOfVariants=11)
-        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR txt/ANNOVAR.txt --force --sample_name kaiw' )
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/ANNOVAR txt/ANNOVAR.txt --force --sample_name kaiw' )
         self.assertProj(numOfSamples= 1, numOfVariants=11)
         self.assertOutput('vtools execute "select sample_name from sample"', 'kaiw\n')
-        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function' )
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function' )
         self.assertSucc('vtools output variant mut_type')
         # test for importing user specified var_info
-        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function --var_info function --force' )
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function --var_info function --force' )
         self.assertSucc('vtools select variant "function is not NULL" -t function')
         self.assertProj(numOfVariants={'function': 78})
         
     def testCASAVA18_SNP(self):
         'Testing the CASAVA SNP input format'
-        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt')
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/CASAVA18_snps txt/CASAVA18_SNP.txt')
         # 20 new, SNVs, 5 invalid
         self.assertProj(numOfSamples= 1, numOfVariants=21)
         # sample name should have been scanned from the last line starting with "#"
         self.assertProj(sampleNames=['max_gt'])
         # test for re-naming the sample
-        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --force --sample_name casavasnp')
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/CASAVA18_snps txt/CASAVA18_SNP.txt --force --sample_name casavasnp')
         # both samples exist
         self.assertProj(numOfSamples= 2, numOfVariants=21, sampleNames=['max_gt', 'casavasnp'])
         self.runCmd('vtools init test -f')
         # test for using user specified genotype information. Have to init a test because of efficiency problem using --force
-        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --geno max_gt --geno_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/CASAVA18_snps txt/CASAVA18_SNP.txt --geno max_gt --geno_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
         # now we have 1 genotype field and 3 info field, plus the variant ID: 5 fields in the genotype_x table
         self.assertProj(numOfColumns={'genotype_1': 5})
         # only 1 sample here. Set num=1
@@ -116,14 +116,14 @@ class TestImport(ProcessTestCase):
         
     def testCASAVA18_INDEL(self):
         'Testing the CASAVA INDEL input format'
-        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_indels txt/CASAVA18_INDEL.txt')
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/CASAVA18_indels txt/CASAVA18_INDEL.txt')
         # (25 new, 7 insertions, 18 deletions)
         self.assertProj(numOfSamples= 1, numOfVariants=25, sampleNames=['max_gtype'],
             genotype={1: '1111111111111111121111211'})
         
     def testPileup_INDEL(self):
         # this file has one genotype but we do not provide a sample name. Named as "None" when no sample name is specified anywhere
-        self.assertSucc('vtools import --build hg18 --format ../format/pileup_indel txt/pileup.indel')
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/pileup_indel txt/pileup.indel')
         self.assertProj(numOfSamples= 1, numOfVariants=30, sampleNames=[''],
             genotype={1: '212111111111121111121121111111'})
     
@@ -314,12 +314,12 @@ class TestImport(ProcessTestCase):
         self.assertSucc("vtools import vcf/500SAMP.vcf --build hg19 --sample_name {}".format(' '.join(input[1:])))
 
     def testCsvImport1(self):
-        self.assertSucc('vtools import txt/test.csv --format ../format/csv.fmt --build hg19 --sample_name samp_csv')
+        self.assertSucc('vtools import txt/test.csv --format ../resources/format/csv.fmt --build hg19 --sample_name samp_csv')
         self.assertProj(numOfSamples=1, numOfVariants=687)
         self.assertOutput('vtools output variant chr pos ref alt', 'output/import_csv.txt')
 
     def testCGAImport(self):
-        self.assertSucc('vtools import txt/CGA.tsv.bz2 --format ../format/CGA.fmt --build hg19 --sample_name samp_csv')
+        self.assertSucc('vtools import txt/CGA.tsv.bz2 --format ../resources/format/CGA.fmt --build hg19 --sample_name samp_csv')
         self.assertProj(numOfSamples=1, numOfVariants=95)
         self.assertOutput('vtools output variant chr pos ref alt', 'output/import_cga.txt') 
         self.assertOutput('vtools show genotypes', 'output/import_cga_phenotype.txt')
