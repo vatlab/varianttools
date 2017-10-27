@@ -36,7 +36,7 @@ from .utils import ProgressBar, delayedAction, \
     consolidateFieldName, DatabaseEngine, env, encodeTableName, decodeTableName, \
     splitField
 
-from .preprocessor import PlainFormatter, SequentialCollector 
+from .preprocessor import *
 
 MAX_COLUMN = 62
 def VariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
