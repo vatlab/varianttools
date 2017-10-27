@@ -8,13 +8,14 @@ from testUtils import ProcessTestCase
 from zipfile import ZipFile
 import argparse
 from random import choice
-from variant_tools.association import NullTest, t
+from variant_tools.association import NullTest
+from variant_tools.assoTests import *
 
 class ActionTester(NullTest):
     def __init__(self, ncovariates=0, logger=None, *method_args):
         NullTest.__init__(self, logger, *method_args)
         self.fields = []
-        self.algorithm = t.AssoAlgorithm([])
+        self.algorithm = AssoAlgorithm([])
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''test methods''')
@@ -32,7 +33,7 @@ class PyActionTester(ActionTester):
     def __init__(self, ncovariates,logger=None, *method_args):
         ActionTester.__init__(self, ncovariates, logger, *method_args)
         self.algorithm.append(
-            t.PyAction(func=self.func)
+            PyAction(func=self.func)
         )
 
     def func(self, data):
@@ -43,8 +44,8 @@ class SetMafTester(ActionTester):
     def __init__(self, ncovariates,logger=None, *method_args):
         ActionTester.__init__(self, ncovariates, logger, *method_args)
         self.algorithm.append(
-            t.SetMaf(),
-            t.PyAction(func=self.func)
+            SetMaf(),
+            PyAction(func=self.func)
         )
 
     def func(self, data):
