@@ -97,7 +97,7 @@ comment= orientation of the gene feature on the genomic accession, '?' if not ap
 
 [assembly]
 index=13
-adj=DiscardRecord('Reference GRCh37.p13 Primary Assembly', keepMatched=True)
+#adj=DiscardRecord('Reference GRCh37.p13 Primary Assembly', keepMatched=True)
 type=VARCHAR(255)
 comment= the name of the assembly '-' if not applicable
 
