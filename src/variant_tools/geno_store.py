@@ -29,7 +29,7 @@ import sys
 import time
 from multiprocessing import Process, Value, Lock, Manager
 from .utils import ProgressBar,  delayedAction, \
-     DatabaseEngine, env
+     DatabaseEngine, env, decodeTableName
 
 from .text_reader import TextReader
 from datetime import datetime
@@ -599,17 +599,21 @@ class Sqlite_Store(Base_Store):
          # get sample_ids
         self.projcur.execute('SELECT sample_id, sample_name FROM sample;')
         samples = self.projcur.fetchall()
+        self.db.attach(self.proj.name+".proj",self.proj.name)
+        # self.cur.execute('ATTACH DATABASE {0}.proj AS {0};'.format(self.proj.name))
         for ID, name in samples:
-            if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, ID)):
-                self.cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'
-                    .format(self.proj.name, ID))
+            if not self.db.hasIndex('genotype_{0}_index'.format(ID)):
+                self.cur.execute('CREATE INDEX genotype_{0}_index ON genotype_{0} (variant_id ASC)'
+                    .format(ID))
+            print('DELETE FROM genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
+                .format(ID, self.proj.name+"."+table))
+            self.cur.execute('DELETE FROM genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
+                .format(ID, self.proj.name+"."+table))
 
-            self.cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
-                .format(self.proj.name, ID, table))
             env.logger.info('{} genotypes are removed from sample {}'.format(self.cur.rowcount, name))
-        # remove the table itself
+        # remove the table itself 
         env.logger.info('Removing table {} itself'.format(decodeTableName(table)))
-        self.db.removeTable(table)
+        self.projdb.removeTable(table)
 
     def remove_genotype(self,cond):
         # get sample_ids
