@@ -41,8 +41,9 @@ class TestAdmin(ProcessTestCase):
         self.assertProj(numOfVariants=577, numOfSamples= 61)
         self.runCmd('vtools admin --rename_samples \'filename like "%SAMP1%"\' NA06985')
         self.assertProj(numOfSamples= 61)
-        self.runCmd('vtools admin --merge_samples')         
-        self.assertProj(numOfVariants=577, numOfSamples= 60)
+        if self.storeMode=="sqlite":
+            self.runCmd('vtools admin --merge_samples')         
+            self.assertProj(numOfVariants=577, numOfSamples= 60)
 
     def testMergeWithOverlappingSamples(self):
         # Test merge samples with overlapping variants

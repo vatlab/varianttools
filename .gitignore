@@ -9,6 +9,9 @@ test/.vtools_cache/
 test/10
 test/ann/testNSFP.DB
 test/parent/
+test/tmp_*_genotypes.h5
+test/ceu/
+test/sam1/
 build
 dist
 boost_*
