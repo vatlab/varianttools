@@ -1,7 +1,7 @@
 # Copyright (C) 2017 Man Chong Leong (henryleong@rice.edu)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 #
 
@@ -9,16 +9,16 @@
 *=GeneID
 
 [data sources]
-description=This database is a comprehensive report of the accessions that are 
+description=This database is a comprehensive report of the accessions that are
     related to a Entrez GeneID.  It includes sequences from the international
-    sequence collaboration, Swiss-Prot, and RefSeq. This database only keeps 
+    sequence collaboration, Swiss-Prot, and RefSeq. This database only keeps
 	record for human genome with reference genome Reference GRCh38.p5 Primary
 	Assembly, and it also only keeps sequence on reference assembly (ref seq
 	with assession type NC_).
 version=20170919
 anno_type=field
 source_url=ftp://ftp.ncbi.nih.gov/gene/DATA/gene2refseq.gz
-#direct_url=annoDB/EntrezGene2RedSeq-20131028.DB.gz
+direct_url=annoDB/EntrezGene2RefSeq-20170919.DB.gz	f61164e6279d14948e619c1c28d2b939
 source_type=txt
 header=1
 
@@ -97,7 +97,7 @@ comment= orientation of the gene feature on the genomic accession, '?' if not ap
 
 [assembly]
 index=13
-adj=DiscardRecord('Reference GRCh37.p13 Primary Assembly', keepMatched=True)
+#adj=DiscardRecord('Reference GRCh37.p13 Primary Assembly', keepMatched=True)
 type=VARCHAR(255)
 comment= the name of the assembly '-' if not applicable
 
@@ -105,7 +105,7 @@ comment= the name of the assembly '-' if not applicable
 index=14
 adj=Nullify('-')
 type=VARCHAR(255)
-comment= will be null (-) if absent 
+comment= will be null (-) if absent
 
 [mature_peptide_gi]
 index=15
@@ -118,6 +118,5 @@ index=16
 adj=Nullify('-')
 type=VARCHAR(255)
 comment= the default symbol for the gene
-
 
 

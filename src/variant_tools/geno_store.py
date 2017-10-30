@@ -32,8 +32,9 @@ from .utils import ProgressBar,  delayedAction, \
      DatabaseEngine, env
 
 from .text_reader import TextReader
-from .monitor import ProcessMonitor
 from datetime import datetime
+from .accessor import *
+import glob
 
 
 class Base_Store(object):
@@ -578,19 +579,57 @@ class Sqlite_Store(Base_Store):
         self.db = DatabaseEngine()
         self.db.connect('{}_genotype.DB'.format(self.proj.name))
         self.cur = self.db.cursor()
+        self.projdb=DatabaseEngine()
+        self.projdb.connect('{}.proj'.format(self.proj.name))
+        self.projcur=self.projdb.cursor()
 
-    def num_variants(self, sample_id):
+    def num_variants(self, sample_id,file=""):
         self.cur.execute('SELECT count(*) FROM genotype_{};'.format(sample_id))
         return self.cur.fetchone()[0]
 
-    def geno_fields(self, sample_id):
+    def geno_fields(self, sample_id,file=""):
         sampleGenotypeHeader = self.db.getHeaders('genotype_{}'.format(sample_id))
         return sampleGenotypeHeader[1:]  # the first field is variant id, second is GT
 
-    def remove_sample(self, sample_id):
+    def remove_sample(self, sample_id,file=""):
         self.db.removeTable('genotype_{}'.format(sample_id))
         self.db.commit()
 
+    def remove_variants(self,variantIDs):
+         # get sample_ids
+        self.projcur.execute('SELECT sample_id, sample_name FROM sample;')
+        samples = self.projcur.fetchall()
+        for ID, name in samples:
+            if not self.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, ID)):
+                self.cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'
+                    .format(self.proj.name, ID))
+            self.cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
+                .format(self.proj.name, ID, table))
+            env.logger.info('{} genotypes are removed from sample {}'.format(self.cur.rowcount, name))
+        # remove the table itself
+        env.logger.info('Removing table {} itself'.format(decodeTableName(table)))
+        self.db.removeTable(table)
+
+    def remove_genotype(self,cond):
+        # get sample_ids
+
+        self.projcur.execute('SELECT sample_id, sample_name FROM sample;')
+
+        samples = self.projcur.fetchall()
+        env.logger.info('Removing genotypes from {} samples using criteria "{}"'.format(len(samples), cond))
+        for ID, name in samples:
+            try:
+                # self.cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE {};'\
+                #     .format(self.proj.name, ID, cond))
+                self.cur.execute('DELETE FROM genotype_{} WHERE {};'\
+                    .format(ID, cond))
+            except Exception as e:
+                env.logger.warning('Failed to remove genotypes from sample {}: {}'
+                    .format(name, e))
+                continue
+            env.logger.info('{} genotypes are removed from sample {}'.format(self.cur.rowcount, name))
+
+    
     def importGenotypes(self, importer):
         '''import files in parallel, by importing variants and genotypes separately, and in their own processes. 
         More specifically, suppose that there are three files
@@ -788,21 +827,55 @@ class Sqlite_Store(Base_Store):
 class HDF5_Store(Base_Store):
     def __init__(self, name):
         super(HDF5_Store, self).__init__(name)
-         
-    def importGenotypes(self, importer):
-        from .importer_hdf5 import importGenotypesInParallel
 
+
+    def remove_sample(self,sampleID,HDFfileName):
+        storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+        storageEngine.remove_sample(sampleID)
+        storageEngine.close()
+
+        
+
+
+    def remove_variants(self,variantIDs):
+        HDFfileNames=glob.glob("tmp*_genotypes.h5")
+        for HDFfileName in HDFfileNames:
+            storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+            storageEngine.remove_variants(variantIDs)
+            storageEngine.close()
+
+
+    def remove_genotype(self,cond):
+        HDFfileNames=glob.glob("tmp*_genotypes.h5")
+        for HDFfileName in HDFfileNames:
+            storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+            storageEngine.remove_genotype(cond)
+            storageEngine.close()
+
+    def num_variants(self, sampleID,HDFfileName):
+        storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+        num=storageEngine.num_variants(sampleID)
+        storageEngine.close()
+        return num
+
+    def geno_fields(self, sampleID,HDFfileName):
+        storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+        genoFields=storageEngine.geno_fields(sampleID)
+        storageEngine.close()
+        return genoFields
+
+    
+    def importGenotypes(self, importer):
+        # from .importer_hdf5 import importGenotypesInParallel
+        # return importGenotypesInParallel(importer)
+        # from .importer_vcf_to_hdf5 import importGenotypes
+        # return importGenotypes(importer)
+        from .importer_allele_hdf5 import importGenotypesInParallel
         return importGenotypesInParallel(importer)
 
 
-def GenoStore(proj,monitor):
-    if monitor:
-        monitor_interval = 2
-        resource_monitor_interval = 60
-        task_id=datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+"_import"
-        m = ProcessMonitor(task_id, monitor_interval=monitor_interval,
-                resource_monitor_interval=resource_monitor_interval)
-        m.start()
+
+def GenoStore(proj):
     if proj.store == 'sqlite':
         return Sqlite_Store(proj)
     elif proj.store == 'hdf5':

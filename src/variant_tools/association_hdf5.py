@@ -83,11 +83,12 @@ class GroupHDFGenerator(Process):
                     # if (self.proc_index==1):
                     #     print(ids)
                     #     print(hdf5.get_rownames(chr)[:])
-                    subMatrix=accessEngine.get_geno_info_by_variant_IDs(ids,chr,geneSymbol)
+                    subMatrix=accessEngine.get_geno_info_by_variant_IDs(ids,chr,"GT")
                     if subMatrix.indices is not None:
                         storageEngine.store(subMatrix,chr,geneSymbol) 
                     # storageEngine.close() 
                 accessEngine.close()
+                storageEngine.close()
                 # 
 
             except KeyboardInterrupt as e:
@@ -339,16 +340,17 @@ def getGenotype_HDF5(worker, group):
     files=sorted(files, key=lambda name: int(name.split("_")[1]))
 
     for fileName in files:
-        startSample=int(fileName.split("_")[1])
-        endSample=int(fileName.split("_")[2])
-        
-       
+        # startSample=int(fileName.split("_")[1])
+        # endSample=int(fileName.split("_")[2])
+         
         accessEngine=Engine_Access.choose_access_engine(fileName)
+        colnames=accessEngine.get_colnames(chr,geneSymbol)
+
         snpdict=accessEngine.get_geno_info_by_group(geneSymbol,chr)
         
         # print(geneSymbol,snpdict.keys(),startSample,endSample)
         accessEngine.close()
-        for ID in range(startSample,endSample+1):
+        for ID in colnames:
             data=snpdict[ID]
             
             gtmp = [data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in variant_id]
@@ -361,5 +363,6 @@ def getGenotype_HDF5(worker, group):
                 geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
             
     gname = ':'.join(list(map(str, group)))
+  
     return worker.filterGenotype(genotype, geno_info, var_info, gname)
 
