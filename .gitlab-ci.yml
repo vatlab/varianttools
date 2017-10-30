@@ -37,100 +37,113 @@ before_script:
                 # - cp -r /home/bpeng/VariantTools/build .
                 - python setup.py install
                 - cd test
-test_admin:
+test_admin-associate-avg_depth-compare:
         stage: test
         script:
                 - python test_admin.py
-
-test_associate:
-        stage: test
-        script:
                 - python test_associate.py
-
-test_avg_depth:
-        stage: test
-        script:
                 - python test_avg_depth.py
-
-test_compare:
-        stage: test
-        script:
                 - python test_compare.py
 
-test_exclude:
+# test_associate:
+#         stage: test
+#         script:
+#                 - python test_associate.py
+
+# test_avg_depth:
+#         stage: test
+#         script:
+#                 - python test_avg_depth.py
+
+# test_compare:
+#         stage: test
+#         script:
+#                 - python test_compare.py
+
+test_exclude-execute-export:
         stage: test
         script:
                 - python test_exclude.py
-
-test_execute:
-        stage: test
-        script:
                 - python test_execute.py
-
-test_export:
-        stage: test
-        script:
                 - python test_export.py
 
-test_func:
-        stage: test
-        script:
-                - python test_func.py
+# test_execute:
+#         stage: test
+#         script:
+#                 - python test_execute.py
+
+# test_export:
+#         stage: test
+#         script:
+#                 - python test_export.py
+
+# test_func:
+#         stage: test
+#         script:
+#                 - python test_func.py
 
 test_import:
         stage: test
         script:
                 - python test_import.py
 
-test_init:
+test_init-listover-func:
         stage: test
         script:
                 - python test_init.py
-
-test_liftover:
-        stage: test
-        script:
                 - python test_liftover.py
+                - python test_func.py
 
-test_output:
+# test_liftover:
+#         stage: test
+#         script:
+#                 - python test_liftover.py
+
+test_output-phenotype-remove-select:
         stage: test
         script:
                 - python test_output.py
-
-test_phenotype:
-        stage: test
-        script:
                 - python test_phenotype.py
-
-test_remove:
-        stage: test
-        script:
                 - python test_remove.py
-
-test_select:
-        stage: test
-        script:
                 - python test_select.py
 
-test_show:
+# test_phenotype:
+#         stage: test
+#         script:
+#                 - python test_phenotype.py
+
+# test_remove:
+#         stage: test
+#         script:
+#                 - python test_remove.py
+
+# test_select:
+#         stage: test
+#         script:
+#                 - python test_select.py
+
+test_show-trans_ratio-update-use:
         stage: test
         script:
                 - python test_show.py
-
-test_trans_ratio:
-        stage: test
-        script:
                 - python test_trans_ratio.py
-
-test_update:
-        stage: test
-        script:
                 - python test_update.py
-
-test_use:
-        stage: test
-        script:
                 - python test_use.py
+
+# test_trans_ratio:
+#         stage: test
+#         script:
+#                 - python test_trans_ratio.py
+
+# test_update:
+#         stage: test
+#         script:
+#                 - python test_update.py
+
+# test_use:
+#         stage: test
+#         script:
+#                 - python test_use.py
 
 
 

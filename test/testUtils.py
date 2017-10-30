@@ -43,7 +43,7 @@ class ProcessTestCase(unittest.TestCase):
         with open(self.test_command + '.log', 'a') as fcmd:
             fcmd.write('\n# {}\n# {} \n'.format(self.id().split('.', 1)[-1], 
                 '' if self.shortDescription() is None else '\n# '.join(self.shortDescription().split('\n'))))
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store hdf5')
 
     def compare(self, itemA, itemB, partial=None, negate=None):
         if not isinstance(itemA, list):
