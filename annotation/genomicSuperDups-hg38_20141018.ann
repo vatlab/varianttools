@@ -11,7 +11,7 @@ hg38=chr, start, end
 anno_type=range
 description=Duplications of >1000 Bases of Non-RepeatMasked Sequence (>90 percent similar).
 version=hg38_20141018
-#direct_url=annoDB/genomicSuperDups-hg19_20130626.DB.gz	2bf334b2edafeba116ebd50d0981e8b1
+direct_url=annoDB/genomicSuperDups-hg38_20141018.DB.gz	8bf227c15b740f4e34491befc19f265d
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/genomicSuperDups.txt.gz
 source_type=txt
 

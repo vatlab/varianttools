@@ -11,7 +11,7 @@ hg38=chr, chr_start, chr_end
 anno_type=range
 description=PhastCons Conservation Scores
 version=hg38_20150913
-#direct_url=annoDB/phastCons-hg19_20130322.DB.gz	0309a4eb2fdd291f977fe45434879a85
+direct_url=annoDB/phastCons-hg38_20150913.DB.gz	f1a21eefa6b0a330a43ea5dac2cf70d6
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/phastCons100way.txt.gz
 source_type=txt
 

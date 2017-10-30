@@ -11,9 +11,9 @@ hg38=chr, exon_start, exon_end
 anno_type=range
 description=Gene predictions based on data from RefSeq, Genbank, CCDS and UniProt, from the UCSC KnownGene track. This
   database contains all exome regions of the UCSC known gene database.
-version=hg38_20160702
+version=hg38_20160328
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/knownGene.txt.gz
-#direct_url=annoDB/knownGene_exon-hg19_20130904.DB.gz	b944475f2b889f6d545d39682ec5b066
+direct_url=annoDB/knownGene_exon-hg38_20160328.DB.gz	0a37147d7599621735c462579a979017
 source_type=txt
 
 [name]

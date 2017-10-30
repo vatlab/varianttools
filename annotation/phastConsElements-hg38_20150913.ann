@@ -1,4 +1,4 @@
-# Copyright (C) 2017 Man Chong Leong (henryleong@rice.edu) 
+# Copyright (C) 2017 Man Chong Leong (henryleong@rice.edu)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
 #
 # Please refer to http://varianttools.sourceforge.net/Annotation/New
@@ -11,14 +11,9 @@ hg38=chr, start, end
 anno_type=range
 description=PhastCons Conservation Scores
 version=hg38_20150913
-#direct_url=annoDB/phastConsElements-hg38_20130622.DB.gz	c212ac8711f0e5194777e7dc9a61b447
+direct_url=annoDB/phastConsElements-hg38_20150913.DB.gz	5b9649e1ae18825622090a4e1f5e07db
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/phastConsElements100way.txt.gz
 source_type=txt
-
-[bin]
-index=1
-type=INTEGER
-comment=Indexing field to speed chromosome range queries.
 
 [chr]
 index=2

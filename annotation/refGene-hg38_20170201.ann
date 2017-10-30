@@ -12,7 +12,7 @@ anno_type=range
 description=Known human protein-coding and non-protein-coding genes taken from the NCBI RNA reference sequences collection (RefSeq).
 version=hg38_20170201
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/refGene.txt.gz
-direct_url=annoDB/refGene-hg38_20130904.DB.gz	f3ae8c8baf11b1e32344ee3c7b64edb6
+direct_url=annoDB/refGene-hg38_20170201.DB.gz	b662d038193874397b4832bbc1861915
 source_type=txt
 
 [name]

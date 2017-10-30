@@ -17,7 +17,7 @@ hg19=chr, pos, ref, alt
 description=1000 Genomes VCF file analyzed in February 2015 from data generated from phase 1 of the project (available from: ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/ALL.wgs.phase3_shapeit2_mvncall_integrated_v5b.20130502.sites.vcf.gz.)
 version=hg19_v5b_20130502
 anno_type=variant
-direct_url=annoDB/thousandGenomes-hg38_v3_20101123.DB.gz	09de6622be34caf42ac79b84faef5946
+direct_url=annoDB/thousandGenomes-hg19_v5b_20130502.DB.gz	d86828c4ea1cd2f7546333481b9e749e
 source_url=ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/release/20130502/ALL.wgs.phase3_shapeit2_mvncall_integrated_v5b.20130502.sites.vcf.gz
 source_type=txt
 source_pattern=
@@ -213,4 +213,3 @@ index=8
 adj=ExtractValue('OLD_VARIANT=', ';')
 type=varchar(255)
 comment=old variant location. Format chrom:position:REF_allele/ALT_allele
-
