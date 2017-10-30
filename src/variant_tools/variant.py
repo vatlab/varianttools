@@ -391,11 +391,11 @@ def select(args, reverse=False):
                 proj.createVariantTable(encodeTableName(args.to_table))
                 proj.describeTable(encodeTableName(args.to_table), args.table_desc, True, True)
                 if not reverse:
-                    query = 'INSERT INTO {0} SELECT DISTINCT {1}.variant_id, {1}.chr {2} {3};'.format(encodeTableName(args.to_table), 
+                    query = 'INSERT INTO {0} SELECT DISTINCT {1}.variant_id {2} {3};'.format(encodeTableName(args.to_table), 
                         encodeTableName(args.from_table),
                         from_clause, where_clause)
                 else:
-                    query = 'INSERT INTO {0} SELECT DISTINCT {1}.variant_id, {1}.chr FROM {1} WHERE {1}.variant_id NOT IN (SELECT {1}.variant_id {2} {3});'.\
+                    query = 'INSERT INTO {0} SELECT DISTINCT {1}.variant_id FROM {1} WHERE {1}.variant_id NOT IN (SELECT {1}.variant_id {2} {3});'.\
                         format(encodeTableName(args.to_table), encodeTableName(args.from_table), from_clause, where_clause)
                 env.logger.trace('Running query {}'.format(query))
                 #

@@ -2064,8 +2064,9 @@ class Project:
             env.logger.warning('Existing table {} is renamed to {}.'
                 .format(decodeTableName(table), decodeTableName(new_table)))
         self.db.execute('''CREATE {0} TABLE {1} (
-                variant_id INTEGER PRIMARY KEY,
-                chr INTEGER
+                -- variant_id INTEGER PRIMARY KEY,
+                -- chr INTEGER
+                variant_id INTEGER PRIMARY KEY
             );'''.format('TEMPORARY' if temporary else '', table))
         if variants:
             # this feature is used by vtools_report
