@@ -24,7 +24,7 @@ stages:
 #        stage: build
 before_script:
 
-                # - git checkout v3
+                - git checkout master
                 - git pull
                 - cp -r /home/bpeng/VariantTools/src/boost_1_49_0 ./src
                 - cp -r /home/bpeng/VariantTools/src/cgatools ./src
