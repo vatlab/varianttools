@@ -23,8 +23,8 @@ stages:
 #build:
 #        stage: build
 
-variables:
-        storeMode: "hdf5"
+# variables:
+#         storeMode: "hdf5"
 
 
 before_script:
@@ -55,10 +55,13 @@ before_script:
 test_show-trans_ratio-update-use:
         stage: test
         script:
+                - export STOREMODE="sqlite"
                 - python test_show.py
-                - python test_trans_ratio.py
-                - python test_update.py
-                - python test_use.py
+                # - python test_trans_ratio.py
+                # - python test_update.py
+                # - python test_use.py
+                - export STOREMODE="hdf5"
+                - python test_show.py
 
 
 # test_exclude-execute-export:
