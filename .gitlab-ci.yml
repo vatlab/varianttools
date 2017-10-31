@@ -39,7 +39,7 @@ before_script:
                 - cp -r /home/bpeng/VariantTools/src/rext ./src
                 - cp -r /home/bpeng/VariantTools/src/sqlite ./src
                 - cp -r /home/bpeng/VariantTools/src/ucsc ./src
-                - cp -r /home/bpeng/.variant_tools ../
+                # - cp -r /home/bpeng/.variant_tools ../
                 # - cp -r /home/bpeng/VariantTools/build .
                 - python setup.py install
                 - cd test
@@ -60,10 +60,10 @@ test_show-trans_ratio-update-use:
         variables:
                 STOREMODE: "sqlite"
         script:
-                - python test_show.py
+                # - python test_show.py
                 - python test_trans_ratio.py
-                - python test_update.py
-                - python test_use.py
+                # - python test_update.py
+                # - python test_use.py
 
 
 # test_exclude-execute-export:
@@ -103,7 +103,7 @@ test_show-trans_ratio-update-use:
 
 
 test_admin-compare-execute:
-        stage: testHDF5
+        stage: testSqlite
         variables:
                 STOREMODE: "hdf5"
         script:
@@ -112,24 +112,24 @@ test_admin-compare-execute:
                 - python test_func.py
 
 
-test_liftover-use-select:
-        stage: testHDF5
-        variables:
-                STOREMODE: "hdf5"
-        script:
-                - python test_init.py
-                - python test_liftover.py
-                - python test_func.py
+# test_liftover-use-select:
+#         stage: testHDF5
+#         variables:
+#                 STOREMODE: "hdf5"
+#         script:
+#                 - python test_init.py
+#                 - python test_liftover.py
+#                 - python test_func.py
 
-test_output-phenotype-remove:
-        stage: testHDF5
-        variables:
-                STOREMODE: "hdf5"
-        script:
-                - python test_output.py
-                - python test_phenotype.py
-                - python test_remove.py
-                - python test_select.p
+# test_output-phenotype-remove:
+#         stage: testHDF5
+#         variables:
+#                 STOREMODE: "hdf5"
+#         script:
+#                 - python test_output.py
+#                 - python test_phenotype.py
+#                 - python test_remove.py
+#                 - python test_select.p
 
 
 # test_associate:
