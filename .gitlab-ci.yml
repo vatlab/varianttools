@@ -1,7 +1,8 @@
 image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5_ci:test
 stages:
         #        - build 
-        - test
+        - testSqlite
+        - testHDF5
 #stages:
 ##        - setup
 ##        - test       
@@ -45,7 +46,9 @@ before_script:
 
 
 # test_admin-associate-avg_depth-compare:
-#         stage: test
+#         stage: testSqlite
+#         varialble:
+#                 STOREMODE: "sqlite"
 #         script:
 #                 - python test_admin.py
 #                 - python test_associate.py
@@ -53,26 +56,29 @@ before_script:
 #                 - python test_compare.py
 
 test_show-trans_ratio-update-use:
-        stage: test
+        stage: testSqlite
+        varialble:
+                STOREMODE: "sqlite"
         script:
-                - export STOREMODE="sqlite"
                 - python test_show.py
-                # - python test_trans_ratio.py
-                # - python test_update.py
-                # - python test_use.py
-                - export STOREMODE="hdf5"
-                - python test_show.py
+                - python test_trans_ratio.py
+                - python test_update.py
+                - python test_use.py
 
 
 # test_exclude-execute-export:
-#         stage: test
+#         stage: testSqlite
+#         varialble:
+#                 STOREMODE: "sqlite"
 #         script:
 #                 - python test_exclude.py
 #                 - python test_execute.py
 #                 - python test_export.py
 
 # test_output-phenotype-remove-select:
-#         stage: test
+#         stage: testSqlite
+#         varialble:
+#                 STOREMODE: "sqlite"
 #         script:
 #                 - python test_output.py
 #                 - python test_phenotype.py
@@ -80,17 +86,50 @@ test_show-trans_ratio-update-use:
 #                 - python test_select.py
 
 # test_import:
-#         stage: test
+#         stage: testSqlite
+#         varialble:
+#                 STOREMODE: "sqlite"
 #         script:
 #                 - python test_import.py
 
 # test_init-listover-func:
-#         stage: test
+#         stage: testSqlite
+#         varialble:
+#                 STOREMODE: "sqlite"
 #         script:
 #                 - python test_init.py
 #                 - python test_liftover.py
 #                 - python test_func.py
 
+
+test_admin-compare-execute:
+        stage: testHDF5
+        varialble:
+                STOREMODE: "hdf5"
+        script:
+                - python test_init.py
+                - python test_liftover.py
+                - python test_func.py
+
+
+test_liftover-use-select:
+        stage: testHDF5
+        varialble:
+                STOREMODE: "hdf5"
+        script:
+                - python test_init.py
+                - python test_liftover.py
+                - python test_func.py
+
+test_output-phenotype-remove:
+        stage: testHDF5
+        varialble:
+                STOREMODE: "hdf5"
+        script:
+                - python test_output.py
+                - python test_phenotype.py
+                - python test_remove.py
+                - python test_select.p
 
 
 # test_associate:
