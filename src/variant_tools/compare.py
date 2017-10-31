@@ -397,11 +397,12 @@ def compareTables(proj, args):
                 'description is allowed: %s provided'.format(table_with_desc))
         proj.createVariantTable(encodeTableName(table))
         prog = ProgressBar('Writing to ' + table, len(var))
-        query = 'INSERT INTO {} VALUES ({});'.format(encodeTableName(table), proj.db.PH)
+        query = 'INSERT INTO {} VALUES ({},{});'.format(encodeTableName(table), proj.db.PH,proj.db.PH)
+
         # sort var so that variant_id will be in order, which might
         # improve database performance
         for count,id in enumerate(sorted(var)):
-            cur.execute(query, (id,))
+            cur.execute(query, (id,None,))
             if count % 10000 == 0:
                 prog.update(count)
         proj.describeTable(encodeTableName(table), desc, True, True)
