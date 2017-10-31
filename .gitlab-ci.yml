@@ -44,21 +44,21 @@ before_script:
                 - cd test
 
 
-test_admin-associate-avg_depth-compare:
-        stage: test
-        script:
-                - python test_admin.py
-                - python test_associate.py
-                - python test_avg_depth.py
-                - python test_compare.py
-
-# test_show-trans_ratio-update-use:
+# test_admin-associate-avg_depth-compare:
 #         stage: test
 #         script:
-#                 - python test_show.py
-#                 - python test_trans_ratio.py
-#                 - python test_update.py
-#                 - python test_use.py
+#                 - python test_admin.py
+#                 - python test_associate.py
+#                 - python test_avg_depth.py
+#                 - python test_compare.py
+
+test_show-trans_ratio-update-use:
+        stage: test
+        script:
+                - python test_show.py
+                - python test_trans_ratio.py
+                - python test_update.py
+                - python test_use.py
 
 
 # test_exclude-execute-export:
