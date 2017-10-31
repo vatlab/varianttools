@@ -2247,7 +2247,7 @@ class Project:
         variantIDs=[]
         for res in result:
             variantIDs.append((res[0],res[1]))
-        
+        self.db.commit()
         store = GenoStore(self)
         store.remove_variants(variantIDs,table)
 

@@ -2951,11 +2951,14 @@ class DatabaseEngine:
     def removeTable(self, table):
         '''Remove specified table'''
         cur = self.database.cursor()
+        sql='DROP TABLE {};'.format(table)
         cur.execute('DROP TABLE {};'.format(table))
         # FIXME: should we automatically do VACUUM, this can be slow when the table is deletec
         # but can help performance for the creation of new tables.
         # NOTE: It seems that re-generating a table can be VERY slow without vacuum.
-        #    cur.execute('VACUUM;')
+        #    cur.execute('VACUUM;'
+
+
         self.database.commit()
 
     def truncateTable(self, table):

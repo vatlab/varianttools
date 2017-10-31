@@ -579,9 +579,7 @@ class Sqlite_Store(Base_Store):
         self.db = DatabaseEngine()
         self.db.connect('{}_genotype.DB'.format(self.proj.name))
         self.cur = self.db.cursor()
-        self.projdb=DatabaseEngine()
-        self.projdb.connect('{}.proj'.format(self.proj.name))
-        self.projcur=self.projdb.cursor()
+
 
     def num_variants(self, sample_id,file=""):
         self.cur.execute('SELECT count(*) FROM genotype_{};'.format(sample_id))
@@ -597,30 +595,28 @@ class Sqlite_Store(Base_Store):
 
     def remove_variants(self,variantIDs,table):
          # get sample_ids
-        self.projcur.execute('SELECT sample_id, sample_name FROM sample;')
-        samples = self.projcur.fetchall()
         self.db.attach(self.proj.name+".proj",self.proj.name)
-        # self.cur.execute('ATTACH DATABASE {0}.proj AS {0};'.format(self.proj.name))
+        self.cur.execute('SELECT sample_id, sample_name FROM {}.sample;'.format(self.proj.name))
+        samples = self.cur.fetchall()
+   
         for ID, name in samples:
             if not self.db.hasIndex('genotype_{0}_index'.format(ID)):
                 self.cur.execute('CREATE INDEX genotype_{0}_index ON genotype_{0} (variant_id ASC)'
                     .format(ID))
-            print('DELETE FROM genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
-                .format(ID, self.proj.name+"."+table))
             self.cur.execute('DELETE FROM genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
                 .format(ID, self.proj.name+"."+table))
 
             env.logger.info('{} genotypes are removed from sample {}'.format(self.cur.rowcount, name))
         # remove the table itself 
         env.logger.info('Removing table {} itself'.format(decodeTableName(table)))
-        self.projdb.removeTable(table)
+        self.db.removeTable(self.proj.name+"."+table)
 
     def remove_genotype(self,cond):
         # get sample_ids
 
-        self.projcur.execute('SELECT sample_id, sample_name FROM sample;')
+        self.cur.execute('SELECT sample_id, sample_name FROM {}.sample;'.format(self.proj.name))
 
-        samples = self.projcur.fetchall()
+        samples = self.cur.fetchall()
         env.logger.info('Removing genotypes from {} samples using criteria "{}"'.format(len(samples), cond))
         for ID, name in samples:
             try:
