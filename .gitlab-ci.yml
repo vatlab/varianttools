@@ -60,16 +60,12 @@ test_admin-associate-avg_depth-compare:
 #         script:
 #                 - python test_compare.py
 
-test_exclude-execute-export:
+test_exclude-execute-export-init-liftover-func:
         stage: test
         script:
                 - python test_exclude.py
                 - python test_execute.py
                 - python test_export.py
-
-test_init-liftover-func:
-        stage: test
-        script:
                 - python test_init.py
                 - python test_liftover.py
                 - python test_func.py
