@@ -47,7 +47,7 @@ before_script:
 
 # test_admin-associate-avg_depth-compare:
 #         stage: testSqlite
-#         varialble:
+#         variable:
 #                 STOREMODE: "sqlite"
 #         script:
 #                 - python test_admin.py
@@ -57,7 +57,7 @@ before_script:
 
 test_show-trans_ratio-update-use:
         stage: testSqlite
-        varialble:
+        variable:
                 STOREMODE: "sqlite"
         script:
                 - python test_show.py
@@ -68,7 +68,7 @@ test_show-trans_ratio-update-use:
 
 # test_exclude-execute-export:
 #         stage: testSqlite
-#         varialble:
+#         variable:
 #                 STOREMODE: "sqlite"
 #         script:
 #                 - python test_exclude.py
@@ -77,7 +77,7 @@ test_show-trans_ratio-update-use:
 
 # test_output-phenotype-remove-select:
 #         stage: testSqlite
-#         varialble:
+#         variable:
 #                 STOREMODE: "sqlite"
 #         script:
 #                 - python test_output.py
@@ -94,7 +94,7 @@ test_show-trans_ratio-update-use:
 
 # test_init-listover-func:
 #         stage: testSqlite
-#         varialble:
+#         variable:
 #                 STOREMODE: "sqlite"
 #         script:
 #                 - python test_init.py
@@ -104,7 +104,7 @@ test_show-trans_ratio-update-use:
 
 test_admin-compare-execute:
         stage: testHDF5
-        varialble:
+        variable:
                 STOREMODE: "hdf5"
         script:
                 - python test_init.py
@@ -114,7 +114,7 @@ test_admin-compare-execute:
 
 test_liftover-use-select:
         stage: testHDF5
-        varialble:
+        variable:
                 STOREMODE: "hdf5"
         script:
                 - python test_init.py
@@ -123,7 +123,7 @@ test_liftover-use-select:
 
 test_output-phenotype-remove:
         stage: testHDF5
-        varialble:
+        variable:
                 STOREMODE: "hdf5"
         script:
                 - python test_output.py
