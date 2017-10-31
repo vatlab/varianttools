@@ -24,7 +24,7 @@ stages:
 #        stage: build
 
 variables:
-        storeMode: "sqlite"
+        storeMode: "hdf5"
 
 
 before_script:
