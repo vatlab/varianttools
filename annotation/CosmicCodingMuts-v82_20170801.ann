@@ -1,4 +1,4 @@
-# Copyright (C) 2017 Man Chong Leong (ml69@rice.edu) 
+# Copyright (C) 2017 Man Chong Leong (ml69@rice.edu)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
 #
 # Please refer to http://varianttools.sourceforge.net/Format/New for
@@ -8,10 +8,10 @@
 hg38=chr, pos, ref, alt
 
 [data sources]
-description=Cosmic coding mutation database.  This data contains mutations affecting 10 or less nucleotides in REF.  The mutation data was obtained from the Sanger Institute Catalogue Of Somatic Mutations In Cancer web site, http://cancer.sanger.ac.uk/cosmic. The COSMIC (Catalogue of Somatic Mutations in Cancer) database and website. Br J Cancer, 91,355-358. 
+description=Cosmic coding mutation database.  This data contains mutations affecting 10 or less nucleotides in REF.  The mutation data was obtained from the Sanger Institute Catalogue Of Somatic Mutations In Cancer web site, http://cancer.sanger.ac.uk/cosmic. The COSMIC (Catalogue of Somatic Mutations in Cancer) database and website. Br J Cancer, 91,355-358.
 version=v82_20170801
 anno_type=variant
-#direct_url=annoDB/CosmicCodingMuts-v81_20170801.DB.gz
+direct_url=annoDB/CosmicCodingMuts-v82_20170801.DB.gz	ffc20728f38d2fcd1a1741aadc18370f
 source_url: Please follow the instruction on the website of COSMIC to see how to download the dataset.
 source_type=txt
 source_pattern=
@@ -77,4 +77,3 @@ index=8
 adj=ExtractFlag('SNP', ';')
 type=INTEGER
 comment=classified as SNP
-

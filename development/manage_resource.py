@@ -99,6 +99,8 @@ if __name__ == '__main__':
         help='''Remove specified files from the online manifest so that it will no
             longer be listed as part of the resource. The file itself, if exists, will
             be renamed but not removed from the server.''') 
+    parser.add_argument('--local', metavar='LOCAL', default=env.local_resource,
+        help='''Local resource directory, default to env.local_resource''')
     # this set up and use default temporary directory
     env.temp_dir = None
     args = parser.parse_args()
@@ -112,7 +114,7 @@ if __name__ == '__main__':
         sys.stderr.write('Local manifest has been saved to MANIFEST_local.txt\n') 
     elif args.list is not None:
         manager = ResourceManager()
-        manager.scanDirectory(env.local_resource, args.list)
+        manager.scanDirectory(args.local, args.list)
         local_manifest = {x:y for x,y in manager.manifest.items()}
         manager.manifest.clear()
         manager.getRemoteManifest()
@@ -141,7 +143,7 @@ if __name__ == '__main__':
     elif args.upload:
         manager = ResourceManager()
         manager.getRemoteManifest('http://bioinformatics.mdanderson.org/Software/VariantTools/{}/'.format(args.repo))
-        resource_dir = os.path.expanduser(env.local_resource)
+        resource_dir = os.path.expanduser(args.local)
         # get information about file
         for filename in args.upload:
             if filename.endswith('.DB'):

@@ -10,9 +10,9 @@ hg38=chr, txStart, txEnd
 [data sources]
 anno_type=range
 description=Gene predictions based on data from RefSeq, Genbank, CCDS and UniProt, from the UCSC KnownGene track.
-version=hg38_20160702
+version=hg38_20160328
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/knownGene.txt.gz
-#direct_url=annoDB/knownGene-hg38_20130904.DB.gz	0dfff9b8e479bbae7f0d8cb4fb406a29
+direct_url=annoDB/knownGene-hg38_20160328.DB.gz	6f1d0d4b00139626f34198cef68eb84f
 source_type=txt
 
 [name]
@@ -76,5 +76,4 @@ comment=UniProt display ID, UniProt accession, or RefSeq protein ID
 index=12
 type=VARCHAR(255)
 comment=Unique identifier (GENCODE transcript ID for GENCODE Basic)
-
 
