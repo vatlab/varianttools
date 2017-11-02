@@ -20,8 +20,11 @@ class ProcessMonitor(threading.Thread):
         self.daemon = True
 
         # self.pulse_file = os.path.join(os.path.expanduser('~'), '.sos', 'tasks', task_id + '.pulse')
-        self.pulse_file = task_id + '.pulse'
-
+        #self.pulse_file = task_id + '.pulse'
+	if 'HDF' in command or 'hdf' in command:
+	    self.pulse_file = command.split(' ')[1] + '_j' + command.split(' ')[[i for i, x in enumerate(p.split(' ')) if '-j' == x][0]+1] + '_hdf5' + '.pulse'
+	else:
+	    self.pulse_file = command.split(' ')[1] + '_j' + command.split(' ')[[i for i, x in enumerate(p.split(' ')) if '-j' == x][0]+1] + '_sqlite' + '.pulse'
         # remove previous status file, which could be readonly if the job is killed
         if os.path.isfile(self.pulse_file):
             if not os.access(self.pulse_file, os.W_OK):
