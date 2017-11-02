@@ -30,10 +30,10 @@ def checking_association(sql_file, hdf5_file):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="the two files path and name, for sqlite and -for hdf5")
-    parser.add_argument("sqlite_file",
+    parser.add_argument("-sql",
                         help="for sqlite and -for sqlite")
-    parser.add_argument("hdf5_file",
+    parser.add_argument("-h5",
                         help="for hdf5 and -for hdf5")
 
     args = parser.parse_args()
-    checking_association(args.sqlite_file, args.hdf5_file)
+    checking_association(args.sql, args.h5)
