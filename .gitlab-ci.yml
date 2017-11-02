@@ -29,6 +29,8 @@ before_script:
                 - git fetch
                 - git checkout v3
                 - git pull
+                - cp -r . /home/jma7/
+                - cd /home/jma7/VariantTools
                 - cp -r /home/bpeng/VariantTools/src/boost_1_49_0 ./src
                 - cp -r /home/bpeng/VariantTools/src/cgatools ./src
                 - cp -r /home/bpeng/VariantTools/src/gsl ./src
@@ -36,7 +38,7 @@ before_script:
                 - cp -r /home/bpeng/VariantTools/src/rext ./src
                 - cp -r /home/bpeng/VariantTools/src/sqlite ./src
                 - cp -r /home/bpeng/VariantTools/src/ucsc ./src
-                - mv /home/jma7/.variant_tools /builds/jma7
+
                 # - cp -r /home/bpeng/.variant_tools ../
                 - python setup.py install
                 - cd test
