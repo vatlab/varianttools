@@ -37,7 +37,6 @@ before_script:
                 - cp -r /home/bpeng/VariantTools/src/ucsc ./src
                 # - cp -r /home/bpeng/.variant_tools ../
                 - python setup.py install
-                - vtools admin --set_runtime_option local_resource=/home/jma7/.variant_tools
                 - cd test
 
 # test_admin-associate-avg_depth-compare:
