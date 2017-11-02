@@ -11,20 +11,21 @@ import sys
 
 
 class ProcessMonitor(threading.Thread):
-    def __init__(self, task_id, monitor_interval,resource_monitor_interval):
+    def __init__(self, task_id, monitor_interval,resource_monitor_interval, command):
         threading.Thread.__init__(self)
         self.task_id = task_id
         self.pid = os.getpid()
         self.monitor_interval = monitor_interval
         self.resource_monitor_interval=resource_monitor_interval
         self.daemon = True
-
+        self.command=command
         # self.pulse_file = os.path.join(os.path.expanduser('~'), '.sos', 'tasks', task_id + '.pulse')
         #self.pulse_file = task_id + '.pulse'
-	if 'HDF' in command or 'hdf' in command:
-	    self.pulse_file = command.split(' ')[1] + '_j' + command.split(' ')[[i for i, x in enumerate(p.split(' ')) if '-j' == x][0]+1] + '_hdf5' + '.pulse'
-	else:
-	    self.pulse_file = command.split(' ')[1] + '_j' + command.split(' ')[[i for i, x in enumerate(p.split(' ')) if '-j' == x][0]+1] + '_sqlite' + '.pulse'
+        # How to know whether we are import hdf5 or sqlite when we are running the import command? The pulse file should be further than the h.5 files
+        if 'HDF' in self.command or 'hdf' in self.command:
+            self.pulse_file = command.split(' ')[1] + '_j' + command.split(' ')[[i for i, x in enumerate(command.split(' ')) if '-j' == x][0]+1] + '_hdf5' + '.pulse'
+        else:
+            self.pulse_file = command.split(' ')[1] + '_j' + command.split(' ')[[i for i, x in enumerate(command.split(' ')) if '-j' == x][0]+1] + '_sqlite' + '.pulse'
         # remove previous status file, which could be readonly if the job is killed
         if os.path.isfile(self.pulse_file):
             if not os.access(self.pulse_file, os.W_OK):
@@ -90,11 +91,11 @@ def main():
     monitor_interval = 2
     resource_monitor_interval = 60
     task_id=datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    m = ProcessMonitor(task_id, monitor_interval=monitor_interval,
-             resource_monitor_interval=resource_monitor_interval)
-    m.start()
     command=sys.argv[1]
     print(command)
+    m = ProcessMonitor(task_id, monitor_interval=monitor_interval,
+             resource_monitor_interval=resource_monitor_interval, command=sys.argv[1])
+    m.start()
     subprocess.call(command,shell=True)
 
 if __name__ == "__main__":
