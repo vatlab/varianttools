@@ -13,36 +13,37 @@ RUN	conda install cython
 RUN	pip install numpy scipy tables
 WORKDIR /home/bpeng
 RUN     git clone http://github.com/vatlab/VariantTools  VariantTools
+
 WORKDIR /home/bpeng/VariantTools
 RUN     git fetch
-RUN	git checkout v3
+RUN		git checkout v3
 RUN     git pull
 RUN     python setup.py install
 
-ENV     HOME /home/bpeng
-RUN     mkdir /home/bpeng/temp
+#ENV     HOME /home/bpeng
+#RUN     mkdir /home/bpeng/temp
 
 # download hg19 reference genome and refGene database
-WORKDIR /home/bpeng/temp
-RUN     touch temp.vcf
-RUN     vtools init test --build hg19
-RUN     vtools import temp.vcf
-RUN     vtools use refGene
+# WORKDIR /home/bpeng/temp
+#RUN     touch temp.vcf
+#RUN     vtools init test --build hg19
+#RUN     vtools import temp.vcf
+#RUN     vtools use refGene
 
-WORKDIR /home/bpeng
-RUN     rm -rf temp
+#WORKDIR /home/bpeng
+#RUN     rm -rf temp
 
-RUN     mkdir /home/bpeng/temp
+#RUN     mkdir /home/bpeng/temp
 
 # download hg18 reference genome and refGene database
-WORKDIR /home/bpeng/temp
-RUN     touch temp.vcf
-RUN     vtools init test --build hg18
-RUN     vtools import temp.vcf
-RUN     vtools use refGene
+# WORKDIR /home/bpeng/temp
+#RUN     touch temp.vcf
+#RUN     vtools init test --build hg18
+#RUN     vtools import temp.vcf
+#RUN     vtools use refGene
 
-WORKDIR /home/bpeng
-RUN     rm -rf temp
+#WORKDIR /home/bpeng
+#RUN     rm -rf temp
 
 # RUN     mkdir /home/bpeng/temp
 # WORKDIR /home/bpeng/boost
