@@ -81,7 +81,7 @@ test_output-phenotype-remove-select:
 
 test_import:
         stage: testSqlite
-        varialble:
+        variables:
                 STOREMODE: "sqlite"
         script:
                 - python test_import.py
