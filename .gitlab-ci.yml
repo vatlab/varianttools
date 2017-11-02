@@ -22,8 +22,8 @@ stages:
 
 #build:
 #        stage: build
-# variables:
-#         storeMode: "hdf5"
+variables:
+         LOCALRESOURCE: "/home/jma7/.variant_tools"
 
 before_script:
                 - git checkout v3
@@ -54,6 +54,7 @@ test_show-trans_ratio-update-use:
         stage: testSqlite
         variables:
                 STOREMODE: "sqlite"
+
         script:
                 # - python test_show.py
                 - python test_trans_ratio.py

@@ -43,8 +43,14 @@ class ProcessTestCase(unittest.TestCase):
         with open(self.test_command + '.log', 'a') as fcmd:
             fcmd.write('\n# {}\n# {} \n'.format(self.id().split('.', 1)[-1], 
                 '' if self.shortDescription() is None else '\n# '.join(self.shortDescription().split('\n'))))
-        self.storeMode=os.getenv("STOREMODE")
-        self.runCmd('vtools init test -f --store '+self.storeMode)
+        if os.environ.get("STOREMODE") is not None:
+            self.storeMode=os.getenv("STOREMODE")
+            self.runCmd('vtools init test -f --store '+self.storeMode)
+        else:
+            self.runCmd('vtools init test -f')
+        if os.environ.get("LOCALRESOURCE") is not None:
+            self.local_resource=os.getenv("LOCALRESOURCE")
+            self.runCmd('vtools admin --set_runtime_option local_resource='+self.local_resource)
 
     def compare(self, itemA, itemB, partial=None, negate=None):
         if not isinstance(itemA, list):
