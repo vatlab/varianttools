@@ -22,7 +22,6 @@ stages:
 
 #build:
 #        stage: build
-
 # variables:
 #         storeMode: "hdf5"
 before_script:
