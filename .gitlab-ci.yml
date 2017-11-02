@@ -25,7 +25,7 @@ stages:
 # variables:
 #         storeMode: "hdf5"
 before_script:
-
+                - git fetch
                 - git checkout v3
                 - git pull
                 - cp -r /home/bpeng/VariantTools/src/boost_1_49_0 ./src
