@@ -29,7 +29,7 @@ before_script:
                 - git fetch
                 - git checkout v3
                 - git pull
-                - ln -s /home/jma7/.variant_tools ../
+                # - ln -s /home/jma7/.variant_tools ../
                 - cp -r /home/bpeng/VariantTools/src/boost_1_49_0 ./src
                 - cp -r /home/bpeng/VariantTools/src/cgatools ./src
                 - cp -r /home/bpeng/VariantTools/src/gsl ./src
