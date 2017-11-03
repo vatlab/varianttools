@@ -52,6 +52,9 @@ class TestExecute(ProcessTestCase):
     
     def testExeAnno(self):
         self.runCmd('vtools init test -f')
+        if os.environ.get("LOCALRESOURCE") is not None:
+            self.local_resource=os.getenv("LOCALRESOURCE")
+            self.runCmd('vtools admin --set_runtime_option local_resource='+self.local_resource)
         self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')
         self.runCmd('vtools import vcf/SAMP2.vcf')
         self.runCmd('vtools use refGene')
