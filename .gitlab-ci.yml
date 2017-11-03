@@ -106,8 +106,6 @@ test_init-listover-func:
 #                 - python test_func.py
 
 
-
-
 test_output-phenotype-remove:
         stage: testSqlite
         variables:
