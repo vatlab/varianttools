@@ -30,6 +30,8 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase
 
+
+@unittest.skipIf(os.getenv("STOREMODE")=="hdf5")
 class TestExclude(ProcessTestCase):
     def setUp(self):
         'Create a project'
