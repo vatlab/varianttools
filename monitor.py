@@ -19,10 +19,15 @@ class ProcessMonitor(threading.Thread):
         self.resource_monitor_interval=resource_monitor_interval
         self.daemon = True
         self.command=command
+
+        cat_hdf5 = 'cat *.log | grep hdf5'
+        cat_hdf5_all = subprocess.Popen(cat_hdf5, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True)
+        output_hdf5 = str(cat_hdf5_all.stdout.read())
+        bool_output = '--store hdf5' in output_hdf5 or '--STORE hdf5' in output_hdf5
+
         # self.pulse_file = os.path.join(os.path.expanduser('~'), '.sos', 'tasks', task_id + '.pulse')
         #self.pulse_file = task_id + '.pulse'
-        # How to know whether we are import hdf5 or sqlite when we are running the import command? The pulse file should be further than the h.5 files
-        if 'HDF' in self.command or 'hdf' in self.command:
+        if 'HDF' in self.command or 'hdf' in self.command or bool_output == True:
             self.pulse_file = command.split(' ')[1] + '_j' + command.split(' ')[[i for i, x in enumerate(command.split(' ')) if '-j' == x][0]+1] + '_hdf5' + '.pulse'
         else:
             self.pulse_file = command.split(' ')[1] + '_j' + command.split(' ')[[i for i, x in enumerate(command.split(' ')) if '-j' == x][0]+1] + '_sqlite' + '.pulse'
