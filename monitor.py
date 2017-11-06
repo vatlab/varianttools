@@ -7,7 +7,8 @@ from datetime import datetime
 import stat
 import subprocess
 import sys
-
+import sqlite3
+import glob
 
 
 class ProcessMonitor(threading.Thread):
@@ -20,11 +21,24 @@ class ProcessMonitor(threading.Thread):
         self.daemon = True
         self.command=command
 
-        cat_hdf5 = 'cat *.log | grep hdf5'
-        cat_hdf5_all = subprocess.Popen(cat_hdf5, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True)
-        output_hdf5 = str(cat_hdf5_all.stdout.read())
-        bool_output = '--store hdf5' in output_hdf5 or '--STORE hdf5' in output_hdf5
-
+        # not an elegant way to do that
+        #cat_hdf5 = 'cat *.log | grep hdf5'
+        #cat_hdf5_all = subprocess.Popen(cat_hdf5, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True)
+        #output_hdf5 = str(cat_hdf5_all.stdout.read())
+        #bool_output = '--store hdf5' in output_hdf5 or '--STORE hdf5' in output_hdf5
+        
+        # more elegant way is to get the information (store, hdf5) in .proj file, which is a database.
+        DB_projfile_name = glob.glob('*.proj')[0] 
+        conn = sqlite3.connect(DB_projfile_name)
+        print(DB_projfile_name)
+        c = conn.cursor()
+        # cannot execute ".table" command in sqlite3 inside python
+        #c.execute("select name from sqlite_master where type='table' order by name") 
+        #c.fetchall()
+        c.execute("select * from project;")
+        result = c.fetchall()
+        bool_output = ('store', 'hdf5') in result
+        
         # self.pulse_file = os.path.join(os.path.expanduser('~'), '.sos', 'tasks', task_id + '.pulse')
         #self.pulse_file = task_id + '.pulse'
         if 'HDF' in self.command or 'hdf' in self.command or bool_output == True:
@@ -49,8 +63,6 @@ class ProcessMonitor(threading.Thread):
         ch_mem = 0
         children = current_process.children(recursive=True)
         n_children = len(children)
-        #disk_use = psutil.disk_usage('/Users/manchongleong/Documents/testVariantTools')
-        #disk_use = os.path.getsize('/Users/manchongleong/Documents/testVariantTools/')
         for child in children:
             ch_cpu += child.cpu_percent()
             ch_mem += child.memory_info()[0]
