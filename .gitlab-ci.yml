@@ -4,7 +4,6 @@ stages:
         # - testHDF5
         - test
 
-
 # variables:
 #          LOCALRESOURCE: "/home/jma7/.variant_tools"
 
