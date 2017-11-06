@@ -18,7 +18,7 @@ version=20170920
 anno_type=field
 encoding=ISO-8859-1
 source_url=ftp://ftp.ebi.ac.uk/pub/databases/genenames/hgnc_complete_set.txt.gz
-#direct_url=annoDB/HGNC-20131029.DB.gz	80bd9bc0697631a6280c39f8e349415d
+direct_url=annoDB/HGNC-20170920.DB.gz	5b089951f58c8e5379db6c4c47a03a7f
 source_type=txt
 
 [name]
@@ -257,4 +257,3 @@ comment=RGD identifier. In the HTML results page this ID links to the RGD Report
 index=42
 type=VARCHAR(255)
 comment=RNAcentral is a comprehensive database of non-coding RNA sequences that represents all types of ncRNA from a broad range of organisms.
-

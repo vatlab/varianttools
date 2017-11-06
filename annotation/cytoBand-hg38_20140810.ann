@@ -34,7 +34,7 @@ anno_type=range
 description=Cyto Band
 version=hg38_20140810
 source_url=http://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/cytoBand.txt.gz
-#direct_url=annoDB/cytoBand-hg19_20111216.DB.gz	9599356253ee9c6f8b0f0210e8182e7a
+direct_url=annoDB/cytoBand-hg38_20140810.DB.gz	1d2bfc11f9cf0ca2da8f160888c2b087
 source_type=txt
 
 [chr]

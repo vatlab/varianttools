@@ -1,0 +1,123 @@
+# Copyright (C) 2017 Man Chong Leong (henryleong@rice.edu)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
+# for a description of the format of this file.
+#
+
+[linked fields]
+hg38=chr, pos, ref, alt
+
+[data sources]
+description=dbscSNV includes all potential human SNVs within splicing consensus regions (-3 to +8 at the 5' splice site and -12 to +2 at the 3' splice site), i.e. scSNVs, related functional annotations and two ensemble prediction scores for predicting their potential of altering splicing. If you uses dbscSNV, please cite:1. Jian X, Boerwinkle E and Liu X. 2014. In silico prediction of splice-altering single nucleotide variants in the human genome. Nucleic Acids Research 42(22):13534-13544. 
+header=1
+preprocessor=Dos2Unix()
+version=hg38_20150412
+anno_type=variant
+#source_url= currently go to https://sites.google.com/site/jpopgen/dbNSFP to download dbscSNV.zip from Onedrive or Googledrive.
+direct_url=annoDB/dbscSNV-hg38_20150412.DB.gz	54ad0a57d36afa0c1db87231b5d614ce
+source_type=txt
+source_pattern=dbscSNV.chr
+
+[chr]
+index=1
+type=VARCHAR(20) NOT NULL
+comment=chromosome number
+
+[pos]
+index=2
+type=INTEGER NOT NULL
+comment=physical position on the chromosome as to hg38 (1-based coordinate)
+
+[ref]
+index=3
+type=CHAR(1) NOT NULL
+comment=reference nucleotide allele (as on the + strand)
+
+[alt]
+index=4
+type=CHAR(1) NOT NULL
+comment=alternative nucleotide allele (as on the + strand)
+
+[hg38_chr]
+index=5
+type=VARCHAR(20) NULL
+comment=chromosome number (hg38)
+
+[hg38_pos]
+index=6
+type=INTEGER NULL
+comment=physical position on the chromosome as to hg18 (1-based coordinate)
+
+[RefSeq]
+index=7
+type=CHAR(1) NULL
+adj=Nullify('.')
+comment=whether the SNV is a scSNV according to RefSeq
+
+[Ensembl]
+index=8
+type=CHAR(1) NULL
+adj=Nullify('.')
+comment=whether the SNV is a scSNV according to Ensembl
+
+[RefSeq_region]
+index=9
+type=VARCHAR(20) NULL
+adj=Nullify('.')
+comment=functional region the SNV located according to RefSeq
+
+[RefSeq_gene]
+index=10
+type=VARCHAR(100) NULL
+adj=Nullify('.')
+comment=gene name according to RefSeq
+
+[RefSeq_functional_consequence]
+index=11
+type=VARCHAR(100) NULL
+adj=Nullify('.')
+comment=functional consequence of the SNV according to RefSeq
+
+[RefSeq_id_c_change_p_changeE]
+index=12
+type=VARCHAR(255) NULL
+adj=Nullify('.')
+comment=SNV in format of c.change and p.change according to RefSeq
+
+[Ensembl_region]
+index=13
+type=VARCHAR(20) NULL
+adj=Nullify('.')
+comment=functional region the SNV located according to Ensembl
+
+[Ensembl_gene]
+index=14
+type=VARCHAR(255) NULL
+adj=Nullify('.')
+comment=gene id according to Ensembl
+
+[Ensembl_functional_consequence]
+index=15
+type=VARCHAR(100) NULL
+adj=Nullify('.')
+comment=functional consequence of the SNV according to Ensembl
+
+[Ensembl_id_c_change_p_change]
+index=16
+type=VARCHAR(255) NULL
+adj=Nullify('.')
+comment=SNV in format of c.change and p.change according to Ensembl
+
+[ada_score]
+index=17
+type=FLOAT NULL
+adj=Nullify('.')
+comment=ensemble prediction score based on ada-boost. Ranges 0 to 1. The larger the score the higher probability the scSNV will affect splicing. The suggested cutoff for a binary prediction (affecting splicing vs. not affecting splicing) is 0.6.
+
+[rf_score]
+index=18
+type=FLOAT NULL
+adj=Nullify('.')
+comment=ensemble prediction score based on random forests. Ranges 0 to 1. The larger the score the higher probability the scSNV will affect splicing. The suggested cutoff for a binary prediction (affecting splicing vs. not affecting splicing) is 0.6.
+

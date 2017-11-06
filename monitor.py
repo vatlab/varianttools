@@ -7,21 +7,45 @@ from datetime import datetime
 import stat
 import subprocess
 import sys
+import sqlite3
+import glob
 
 
 
 class ProcessMonitor(threading.Thread):
-    def __init__(self, task_id, monitor_interval,resource_monitor_interval):
+    def __init__(self, task_id, monitor_interval,resource_monitor_interval, command):
         threading.Thread.__init__(self)
         self.task_id = task_id
         self.pid = os.getpid()
         self.monitor_interval = monitor_interval
         self.resource_monitor_interval=resource_monitor_interval
         self.daemon = True
+        self.command=command
 
+        # not an elegant way to do that
+        #cat_hdf5 = 'cat *.log | grep hdf5'
+        #cat_hdf5_all = subprocess.Popen(cat_hdf5, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True)
+        #output_hdf5 = str(cat_hdf5_all.stdout.read())
+        #bool_output = '--store hdf5' in output_hdf5 or '--STORE hdf5' in output_hdf5
+        
+        # more elegant way is to get the information (store, hdf5) in .proj file, which is a database.
+        DB_projfile_name = glob.glob('*.proj')[0] 
+        conn = sqlite3.connect(DB_projfile_name)
+        print(DB_projfile_name)
+        c = conn.cursor()
+        # cannot execute ".table" command in sqlite3 inside python
+        #c.execute("select name from sqlite_master where type='table' order by name") 
+        #c.fetchall()
+        c.execute("select * from project;")
+        result = c.fetchall()
+        bool_output = ('store', 'hdf5') in result
+        
         # self.pulse_file = os.path.join(os.path.expanduser('~'), '.sos', 'tasks', task_id + '.pulse')
-        self.pulse_file = task_id + '.pulse'
-
+        #self.pulse_file = task_id + '.pulse'
+        if 'HDF' in self.command or 'hdf' in self.command or bool_output == True:
+            self.pulse_file = command.split(' ')[1] + '_j' + command.split(' ')[[i for i, x in enumerate(command.split(' ')) if '-j' == x][0]+1] + '_hdf5' + '.pulse'
+        else:
+            self.pulse_file = command.split(' ')[1] + '_j' + command.split(' ')[[i for i, x in enumerate(command.split(' ')) if '-j' == x][0]+1] + '_sqlite' + '.pulse'
         # remove previous status file, which could be readonly if the job is killed
         if os.path.isfile(self.pulse_file):
             if not os.access(self.pulse_file, os.W_OK):
@@ -45,15 +69,13 @@ class ProcessMonitor(threading.Thread):
         for child in children:
             ch_cpu += child.cpu_percent()
             ch_mem += child.memory_info()[0]
-        return par_cpu, par_mem, n_children, ch_cpu, ch_mem#, disk_use
-    
+        return par_cpu, par_mem, n_children, ch_cpu, ch_mem
+
     def size(self):
-        #disk_use = 0
+        disk_use = 0
         for root, dirs, files in os.walk(os.getcwd(), topdown=False):
-            #for file in [x for x in files if os.path.splitext(x) in ('.h5', '.DB')]:
-            #disk_use = sum(os.path.getsize(os.path.join(root,file)) for file in [x for x in files if os.path.splitext(x)[1] in ('.h5', '.DB')])
-            #disk_use = sum(os.path.getsize(os.path.join(root,file)) for file in [x for x in files if x.split('.')[1] not in ('.pulse', '.vcf', '.txt', '.log', '.proj')])
-            disk_use = sum(os.path.getsize(os.path.join(root,file)) for file in files)
+            disk_use += sum(os.path.getsize(os.path.join(root,file)) for file in files if os.path.splitext(file)[1] in ('.h5', '.DB'))
+            dirs = [x for x in dirs if not x.startswith('.')]
         return disk_use
 
     def run(self):
@@ -89,13 +111,12 @@ def main():
     monitor_interval = 2
     resource_monitor_interval = 60
     task_id=datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    m = ProcessMonitor(task_id, monitor_interval=monitor_interval,
-             resource_monitor_interval=resource_monitor_interval)
-    m.start()
     command=sys.argv[1]
     print(command)
+    m = ProcessMonitor(task_id, monitor_interval=monitor_interval,
+             resource_monitor_interval=resource_monitor_interval, command=sys.argv[1])
+    m.start()
     subprocess.call(command,shell=True)
-    
 
 if __name__ == "__main__":
     main()

@@ -12,7 +12,7 @@ description=Cosmic non-coding mutation database.  This data contains mutations a
 version=v82_20170801
 anno_type=variant
 source_url: Please follow the instruction on the website of COSMIC to see how to download the dataset.
-#direct_url=annoDB/CosmicNonCodingVariants-v82_20170801.DB.gz	07366d9d5ba0cd79e03893263d31b7ea
+direct_url=annoDB/CosmicNonCodingVariants-v82_20170801.DB.gz	7289f655097d574aa96de72e8c72f127
 source_type=txt
 source_pattern=
 
@@ -89,4 +89,3 @@ index=8
 adj=ExtractFlag('SNP', ';')
 type=INTEGER
 comment=classified as SNP
-

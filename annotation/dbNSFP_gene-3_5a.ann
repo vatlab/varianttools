@@ -9,33 +9,27 @@
 #vtools use HGNC --linked_by refGene.name2
 #vtools use dbNSFP_gene --linked_by HGNC.name
 #
- 
+
 [linked fields]
 *=Gene_name
 
 [data sources]
 description=dbNSFP_gene version 3.5a, maintained by Dr. Xiaoming Liu from UTSPH. Please cite:
-	"Liu X, Jian X, and Boerwinkle E. 2011. dbNSFP: a lightweight database of human 
+	"Liu X, Jian X, and Boerwinkle E. 2011. dbNSFP: a lightweight database of human
 		non-synonymous SNPs and their functional predictions. Human Mutation. 32:894-899.
-	Liu X, Wu C, Li C and Boerwinkle E. 2016. dbNSFP v3.0: A One-Stop Database of Functional 
-		Predictions and Annotations for Human Non-synonymous and Splice Site SNVs. 
+	Liu X, Wu C, Li C and Boerwinkle E. 2016. dbNSFP v3.0: A One-Stop Database of Functional
+		Predictions and Annotations for Human Non-synonymous and Splice Site SNVs.
 		Human Mutation. 37(3):235-241." if you find this database useful.
 header=1
 preprocessor=Dos2Unix()
-version=3.5a
+version=3_5a
 anno_type=field
 source_url=ftp://dbnsfp:dbnsfp@dbnsfp.softgenetics.com/dbNSFPv3.5a.zip
-direct_url=
+direct_url=anno/dbNSFP_gene-3_5a.DB.gz	45d1477164dcdf5f35e55128270230ad
 source_type=txt
 source_pattern=dbNSFP3.5a_gene.complete
 
-
-Columns of dbNSFP_gene:
-	Gene_name: Gene symbol from HGNC
-	Ensembl_gene: Ensembl gene id (from HGNC)
-	chr: Chromosome number (from HGNC)
-
-[Gene_old_names]
+[Gene_name]
 index=1
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
@@ -218,7 +212,7 @@ index=30
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
 comment=Other genes (separated by ;) this gene interacting with
-		(from ConsensusPathDB). Full information (gene name followed by Pubmed id in "[]") can be 
+		(from ConsensusPathDB). Full information (gene name followed by Pubmed id in "[]") can be
 		found in the ".complete" table
 
 [P_HI]
@@ -241,7 +235,7 @@ type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
 comment=Known recessive status of the gene (from DOI:10.1126/science.1215040)
 		"lof-tolerant = seen in homozygous state in at least one 1000G individual"
-		"recessive = known OMIM recessive disease" 
+		"recessive = known OMIM recessive disease"
 		(original annotations from DOI:10.1126/science.1215040)
 
 [RVIS_EVS]
@@ -285,13 +279,13 @@ index=39
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
 comment=A score predicting the gene haploinsufficiency. The higher the score the more likely the gene is
-		haploinsufficient. (from doi: 10.1093/nar/gkv474) 
+		haploinsufficient. (from doi: 10.1093/nar/gkv474)
 
 [ExAC_pLI]
 index=40
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
-comment="the probability of being loss-of-function intolerant (intolerant of both heterozygous and 
+comment="the probability of being loss-of-function intolerant (intolerant of both heterozygous and
 		homozygous lof variants)" based on ExAC r0.3 data
 
 [ExAC_pRec]
@@ -312,7 +306,7 @@ comment="the probability of being tolerant of both heterozygous and homozygous l
 index=43
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
-comment="the probability of being loss-of-function intolerant (intolerant of both heterozygous and 
+comment="the probability of being loss-of-function intolerant (intolerant of both heterozygous and
 		homozygous lof variants)" based on ExAC r0.3 nonTCGA subset
 
 [ExAC_nonTCGA_pRec]
@@ -333,7 +327,7 @@ comment="the probability of being tolerant of both heterozygous and homozygous l
 index=46
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
-comment="the probability of being loss-of-function intolerant (intolerant of both heterozygous and 
+comment="the probability of being loss-of-function intolerant (intolerant of both heterozygous and
 		homozygous lof variants)" based on ExAC r0.3 nonpsych subset
 
 [ExAC_nonpsych_pRec]
@@ -471,8 +465,8 @@ index=66
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
 comment=the fraction of individuals in the 1000 Genomes Project data (N=2504)
-		who are either Heterozygote or Homozygote of LOF SNVs whose MAF<0.005. This fraction is from 
-		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants). 
+		who are either Heterozygote or Homozygote of LOF SNVs whose MAF<0.005. This fraction is from
+		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants).
 		Please see doi: 10.1101/103218 for details.
 
 [SORVA_LOF_MAF0__005_HomOrCompoundHet]
@@ -480,8 +474,8 @@ index=67
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
 comment=the fraction of individuals in the 1000 Genomes Project data (N=2504)
-		who are either Compound Heterozygote or Homozygote of LOF SNVs whose MAF<0.005. This fraction is from 
-		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants). 
+		who are either Compound Heterozygote or Homozygote of LOF SNVs whose MAF<0.005. This fraction is from
+		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants).
 		Please see doi: 10.1101/103218 for details.
 
 [SORVA_LOF_MAF0__001_HetOrHom]
@@ -489,8 +483,8 @@ index=68
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
 comment=the fraction of individuals in the 1000 Genomes Project data (N=2504)
-		who are either Heterozygote or Homozygote of LOF SNVs whose MAF<0.001. This fraction is from 
-		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants). 
+		who are either Heterozygote or Homozygote of LOF SNVs whose MAF<0.001. This fraction is from
+		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants).
 		Please see doi: 10.1101/103218 for details.
 
 [SORVA_LOF_MAF0__001_HomOrCompoundHet]
@@ -498,8 +492,8 @@ index=69
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
 comment=the fraction of individuals in the 1000 Genomes Project data (N=2504)
-		who are either Compound Heterozygote or Homozygote of LOF SNVs whose MAF<0.001. This fraction is from 
-		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants). 
+		who are either Compound Heterozygote or Homozygote of LOF SNVs whose MAF<0.001. This fraction is from
+		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants).
 		Please see doi: 10.1101/103218 for details.
 
 [SORVA_LOForMissense_MAF0__005_HetOrHom]
@@ -507,8 +501,8 @@ index=70
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
 comment=the fraction of individuals in the 1000 Genomes Project data (N=2504)
-		who are either Heterozygote or Homozygote of LOF or missense SNVs whose MAF<0.005. This fraction is from 
-		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants). 
+		who are either Heterozygote or Homozygote of LOF or missense SNVs whose MAF<0.005. This fraction is from
+		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants).
 		Please see doi: 10.1101/103218 for details.
 
 [SORVA_LOForMissense_MAF0__005_HomOrCompoundHet]
@@ -516,8 +510,8 @@ index=71
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
 comment=the fraction of individuals in the 1000 Genomes Project data (N=2504)
-		who are either Compound Heterozygote or Homozygote of LOF or missense SNVs whose MAF<0.005. This fraction is from 
-		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants). 
+		who are either Compound Heterozygote or Homozygote of LOF or missense SNVs whose MAF<0.005. This fraction is from
+		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants).
 		Please see doi: 10.1101/103218 for details.
 
 [SORVA_LOForMissense_MAF0__001_HetOrHom]
@@ -525,8 +519,8 @@ index=72
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
 comment=the fraction of individuals in the 1000 Genomes Project data (N=2504)
-		who are either Heterozygote or Homozygote of LOF or missense SNVs whose MAF<0.001. This fraction is from 
-		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants). 
+		who are either Heterozygote or Homozygote of LOF or missense SNVs whose MAF<0.001. This fraction is from
+		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants).
 		Please see doi: 10.1101/103218 for details.
 
 [SORVA_LOForMissense_MAF0__001_HomOrCompoundHet]
@@ -534,8 +528,8 @@ index=73
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
 comment=the fraction of individuals in the 1000 Genomes Project data (N=2504)
-		who are either Compound Heterozygote or Homozygote of LOF or missense SNVs whose MAF<0.001. This fraction is from 
-		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants). 
+		who are either Compound Heterozygote or Homozygote of LOF or missense SNVs whose MAF<0.001. This fraction is from
+		a method for ranking genes based on mutational burden called SORVA (Significance Of Rare VAriants).
 		Please see doi: 10.1101/103218 for details.
 
 [Essential_gene]
@@ -581,5 +575,4 @@ index=80
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
 comment=Phenotype tag for the homolog zebrafish gene from ZFIN
-
 

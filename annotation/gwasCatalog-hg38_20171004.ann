@@ -16,14 +16,9 @@ description=This database contains single nucleotide polymorphisms (SNPs) identi
 
 version=hg38_20171004
 source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/gwasCatalog.txt.gz
-#direct_url=annoDB/gwasCatalog-hg38_20171004.DB.gz	d425d79e01a334b08de533e84c3ea4bb
+direct_url=annoDB/gwasCatalog-hg38_20171004.DB.gz	3e3eba250048e084ef31f909fae07a59
 source_type=txt
 encoding=ISO-8859-1
-
-[bin]
-index=1
-type=smallint(5) unsigned
-comment=Indexing field to speed chromosome range queries.
 
 [chr]
 index=2
