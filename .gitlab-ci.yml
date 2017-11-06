@@ -101,7 +101,7 @@ HDF5_test_show-trans_ratio-update-use:
                 - python test_use.py
 
 HDF5_test_exclude-execute-export:
-        stage: testSqlite
+        stage: test
         variables:
                 STOREMODE: "hdf5"
         script:
