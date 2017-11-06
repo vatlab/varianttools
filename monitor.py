@@ -30,7 +30,7 @@ class ProcessMonitor(threading.Thread):
         # more elegant way is to get the information (store, hdf5) in .proj file, which is a database.
         DB_projfile_name = glob.glob('*.proj')[0] 
         conn = sqlite3.connect(DB_projfile_name)
-        print(DB_projfile_name)
+        #print(DB_projfile_name)
         c = conn.cursor()
         # cannot execute ".table" command in sqlite3 inside python
         #c.execute("select name from sqlite_master where type='table' order by name") 
