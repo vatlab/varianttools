@@ -67,6 +67,7 @@ class GroupHDFGenerator(Process):
                 
                 db = DatabaseEngine()
                 db.connect('{0}.proj'.format(self.proj.name), '__asso_tmp')
+                time.sleep(self.proc_index)
                 cur = db.cursor()
         
                 # select_group="SELECT {0}, group_concat(variant_id) from __asso_tmp group by {0}".\
