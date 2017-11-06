@@ -1,29 +1,12 @@
 image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5_ci:test
 stages:
-        #        - build 
-        - testSqlite
-        - testHDF5
+        # - testSqlite
+        # - testHDF5
+        - test
 
-#stages:
-##        - setup
-##        - test       
-##services:
-##        - vtools_hdf5:latest 
-#        #        - bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5:test
-#        #setup:
-#        #        stage: setup
-#        #        script:
-#        #                - cd ~/Development/VAT/VariantTools/
-#        #                - python setup.py install 
-#        #                - cd test
-#
-#        #before_script:
-#        #        -
-#
-#build:
-#        stage: build
-variables:
-         LOCALRESOURCE: "/home/jma7/.variant_tools"
+
+# variables:
+#          LOCALRESOURCE: "/home/jma7/.variant_tools"
 
 before_script:
                 - git checkout v3
@@ -39,28 +22,85 @@ before_script:
                 - python setup.py install
                 - cd test
 
-# test_admin-associate-avg_depth-compare:
-#         stage: testSqlite
-#         variables:
-#                 STOREMODE: "sqlite"
-#         script:
-#                 - python test_admin.py
-#                 - python test_associate.py
-#                 - python test_avg_depth.py
-#                 - python test_compare.py
+test_admin-associate-avg_depth-compare:
+        stage: test
+        variables:
+                STOREMODE: "sqlite"
+        script:
+                - python test_admin.py
+                - python test_associate.py
+                - python test_avg_depth.py
+                - python test_compare.py
 
-# test_show-trans_ratio-update-use:
-#         stage: testSqlite
-#         variables:
-#                 STOREMODE: "sqlite"
+test_show-trans_ratio-update-use:
+        stage: test
+        variables:
+                STOREMODE: "sqlite"
 
-#         script:
-#                 - python test_show.py
-#                 - python test_trans_ratio.py
-#                 - python test_update.py
-#                 - python test_use.py
+        script:
+                - python test_show.py
+                - python test_trans_ratio.py
+                - python test_update.py
+                - python test_use.py
 
 test_exclude-execute-export:
+        stage: testSqlite
+        variables:
+                STOREMODE: "sqlite"
+        script:
+                - python test_exclude.py
+                - python test_execute.py
+                - python test_export.py
+
+test_output-phenotype-remove-select:
+        stage: test
+        variables:
+                STOREMODE: "sqlite"
+        script:
+                - python test_output.py
+                - python test_phenotype.py
+                - python test_remove.py
+                - python test_select.py
+
+test_import:
+        stage: test
+        variables:
+                STOREMODE: "sqlite"
+        script:
+                - python test_import.py
+
+test_init-listover-func:
+        stage: test
+        variables:
+                STOREMODE: "sqlite"
+        script:
+                - python test_init.py
+                - python test_liftover.py
+                - python test_func.py
+
+
+HDF5_test_admin-associate-avg_depth-compare:
+        stage: test
+        variables:
+                STOREMODE: "hdf5"
+        script:
+                - python test_admin.py
+                - python test_associate.py
+                - python test_avg_depth.py
+                - python test_compare.py
+
+HDF5_test_show-trans_ratio-update-use:
+        stage: test
+        variables:
+                STOREMODE: "hdf5"
+
+        script:
+                - python test_show.py
+                - python test_trans_ratio.py
+                - python test_update.py
+                - python test_use.py
+
+HDF5_test_exclude-execute-export:
         stage: testSqlite
         variables:
                 STOREMODE: "hdf5"
@@ -69,52 +109,33 @@ test_exclude-execute-export:
                 - python test_execute.py
                 - python test_export.py
 
-# test_output-phenotype-remove-select:
-#         stage: testSqlite
-#         variables:
-#                 STOREMODE: "sqlite"
-#         script:
-#                 - python test_output.py
-#                 - python test_phenotype.py
-#                 - python test_remove.py
-#                 - python test_select.py
+HDF5_test_output-phenotype-remove-select:
+        stage: test
+        variables:
+                STOREMODE: "hdf5"
+        script:
+                - python test_output.py
+                - python test_phenotype.py
+                - python test_remove.py
+                - python test_select.py
 
-# test_import:
-#         stage: testSqlite
-#         variables:
-#                 STOREMODE: "sqlite"
-#         script:
-#                 - python test_import.py
+HDF5_test_import:
+        stage: test
+        variables:
+                STOREMODE: "hdf5"
+        script:
+                - python test_import.py
 
-# test_init-listover-func:
-#         stage: testSqlite
-#         variables:
-#                 STOREMODE: "sqlite"
-#         script:
-#                 - python test_init.py
-#                 - python test_liftover.py
-#                 - python test_func.py
-
-
-# test_admin-compare-execute:
-#         stage: testSqlite
-#         variables:
-#                 STOREMODE: "hdf5"
-#         script:
-#                 - python test_init.py
-#                 - python test_liftover.py
-#                 - python test_func.py
+HDF5_test_init-listover-func:
+        stage: test
+        variables:
+                STOREMODE: "hdf5"
+        script:
+                - python test_init.py
+                - python test_liftover.py
+                - python test_func.py
 
 
-# test_output-phenotype-remove:
-#         stage: testSqlite
-#         variables:
-#                 STOREMODE: "hdf5"
-#         script:
-#                 - python test_output.py
-#                 - python test_phenotype.py
-#                 - python test_remove.py
-#                 - python test_select.p
 
 
 # test_associate:

@@ -46,6 +46,7 @@ class TestFunc(ProcessTestCase):
         self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'info.AN')" ''')
         self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'qual')" ''')
 
+    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
     def testGenotype(self):
         'Testing function genotype'
         self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')
@@ -58,6 +59,7 @@ class TestFunc(ProcessTestCase):
         self.runCmd('vtools import vcf/SAMP3_complex_variants.vcf --sample_name SAMP3')
         self.assertSucc("vtools output variant chr pos 'genotype()'")
 
+    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
     def testSamples(self):
         'Testing function samples'
         self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')

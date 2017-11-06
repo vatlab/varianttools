@@ -31,7 +31,7 @@ import subprocess
 from testUtils import ProcessTestCase
 
 
-@unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version not implemented")
+@unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented")
 class TestExclude(ProcessTestCase):
     def setUp(self):
         'Create a project'

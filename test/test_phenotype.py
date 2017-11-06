@@ -30,6 +30,8 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase
 
+
+@unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
 class TestPhenotype(ProcessTestCase):
     def setUp(self):
         'Create a project'
@@ -78,6 +80,7 @@ class TestPhenotype(ProcessTestCase):
         # have to use quote to pass the test
         self.assertSucc('vtools phenotype --set \'race="white"\' --samples \'filename like "%CEU%"\'')
 
+    
     def testPhenotypeFromStat(self):
         'Test command phenotype --from_stat'
         self.assertFail('vtools phenotype --from_stat')

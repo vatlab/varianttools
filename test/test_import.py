@@ -30,6 +30,7 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase 
 
+@unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
 class TestImport(ProcessTestCase):
     def testInvalidVariant(self):
         'Test importing invalid variants (<DEL>)'

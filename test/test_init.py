@@ -43,6 +43,7 @@ class TestInit(ProcessTestCase):
         # can specify build
         self.assertSucc('vtools init test --build hg19 -f')
     
+    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
     def testInitFromParentalProject(self):
         'Test command init --parent (create a project from a parent project)'
         try:

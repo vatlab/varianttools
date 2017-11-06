@@ -11,6 +11,8 @@ from random import choice
 from variant_tools.association import NullTest
 from variant_tools.assoTests import *
 
+
+
 class ActionTester(NullTest):
     def __init__(self, ncovariates=0, logger=None, *method_args):
         NullTest.__init__(self, logger, *method_args)
@@ -53,7 +55,7 @@ class SetMafTester(ActionTester):
         print(data)
         return True
 
-
+@unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
 class TestAssociate(ProcessTestCase):
     def setUp(self):
         ProcessTestCase.setUp(self)
