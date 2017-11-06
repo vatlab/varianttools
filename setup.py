@@ -613,8 +613,8 @@ else:
     libs = []
     gccargs = ['-O3', '-Wno-unused-local-typedef', '-Wno-return-type']
 
-ENV_INCLUDE_DIRS = os.environ.get('LD_INCLUDE_PATH', '').split(os.pathsep)
-ENV_LIBRARY_DIRS = os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep)
+# ENV_INCLUDE_DIRS = os.environ.get('LD_INCLUDE_PATH', '').split(os.pathsep)
+# ENV_LIBRARY_DIRS = os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep)
 
 if EMBEDDED_BOOST:
     try:
@@ -622,7 +622,8 @@ if EMBEDDED_BOOST:
         if not os.path.isfile(os.path.join('build', c.static_lib_format % ('embedded_boost', c.static_lib_extension))):
             # -w suppress all warnings caused by the use of boost libraries
             objects = c.compile(LIB_BOOST,
-                include_dirs=['src/boost_1_49_0'] + ENV_INCLUDE_DIRS,
+                # include_dirs=['src/boost_1_49_0'] + ENV_INCLUDE_DIRS,
+                include_dirs=['src/boost_1_49_0'],
                 output_dir='build',
                 extra_preargs = ['-w', '-fPIC'],
                 macros = [('BOOST_ALL_NO_LIB', None)])
@@ -650,7 +651,8 @@ for files, incs, macs, libname in [
         c = new_compiler()
         # -w suppress all warnings caused by the use of boost libraries
         objects = c.compile(files,
-            include_dirs=incs  + ENV_INCLUDE_DIRS,
+            # include_dirs=incs  + ENV_INCLUDE_DIRS,
+            include_dirs=incs ,
             output_dir='build',
             extra_preargs = ['-w', '-fPIC'],
             macros = macs)
@@ -664,14 +666,17 @@ ext_modules=[
             extra_compile_args=['-w'],
             sources = SQLITE_FILES,
             define_macros = [('MODULE_NAME', '"vt_sqlite3"'), ('HAVE_USLEEP', None)],
-            include_dirs = ['src/sqlite', SQLITE_FOLDER] + ENV_INCLUDE_DIRS,
+            # include_dirs = ['src/sqlite', SQLITE_FOLDER] + ENV_INCLUDE_DIRS,
+            include_dirs = ['src/sqlite', SQLITE_FOLDER],
         ),
         Extension('variant_tools._ucsctools',
             # stop warning message ucsctools because it is written by us.
             extra_compile_args=['-w'],
             sources = [UCSCTOOLS_WRAPPER_CPP_FILE],
-            include_dirs = ['.', 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools']  + ENV_INCLUDE_DIRS,
-            library_dirs = ["build"]  + ENV_LIBRARY_DIRS,
+            # include_dirs = ['.', 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools']  + ENV_INCLUDE_DIRS,
+            nclude_dirs = ['.', 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools'],
+            # library_dirs = ["build"]  + ENV_LIBRARY_DIRS,
+            library_dirs = ["build"] ,
             define_macros =  [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
                 ('_USE_KNETFILE', None), ('BGZF_CACHE', None)],
             libraries = ['ucsc', 'z', 'bz2'],
@@ -680,14 +685,18 @@ ext_modules=[
             # stop warning message ucsctools because it is written by us.
             extra_compile_args=['-w'],
             sources = LIB_PLINKIO,
-            include_dirs = ['src/libplinkio']  + ENV_INCLUDE_DIRS,
+            # include_dirs = ['src/libplinkio']  + ENV_INCLUDE_DIRS,
+            include_dirs = ['src/libplinkio'],
         ),
         Extension('variant_tools._vt_sqlite3_ext',
             # stop warning message for sqlite because it is written by us.
             sources = ['src/sqlite/vt_sqlite3_ext.cpp'],
+            # include_dirs = ["src/", 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools',
+            #     'src/sqlite', "src/variant_tools", "src/gsl", "src/cgatools", "src/boost_1_49_0"] + ENV_INCLUDE_DIRS,
             include_dirs = ["src/", 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools',
-                'src/sqlite', "src/variant_tools", "src/gsl", "src/cgatools", "src/boost_1_49_0"] + ENV_INCLUDE_DIRS,
-            library_dirs = ["build"] + ENV_LIBRARY_DIRS,
+                'src/sqlite', "src/variant_tools", "src/gsl", "src/cgatools", "src/boost_1_49_0"],
+            # library_dirs = ["build"] + ENV_LIBRARY_DIRS,
+            library_dirs = ["build"],
             libraries = ['sqlite_gsl', 'stat', 'ucsc', 'cgatools'] + \
                 (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']) + \
                 ['z', 'bz2'],
@@ -708,15 +717,19 @@ ext_modules=[
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
             extra_compile_args = gccargs,
             swig_opts = ['-O', '-shadow', '-c++', '-keyword'],
-            include_dirs = ["src", "src/cgatools", "src/boost_1_49_0"] + ENV_INCLUDE_DIRS,
-            library_dirs = ["build"] + ENV_LIBRARY_DIRS,
+            # include_dirs = ["src", "src/cgatools", "src/boost_1_49_0"] + ENV_INCLUDE_DIRS,
+            include_dirs = ["src", "src/cgatools", "src/boost_1_49_0"],
+            #library_dirs = ["build"] + ENV_LIBRARY_DIRS,
+            library_dirs = ["build"],
         ),
         Extension('variant_tools._assoTests',
             sources = [ASSO_WRAPPER_CPP_FILE] + ASSOC_FILES,
             extra_compile_args = gccargs,
             libraries = libs + ['gsl', 'stat'], #, 'blas'],
-            library_dirs = ["build"] + ENV_LIBRARY_DIRS,
-            include_dirs = ["src", "src/variant_tools", "src/gsl"] + ENV_INCLUDE_DIRS,
+            # library_dirs = ["build"] + ENV_LIBRARY_DIRS,
+            library_dirs = ["build"],
+            # include_dirs = ["src", "src/variant_tools", "src/gsl"] + ENV_INCLUDE_DIRS,
+            include_dirs = ["src", "src/variant_tools", "src/gsl"],
         )
       ]
 ext_modules+=cythonize([Extension('variant_tools.io_vcf_read',
