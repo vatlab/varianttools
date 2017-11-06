@@ -44,7 +44,7 @@ test_show-trans_ratio-update-use:
                 - python test_use.py
 
 test_exclude-execute-export:
-        stage: testSqlite
+        stage: test
         variables:
                 STOREMODE: "sqlite"
         script:
