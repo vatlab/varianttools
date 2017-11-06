@@ -613,8 +613,10 @@ else:
     libs = []
     gccargs = ['-O3', '-Wno-unused-local-typedef', '-Wno-return-type']
 
-ENV_INCLUDE_DIRS = os.environ.get('LD_INCLUDE_PATH', '').split(os.pathsep)
-ENV_LIBRARY_DIRS = os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep)
+# ENV_INCLUDE_DIRS = os.environ.get('LD_INCLUDE_PATH', '').split(os.pathsep)
+# ENV_LIBRARY_DIRS = os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep)
+ENV_INCLUDE_DIRS = ""
+ENV_LIBRARY_DIRS = ""
 
 if EMBEDDED_BOOST:
     try:
@@ -708,15 +710,15 @@ ext_modules=[
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
             extra_compile_args = gccargs,
             swig_opts = ['-O', '-shadow', '-c++', '-keyword'],
-            include_dirs = ["src", "src/cgatools", "src/boost_1_49_0"],
-            library_dirs = ["build"],
+            include_dirs = ["src", "src/cgatools", "src/boost_1_49_0"] + ENV_INCLUDE_DIRS,
+            library_dirs = ["build"] + ENV_LIBRARY_DIRS,
         ),
         Extension('variant_tools._assoTests',
             sources = [ASSO_WRAPPER_CPP_FILE] + ASSOC_FILES,
             extra_compile_args = gccargs,
             libraries = libs + ['gsl', 'stat'], #, 'blas'],
-            library_dirs = ["build"],
-            include_dirs = ["src", "src/variant_tools", "src/gsl"],
+            library_dirs = ["build"] + ENV_LIBRARY_DIRS,
+            include_dirs = ["src", "src/variant_tools", "src/gsl"] + ENV_INCLUDE_DIRS,
         )
       ]
 ext_modules+=cythonize([Extension('variant_tools.io_vcf_read',
