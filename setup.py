@@ -718,12 +718,12 @@ ext_modules=[
             library_dirs = ["build"] + ENV_LIBRARY_DIRS,
             include_dirs = ["src", "src/variant_tools", "src/gsl"] + ENV_INCLUDE_DIRS,
         )
-      ] 
+      ]
 ext_modules+=cythonize([Extension('variant_tools.io_vcf_read',
     # sources=['/Users/jma7/Development/VAT/VariantTools/src/variant_tools/io_vcf_read.c'],
     sources=['src/variant_tools/io_vcf_read.pyx'],
-    include_dirs=[np.get_include()] + ENV_INCLUDE_DIRS,
-    library_dirs = ["build"] + ENV_LIBRARY_DIRS)])
+    include_dirs=[np.get_include()],
+    library_dirs = ["build"])])
 
 
 setup(name = "variant_tools",
