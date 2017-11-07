@@ -67,8 +67,11 @@ class ProcessMonitor(threading.Thread):
         #disk_use = psutil.disk_usage('/Users/manchongleong/Documents/testVariantTools')
         #disk_use = os.path.getsize('/Users/manchongleong/Documents/testVariantTools/')
         for child in children:
-            ch_cpu += child.cpu_percent()
-            ch_mem += child.memory_info()[0]
+            try:
+                ch_cpu += child.cpu_percent()
+                ch_mem += child.memory_info()[0]
+            except Exception as e:
+                continue
         return par_cpu, par_mem, n_children, ch_cpu, ch_mem
 
     def size(self):
