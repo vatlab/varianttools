@@ -617,6 +617,8 @@ ENV_INCLUDE_DIRS = os.environ.get('LD_INCLUDE_PATH', '').split(os.pathsep)
 ENV_LIBRARY_DIRS = os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep)
 #ENV_INCLUDE_DIRS = ['']
 #ENV_LIBRARY_DIRS = ['']
+print("ENV_INCLUDE_DIRS",ENV_INCLUDE_DIRS)
+print("ENV_LIBRARY_DIRS",ENV_LIBRARY_DIRS)
 
 if EMBEDDED_BOOST:
     try:
