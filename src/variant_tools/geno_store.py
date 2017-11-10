@@ -859,6 +859,12 @@ class HDF5_Store(Base_Store):
         storageEngine.close()
         return num
 
+    def get_noWT_variants(self, sampleID,HDFfileName):
+        storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+        variantIDs=storageEngine.get_noWT_variants(sampleID)
+        storageEngine.close()
+        return variantIDs
+
     def geno_fields(self, sampleID,HDFfileName):
         storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
         genoFields=storageEngine.geno_fields(sampleID)

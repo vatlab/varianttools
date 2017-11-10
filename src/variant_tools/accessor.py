@@ -266,11 +266,41 @@ class HDF5Engine_storage(Base_Storage):
                 colPos=np.where(indices==samplePos[0][0])
                 data=group.data[colPos]
                 numNan=np.where(np.isnan(data))
-                numMone=np.where(data==-1)
-                totalNum+=numVariants-len(numNan[0])-len(numMone[0])
+                numNone=np.where(data==-1)
+                print("Here",numVariants,numNan,numNone)
+                print(group.rownames[:])
+                totalNum+=numVariants-len(numNan[0])-len(numNone[0])
             except:
                 pass
         return totalNum
+
+    def to_csr_matrix(self,group):
+        return csr_matrix((group.data[:],group.indices[:],group.indptr[:]),shape=group.shape[:])
+
+    def get_noWT_variants(self,sampleID):
+        noWT=None
+        for chr in range(1,23):
+            try:
+                #haven't dealt with data==-1
+                group=self.file.get_node("/chr"+str(chr)+"/GT/")
+                matrix=self.to_csr_matrix(group)
+                colnames=group.colnames[:]
+                rownames=group.rownames[:]
+                samplePos=np.where(colnames==sampleID)
+                nonZero=matrix.nonzero()
+                sampleLoc=np.where(nonZero[1]==samplePos)
+                rowLoc=nonZero[0][sampleLoc[1]]
+                noWT=rownames[rowLoc]
+                # colPos=np.where(indices==samplePos[0][0])
+                # data=group.data[colPos]
+                # print(data)
+                # noNan=rownames[np.where(~np.isnan(data))]
+                # noNone=rownames[np.where(data!=-1)]
+                # noWT=np.intersect1d(noNan,noNone)
+            except Exception as e:
+                pass
+        return noWT
+
 
     def geno_fields(self,sampleID):
         for chr in range(1,23):

@@ -4155,6 +4155,9 @@ def dehtml(text):
         env.logger.warning('Failed to dehtml text: {}'.format(e))
         return text
 
+def chunks(data, rows=10000):
+    for i in range(0, len(data), rows):
+        yield data[i:i+rows]
 
 
 class RuntimeFiles: 
