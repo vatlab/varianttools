@@ -310,8 +310,6 @@ class HDF5Engine_storage(Base_Storage):
                 return ["GT","DP","GQ","AD","PL"]
                 break
             except:
-                return ["GT"]
-                break
                 pass
 
 

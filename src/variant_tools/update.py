@@ -36,7 +36,7 @@ from .utils import ProgressBar, lineCount, delayedAction, RefGenome,\
     getVariantsOnManifolds
 from .importer import LineProcessor, probeSampleName
 from .text_reader import TextReader
-
+from .geno_store import *
 #
 #
 #  Command update
@@ -659,6 +659,9 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             numFemales = len({x:y for x,y in list(ID_sex.items()) if y == 2})
             env.logger.info('{} males and {} females are identified'
                 .format(numMales, numFemales))
+    
+    print(genotypeFields)
+
     #
     # Error checking with the user specified genotype fields
     # 1) if a field does not exist within one of the sample genotype tables a warning is issued
@@ -667,12 +670,15 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     genotypeFieldTypes = {}
     fieldInTable = defaultdict(list)
     for id in IDs:
-        fields = [x.lower() for x in proj.db.getHeaders('{}_genotype.genotype_{}'.format(proj.name, id))]
+        store=GenoStore(proj)
+        fields=["variant_id"]
+        fields.extend(store.geno_fields(id))
         for field in fields:
             fieldInTable[field].append(id)
             if field not in genotypeFieldTypes:
                 genotypeFieldTypes[field] = 'INT'
-                fieldType = proj.db.typeOfColumn('{}_genotype.genotype_{}'.format(proj.name, id), field) 
+                # fieldType = proj.db.typeOfColumn('{}_genotype.genotype_{}'.format(proj.name, id), field) 
+                fieldType=store.get_typeOfColumn(id,field)
                 if fieldType.upper().startswith('FLOAT'):
                     genotypeFieldTypes[field] = 'FLOAT'
                 elif fieldType.upper().startswith('VARCHAR'):
@@ -711,31 +717,22 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     for name in queryDestinations:
         if name is not None:
             proj.checkFieldName(name, exclude='variant')
+    print(queryDestinations)
     #
     variants = dict()
     prog = ProgressBar('Counting variants', len(IDs))
     prog_step = max(len(IDs) // 100, 1) 
     for id_idx, id in enumerate(IDs):
         record_male_gt = ID_sex is not None and ID_sex[id] == 1
-        where_cond = []
-        if genotypes is not None and len(genotypes) != 0:
-            where_cond.extend(genotypes)
-        if variant_table != 'variant':
-            where_cond.append('variant_id in (SELECT variant_id FROM {})'.format(variant_table))
-        whereClause = 'WHERE ' + ' AND '.join(['({})'.format(x) for x in where_cond]) if where_cond else ''
         fieldSelect = ['GT' if ('gt' in fieldInTable and id in fieldInTable['gt']) else 'NULL']
         if validGenotypeFields is not None and len(validGenotypeFields) != 0:
-            fieldSelect.extend([x if id in fieldInTable[x.lower()] else 'NULL' for x in validGenotypeFields])
-
+             fieldSelect.extend([x if id in fieldInTable[x.lower()] else 'NULL' for x in validGenotypeFields])
         if not fieldSelect or all([x == 'NULL' for x in fieldSelect]):
             continue
+        result=store.get_genoType_genoInfo(id,genotypes,variant_table,fieldSelect)
+        
 
-        query = 'SELECT variant_id {} FROM {}_genotype.genotype_{} {};'.format(' '.join([',' + x for x in fieldSelect]),
-                proj.name, id, whereClause)
-        env.logger.trace(query)
-        cur.execute(query)
-
-        for rec in cur:
+        for rec in result:
             if rec[0] not in variants:
                 # the last item is for number of genotype for male individual
                 variants[rec[0]] = [0, 0, 0, 0, 0]
@@ -789,6 +786,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                             variants[rec[0]][recIndex] = rec[queryIndex]  
         if id_idx % prog_step == 0:
             prog.update(id_idx + 1)
+    print(variants)
     prog.done()
     #
     # even if no variant is updated, we need set count 0 to fields.
