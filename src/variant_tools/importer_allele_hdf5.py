@@ -1123,9 +1123,9 @@ class HDF5GenotypeImportWorker(Process):
                     rowData.append(infoDict[name][rowID][3])
                     rowData.append(infoDict[name][rowID][4])
                     rowData.append(infoDict[name][rowID][5])
+                elif name=="GT":
+                    rowData.append(infoDict[name][rowID])
             self.rowData.append(rowData)
-
-
 
 
 
@@ -1175,6 +1175,7 @@ class HDF5GenotypeImportWorker(Process):
             pos=self.chunk["variants/POS"][i]
             GT=self.chunk["calldata/GT"][i].tolist()
             if len(self.geno_info)>0:
+                infoDict["GT"]=GT
                 if "calldata/DP" in self.chunk:
                     DP_geno=self.chunk["calldata/DP"][i].tolist()
                     infoDict["DP_geno"]=DP_geno
@@ -1220,6 +1221,7 @@ class HDF5GenotypeImportWorker(Process):
         #         #indptr,indices,data,shape,rownames
         #         self.info[info.name]=[[],[],[],[],[]]
         tableName="genoInfo"
+
         if len(self.geno_info)>0:
             storageEngine.store_table(self.rowData,tableName,chr)
 

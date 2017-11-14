@@ -733,6 +733,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         
 
         for rec in result:
+            print(rec)
             if rec[0] not in variants:
                 # the last item is for number of genotype for male individual
                 variants[rec[0]] = [0, 0, 0, 0, 0]
@@ -786,7 +787,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                             variants[rec[0]][recIndex] = rec[queryIndex]  
         if id_idx % prog_step == 0:
             prog.update(id_idx + 1)
-    print(variants)
+    # print(variants)
     prog.done()
     #
     # even if no variant is updated, we need set count 0 to fields.

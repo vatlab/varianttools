@@ -202,13 +202,14 @@ class GenoCallData(tb.IsDescription):
     entryMask=tb.BoolCol(pos=1)
     variant_id=tb.Int32Col(dflt=1,pos=2)
     sample_id=tb.Int16Col(dflt=1,pos=3)
-    DP=tb.Int8Col(dflt=1,pos=4)
-    GQ=tb.Int8Col(dflt=1,pos=5)
-    AD1=tb.Int8Col(dflt=1,pos=6)
-    AD2=tb.Int8Col(dflt=1,pos=7)
-    PL1=tb.Int8Col(dflt=1,pos=8)
-    PL2=tb.Int8Col(dflt=1,pos=9)
-    PL3=tb.Int8Col(dflt=1,pos=10)
+    GT=tb.Int8Col(dflt=1,pos=4)
+    DP=tb.Int8Col(dflt=1,pos=5)
+    GQ=tb.Int8Col(dflt=1,pos=6)
+    AD1=tb.Int8Col(dflt=1,pos=7)
+    AD2=tb.Int8Col(dflt=1,pos=8)
+    PL1=tb.Int8Col(dflt=1,pos=9)
+    PL2=tb.Int8Col(dflt=1,pos=10)
+    PL3=tb.Int8Col(dflt=1,pos=11)
 
 
 
@@ -246,10 +247,12 @@ class HDF5Engine_storage(Base_Storage):
         row=table.row
         row["entryMask"]=False
         for dataRow in data:
-            if (len(dataRow)==9):
-                for idx,var in enumerate(["variant_id","sample_id","DP","GQ","AD1","AD2","PL1","PL2","PL3"]):
-                    row[var]=dataRow[idx]
-                row.append()
+            if (len(dataRow)==10):
+                    for idx,var in enumerate(["variant_id","sample_id","GT","DP","GQ","AD1","AD2","PL1","PL2","PL3"]):
+                        row[var]=dataRow[idx]
+                    row.append()
+            else:
+                print("The data format is not supported to save in HDF5.")
         table.flush()
 
 
