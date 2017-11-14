@@ -896,7 +896,7 @@ class HDF5_Store(Base_Store):
         genoFields=storageEngine.geno_fields(sampleID)
         genoFields=["dp_geno" if x=="DP" else x for x in genoFields]
         genoFields=["gq_geno" if x=="GQ" else x for x in genoFields]
-        # genoFields=[x.lower for x in genoFields]
+        genoFields=[x.lower() for x in genoFields]
         storageEngine.close()
         return genoFields
 
@@ -913,7 +913,11 @@ class HDF5_Store(Base_Store):
 
     def get_genoType_genoInfo(self,sampleID,genotypes,variant_table,fieldSelect):
         HDFfileName=self.get_sampleFileName(sampleID)
+        accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+        print(fieldSelect)
+        result=accessEngine.get_geno_field_from_table(sampleID,genotypes,fieldSelect)
         print(HDFfileName)
+        return result
 
 
     

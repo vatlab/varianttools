@@ -1130,6 +1130,26 @@ class HDF5Engine_access(Base_Access):
         return snpdict
 
 
+    def get_geno_field_from_table(self,sampleID,cond,fields):
+        chr="22"
+        genoNode="/chr"+chr+"/genoInfo"
+        try:
+            genoInfoNode=self.file.get_node(genoNode)
+            table=genoInfoNode.genoInfo
+            print(sampleID,cond)
+            cond="sample_id=="+str(sampleID)
+            fields=["variant_id"]+fields
+            for row in table.where(cond):
+                result=[]
+                for field in fields:
+                    print(field)
+                    result.append(row[field.replace("_geno","")])
+                yield(tuple(result))
+
+        except ValueError:
+            env.logger.error("geno info fields are not in the file")
+
+
     def compare_HDF5(self,hdf5,chr,groupName=""):
         """This function checks the similarity of two HDF5 files.
 

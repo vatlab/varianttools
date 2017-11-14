@@ -687,7 +687,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                     # VARCHAR fields in the genotype tables.  We'll throw an error if someone wants to perform numeric operations on these fields
                     # further down in the code.
                     # raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
-
+    print(fieldInTable)
     validGenotypeIndices = []
     for index, field in enumerate(genotypeFields):
         if field.lower() not in [x.lower() for x in list(genotypeFieldTypes.keys())]:
