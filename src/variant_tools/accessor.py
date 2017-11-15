@@ -204,11 +204,11 @@ class GenoCallData(tb.IsDescription):
     sample_id=tb.Int16Col(dflt=1,pos=3)
     DP=tb.Int8Col(dflt=1,pos=4)
     GQ=tb.Float16Col(dflt=1,pos=5)
-    AD1=tb.Int8Col(dflt=1,pos=6)
-    AD2=tb.Int8Col(dflt=1,pos=7)
-    PL1=tb.Int8Col(dflt=1,pos=8)
-    PL2=tb.Int8Col(dflt=1,pos=9)
-    PL3=tb.Int8Col(dflt=1,pos=10)
+    # AD1=tb.Int8Col(dflt=1,pos=6)
+    # AD2=tb.Int8Col(dflt=1,pos=7)
+    # PL1=tb.Int8Col(dflt=1,pos=8)
+    # PL2=tb.Int8Col(dflt=1,pos=9)
+    # PL3=tb.Int8Col(dflt=1,pos=10)
 
 
 
@@ -246,8 +246,9 @@ class HDF5Engine_storage(Base_Storage):
         row=table.row
         row["entryMask"]=False
         for dataRow in data:
-            if (len(dataRow)==9):
-                for idx,var in enumerate(["variant_id","sample_id","DP","GQ","AD1","AD2","PL1","PL2","PL3"]):
+            if (len(dataRow)==4):
+                # for idx,var in enumerate(["variant_id","sample_id","DP","GQ","AD1","AD2","PL1","PL2","PL3"]):
+                for idx,var in enumerate(["variant_id","sample_id","DP","GQ"]):
                     row[var]=dataRow[idx]
                 row.append()
         table.flush()
