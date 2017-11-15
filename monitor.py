@@ -64,8 +64,11 @@ class ProcessMonitor(threading.Thread):
         children = current_process.children(recursive=True)
         n_children = len(children)
         for child in children:
-            ch_cpu += child.cpu_percent()
-            ch_mem += child.memory_info()[0]
+            try:
+                ch_cpu += child.cpu_percent()
+                ch_mem += child.memory_info()[0]
+            except Exception as e:
+                continue
         return par_cpu, par_mem, n_children, ch_cpu, ch_mem
 
     def size(self):

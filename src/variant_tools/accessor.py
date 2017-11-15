@@ -203,7 +203,7 @@ class GenoCallData(tb.IsDescription):
     variant_id=tb.Int32Col(dflt=1,pos=2)
     sample_id=tb.Int16Col(dflt=1,pos=3)
     DP=tb.Int8Col(dflt=1,pos=4)
-    GQ=tb.Int8Col(dflt=1,pos=5)
+    GQ=tb.Float16Col(dflt=1,pos=5)
     AD1=tb.Int8Col(dflt=1,pos=6)
     AD2=tb.Int8Col(dflt=1,pos=7)
     PL1=tb.Int8Col(dflt=1,pos=8)

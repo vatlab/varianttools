@@ -633,7 +633,7 @@ default_types = {
     'variants/MQ': 'f4',
     'variants/ANN': 'object',
     'calldata/GT': 'genotype/i1',
-    'calldata/GQ': 'i1',
+    'calldata/GQ': 'f4',
     'calldata/HQ': 'i1',
     'calldata/DP': 'i2',
     'calldata/AD': 'i2',
@@ -1418,7 +1418,7 @@ def importGenotypesInParallel(importer,num_sample=0):
             for worker in importers:
                 worker.join()
             lines+=chunk_length
-            prog.update(chunk_length)
+            prog.update(lines)
 
         prog.done()
 
