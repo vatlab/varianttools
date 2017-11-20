@@ -842,6 +842,7 @@ class AssoTestsWorker(Process):
         # check for non-triviality of genotype matrix
         if len(genotype[0]) == 0:
             raise ValueError("No variant found in genotype data for {}.".format(repr(gname)))
+            # raise ValueError("No variant found in genotype data for {}.".format(repr(gname)))
         return genotype, which, var_info, geno_info
 
     def setGenotype(self, which, data, info, grpname):
@@ -1193,8 +1194,11 @@ def associate(args):
                 if len(HDFfileNames)==0:
                     env.logger.error("No HDF5 file found. Please run vtools import with --HDF5 tag first.")
                     sys.exit()
-                HDFfileGroupNames=glob.glob("tmp*_multi_genes.h5")
+                print(HDFfileNames)
+                HDFfileGroupNames=glob.glob("tmp*multi_genes.h5")
+                print(HDFfileGroupNames)
                 if len(HDFfileGroupNames)==0 or args.force:
+                    print(len(HDFfileGroupNames),args.force)
                     nJobs = max(args.jobs, 1)
                     
                     # generateHDFbyGroup_update(asso,nJobs)

@@ -1160,67 +1160,8 @@ class HDF5GenotypeImportWorker(Process):
     #     self.rownames.append(variant_id)
 
 
-
-
-    def writeIntoHDF(self):
+    def writeIntoHDF(self,chr):
         storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
-        chr=self.chunk["variants/CHROM"][0].replace("chr","")
-        tolistTime=0
-        getGTtime=0
-        getInfotime=0
-        for i in range(len(self.chunk["variants/ID"])):
-            infoDict={}
-            chr=self.chunk["variants/CHROM"][i].replace("chr","")
-            # if chr.startswith("chr"):
-            #     chr=chr.replace("chr","")
-            ref=self.chunk["variants/REF"][i]
-            pos=self.chunk["variants/POS"][i]
-            GT=self.chunk["calldata/GT"][i].tolist()
-            # starttime=time.time()
-            # if len(self.geno_info)>0:
-            #     if "calldata/DP" in self.chunk:
-            #         DP_geno=self.chunk["calldata/DP"][i].tolist()
-            #         infoDict["DP_geno"]=DP_geno
-            #     if "calldata/GQ" in self.chunk:
-            #         GQ_geno=self.chunk["calldata/GQ"][i].tolist()
-            #         infoDict["GQ_geno"]=GQ_geno
-            #     if "calldata/AD" in self.chunk:
-            #         AD_geno=self.chunk["calldata/AD"][i].tolist()
-            #         infoDict["AD_geno"]=AD_geno
-            #     if "calldata/PL" in self.chunk:
-            #         PL_geno=self.chunk["calldata/PL"][i].tolist()
-            #         infoDict["PL_geno"]=PL_geno
-            # tolistTime+=time.time()-starttime
-            for altIndex in range(len(self.chunk["variants/ALT"][i])):
-                alt=self.chunk["variants/ALT"][i][altIndex]
-                if alt!="":
-                    if tuple((chr, ref, alt)) in self.variantIndex:
-                        variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
-                        starttime=time.time()
-                        self.getGT(variant_id,GT,altIndex)
-                        getGTtime+=time.time()-starttime
-
-                        if len(self.geno_info)>0:
-                            starttime=time.time()
-                            self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
-                            # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
-                            # self.getInfoTable(variant_id,infoDict,altIndex)
-                            getInfotime+=time.time()-starttime      
-                    else:
-                        rec=[str(chr),str(pos),ref,alt]  
-                        msg=normalize_variant(RefGenome(self.build).crr, rec, 0, 1, 2, 3)
-                        if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
-                            variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
-                            starttime=time.time()
-                            self.getGT(variant_id,GT,altIndex)
-                            getGTtime+=time.time()-starttime
-                            if len(self.geno_info)>0:
-                                starttime=time.time()
-                                self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
-                                # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
-                                # self.getInfoTable(variant_id,infoDict,altIndex)
-                                getInfotime+=time.time()-starttime
-   
         # if self.proc_index==1:
         #     print(self.proc_index,tolistTime,getGTtime,getInfotime)
         shape=(len(self.indptr),len(self.colnames))
@@ -1246,6 +1187,79 @@ class HDF5GenotypeImportWorker(Process):
         # if self.proc_index==1:
         #     print(self.proc_index,"infoWrite",time.time()-starttime)
         storageEngine.close()
+        self.indptr=[]
+        self.indices=[]
+        self.data=[]
+        self.rownames=[]
+        self.rowData=[]
+
+
+
+
+    def processFile(self):
+        prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
+        tolistTime=0
+        getGTtime=0
+        getInfotime=0
+        for i in range(len(self.chunk["variants/ID"])):
+            infoDict={}
+            chr=self.chunk["variants/CHROM"][i].replace("chr","")
+            if chr!=prev_chr:
+                self.writeIntoHDF(prev_chr)
+                prev_chr=chr
+                
+            # if chr.startswith("chr"):
+            #     chr=chr.replace("chr","")
+            ref=self.chunk["variants/REF"][i]
+            pos=self.chunk["variants/POS"][i]
+            GT=self.chunk["calldata/GT"][i].tolist()
+            # starttime=time.time()
+            # if len(self.geno_info)>0:
+            #     if "calldata/DP" in self.chunk:
+            #         DP_geno=self.chunk["calldata/DP"][i].tolist()
+            #         infoDict["DP_geno"]=DP_geno
+            #     if "calldata/GQ" in self.chunk:
+            #         GQ_geno=self.chunk["calldata/GQ"][i].tolist()
+            #         infoDict["GQ_geno"]=GQ_geno
+            #     if "calldata/AD" in self.chunk:
+            #         AD_geno=self.chunk["calldata/AD"][i].tolist()
+            #         infoDict["AD_geno"]=AD_geno
+            #     if "calldata/PL" in self.chunk:
+            #         PL_geno=self.chunk["calldata/PL"][i].tolist()
+            #         infoDict["PL_geno"]=PL_geno
+            # tolistTime+=time.time()-starttime
+            for altIndex in range(len(self.chunk["variants/ALT"][i])):
+                alt=self.chunk["variants/ALT"][i][altIndex]
+                if alt!="":
+                    if tuple((chr, ref, alt)) in self.variantIndex:
+                        variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
+                        # starttime=time.time()
+                        self.getGT(variant_id,GT,altIndex)
+                        # getGTtime+=time.time()-starttime
+
+                        if len(self.geno_info)>0:
+                            # starttime=time.time()
+                            self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
+                            # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
+                            # self.getInfoTable(variant_id,infoDict,altIndex)
+                            # getInfotime+=time.time()-starttime      
+                    else:
+                        rec=[str(chr),str(pos),ref,alt]  
+                        msg=normalize_variant(RefGenome(self.build).crr, rec, 0, 1, 2, 3)
+                        if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
+                            variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
+                            starttime=time.time()
+                            self.getGT(variant_id,GT,altIndex)
+                            getGTtime+=time.time()-starttime
+                            if len(self.geno_info)>0:
+                                # starttime=time.time()
+                                self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
+                                # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
+                                # self.getInfoTable(variant_id,infoDict,altIndex)
+                                # getInfotime+=time.time()-starttime
+        self.writeIntoHDF(chr)
+   
+        
       
 
 
@@ -1257,7 +1271,7 @@ class HDF5GenotypeImportWorker(Process):
                 genoDict[info.name]=0
 
         self.start_count = self.variant_count.value   
-        self.writeIntoHDF()
+        self.processFile()
      
 
       
