@@ -92,7 +92,7 @@ with open('src/variant_tools/_version.py') as init:
             break
 
 SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511', '-w-509',
-    '-outdir', 'build/variant_tools', '-py3']
+    '-outdir', 'src/variant_tools', '-py3']
 
 ASSO_WRAPPER_CPP_FILE = 'src/variant_tools/assoTests_wrap.cpp'
 ASSO_WRAPPER_PY_FILE = 'src/variant_tools/assoTests.py'
@@ -586,21 +586,21 @@ if not os.path.isfile(ASSO_WRAPPER_PY_FILE) or not os.path.isfile(ASSO_WRAPPER_C
     ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', ASSO_WRAPPER_CPP_FILE, ASSO_INTERFACE_FILE]), shell=True)
     if ret != 0:
         sys.exit('Failed to generate wrapper file for association module.')
-    os.rename('build/variant_tools/assoTests.py', ASSO_WRAPPER_PY_FILE)
+    os.rename('src/variant_tools/assoTests.py', ASSO_WRAPPER_PY_FILE)
 #
 if not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE) or not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE):
     print('Generating {}'.format(CGATOOLS_WRAPPER_CPP_FILE))
     ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', CGATOOLS_WRAPPER_CPP_FILE, CGATOOLS_INTERFACE_FILE]), shell=True)
     if ret != 0:
         sys.exit('Failed to generate wrapper file for cgatools.')
-    os.rename('build/variant_tools/cgatools.py', CGATOOLS_WRAPPER_PY_FILE)
+    os.rename('src/variant_tools/cgatools.py', CGATOOLS_WRAPPER_PY_FILE)
 #
 if not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE) or not os.path.isfile(UCSCTOOLS_WRAPPER_CPP_FILE):
     print('Generating {}'.format(UCSCTOOLS_WRAPPER_CPP_FILE))
     ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', UCSCTOOLS_WRAPPER_CPP_FILE, UCSCTOOLS_INTERFACE_FILE]), shell=True)
     if ret != 0:
         sys.exit('Failed to generate wrapper file for ucsctools.')
-    os.rename('build/variant_tools/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE)
+    os.rename('src/variant_tools/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE)
          
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.
 if sys.platform in 'linux2':
