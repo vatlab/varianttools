@@ -1043,7 +1043,6 @@ class HDF5Engine_access(Base_Access):
                 sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(0,len(sub_indptr))]
                 sub_shape=(len(sub_indptr)-1,group.shape[1])
 
-
             update_rowMask=rowMask[minPos:maxPos+1]
             rowMasked=np.where(update_rowMask==True)[0]
             sampleMasked=np.where(sampleMask==True)[0]+1
@@ -1058,16 +1057,18 @@ class HDF5Engine_access(Base_Access):
                 # print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
             
             #check removed genotypes
-            genoNode="/chr"+chr+"/genoInfo"
-            if genoNode in self.file:
-                genoInfoNode=self.file.get_node(genoNode)
-                table=genoInfoNode.genoInfo
-                cond="(variant_id>="+str(update_rownames[0])+")&(variant_id<="+str(update_rownames[-1])+")&(entryMask==True)"
-                entryMaskList=[]
-                for x in table.where(cond):
-                    entryMaskList.append((x["variant_id"],x["sample_id"]))
-                if len(entryMaskList)>0:
-                    sub_data,sub_indices,sub_indptr,sub_shape=self.maskRemovedGenotypes(entryMaskList,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
+            # genoNode="/chr"+chr+"/genoInfo"
+            # if genoNode in self.file:
+            #     genoInfoNode=self.file.get_node(genoNode)
+            #     table=genoInfoNode.genoInfo
+            #     cond="(variant_id>="+str(update_rownames[0])+")&(variant_id<="+str(update_rownames[-1])+")&(entryMask==True)"
+            #     entryMaskList=[]
+            #     for x in table.where(cond):
+            #         entryMaskList.append((x["variant_id"],x["sample_id"]))
+            #     if len(entryMaskList)>0:
+            #         sub_data,sub_indices,sub_indptr,sub_shape=self.maskRemovedGenotypes(entryMaskList,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
+            
+            
 
             return HMatrix(sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
         except NameError:

@@ -1192,11 +1192,12 @@ class HDF5GenotypeImportWorker(Process):
         self.data=[]
         self.rownames=[]
         self.rowData=[]
+        self.genoCount=0
 
 
 
 
-    def processFile(self):
+    def run(self):
         prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
         tolistTime=0
         getGTtime=0
@@ -1260,18 +1261,7 @@ class HDF5GenotypeImportWorker(Process):
         self.writeIntoHDF(chr)
    
         
-      
-
-
-    def run(self): 
-        genoCount=0
-        genoDict={}
-        if len(self.geno_info)>0:
-            for info in self.geno_info:
-                genoDict[info.name]=0
-
-        self.start_count = self.variant_count.value   
-        self.processFile()
+    
      
 
       

@@ -227,7 +227,7 @@ class AssociationTestManager:
                      flatten([['{}.{}'.format(db.name, x.name) for x in db.fields] for db in self.proj.annoDB])
             fields += [field for field in self.proj.db.getHeaders(self.table) \
                        if field not in ('variant_id', 'bin', 'alt_bin')]
-            print(fields)
+           
             for item in extern_weight:
                 if not item in geno_info + var_info:
                     # Is extern_weight in var_info?
@@ -1194,11 +1194,11 @@ def associate(args):
                 if len(HDFfileNames)==0:
                     env.logger.error("No HDF5 file found. Please run vtools import with --HDF5 tag first.")
                     sys.exit()
-                print(HDFfileNames)
+            
                 HDFfileGroupNames=glob.glob("tmp*multi_genes.h5")
-                print(HDFfileGroupNames)
+            
                 if len(HDFfileGroupNames)==0 or args.force:
-                    print(len(HDFfileGroupNames),args.force)
+                 
                     nJobs = max(args.jobs, 1)
                     
                     # generateHDFbyGroup_update(asso,nJobs)

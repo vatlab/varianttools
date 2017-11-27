@@ -86,8 +86,11 @@ class GroupHDFGenerator(Process):
                     #     print(ids)
                     #     print(hdf5.get_rownames(chr)[:])
                     subMatrix=accessEngine.get_geno_info_by_variant_IDs(ids,chr,"GT")
+
+
                     if subMatrix is not None and subMatrix.indices is not None:
                         storageEngine.store(subMatrix,chr,geneSymbol) 
+
                     # storageEngine.close() 
                 accessEngine.close()
                 storageEngine.close()
