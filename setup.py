@@ -615,6 +615,10 @@ else:
 
 ENV_INCLUDE_DIRS = os.environ.get('LD_INCLUDE_PATH', '').split(os.pathsep)
 ENV_LIBRARY_DIRS = os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep)
+if ENV_INCLUDE_DIRS[0]=='' or ENV_LIBRARY_DIRS[0]=='':
+  ENV_INCLUDE_DIRS=[]
+  ENV_LIBRARY_DIRS=[]
+
 
 if EMBEDDED_BOOST:
     try:
