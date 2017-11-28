@@ -619,6 +619,7 @@ if ENV_INCLUDE_DIRS[0]=='' or ENV_LIBRARY_DIRS[0]=='':
   ENV_INCLUDE_DIRS=[]
   ENV_LIBRARY_DIRS=[]
 
+
 if EMBEDDED_BOOST:
     try:
         c = new_compiler()

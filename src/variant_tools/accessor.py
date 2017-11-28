@@ -203,12 +203,12 @@ class GenoCallData(tb.IsDescription):
     variant_id=tb.Int32Col(dflt=1,pos=2)
     sample_id=tb.Int16Col(dflt=1,pos=3)
     DP=tb.Int8Col(dflt=1,pos=4)
-    GQ=tb.Int8Col(dflt=1,pos=5)
-    AD1=tb.Int8Col(dflt=1,pos=6)
-    AD2=tb.Int8Col(dflt=1,pos=7)
-    PL1=tb.Int8Col(dflt=1,pos=8)
-    PL2=tb.Int8Col(dflt=1,pos=9)
-    PL3=tb.Int8Col(dflt=1,pos=10)
+    GQ=tb.Float16Col(dflt=1,pos=5)
+    # AD1=tb.Int8Col(dflt=1,pos=6)
+    # AD2=tb.Int8Col(dflt=1,pos=7)
+    # PL1=tb.Int8Col(dflt=1,pos=8)
+    # PL2=tb.Int8Col(dflt=1,pos=9)
+    # PL3=tb.Int8Col(dflt=1,pos=10)
 
 
 
@@ -237,17 +237,19 @@ class HDF5Engine_storage(Base_Storage):
         # self.close()    
 
     def store_table(self,data,tableName,chr="",groupName=""):
+        filters = tb.Filters(complevel=9, complib='blosc')
         if not self.checkGroup(chr,tableName):
             group=self.getGroup(chr,tableName)
-            table=self.file.create_table(group,tableName,GenoCallData)
+            table=self.file.create_table(group,tableName,GenoCallData,filters=filters)
 
         group=self.getGroup(chr,tableName)
         table=group.genoInfo
         row=table.row
         row["entryMask"]=False
         for dataRow in data:
-            if (len(dataRow)==9):
-                for idx,var in enumerate(["variant_id","sample_id","DP","GQ","AD1","AD2","PL1","PL2","PL3"]):
+            if (len(dataRow)==4):
+                # for idx,var in enumerate(["variant_id","sample_id","DP","GQ","AD1","AD2","PL1","PL2","PL3"]):
+                for idx,var in enumerate(["variant_id","sample_id","DP","GQ"]):
                     row[var]=dataRow[idx]
                 row.append()
         table.flush()
@@ -1027,45 +1029,50 @@ class HDF5Engine_access(Base_Access):
                 break
             except ValueError:
                 continue
-        
-        update_rownames=rownames[minPos:maxPos+1]
-        sub_indptr=group.indptr[minPos:maxPos+2]
+        try:
+            minPos
+            maxPos
+            update_rownames=rownames[minPos:maxPos+1]
+            sub_indptr=group.indptr[minPos:maxPos+2]
 
-        # print(idPos[0],idPos[-1],len(sub_indptr))
-        sub_indices=sub_data=sub_shape=None
-        if len(sub_indptr)>0:
-            sub_indices=group.indices[sub_indptr[0]:sub_indptr[-1]]
-            sub_data=group.data[sub_indptr[0]:sub_indptr[-1]]
-            sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(0,len(sub_indptr))]
-            sub_shape=(len(sub_indptr)-1,group.shape[1])
+            # print(idPos[0],idPos[-1],len(sub_indptr))
+            sub_indices=sub_data=sub_shape=None
+            if len(sub_indptr)>0:
+                sub_indices=group.indices[sub_indptr[0]:sub_indptr[-1]]
+                sub_data=group.data[sub_indptr[0]:sub_indptr[-1]]
+                sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(0,len(sub_indptr))]
+                sub_shape=(len(sub_indptr)-1,group.shape[1])
 
+            update_rowMask=rowMask[minPos:maxPos+1]
+            rowMasked=np.where(update_rowMask==True)[0]
+            sampleMasked=np.where(sampleMask==True)[0]+1
+            # check removed variants
+            if len(rowMasked)>0:
+                sub_data,sub_indices,sub_indptr,sub_shape,update_rownames=self.maskRemovedVariants(rowMasked,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames)
+                # print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames))
+            #check removed samples
+            if len(sampleMasked)>0:
+                # print("before",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
+                sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames=self.maskRemovedSamples(sampleMasked,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
+                # print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
+            
+            #check removed genotypes
+            # genoNode="/chr"+chr+"/genoInfo"
+            # if genoNode in self.file:
+            #     genoInfoNode=self.file.get_node(genoNode)
+            #     table=genoInfoNode.genoInfo
+            #     cond="(variant_id>="+str(update_rownames[0])+")&(variant_id<="+str(update_rownames[-1])+")&(entryMask==True)"
+            #     entryMaskList=[]
+            #     for x in table.where(cond):
+            #         entryMaskList.append((x["variant_id"],x["sample_id"]))
+            #     if len(entryMaskList)>0:
+            #         sub_data,sub_indices,sub_indptr,sub_shape=self.maskRemovedGenotypes(entryMaskList,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
+            
+            
 
-        update_rowMask=rowMask[minPos:maxPos+1]
-        rowMasked=np.where(update_rowMask==True)[0]
-        sampleMasked=np.where(sampleMask==True)[0]+1
-        # check removed variants
-        if len(rowMasked)>0:
-            sub_data,sub_indices,sub_indptr,sub_shape,update_rownames=self.maskRemovedVariants(rowMasked,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames)
-            # print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames))
-        #check removed samples
-        if len(sampleMasked)>0:
-            # print("before",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
-            sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames=self.maskRemovedSamples(sampleMasked,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
-            # print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
-        
-        #check removed genotypes
-        genoNode="/chr"+chr+"/genoInfo"
-        if genoNode in self.file:
-            genoInfoNode=self.file.get_node(genoNode)
-            table=genoInfoNode.genoInfo
-            cond="(variant_id>="+str(update_rownames[0])+")&(variant_id<="+str(update_rownames[-1])+")&(entryMask==True)"
-            entryMaskList=[]
-            for x in table.where(cond):
-                entryMaskList.append((x["variant_id"],x["sample_id"]))
-            if len(entryMaskList)>0:
-                sub_data,sub_indices,sub_indptr,sub_shape=self.maskRemovedGenotypes(entryMaskList,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
-
-        return HMatrix(sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
+            return HMatrix(sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
+        except NameError:
+            env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
 
 
 
