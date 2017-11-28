@@ -28,7 +28,7 @@ elif _swig_python_version_info >= (2, 6, 0):
         try:
             fp, pathname, description = imp.find_module('_assoTests', [dirname(__file__)])
         except ImportError:
-            from . import _assoTests
+            import _assoTests
             return _assoTests
         try:
             _mod = imp.load_module('_assoTests', fp, pathname, description)
@@ -39,7 +39,7 @@ elif _swig_python_version_info >= (2, 6, 0):
     _assoTests = swig_import_helper()
     del swig_import_helper
 else:
-    from . import _assoTests
+    import _assoTests
 del _swig_python_version_info
 
 try:
@@ -50,7 +50,7 @@ except NameError:
 try:
     import builtins as __builtin__
 except ImportError:
-    import builtins
+    import __builtin__
 
 def _swig_setattr_nondynamic(self, class_type, name, value, static=1):
     if (name == "thisown"):
@@ -84,7 +84,7 @@ def _swig_getattr(self, class_type, name):
 def _swig_repr(self):
     try:
         strthis = "proxy of " + self.this.__repr__()
-    except builtins.Exception:
+    except __builtin__.Exception:
         strthis = ""
     return "<%s.%s; %s >" % (self.__class__.__module__, self.__class__.__name__, strthis,)
 
@@ -968,18 +968,7 @@ class OptimalWeightTester(BasePermutator):
 OptimalWeightTester_swigregister = _assoTests.OptimalWeightTester_swigregister
 OptimalWeightTester_swigregister(OptimalWeightTester)
 
-class Exception(object):
-    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
-    __repr__ = _swig_repr
-
-    def __init__(self, msg: 'string const &'):
-        _assoTests.Exception_swiginit(self, _assoTests.new_Exception(msg))
-    __swig_destroy__ = _assoTests.delete_Exception
-Exception.message = new_instancemethod(_assoTests.Exception_message, None, Exception)
-Exception_swigregister = _assoTests.Exception_swigregister
-Exception_swigregister(Exception)
-
-class StopIteration(Exception):
+class StopIteration(object):
     thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
     __repr__ = _swig_repr
 
@@ -988,46 +977,6 @@ class StopIteration(Exception):
     __swig_destroy__ = _assoTests.delete_StopIteration
 StopIteration_swigregister = _assoTests.StopIteration_swigregister
 StopIteration_swigregister(StopIteration)
-
-class IndexError(Exception):
-    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
-    __repr__ = _swig_repr
-
-    def __init__(self, msg: 'string const'):
-        _assoTests.IndexError_swiginit(self, _assoTests.new_IndexError(msg))
-    __swig_destroy__ = _assoTests.delete_IndexError
-IndexError_swigregister = _assoTests.IndexError_swigregister
-IndexError_swigregister(IndexError)
-
-class ValueError(Exception):
-    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
-    __repr__ = _swig_repr
-
-    def __init__(self, msg: 'string const'):
-        _assoTests.ValueError_swiginit(self, _assoTests.new_ValueError(msg))
-    __swig_destroy__ = _assoTests.delete_ValueError
-ValueError_swigregister = _assoTests.ValueError_swigregister
-ValueError_swigregister(ValueError)
-
-class SystemError(Exception):
-    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
-    __repr__ = _swig_repr
-
-    def __init__(self, msg: 'string const'):
-        _assoTests.SystemError_swiginit(self, _assoTests.new_SystemError(msg))
-    __swig_destroy__ = _assoTests.delete_SystemError
-SystemError_swigregister = _assoTests.SystemError_swigregister
-SystemError_swigregister(SystemError)
-
-class RuntimeError(Exception):
-    thisown = _swig_property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
-    __repr__ = _swig_repr
-
-    def __init__(self, msg: 'string const'):
-        _assoTests.RuntimeError_swiginit(self, _assoTests.new_RuntimeError(msg))
-    __swig_destroy__ = _assoTests.delete_RuntimeError
-RuntimeError_swigregister = _assoTests.RuntimeError_swigregister
-RuntimeError_swigregister(RuntimeError)
 
 
 def gsl_cdf_gaussian_P(x: 'double', sigma: 'double') -> "double":

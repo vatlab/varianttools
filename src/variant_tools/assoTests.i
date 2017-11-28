@@ -112,6 +112,13 @@ namespace std
 %include "lm.h"
 %include "assoData.h"
 %include "action.h"
+
+%ignore vtools::Exception;
+%ignore vtools::IndexError;
+%ignore vtools::ValueError;
+%ignore vtools::SystemError;
+%ignore vtools::RuntimeError;
+
 %include "assoTests.h"
 
 // gsl functions
