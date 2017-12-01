@@ -255,6 +255,20 @@ class HDF5Engine_storage(Base_Storage):
         table.flush()
 
 
+    def store_nparray(self,data,chr="",groupName=""):
+        filters = tb.Filters(complevel=9, complib='blosc')       
+        group=self.getGroup(chr)
+        if not self.checkGroup(chr,groupName):
+            ds = self.file.create_earray(group, groupName, tb.Atom.from_dtype(data.dtype), (0,data.shape[-1]),filters=filters,expectedrows=len(data))
+            ds.append(data)
+        else:
+            if groupName=="DP_geno":
+                group.DP_geno.append(data)
+            elif groupName=="GQ_geno":
+                group.GQ_geno.append(data)
+
+
+
     def num_variants(self,sampleID):
         totalNum=0
         for chr in range(1,23):
