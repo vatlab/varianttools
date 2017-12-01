@@ -255,7 +255,7 @@ class HDF5Engine_storage(Base_Storage):
         table.flush()
 
 
-    def store_nparray(self,data,chr="",groupName=""):
+    def store_genoInfo(self,data,chr="",groupName=""):
         filters = tb.Filters(complevel=9, complib='blosc')       
         group=self.getGroup(chr)
         if not self.checkGroup(chr,groupName):
@@ -266,6 +266,8 @@ class HDF5Engine_storage(Base_Storage):
                 group.DP_geno.append(data)
             elif groupName=="GQ_geno":
                 group.GQ_geno.append(data)
+            elif groupName=="GT_geno":
+                group.GT_geno.append(data)
 
 
 
