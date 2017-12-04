@@ -1085,9 +1085,9 @@ class HDF5GenotypeImportWorker(Process):
         
         GT_geno=self.chunk["calldata/GT"][pos,self.start_sample:self.end_sample].tolist()
         if altIndex==0:
-            GT_geno[GT_geno==3 or GT_geno==4]=np.nan
+            GT_geno[np.logical_or(GT_geno==3, GT_geno==4)]=np.nan
         elif altIndex==1:
-            GT_geno[GT_geno!=3 or GT_geno!=4]=np.nan
+            GT_geno[np.logical_or(GT_geno!=3, GT_geno!=4)]=np.nan
             GT_geno[GT_geno==3]=1
             GT_geno[GT_geno==4]=2
         self.info["GT_geno"].append(GT_geno)
