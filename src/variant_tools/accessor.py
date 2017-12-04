@@ -226,15 +226,15 @@ class HDF5Engine_storage(Base_Storage):
         self.fileName=fileName
 
 
-    def store(self,hmatrix,chr,groupName=""):
+    def store(self,data,chr,groupName=""):
 
+        self.store_genoInfo(data,chr,groupName)
         
-        # self.file=tb.open_file(self.dbPath,"a")
-        if not self.checkGroup(chr,groupName):
-            self.store_HDF5(hmatrix,chr,groupName) 
-        else:
-            self.append_HDF5(hmatrix,chr,groupName)
-        # self.close()    
+        # if not self.checkGroup(chr,groupName):
+        #     self.store_HDF5(data,chr,groupName) 
+        # else:
+        #     self.append_HDF5(data,chr,groupName)
+          
 
     def store_table(self,data,tableName,chr="",groupName=""):
         filters = tb.Filters(complevel=9, complib='blosc')
@@ -259,15 +259,27 @@ class HDF5Engine_storage(Base_Storage):
         filters = tb.Filters(complevel=9, complib='blosc')       
         group=self.getGroup(chr)
         if not self.checkGroup(chr,groupName):
-            ds = self.file.create_earray(group, groupName, tb.Atom.from_dtype(data.dtype), (0,data.shape[-1]),filters=filters,expectedrows=len(data))
+            groups=groupName.split("/")
+            groupName=groups[-1]
+            if len(groups)>1:
+                group=self.getGroup(chr,groups[0])
+                # group=self.file.create_group("/chr"+chr+"/"+groups[0],groups[-1])
+            if len(data.shape)>1:
+                ds = self.file.create_earray(group, groupName, tb.Atom.from_dtype(data.dtype), (0,data.shape[-1]),filters=filters,expectedrows=len(data))
+            else:
+                ds = self.file.create_earray(group, groupName, tb.Atom.from_dtype(data.dtype), (0,),filters=filters)
             ds.append(data)
+
         else:
-            if groupName=="DP_geno":
+            if "DP_geno" in groupName:
                 group.DP_geno.append(data)
-            elif groupName=="GQ_geno":
+            elif "GQ_geno" in groupName:
                 group.GQ_geno.append(data)
-            elif groupName=="GT_geno":
+            elif "GT_geno" in groupName:
                 group.GT_geno.append(data)
+            elif "rownames" in groupName:
+                group.rownames.append(data)
+
 
 
 
@@ -914,6 +926,20 @@ class HDF5Engine_access(Base_Access):
         self.rownames=pars[4]
         self.colnames=pars[5]
 
+    def get_geno_by_group(self,chr,groupName):
+        group=self.getGroup(chr)
+        self.colnames=group.colnames[:].tolist()
+        group=self.getGroup(chr,groupName)
+        self.rownames=group.rownames[:].tolist()
+        self.GT=group.GT_geno[:]
+        snpdict=dict.fromkeys(self.colnames,{})
+        for key,value in snpdict.items():
+            snpdict[key]=dict.fromkeys(self.rownames,(0,))
+
+        for rowidx,rowID in enumerate(self.rownames):
+            for colidx,colID in enumerate(self.colnames):
+                snpdict[colID][rowID]=(self.GT[rowidx,colidx],)
+        return snpdict
 
 
     def get_geno_info_by_group(self,groupName,chr=None):
@@ -1031,8 +1057,6 @@ class HDF5Engine_access(Base_Access):
         rowMask=group.rowMask[:]
         sampleMask=group.sampleMask[:]
 
-        
-
         for id in rowIDs:
             try:
                 minPos=rownames.index(id)
@@ -1087,6 +1111,39 @@ class HDF5Engine_access(Base_Access):
             
 
             return HMatrix(sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
+        except NameError:
+            env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
+
+
+    def get_geno_by_variant_IDs(self,rowIDs,chr,groupName=""):
+
+        #assume rowIDs are sorted by genome position
+        group=self.getGroup(chr,groupName)
+        rownames=group.rownames[:].tolist()
+        colnames=group.colnames[:]
+        # rowMask=group.rowMask[:]
+        # sampleMask=group.sampleMask[:]
+
+        for id in rowIDs:
+            try:
+                minPos=rownames.index(id)
+                break
+            except ValueError:
+                continue
+        for id in reversed(rowIDs):
+            try:
+                maxPos=rownames.index(id)
+                break
+            except ValueError:
+                continue
+        try:
+            minPos
+            maxPos
+            update_rownames=rownames[minPos:maxPos+1]
+            sub_GT=group.GT_geno[minPos:maxPos+1,:]
+      
+
+            return np.array(update_rownames),colnames,np.array(sub_GT)
         except NameError:
             env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
 

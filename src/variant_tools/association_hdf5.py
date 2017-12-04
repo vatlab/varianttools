@@ -81,16 +81,17 @@ class GroupHDFGenerator(Process):
                     ids=[int(x) for x in ids]
                     # ids.sort()
                     chr= getChr(ids[0],db.cursor())
+                    
+                    # subMatrix=accessEngine.get_geno_info_by_variant_IDs(ids,chr,"GT")
+                    # if subMatrix is not None and subMatrix.indices is not None:
+                    #     storageEngine.store(subMatrix,chr,geneSymbol) 
 
-                    # if (self.proc_index==1):
-                    #     print(ids)
-                    #     print(hdf5.get_rownames(chr)[:])
-                    subMatrix=accessEngine.get_geno_info_by_variant_IDs(ids,chr,"GT")
 
-
-                    if subMatrix is not None and subMatrix.indices is not None:
-                        storageEngine.store(subMatrix,chr,geneSymbol) 
-
+                    updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
+                    if subMatrix is not None:
+                        storageEngine.store(subMatrix,chr,geneSymbol+"/GT_geno")
+                        storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
+                        storageEngine.store(colnames,chr,"colnames")
                     # storageEngine.close() 
                 accessEngine.close()
                 storageEngine.close()
@@ -345,15 +346,15 @@ def getGenotype_HDF5(worker, group):
     files=sorted(files, key=lambda name: int(name.split("_")[1]))
 
     for fileName in files:
-        # startSample=int(fileName.split("_")[1])
-        # endSample=int(fileName.split("_")[2])
          
         accessEngine=Engine_Access.choose_access_engine(fileName)
-        colnames=accessEngine.get_colnames(chr,geneSymbol)
 
-        snpdict=accessEngine.get_geno_info_by_group(geneSymbol,chr)
+        # colnames=accessEngine.get_colnames(chr,geneSymbol)
+        # snpdict=accessEngine.get_geno_info_by_group(geneSymbol,chr)
         
-        # print(geneSymbol,snpdict.keys(),startSample,endSample)
+        colnames=accessEngine.get_colnames(chr)
+        snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
+        
         accessEngine.close()
         for ID in colnames:
             data=snpdict[ID]
