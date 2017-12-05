@@ -376,8 +376,12 @@ class HDF5Engine_storage(Base_Storage):
                 group=self.file.get_node(genoNode)
                 DP_geno=group.DP_geno[:]
                 GQ_geno=group.GQ_geno[:]
-                Mask_geno=group.Mask_geno[:]
-                group.Mask_geno[:]=np.where(eval(cond),Mask_geno,0)
+                # Mask_geno=group.Mask_geno[:]
+                Mask_geno=np.ones(shape=DP_geno.shape,dtype=np.int8)
+                group.Mask_geno[:]=np.where(eval(cond),0,Mask_geno)
+                print(group.Mask_geno[:])
+                print(group.DP_geno[:])
+                print(group.GQ_geno[:])
             except Exception as e:
                 # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
                 pass
@@ -1161,16 +1165,21 @@ class HDF5Engine_access(Base_Access):
             update_rownames=rownames[minPos:maxPos+1]
             sub_GT=group.GT_geno[minPos:maxPos+1,:]
             sub_Mask=group.Mask_geno[minPos:maxPos+1,:]
-            print("before",sub_GT)
             sub_GT=np.multiply(sub_GT,sub_Mask)
-            print("after",sub_GT)
+        
             update_rowMask=rowMask[minPos:maxPos+1]
             rowMasked=np.where(update_rowMask==True)[0]
             sampleMasked=np.where(sampleMask==True)[0]+1
-            print(rowMasked)
-            print(sampleMasked)
-
-      
+            if len(rowMasked)>0:
+                for i in rowMasked:
+                    update_rownames[i:-1] = update_rownames[i+1:]
+                    update_rownames =update_rownames[:-1]
+                    np.delete(sub_GT, i, 0)
+            if len(sampleMasked)>0:
+                for i in sampleMasked:
+                    colnames[i:-1] = colnames[i+1:]
+                    colnames =colnames[:-1]
+                    np.delete(sub_GT, i, 1)
 
             return np.array(update_rownames),colnames,np.array(sub_GT)
         except NameError:

@@ -838,7 +838,7 @@ class HDF5_Store(Base_Store):
         
 
 
-    def remove_variants(self,variantIDs):
+    def remove_variants(self,variantIDs,table):
         HDFfileNames=glob.glob("tmp*_genotypes.h5")
         for HDFfileName in HDFfileNames:
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
