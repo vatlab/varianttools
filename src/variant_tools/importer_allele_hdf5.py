@@ -1007,6 +1007,7 @@ class HDF5GenotypeImportWorker(Process):
         self.info={}
         self.rowData=[]
         self.info["GT_geno"]=[]
+        self.info["Mask_geno"]=[]
         self.namedict={"DP_geno":"calldata/DP","GQ_geno":"calldata/GQ"}
         if len(self.geno_info)>0:
             for info in self.geno_info:
@@ -1091,6 +1092,7 @@ class HDF5GenotypeImportWorker(Process):
             GT_geno[GT_geno==3]=1
             GT_geno[GT_geno==4]=2
         self.info["GT_geno"].append(GT_geno)
+        self.info["Mask_geno"].append([1]*len(GT_geno))
         if len(self.geno_info)>0:
             # self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
@@ -1135,10 +1137,17 @@ class HDF5GenotypeImportWorker(Process):
         # storageEngine.store(hmatrix,chr,"GT")
         
         storageEngine.store(np.array(self.info["GT_geno"]),chr,"GT_geno")
+        storageEngine.store(np.array(self.info["Mask_geno"]),chr,"Mask_geno")
         storageEngine.store(np.array(self.rownames),chr,"rownames")
         storageEngine.store(np.array(self.colnames),chr,"colnames")
+        rowmask=np.zeros(len(self.rownames),dtype=np.bool)
+        colmask=np.zeros(len(self.colnames),dtype=np.bool)
+        storageEngine.store(np.array(rowmask),chr,"rowmask")
+        storageEngine.store(np.array(colmask),chr,"samplemask")
+
 
         self.info["GT_geno"]=[]
+        self.info["Mask_geno"]=[]
 
         # if self.proc_index==1:
         #     print(self.proc_index,"GTWrite",time.time()-starttime)
@@ -1265,6 +1274,7 @@ def importGenotypesInParallel(importer,num_sample=0):
             continue
         allNames=manageHDF5(importer,allNames)
         sample_ids=[int(allNames[name]) for name in names]
+
        
         workload=None
        

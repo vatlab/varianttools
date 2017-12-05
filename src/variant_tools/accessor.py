@@ -270,15 +270,20 @@ class HDF5Engine_storage(Base_Storage):
                 ds = self.file.create_earray(group, groupName, tb.Atom.from_dtype(data.dtype), (0,),filters=filters)
             ds.append(data)
 
-        else:
+        else:   
             if "DP_geno" in groupName:
                 group.DP_geno.append(data)
             elif "GQ_geno" in groupName:
                 group.GQ_geno.append(data)
             elif "GT_geno" in groupName:
                 group.GT_geno.append(data)
+            elif "Mask_geno" in groupName:
+                group.Mask_geno.append(data)
             elif "rownames" in groupName:
                 group.rownames.append(data)
+            elif "rowmask" in groupName:
+                group.rowmask.append(data)
+
 
 
 
@@ -323,45 +328,59 @@ class HDF5Engine_storage(Base_Storage):
             chr=res[1]
             if chr!=preChr:
                 preChr=chr
-                group=self.file.get_node("/chr"+str(chr)+"/GT/")
+                # group=self.file.get_node("/chr"+str(chr)+"/GT/")
+                group=self.file.get_node("/chr"+str(chr))
                 rownames=group.rownames[:]
             # i=self.rownames.index(variant_id)
             i=np.where(rownames==res[0])[0][0]
-            group.rowMask[i]=True
+            group.rowmask[i]=True
 
     def recover_variant(self,variant_id,chr,groupName=""):
         group=self.file.get_node("/chr"+chr+"/"+groupName)
         # i=self.rownames.index(variant_id)
         rownames=group.rownames[:]
         i=np.where(rownames==variant_id)[0][0]
-        group.rowMask[i]=False
+        group.rowmask[i]=False
 
     
     def remove_sample(self,sample_id):
         for chr in range(1,23):
             try:
-                group=self.file.get_node("/chr"+str(chr)+"/GT/")
+                # group=self.file.get_node("/chr"+str(chr)+"/GT/")
+                group=self.file.get_node("/chr"+str(chr))
                 # i=self.rownames.index(variant_id)
                 colnames=group.colnames[:]
                 i=np.where(colnames==sample_id)[0][0]
-                print(i,sample_id)
-                group.sampleMask[i]=True
+                group.samplemask[i]=True
             except:
                 pass
         
 
+    # def remove_genotype(self,cond):
+    #     for chr in range(1,23):
+    #         genoNode="/chr"+str(chr)+"/genoInfo"
+    #         try:
+    #             group=self.file.get_node(genoNode)
+    #             table=group.genoInfo
+    #             for x in table.where(cond):
+    #                 x["entryMask"]=True
+    #                 x.update()
+    #         except:
+    #             env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
+
+
     def remove_genotype(self,cond):
         for chr in range(1,23):
-            genoNode="/chr"+str(chr)+"/genoInfo"
+            genoNode="/chr"+str(chr)
             try:
                 group=self.file.get_node(genoNode)
-                table=group.genoInfo
-                for x in table.where(cond):
-                    x["entryMask"]=True
-                    x.update()
-            except:
-                env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
-                
+                DP_geno=group.DP_geno[:]
+                GQ_geno=group.GQ_geno[:]
+                Mask_geno=group.Mask_geno[:]
+                group.Mask_geno[:]=np.where(eval(cond),Mask_geno,0)
+            except Exception as e:
+                # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
+                pass
         
         # group=self.file.get_node("/chr"+chr+"/GT")
         # indptr=group.indptr
@@ -1121,8 +1140,8 @@ class HDF5Engine_access(Base_Access):
         group=self.getGroup(chr,groupName)
         rownames=group.rownames[:].tolist()
         colnames=group.colnames[:]
-        # rowMask=group.rowMask[:]
-        # sampleMask=group.sampleMask[:]
+        rowMask=group.rowmask[:]
+        sampleMask=group.samplemask[:]
 
         for id in rowIDs:
             try:
@@ -1141,6 +1160,16 @@ class HDF5Engine_access(Base_Access):
             maxPos
             update_rownames=rownames[minPos:maxPos+1]
             sub_GT=group.GT_geno[minPos:maxPos+1,:]
+            sub_Mask=group.Mask_geno[minPos:maxPos+1,:]
+            print("before",sub_GT)
+            sub_GT=np.multiply(sub_GT,sub_Mask)
+            print("after",sub_GT)
+            update_rowMask=rowMask[minPos:maxPos+1]
+            rowMasked=np.where(update_rowMask==True)[0]
+            sampleMasked=np.where(sampleMask==True)[0]+1
+            print(rowMasked)
+            print(sampleMasked)
+
       
 
             return np.array(update_rownames),colnames,np.array(sub_GT)
