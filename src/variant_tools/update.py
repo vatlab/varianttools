@@ -687,7 +687,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                     # VARCHAR fields in the genotype tables.  We'll throw an error if someone wants to perform numeric operations on these fields
                     # further down in the code.
                     # raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
-    print(fieldInTable)
+    
     validGenotypeIndices = []
     for index, field in enumerate(genotypeFields):
         if field.lower() not in [x.lower() for x in list(genotypeFieldTypes.keys())]:
@@ -722,6 +722,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     variants = dict()
     prog = ProgressBar('Counting variants', len(IDs))
     prog_step = max(len(IDs) // 100, 1) 
+
     for id_idx, id in enumerate(IDs):
         record_male_gt = ID_sex is not None and ID_sex[id] == 1
         fieldSelect = ['GT' if ('gt' in fieldInTable and id in fieldInTable['gt']) else 'NULL']
@@ -732,8 +733,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         result=store.get_genoType_genoInfo(id,genotypes,variant_table,fieldSelect)
         
 
-        for rec in result:
-            print(rec)
+        for rec in result:          
             if rec[0] not in variants:
                 # the last item is for number of genotype for male individual
                 variants[rec[0]] = [0, 0, 0, 0, 0]
@@ -789,6 +789,11 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             prog.update(id_idx + 1)
     # print(variants)
     prog.done()
+
+    # for key,value in variants.items():
+    #     print(key,value)
+
+
     #
     # even if no variant is updated, we need set count 0 to fields.
     #if len(variants) == 0:

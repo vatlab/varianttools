@@ -1261,24 +1261,58 @@ class HDF5Engine_access(Base_Access):
         return snpdict
 
 
-    def get_geno_field_from_table(self,sampleID,cond,fields):
-        chr="22"
-        genoNode="/chr"+chr+"/genoInfo"
-        try:
-            genoInfoNode=self.file.get_node(genoNode)
-            table=genoInfoNode.genoInfo
-            print(sampleID,cond)
-            cond="sample_id=="+str(sampleID)
-            fields=["variant_id"]+fields
-            for row in table.where(cond):
-                result=[]
-                for field in fields:
-                    print(field)
-                    result.append(row[field.replace("_geno","")])
-                yield(tuple(result))
+    # def get_geno_field_from_table(self,sampleID,cond,fields):
+    #     chr="22"
+    #     genoNode="/chr"+chr+"/genoInfo"
+    #     try:
+    #         genoInfoNode=self.file.get_node(genoNode)
+    #         table=genoInfoNode.genoInfo
+    #         print(sampleID,cond)
+    #         cond="sample_id=="+str(sampleID)
+    #         fields=["variant_id"]+fields
+    #         for row in table.where(cond):
+    #             result=[]
+    #             for field in fields:
+    #                 print(field)
+    #                 result.append(row[field.replace("_geno","")])
+    #             yield(tuple(result))
 
-        except ValueError:
-            env.logger.error("geno info fields are not in the file")
+    #     except ValueError:
+    #         env.logger.error("geno info fields are not in the file")
+
+    def get_geno_field_from_table(self,sampleID,cond,fields):
+        for chr in range(1,23):
+            try:
+                node=self.file.get_node("/chr"+str(chr))
+                colnames=node.colnames[:].tolist()
+                colPos=colnames.index(sampleID)
+                rownames=node.rownames[:].tolist()
+                infos=[]
+
+                for field in fields:
+                    if field=="GT":
+                        field="GT_geno"
+                    if "/chr"+str(chr)+"/"+field in self.file:
+                        
+                        if field=="GT_geno":
+                            genoinfo=node.GT_geno
+                            infos.append(genoinfo)
+                        elif field=="DP_geno":
+                            genoinfo=node.DP_geno
+                            infos.append(genoinfo)
+                        elif field=="GQ_geno":
+                            genoinfo=node.GQ_geno
+                            infos.append(genoinfo)
+                for rowPos,rowName in enumerate(rownames):
+                    line=[rowName]
+                    for info in infos:
+                        line.append(info[int(rowPos),int(colPos)])
+                    yield(tuple(line))
+        
+            except Exception as e:
+                # print(e)
+                pass
+                
 
 
     def compare_HDF5(self,hdf5,chr,groupName=""):

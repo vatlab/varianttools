@@ -914,9 +914,8 @@ class HDF5_Store(Base_Store):
     def get_genoType_genoInfo(self,sampleID,genotypes,variant_table,fieldSelect):
         HDFfileName=self.get_sampleFileName(sampleID)
         accessEngine=Engine_Access.choose_access_engine(HDFfileName)
-        print(fieldSelect)
+        # print(fieldSelect)
         result=accessEngine.get_geno_field_from_table(sampleID,genotypes,fieldSelect)
-        print(HDFfileName)
         return result
 
 
