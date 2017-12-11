@@ -339,15 +339,29 @@ class HDF5Engine_storage(Base_Storage):
         return noWT
 
 
+    # def geno_fields(self,sampleID):
+    #     for chr in range(1,23):
+    #         try:
+    #             group=self.file.get_node("/chr"+str(chr)+"/genoInfo/")
+    #             table=group.genoInfo
+    #             return ["GT","DP","GQ","AD","PL"]
+    #             break
+    #         except:
+    #             pass
+
     def geno_fields(self,sampleID):
+        fields=[]
         for chr in range(1,23):
             try:
-                group=self.file.get_node("/chr"+str(chr)+"/genoInfo/")
-                table=group.genoInfo
-                return ["GT","DP","GQ","AD","PL"]
-                break
+                for field in ["GT_geno","DP_geno","GQ_geno"]:
+                    group=self.file.get_node("/chr"+str(chr)+"/"+field)  
+                    if field=="GT_geno":
+                        field="gt"     
+                    fields.append(field)
             except:
                 pass
+        return list(set(fields))
+
 
 
     def remove_variants(self,variantIDs):
