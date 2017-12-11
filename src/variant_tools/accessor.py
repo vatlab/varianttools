@@ -1312,6 +1312,45 @@ class HDF5Engine_access(Base_Access):
             except Exception as e:
                 # print(e)
                 pass
+
+    def get_hdf5_geno_field_from_table(self,samples,genotypes,fieldSelect,operations):
+        vardict={}
+        for chr in range(1,23):
+            try:
+                node=self.file.get_node("/chr"+str(chr))
+                colnames=node.colnames[:].tolist()
+                rownames=node.rownames[:].tolist()
+                numrow=len(rownames)
+                numcol=len(colnames)
+                variants=np.empty(shape=(numrow,len(fieldSelect)+5),dtype=np.int8)
+                print(variants.shape)
+                for field in fieldSelect:
+                    if field=="GT":
+                        field="GT_geno"
+
+                    if "/chr"+str(chr)+"/"+field in self.file:
+                        if field=="GT_geno":
+                            genoinfo=node.GT_geno[:]
+                            variants[:,3]=np.nansum(~np.isnan(genoinfo),axis=1)
+                            variants[:,0]=np.nansum(genoinfo==1,axis=1)
+                            variants[:,1]=np.nansum(genoinfo==2,axis=1)
+                            variants[:,2]=np.nansum(genoinfo==-1,axis=1)                      
+                        elif field=="DP_geno":
+                            genoinfo=node.DP_geno[:]
+                            for operation in operations:
+                                if operation==0:
+                                    variants[:,5]=np.sum(genoinfo,axis=1)
+                                    variants[:,6]=np.repeat(numcol,numrow)
+                                    # variants[:,5]=np.insert(genoinfo.sum(axis=1).reshape(numrow,1),1,numcol,axis=1)                 
+                        elif field=="GQ_geno":
+                            genoinfo=node.GQ_geno
+                vardict.update(dict(zip(rownames,variants)))                              
+            except Exception as e:
+                print(e)
+                pass
+        return vardict
+
+
                 
 
 

@@ -723,75 +723,80 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     prog = ProgressBar('Counting variants', len(IDs))
     prog_step = max(len(IDs) // 100, 1) 
 
-    for id_idx, id in enumerate(IDs):
-        record_male_gt = ID_sex is not None and ID_sex[id] == 1
-        fieldSelect = ['GT' if ('gt' in fieldInTable and id in fieldInTable['gt']) else 'NULL']
-        if validGenotypeFields is not None and len(validGenotypeFields) != 0:
-             fieldSelect.extend([x if id in fieldInTable[x.lower()] else 'NULL' for x in validGenotypeFields])
-        if not fieldSelect or all([x == 'NULL' for x in fieldSelect]):
-            continue
-        result=store.get_genoType_genoInfo(id,genotypes,variant_table,fieldSelect)
-        
+    if proj.store=="sqlite":    
+        for id_idx, id in enumerate(IDs):
+            record_male_gt = ID_sex is not None and ID_sex[id] == 1
+            fieldSelect = ['GT' if ('gt' in fieldInTable and id in fieldInTable['gt']) else 'NULL']
+            if validGenotypeFields is not None and len(validGenotypeFields) != 0:
+                 fieldSelect.extend([x if id in fieldInTable[x.lower()] else 'NULL' for x in validGenotypeFields])
+            if not fieldSelect or all([x == 'NULL' for x in fieldSelect]):
+                continue
+            result=store.get_genoType_genoInfo(id,genotypes,variant_table,fieldSelect)
+            
 
-        for rec in result:          
-            if rec[0] not in variants:
-                # the last item is for number of genotype for male individual
-                variants[rec[0]] = [0, 0, 0, 0, 0]
-                variants[rec[0]].extend(list(fieldCalcs))
-            # total valid GT
-            if rec[1] is not None:
-                variants[rec[0]][3] += 1
-            # if tracking genotype of males (for maf), and the sex is male
-            if record_male_gt:
-                variants[rec[0]][4] += 1
-            # type heterozygote
-            if rec[1] == 1:
-                variants[rec[0]][0] += 1
-            # type homozygote
-            elif rec[1] == 2:
-                variants[rec[0]][1] += 1
-            # type double heterozygote with two different alternative alleles
-            elif rec[1] == -1:
-                variants[rec[0]][2] += 1
-            elif rec[1] not in [0, None]:
-                env.logger.warning('Invalid genotype type {}'.format(rec[1]))
-            #
-            # this collects genotype_field information
-            if len(validGenotypeFields) > 0:
-                for index in validGenotypeIndices:
-                    queryIndex = index + 2     # to move beyond the variant_id and GT fields in the select statement
-                    recIndex = index + 5       # first 5 attributes of variants are het, hom, double_het, GT, GT in males
-                    # ignore missing (NULL) values, and empty string that, if so inserted, could be returned
-                    # by sqlite even when the field type is INT.
-                    if rec[queryIndex] in [None, '', '.']:
-                        continue
-                    operation = operations[index]
-                    field = genotypeFields[index]
-                    if operation == MEAN:
-                        if variants[rec[0]][recIndex] is None:
-                            # we need to track the number of valid records
-                            variants[rec[0]][recIndex] = [rec[queryIndex], 1]
-                        else:
-                            variants[rec[0]][recIndex][0] += rec[queryIndex]
-                            variants[rec[0]][recIndex][1] += 1
-                    elif operation == SUM:
-                        if variants[rec[0]][recIndex] is None:
-                            variants[rec[0]][recIndex] = rec[queryIndex]
-                        else:
-                            variants[rec[0]][recIndex] += rec[queryIndex]
-                    elif operation == MIN:
-                        if variants[rec[0]][recIndex] is None or rec[queryIndex] < variants[rec[0]][recIndex]:
-                            variants[rec[0]][recIndex] = rec[queryIndex]
-                    elif operation == MAX:
-                        if variants[rec[0]][recIndex] is None or rec[queryIndex] > variants[rec[0]][recIndex]:
-                            variants[rec[0]][recIndex] = rec[queryIndex]  
-        if id_idx % prog_step == 0:
-            prog.update(id_idx + 1)
-    # print(variants)
-    prog.done()
+            for rec in result:          
+                if rec[0] not in variants:
+                    # the last item is for number of genotype for male individual
+                    variants[rec[0]] = [0, 0, 0, 0, 0]
+                    variants[rec[0]].extend(list(fieldCalcs))
+                # total valid GT
+                if rec[1] is not None:
+                    variants[rec[0]][3] += 1
+                # if tracking genotype of males (for maf), and the sex is male
+                if record_male_gt:
+                    variants[rec[0]][4] += 1
+                # type heterozygote
+                if rec[1] == 1:
+                    variants[rec[0]][0] += 1
+                # type homozygote
+                elif rec[1] == 2:
+                    variants[rec[0]][1] += 1
+                # type double heterozygote with two different alternative alleles
+                elif rec[1] == -1:
+                    variants[rec[0]][2] += 1
+                elif rec[1] not in [0, None]:
+                    env.logger.warning('Invalid genotype type {}'.format(rec[1]))
+                #
+                # this collects genotype_field information
+                if len(validGenotypeFields) > 0:
+                    for index in validGenotypeIndices:
+                        queryIndex = index + 2     # to move beyond the variant_id and GT fields in the select statement
+                        recIndex = index + 5       # first 5 attributes of variants are het, hom, double_het, GT, GT in males
+                        # ignore missing (NULL) values, and empty string that, if so inserted, could be returned
+                        # by sqlite even when the field type is INT.
+                        if rec[queryIndex] in [None, '', '.']:
+                            continue
+                        operation = operations[index]
+                        field = genotypeFields[index]
+                        if operation == MEAN:
+                            if variants[rec[0]][recIndex] is None:
+                                # we need to track the number of valid records
+                                variants[rec[0]][recIndex] = [rec[queryIndex], 1]
+                            else:
+                                variants[rec[0]][recIndex][0] += rec[queryIndex]
+                                variants[rec[0]][recIndex][1] += 1
+                        elif operation == SUM:
+                            if variants[rec[0]][recIndex] is None:
+                                variants[rec[0]][recIndex] = rec[queryIndex]
+                            else:
+                                variants[rec[0]][recIndex] += rec[queryIndex]
+                        elif operation == MIN:
+                            if variants[rec[0]][recIndex] is None or rec[queryIndex] < variants[rec[0]][recIndex]:
+                                variants[rec[0]][recIndex] = rec[queryIndex]
+                        elif operation == MAX:
+                            if variants[rec[0]][recIndex] is None or rec[queryIndex] > variants[rec[0]][recIndex]:
+                                variants[rec[0]][recIndex] = rec[queryIndex]  
+            if id_idx % prog_step == 0:
+                prog.update(id_idx + 1)
+        # print(variants)
+        prog.done()
+    elif proj.store=="hdf5":
+        fieldSelect=["GT","DP_geno"]
+        variants=store.get_hdf5_genoType_genoInfo(IDs,genotypes,variant_table,fieldSelect,operations)
+        prog.done()
 
     # for key,value in variants.items():
-    #     print(key,value)
+    #      print(key,value)
 
 
     #
@@ -955,7 +960,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             for index in validGenotypeIndices:
                 # the first 4 indices hold the values for hom, het, double het, total genotype and total genotype in males
                 operationIndex = index + 5     
-                operationCalculation = value[operationIndex]
+                operationCalculation = value[operationIndex:]
                 if operations[index] == MEAN and operationCalculation is not None:
                     res.append(float(operationCalculation[0]) / operationCalculation[1])
                 else:
