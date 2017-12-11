@@ -1181,7 +1181,6 @@ class HDF5GenotypeImportWorker(Process):
         self.genoCount=0
         
 
-        
 
 
 
@@ -1195,7 +1194,7 @@ class HDF5GenotypeImportWorker(Process):
                 prev_chr=chr             
             ref=self.chunk["variants/REF"][i]
             pos=self.chunk["variants/POS"][i]
-            
+
             for altIndex in range(len(self.chunk["variants/ALT"][i])):
                 alt=self.chunk["variants/ALT"][i][altIndex]
                 if alt!="":
@@ -1213,8 +1212,6 @@ class HDF5GenotypeImportWorker(Process):
                             self.get_geno(variant_id,i,altIndex)
         self.writeIntoHDF(chr)
        
-   
-        
 
 
 def updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDF5fileName):

@@ -586,8 +586,11 @@ class Sqlite_Store(Base_Store):
         return self.cur.fetchone()[0]
 
     def geno_fields(self, sample_id,file=""):
-        sampleGenotypeHeader = self.db.getHeaders('genotype_{}'.format(sample_id))
+        sampleGenotypeHeader = [x.lower() for x in self.db.getHeaders('genotype_{}'.format(sample_id))]
         return sampleGenotypeHeader[1:]  # the first field is variant id, second is GT
+
+    def get_typeOfColumn(self,sample_id,field):
+        return self.db.typeOfColumn('genotype_{}'.format(sample_id), field) 
 
     def remove_sample(self, sample_id,file=""):
         self.db.removeTable('genotype_{}'.format(sample_id))
@@ -629,6 +632,27 @@ class Sqlite_Store(Base_Store):
                     .format(name, e))
                 continue
             env.logger.info('{} genotypes are removed from sample {}'.format(self.cur.rowcount, name))
+
+    def get_genoType_genoInfo(self,id,genotypes,variant_table,fieldSelect):
+        where_cond = []
+        if genotypes is not None and len(genotypes) != 0:
+            where_cond.extend(genotypes)
+        if variant_table != 'variant':
+            where_cond.append('variant_id in (SELECT variant_id FROM {})'.format(variant_table))
+        whereClause = 'WHERE ' + ' AND '.join(['({})'.format(x) for x in where_cond]) if where_cond else ''
+        
+      
+        query = 'SELECT variant_id {} FROM {}_genotype.genotype_{} {};'.format(' '.join([',' + x for x in fieldSelect]),
+                self.proj.name, id, whereClause)
+        print(query)
+        self.db.attach(self.proj.name+"_genotype.DB",self.proj.name+"_genotype")
+        env.logger.trace(query)
+        self.cur.execute(query)
+        result=self.cur.fetchall()
+        self.db.commit()
+        self.db.detach(self.proj.name+"_genotype")
+        return result
+
 
     
     def importGenotypes(self, importer):
@@ -826,8 +850,9 @@ class Sqlite_Store(Base_Store):
 
 
 class HDF5_Store(Base_Store):
-    def __init__(self, name):
-        super(HDF5_Store, self).__init__(name)
+    def __init__(self, proj):
+        self.proj=proj
+        super(HDF5_Store, self).__init__(proj)
 
 
     def remove_sample(self,sampleID,HDFfileName):
@@ -859,11 +884,41 @@ class HDF5_Store(Base_Store):
         storageEngine.close()
         return num
 
-    def geno_fields(self, sampleID,HDFfileName):
+    def get_noWT_variants(self, sampleID,HDFfileName):
+        storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+        variantIDs=storageEngine.get_noWT_variants(sampleID)
+        storageEngine.close()
+        return variantIDs
+
+    def geno_fields(self, sampleID):
+        HDFfileName=self.get_sampleFileName(sampleID)
         storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
         genoFields=storageEngine.geno_fields(sampleID)
+        genoFields=["dp_geno" if x=="DP" else x for x in genoFields]
+        genoFields=["gq_geno" if x=="GQ" else x for x in genoFields]
+        genoFields=[x.lower() for x in genoFields]
         storageEngine.close()
         return genoFields
+
+    def get_sampleFileName(self,id):
+        self.cur=self.proj.db.cursor()
+        self.cur.execute('SELECT HDF5 FROM sample WHERE sample_id = ?;', (id,))
+        res=self.cur.fetchone()
+        hdf5file=res[0]
+        self.proj.db.commit()
+        return hdf5file
+
+    def get_typeOfColumn(self,sampleID,field):
+        return "INTEGER"
+
+    def get_genoType_genoInfo(self,sampleID,genotypes,variant_table,fieldSelect):
+        HDFfileName=self.get_sampleFileName(sampleID)
+        accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+        print(fieldSelect)
+        result=accessEngine.get_geno_field_from_table(sampleID,genotypes,fieldSelect)
+        print(HDFfileName)
+        return result
+
 
     
     def importGenotypes(self, importer):

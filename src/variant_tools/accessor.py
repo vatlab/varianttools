@@ -202,6 +202,7 @@ class GenoCallData(tb.IsDescription):
     entryMask=tb.BoolCol(pos=1)
     variant_id=tb.Int32Col(dflt=1,pos=2)
     sample_id=tb.Int16Col(dflt=1,pos=3)
+<<<<<<< HEAD
     DP=tb.Int8Col(dflt=1,pos=4)
     GQ=tb.Float16Col(dflt=1,pos=5)
     # AD1=tb.Int8Col(dflt=1,pos=6)
@@ -209,6 +210,17 @@ class GenoCallData(tb.IsDescription):
     # PL1=tb.Int8Col(dflt=1,pos=8)
     # PL2=tb.Int8Col(dflt=1,pos=9)
     # PL3=tb.Int8Col(dflt=1,pos=10)
+=======
+    GT=tb.Int8Col(dflt=1,pos=4)
+    DP=tb.Int8Col(dflt=1,pos=5)
+    # GQ=tb.Int8Col(dflt=1,pos=6)
+    GQ=tb.Float16Col(dflt=1,pos=6)
+    AD1=tb.Int8Col(dflt=1,pos=7)
+    AD2=tb.Int8Col(dflt=1,pos=8)
+    PL1=tb.Int8Col(dflt=1,pos=9)
+    PL2=tb.Int8Col(dflt=1,pos=10)
+    PL3=tb.Int8Col(dflt=1,pos=11)
+>>>>>>> v3_fix
 
 
 
@@ -247,11 +259,20 @@ class HDF5Engine_storage(Base_Storage):
         row=table.row
         row["entryMask"]=False
         for dataRow in data:
+<<<<<<< HEAD
             if (len(dataRow)==4):
                 # for idx,var in enumerate(["variant_id","sample_id","DP","GQ","AD1","AD2","PL1","PL2","PL3"]):
                 for idx,var in enumerate(["variant_id","sample_id","DP","GQ"]):
                     row[var]=dataRow[idx]
                 row.append()
+=======
+            if (len(dataRow)==10):
+                    for idx,var in enumerate(["variant_id","sample_id","GT","DP","GQ","AD1","AD2","PL1","PL2","PL3"]):
+                        row[var]=dataRow[idx]
+                    row.append()
+            else:
+                print("The data format is not supported to save in HDF5.")
+>>>>>>> v3_fix
         table.flush()
 
 
@@ -301,11 +322,41 @@ class HDF5Engine_storage(Base_Storage):
                 colPos=np.where(indices==samplePos[0][0])
                 data=group.data[colPos]
                 numNan=np.where(np.isnan(data))
-                numMone=np.where(data==-1)
-                totalNum+=numVariants-len(numNan[0])-len(numMone[0])
+                numNone=np.where(data==-1)
+                print("Here",numVariants,numNan,numNone)
+                print(group.rownames[:])
+                totalNum+=numVariants-len(numNan[0])-len(numNone[0])
             except:
                 pass
         return totalNum
+
+    def to_csr_matrix(self,group):
+        return csr_matrix((group.data[:],group.indices[:],group.indptr[:]),shape=group.shape[:])
+
+    def get_noWT_variants(self,sampleID):
+        noWT=None
+        for chr in range(1,23):
+            try:
+                #haven't dealt with data==-1
+                group=self.file.get_node("/chr"+str(chr)+"/GT/")
+                matrix=self.to_csr_matrix(group)
+                colnames=group.colnames[:]
+                rownames=group.rownames[:]
+                samplePos=np.where(colnames==sampleID)
+                nonZero=matrix.nonzero()
+                sampleLoc=np.where(nonZero[1]==samplePos)
+                rowLoc=nonZero[0][sampleLoc[1]]
+                noWT=rownames[rowLoc]
+                # colPos=np.where(indices==samplePos[0][0])
+                # data=group.data[colPos]
+                # print(data)
+                # noNan=rownames[np.where(~np.isnan(data))]
+                # noNone=rownames[np.where(data!=-1)]
+                # noWT=np.intersect1d(noNan,noNone)
+            except Exception as e:
+                pass
+        return noWT
+
 
     def geno_fields(self,sampleID):
         for chr in range(1,23):
@@ -315,8 +366,6 @@ class HDF5Engine_storage(Base_Storage):
                 return ["GT","DP","GQ","AD","PL"]
                 break
             except:
-                return ["GT"]
-                break
                 pass
 
 
@@ -1215,6 +1264,26 @@ class HDF5Engine_access(Base_Access):
                 genotype=int(value[0])
             snpdict[self.rownames[idx]]=genotype
         return snpdict
+
+
+    def get_geno_field_from_table(self,sampleID,cond,fields):
+        chr="22"
+        genoNode="/chr"+chr+"/genoInfo"
+        try:
+            genoInfoNode=self.file.get_node(genoNode)
+            table=genoInfoNode.genoInfo
+            print(sampleID,cond)
+            cond="sample_id=="+str(sampleID)
+            fields=["variant_id"]+fields
+            for row in table.where(cond):
+                result=[]
+                for field in fields:
+                    print(field)
+                    result.append(row[field.replace("_geno","")])
+                yield(tuple(result))
+
+        except ValueError:
+            env.logger.error("geno info fields are not in the file")
 
 
     def compare_HDF5(self,hdf5,chr,groupName=""):
