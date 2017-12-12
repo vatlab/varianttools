@@ -1325,6 +1325,7 @@ class HDF5Engine_access(Base_Access):
                 numcol=len(colnames)
                 variants=np.zeros(shape=(numrow,len(fieldSelect)+5),dtype=np.int32)
                 colpos=list(map(lambda x:colnames.index(x),samples))
+
                 for field in fieldSelect:
                     if field=="GT":
                         field="GT_geno"

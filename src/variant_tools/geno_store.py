@@ -633,25 +633,97 @@ class Sqlite_Store(Base_Store):
                 continue
             env.logger.info('{} genotypes are removed from sample {}'.format(self.cur.rowcount, name))
 
-    def get_genoType_genoInfo(self,id,genotypes,variant_table,fieldSelect):
-        where_cond = []
-        if genotypes is not None and len(genotypes) != 0:
-            where_cond.extend(genotypes)
-        if variant_table != 'variant':
-            where_cond.append('variant_id in (SELECT variant_id FROM {})'.format(variant_table))
-        whereClause = 'WHERE ' + ' AND '.join(['({})'.format(x) for x in where_cond]) if where_cond else ''
+    def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
+        MEAN = 0
+        SUM = 1
+        MIN = 2
+        MAX = 3
+        variants=dict()
+        id_idx=0
+        for id,sampleInfo in sampleDict.items():
+            record_male_gt=sampleInfo[0]
+            fieldSelect=sampleInfo[1]
+            if not fieldSelect or all([x == 'NULL' for x in fieldSelect]):
+                continue
         
-      
-        query = 'SELECT variant_id {} FROM {}_genotype.genotype_{} {};'.format(' '.join([',' + x for x in fieldSelect]),
-                self.proj.name, id, whereClause)
-        print(query)
-        self.db.attach(self.proj.name+"_genotype.DB",self.proj.name+"_genotype")
-        env.logger.trace(query)
-        self.cur.execute(query)
-        result=self.cur.fetchall()
-        self.db.commit()
-        self.db.detach(self.proj.name+"_genotype")
-        return result
+            where_cond = []
+            if genotypes is not None and len(genotypes) != 0:
+                where_cond.extend(genotypes)
+            if variant_table != 'variant':
+                where_cond.append('variant_id in (SELECT variant_id FROM {})'.format(variant_table))
+            whereClause = 'WHERE ' + ' AND '.join(['({})'.format(x) for x in where_cond]) if where_cond else ''
+            
+          
+            query = 'SELECT variant_id {} FROM {}_genotype.genotype_{} {};'.format(' '.join([',' + x for x in fieldSelect]),
+                    self.proj.name, id, whereClause)
+            self.db.attach(self.proj.name+"_genotype.DB",self.proj.name+"_genotype")
+            env.logger.trace(query)
+            self.cur.execute(query)
+            result=self.cur.fetchall()
+            self.db.commit()
+            self.db.detach(self.proj.name+"_genotype")
+
+            id_idx+=1
+
+            for rec in result:          
+                if rec[0] not in variants:
+                    # the last item is for number of genotype for male individual
+                    variants[rec[0]] = [0, 0, 0, 0, 0]
+                    variants[rec[0]].extend(list(fieldCalcs))
+                # total valid GT
+                if rec[1] is not None:
+                    variants[rec[0]][3] += 1
+                # if tracking genotype of males (for maf), and the sex is male
+                if record_male_gt:
+                    variants[rec[0]][4] += 1
+                # type heterozygote
+                if rec[1] == 1:
+                    variants[rec[0]][0] += 1
+                # type homozygote
+                elif rec[1] == 2:
+                    variants[rec[0]][1] += 1
+                # type double heterozygote with two different alternative alleles
+                elif rec[1] == -1:
+                    variants[rec[0]][2] += 1
+                elif rec[1] not in [0, None]:
+                    env.logger.warning('Invalid genotype type {}'.format(rec[1]))
+                #
+                # this collects genotype_field information
+                if len(validGenotypeFields) > 0:
+                    for index in validGenotypeIndices:
+                        queryIndex = index + 2     # to move beyond the variant_id and GT fields in the select statement
+                        recIndex = index + 5       # first 5 attributes of variants are het, hom, double_het, GT, GT in males
+                        # ignore missing (NULL) values, and empty string that, if so inserted, could be returned
+                        # by sqlite even when the field type is INT.
+                        if rec[queryIndex] in [None, '', '.']:
+                            continue
+                        operation = operations[index]
+                        field = genotypeFields[index]
+                        if operation == MEAN:
+                            if variants[rec[0]][recIndex] is None:
+                                # we need to track the number of valid records
+                                variants[rec[0]][recIndex] = [rec[queryIndex], 1]
+                            else:
+                                variants[rec[0]][recIndex][0] += rec[queryIndex]
+                                variants[rec[0]][recIndex][1] += 1
+                        elif operation == SUM:
+                            if variants[rec[0]][recIndex] is None:
+                                variants[rec[0]][recIndex] = rec[queryIndex]
+                            else:
+                                variants[rec[0]][recIndex] += rec[queryIndex]
+                        elif operation == MIN:
+                            if variants[rec[0]][recIndex] is None or rec[queryIndex] < variants[rec[0]][recIndex]:
+                                variants[rec[0]][recIndex] = rec[queryIndex]
+                        elif operation == MAX:
+                            if variants[rec[0]][recIndex] is None or rec[queryIndex] > variants[rec[0]][recIndex]:
+                                variants[rec[0]][recIndex] = rec[queryIndex]
+            if id_idx % prog_step == 0:
+                prog.update(id_idx + 1)
+        prog.done()
+        return variants
+
+
+
 
 
     
@@ -911,31 +983,29 @@ class HDF5_Store(Base_Store):
     def get_typeOfColumn(self,sampleID,field):
         return "INTEGER"
 
-    def get_genoType_genoInfo(self,sampleID,genotypes,variant_table,fieldSelect):
-        HDFfileName=self.get_sampleFileName(sampleID)
-        accessEngine=Engine_Access.choose_access_engine(HDFfileName)
-        # print(fieldSelect)
-        result=accessEngine.get_geno_field_from_table(sampleID,genotypes,fieldSelect)
-        return result
+    # def get_genoType_genoInfo(self,sampleID,genotypes,variant_table,fieldSelect):
+    #     HDFfileName=self.get_sampleFileName(sampleID)
+    #     accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+    #     # print(fieldSelect)
+    #     result=accessEngine.get_geno_field_from_table(sampleID,genotypes,fieldSelect)
+    #     return result
 
-
-
-    def get_hdf5_genoType_genoInfo(self,samples,genotypes,variant_table,fieldSelect,operations):
+    def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
+      
         self.cur=self.proj.db.cursor()
         self.cur.execute('SELECT sample_id, HDF5 FROM sample')
         result=self.cur.fetchall()
-        sampledict={}
+        sampleFileMap={}
         for res in result:
-            if res[1] not in sampledict:
-                sampledict[res[1]]=[]
-            sampledict[res[1]].append(res[0])
-
+            if res[1] not in sampleFileMap:
+                sampleFileMap[res[1]]=[]
+            sampleFileMap[res[1]].append(res[0])
+        fieldSelect=list(sampleDict.values())[0][1]
         master={}
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
-            samplesInfile=sampledict[HDFfileName.split("/")[-1]]
+            samplesInfile=sampleFileMap[HDFfileName.split("/")[-1]]
             accessEngine=Engine_Access.choose_access_engine(HDFfileName)
-            result=accessEngine.get_hdf5_geno_field_from_table(list(set(samples).intersection(samplesInfile)),genotypes,fieldSelect,operations)
-            
+            result=accessEngine.get_hdf5_geno_field_from_table(list(set(sampleDict.keys()).intersection(samplesInfile)),genotypes,fieldSelect,operations)
             for key,value in result.items():
                 if key not in master:
                     master[key]=value
