@@ -1324,21 +1324,21 @@ class HDF5Engine_access(Base_Access):
                 numrow=len(rownames)
                 numcol=len(colnames)
                 variants=np.zeros(shape=(numrow,len(fieldSelect)+5),dtype=np.int32)
-
+                colpos=list(map(lambda x:colnames.index(x),samples))
                 for field in fieldSelect:
                     if field=="GT":
                         field="GT_geno"
 
                     if "/chr"+str(chr)+"/"+field in self.file:
                         if field=="GT_geno":
-                            genoinfo=node.GT_geno[:]
+                            genoinfo=node.GT_geno[:,colpos]
                             variants[:,3]=np.nansum(~np.isnan(genoinfo),axis=1)
                             variants[:,0]=np.nansum(genoinfo==1,axis=1)
                             variants[:,1]=np.nansum(genoinfo==2,axis=1)
                             variants[:,2]=np.nansum(genoinfo==-1,axis=1)  
                  
                         elif field=="DP_geno":
-                            genoinfo=node.DP_geno[:]
+                            genoinfo=node.DP_geno[:,colpos]
                             for operation in operations:
                                 if operation==0:
                                     variants[:,5]=np.nansum(genoinfo*(genoinfo>0),axis=1)

@@ -918,12 +918,23 @@ class HDF5_Store(Base_Store):
         result=accessEngine.get_geno_field_from_table(sampleID,genotypes,fieldSelect)
         return result
 
+
+
     def get_hdf5_genoType_genoInfo(self,samples,genotypes,variant_table,fieldSelect,operations):
+        self.cur=self.proj.db.cursor()
+        self.cur.execute('SELECT sample_id, HDF5 FROM sample')
+        result=self.cur.fetchall()
+        sampledict={}
+        for res in result:
+            if res[1] not in sampledict:
+                sampledict[res[1]]=[]
+            sampledict[res[1]].append(res[0])
+
         master={}
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
-            print(HDFfileName)
+            samplesInfile=sampledict[HDFfileName.split("/")[-1]]
             accessEngine=Engine_Access.choose_access_engine(HDFfileName)
-            result=accessEngine.get_hdf5_geno_field_from_table(samples,genotypes,fieldSelect,operations)
+            result=accessEngine.get_hdf5_geno_field_from_table(list(set(samples).intersection(samplesInfile)),genotypes,fieldSelect,operations)
             
             for key,value in result.items():
                 if key not in master:
