@@ -960,6 +960,9 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                 # the first 4 indices hold the values for hom, het, double het, total genotype and total genotype in males
                 operationIndex = index + 5     
                 operationCalculation = value[operationIndex]
+                #temp fix
+                if proj.store=="hdf5":
+                    operationCalculation = value[operationIndex:]
                 if operations[index] == MEAN and operationCalculation is not None:
                     res.append(float(operationCalculation[0]) / operationCalculation[1])
                 else:
