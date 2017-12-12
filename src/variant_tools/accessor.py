@@ -1341,8 +1341,8 @@ class HDF5Engine_access(Base_Access):
                             genoinfo=node.DP_geno[:]
                             for operation in operations:
                                 if operation==0:
-                                    variants[:,5]=np.nansum(genoinfo,axis=1)
-                                    variants[:,6]=np.repeat(numcol,numrow)
+                                    variants[:,5]=np.nansum(genoinfo*(genoinfo>0),axis=1)
+                                    variants[:,6]=np.nansum(genoinfo>0,axis=1)
                                     # variants[:,5]=np.insert(genoinfo.sum(axis=1).reshape(numrow,1),1,numcol,axis=1)                 
                         elif field=="GQ_geno":
                             genoinfo=node.GQ_geno
