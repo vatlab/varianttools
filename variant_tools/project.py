@@ -5021,12 +5021,16 @@ def adminArguments(parser):
             sequence. A reference genome will be automatically downloaded if it
             does not exist in the local resource directory.''')
     validate = parser.add_argument_group('Validate reported sex')
-    validate.add_argument('--validate_sex', action='store_true',
+    validate.add_argument('--validate_sex', nargs='?', const='report',
+            choices=['report', 'force-heterozygote'],
         help='''Validate the sex of samples by checking the genotypes of samples
             on sex chromosomes (excluding pseudo-autosomal regions). Sex of 
             samples are determined by a phenotype named sex or gender with values
             1/2, M/F or Male/Female. Inconsistency will be reported if, for example,
-            a female sample has genotypes on chromosome Y.''')
+            a female sample has genotypes on chromosome Y. This argument
+            accepts an option argument, which is report by default (report
+            inconsistent genotype or sex), but can also be
+            'force-heterozygote' for male individuals on chromosome X.''')
     snapshots = parser.add_argument_group('Save and load snapshots')
     snapshots.add_argument('--save_snapshot', nargs=2, metavar=('NAME', 'MESSAGE'),
         help='''Create a snapshot of the current project with NAME, which could be
@@ -5281,7 +5285,7 @@ x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in _user_options.
                 proj.db.attach(proj.name + '_genotype', '__geno')
                 prog = ProgressBar('Validate sample sex', len(sample_sex))
                 count = 0
-                err_count = 0
+                err_samples = set()
                 cur = proj.db.cursor()
                 for ID, sex in sample_sex.items():
                     count += 1
@@ -5298,7 +5302,7 @@ x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in _user_options.
                             "{0}.variant_id = variant.variant_id AND "
                             "variant.chr in ('X', 'x', '23') AND {0}.GT=2"
                             .format(geno_table))
-                        for rec in cur:
+                        for rec in cur.fetchall():
                             # var_chrX do not have variants in psudo-autosomal regions
                             if rec[0] in var_chrX:
                                 cur.execute('SELECT sample_name FROM sample WHERE sample_id = {}'
@@ -5307,11 +5311,15 @@ x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in _user_options.
                                 cur.execute('SELECT chr, pos, ref, alt FROM variant WHERE variant_id = {}'
                                     .format(rec[0]))
                                 variant = cur.fetchone()
-                                env.logger.warning('Homozygous variants on chromosome X is detected for male sample {}: {} {} {} {}'
-                                    .format(sample_name, variant[0], variant[1], variant[2], variant[3]))
-                                err_count += 1
-                                break
-                    else:
+                                if args.validate_sex == 'report':
+                                    env.logger.warning('Homozygous variants on chromosome X is detected for male sample {}: {} {} {} {}'
+                                        .format(sample_name, variant[0], variant[1], variant[2], variant[3]))
+                                elif args.validate_sex == 'force-heterozygote':
+                                    cur.execute("UPDATE {} SET GT=1 WHERE variant_id = {}".format(geno_table, rec[0]))
+                                    env.logger.warning('Homozygous variants on chromosome X is converted to heterzygote for male sample {}: {} {} {} {}'
+                                        .format(sample_name, variant[0], variant[1], variant[2], variant[3]))
+                                err_samples.add(ID)
+                    elif sex == 2:
                         # for female, check if there is any genotype on chromosome Y
                         cur.execute("SELECT variant.variant_id FROM {0}, variant WHERE "
                             "{0}.variant_id = variant.variant_id AND "
@@ -5328,13 +5336,16 @@ x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in _user_options.
                                 variant = cur.fetchone()
                                 env.logger.warning('Variant on chromosome Y is detected for female sample {}: {} {} {} {}'
                                     .format(sample_name, variant[0], variant[1], variant[2], variant[3]))
-                                err_count += 1
+                                err_samples.add(ID)
                                 break
-                    prog.update(count, err_count)
+                    else:
+                        env.logger.warning('Missing or invalid sex (with value {}) for sample {}'.format(sex, ID))
+                    prog.update(count, len(err_samples))
                 prog.done()
-                if err_count > 0:
+                if err_samples:
                     env.logger.info('{} out of {} samples show inconsistency in reported sex'
-                        .format(err_count, count))
+                        .format(len(err_samples), count))
+                    proj.db.commit()
                 else:
                     env.logger.info('No inconsistency of sex has been detected from {} samples.'
                         .format(count))
