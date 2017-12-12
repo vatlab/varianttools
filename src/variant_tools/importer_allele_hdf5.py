@@ -1084,9 +1084,10 @@ class HDF5GenotypeImportWorker(Process):
     def get_geno(self,variant_id,pos,altIndex):
         self.rownames.append(variant_id)
         
-        GT_geno=self.chunk["calldata/GT"][pos,self.start_sample:self.end_sample].tolist()
+        GT_geno=self.chunk["calldata/GT"][pos,self.start_sample:self.end_sample]
+        GT_geno=GT_geno.astype(float)
         if altIndex==0:
-            GT_geno[np.logical_or(GT_geno==3, GT_geno==4)]=np.nan
+            GT_geno[np.logical_or(GT_geno==3, GT_geno==4)]=np.nan          
         elif altIndex==1:
             GT_geno[np.logical_or(GT_geno!=3, GT_geno!=4)]=np.nan
             GT_geno[GT_geno==3]=1
@@ -1098,7 +1099,7 @@ class HDF5GenotypeImportWorker(Process):
             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
             # self.getInfoTable(variant_id,infoDict,altIndex)
             for info in self.geno_info:
-                self.info[info.name].append(self.chunk[self.namedict[info.name]][pos,self.start_sample:self.end_sample].tolist())
+                self.info[info.name].append(self.chunk[self.namedict[info.name]][pos,self.start_sample:self.end_sample])
 
 
     def getInfoTable(self,variant_id,infoDict,altIndex):

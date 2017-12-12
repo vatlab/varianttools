@@ -921,16 +921,16 @@ class HDF5_Store(Base_Store):
     def get_hdf5_genoType_genoInfo(self,samples,genotypes,variant_table,fieldSelect,operations):
         master={}
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
-            accessEngine=Engine_Access.choose_access_engine(HDFfileName)
             print(HDFfileName)
+            accessEngine=Engine_Access.choose_access_engine(HDFfileName)
             result=accessEngine.get_hdf5_geno_field_from_table(samples,genotypes,fieldSelect,operations)
-            # print(HDFfileName,result[1])
+            
             for key,value in result.items():
                 if key not in master:
                     master[key]=value
                 else:
                     master[key]= [sum(x) for x in zip(master[key], value)]
-            # print("master ",master[1])
+          
         return master
 
 
