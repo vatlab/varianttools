@@ -37,6 +37,7 @@ from .utils import ProgressBar, lineCount, delayedAction, RefGenome,\
 from .importer import LineProcessor, probeSampleName
 from .text_reader import TextReader
 from .geno_store import *
+import sqlite3
 #
 #
 #  Command update
@@ -660,7 +661,6 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             env.logger.info('{} males and {} females are identified'
                 .format(numMales, numFemales))
     
-    print(genotypeFields)
 
     #
     # Error checking with the user specified genotype fields
@@ -717,7 +717,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     for name in queryDestinations:
         if name is not None:
             proj.checkFieldName(name, exclude='variant')
-    print(queryDestinations)
+    # print(queryDestinations)
     #
     variants = dict()
     prog = ProgressBar('Counting variants', len(IDs))
@@ -788,15 +788,14 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                                 variants[rec[0]][recIndex] = rec[queryIndex]  
             if id_idx % prog_step == 0:
                 prog.update(id_idx + 1)
-        # print(variants)
         prog.done()
     elif proj.store=="hdf5":
         fieldSelect=["GT","DP_geno"]
         variants=store.get_hdf5_genoType_genoInfo(IDs,genotypes,variant_table,fieldSelect,operations)
         prog.done()
 
-    # for key,value in variants.items():
-    #      print(key,value)
+    for key,value in variants.items():
+         print(key,value)
 
 
     #
@@ -810,7 +809,6 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             (missing, 'INT'), (wtGT, 'INT'), (mutGT, 'INT'),
             (maf, 'FLOAT')]
     fieldsDefaultZero = [alt, hom, het, other, GT, missing, wtGT, mutGT, maf]
-    
     for index in validGenotypeIndices:
         field = genotypeFields[index]
         genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index].lower()) 
@@ -855,6 +853,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     prog = ProgressBar('Updating {}'.format(decodeTableName(variant_table)), len(variants))
     update_query = 'UPDATE {0} SET {2} WHERE variant_id={1};'.format('variant', proj.db.PH,
         ' ,'.join(['{}={}'.format(x, proj.db.PH) for x in queryDestinations if x is not None]))
+
     count = 0
     for count,id in enumerate(variants):
         value = variants[id]
@@ -960,11 +959,12 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             for index in validGenotypeIndices:
                 # the first 4 indices hold the values for hom, het, double het, total genotype and total genotype in males
                 operationIndex = index + 5     
-                operationCalculation = value[operationIndex:]
+                operationCalculation = value[operationIndex]
                 if operations[index] == MEAN and operationCalculation is not None:
                     res.append(float(operationCalculation[0]) / operationCalculation[1])
                 else:
                     res.append(operationCalculation)
+            # print(res+[id])
             cur.execute(update_query, res + [id])
         except Exception as e:
             env.logger.debug(e)
@@ -988,6 +988,11 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                     prog.update(count)
     prog.done()
     # done
+    # result=cur.execute('SELECT * FROM {};'.format(variant_table))
+    # for res in result:
+    #     print(res)
+
+
     proj.db.commit()
     env.logger.info('{} records are updated'.format(count + 1))
 

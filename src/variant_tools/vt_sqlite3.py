@@ -22,6 +22,7 @@
 
 import datetime
 import time
+import numpy as np
 
 from ._vt_sqlite3 import *
 
@@ -79,6 +80,8 @@ def register_adapters_and_converters():
     register_adapter(datetime.datetime, adapt_datetime)
     register_converter("date", convert_date)
     register_converter("timestamp", convert_timestamp)
+    register_adapter(np.float64,float)
+    register_adapter(np.int64,int)
 
 register_adapters_and_converters()
 
