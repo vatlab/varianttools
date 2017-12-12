@@ -1081,6 +1081,7 @@ class HDF5GenotypeImportWorker(Process):
             for info in self.geno_info:
                 self.info[info.name].append(self.chunk[self.namedict[info.name]][i,self.start_sample:self.end_sample].tolist())
 
+    # check io_vcf_read.pyx function vcf_genotype_parse to see the meaning of coding
     def get_geno(self,variant_id,pos,altIndex):
         self.rownames.append(variant_id)
         
@@ -1092,6 +1093,7 @@ class HDF5GenotypeImportWorker(Process):
             GT_geno[np.logical_or(GT_geno!=3, GT_geno!=4)]=np.nan
             GT_geno[GT_geno==3]=1
             GT_geno[GT_geno==4]=2
+        GT_geno[GT_geno==-10]=np.nan
         self.info["GT_geno"].append(GT_geno)
         self.info["Mask_geno"].append([1]*len(GT_geno))
         if len(self.geno_info)>0:
@@ -1365,6 +1367,8 @@ def importGenotypesInParallel(importer,num_sample=0):
         # print(fields[6:])
         start=time.time()
         for chunk, _, _, _ in it:
+            print(chunk["calldata/GT"][0][:10])
+            print(chunk["calldata/DP"][0][:10])
             print("start "+str(time.time()-start)) 
               
             start_sample =0

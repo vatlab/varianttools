@@ -3035,6 +3035,7 @@ cdef int vcf_genotype_parse(InputStreamBase stream,
                 stream.c == 0:
             # vcf_genotype_store(context, memory, value_index)
             allele2=vcf_genotype_check(context, value_index)
+
             if allele1+allele2==0:
                 cell=0
             elif allele1==1 and allele2==1:
@@ -3047,6 +3048,8 @@ cdef int vcf_genotype_parse(InputStreamBase stream,
                 cell=4
             elif (allele1==1 and allele2==2) or (allele1==2 and allele2==1):
                 cell=-1
+            elif allele1==-10 and allele2==-10:
+                cell=-10
             break
 
         else:
@@ -3064,7 +3067,10 @@ cdef int vcf_genotype_check(VCFContext context,
 
     # attempt to parse allele
     parsed = vcf_strtol(&context.temp, context, &allele)
-    return allele
+    if parsed>0:
+        return allele
+    else:
+        return -10
 
 
 
