@@ -1323,7 +1323,7 @@ class HDF5Engine_access(Base_Access):
                 rownames=node.rownames[:].tolist()
                 numrow=len(rownames)
                 numcol=len(colnames)
-                variants=np.zeros(shape=(numrow,len(fieldSelect)+5),dtype=np.int32)
+                variants=np.zeros(shape=(numrow,len(fieldSelect)+4),dtype=np.int32)
                 colpos=list(map(lambda x:colnames.index(x),samples))
 
                 for field in fieldSelect:
@@ -1343,7 +1343,7 @@ class HDF5Engine_access(Base_Access):
                             for operation in operations:
                                 if operation==0:
                                     variants[:,5]=np.nansum(genoinfo*(genoinfo>0),axis=1)
-                                    variants[:,6]=np.nansum(genoinfo>0,axis=1)
+                                    # variants[:,6]=np.nansum(genoinfo>0,axis=1)
                                     # variants[:,5]=np.insert(genoinfo.sum(axis=1).reshape(numrow,1),1,numcol,axis=1)                 
                         elif field=="GQ_geno":
                             genoinfo=node.GQ_geno

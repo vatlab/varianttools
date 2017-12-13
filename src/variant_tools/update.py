@@ -732,7 +732,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             sampleDict[id]=[record_male_gt,fieldSelect]
             if not fieldSelect or all([x == 'NULL' for x in fieldSelect]):
                 continue
-
+    print(genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs)
     variants=store.get_genoType_genoInfo(sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step)
 
     for key,value in variants.items():
@@ -901,11 +901,13 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                 # the first 4 indices hold the values for hom, het, double het, total genotype and total genotype in males
                 operationIndex = index + 5     
                 operationCalculation = value[operationIndex]
-                #temp fix
-                if proj.store=="hdf5":
-                    operationCalculation = value[operationIndex:]
+                # #temp fix
+                # if proj.store=="hdf5":
+                #     operationCalculation = value[operationIndex:]
                 if operations[index] == MEAN and operationCalculation is not None:
-                    res.append(float(operationCalculation[0]) / operationCalculation[1])
+                    # res.append(float(operationCalculation[0]) / operationCalculation[1])
+                    if value[3]!=0:
+                        res.append(float(operationCalculation) / value[3])
                 else:
                     res.append(operationCalculation)
             # print(res+[id])
