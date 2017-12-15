@@ -993,7 +993,6 @@ class HDF5_Store(Base_Store):
     #     return result
 
     def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
-      
         self.cur=self.proj.db.cursor()
         self.cur.execute('SELECT sample_id, HDF5 FROM sample')
         result=self.cur.fetchall()
