@@ -1130,14 +1130,6 @@ class HDF5GenotypeImportWorker(Process):
 
     def writeIntoHDF(self,chr):
         storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
-        # if self.proc_index==1:
-        #     print(self.proc_index,tolistTime,getGTtime,getInfotime)
-        # shape=(len(self.indptr),len(self.colnames))
-        # make a HMatrix object which is a matrix with rownames and colnames
-        # hmatrix=HMatrix(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames)
-        # write GT into file
-      
-        # storageEngine.store(hmatrix,chr,"GT")
         shape=np.array([len(self.rownames),len(self.colnames)])
         storageEngine.store(np.array(self.info["GT_geno"]),chr,"GT_geno")
         storageEngine.store(np.array(self.info["Mask_geno"]),chr,"Mask_geno")
@@ -1149,32 +1141,15 @@ class HDF5GenotypeImportWorker(Process):
         storageEngine.store(np.array(colmask),chr,"samplemask")
         storageEngine.store(shape,chr,"shape")
 
-
         self.info["GT_geno"]=[]
         self.info["Mask_geno"]=[]
 
-        # if self.proc_index==1:
-        #     print(self.proc_index,"GTWrite",time.time()-starttime)
-        starttime=time.time()
-        # if len(self.geno_info)>0:
-        #     for key,value in list(self.info.items()):
-        #         hmatrix=HMatrix(value[2],value[1],value[0],shape,value[3],self.colnames)
-        #         storageEngine.store(hmatrix,chr,key) 
-        #     for info in self.geno_info:
-        #         #indptr,indices,data,shape,rownames
-        #         self.info[info.name]=[[],[],[],[],[]]
-        # tableName="genoInfo"
-        # if len(self.geno_info)>0:
-        #     # print(len(self.rowData),self.rowData[0])
-        #     storageEngine.store_table(self.rowData,tableName,chr)
-        
         if len(self.geno_info)>0:
             for info in self.geno_info:
                 storageEngine.store_genoInfo(np.array(self.info[info.name]),chr,info.name)
                 self.info[info.name]=[]
         if self.proc_index==1:
              print(self.proc_index,"infoWrite",time.time()-starttime)
-
 
         storageEngine.close()
         self.indptr=[]
@@ -1183,9 +1158,34 @@ class HDF5GenotypeImportWorker(Process):
         self.rownames=[]
         self.rowData=[]
         self.genoCount=0
-        
 
-
+   
+    def writeSparseGT_IntoHDF(self,chr):
+        storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
+        # if self.proc_index==1:
+        #     print(self.proc_index,tolistTime,getGTtime,getInfotime)
+        shape=(len(self.indptr),len(self.colnames))
+        # make a HMatrix object which is a matrix with rownames and colnames
+        hmatrix=HMatrix(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames)
+        # write GT into file
+        storageEngine.store(hmatrix,chr,"GT")
+        # if len(self.geno_info)>0:
+        #     for key,value in list(self.info.items()):
+        #         hmatrix=HMatrix(value[2],value[1],value[0],shape,value[3],self.colnames)
+        #         storageEngine.store(hmatrix,chr,key) 
+        #     for info in self.geno_info:
+        #         #indptr,indices,data,shape,rownames
+        #         self.info[info.name]=[[],[],[],[],[]]
+        tableName="genoInfo"
+        if len(self.geno_info)>0:
+            storageEngine.store_table(self.rowData,tableName,chr)
+        storageEngine.close()
+        self.indptr=[]
+        self.indices=[]
+        self.data=[]
+        self.rownames=[]
+        self.rowData=[]
+        self.genoCount=0
 
 
     def run(self):
@@ -1215,6 +1215,47 @@ class HDF5GenotypeImportWorker(Process):
                             # self.getGT(variant_id,i,altIndex)
                             self.get_geno(variant_id,i,altIndex)
         self.writeIntoHDF(chr)
+
+    #save into sparse
+    # def run(self):
+    #     prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
+
+    #     for i in range(len(self.chunk["variants/ID"])):
+    #         infoDict={}
+    #         chr=self.chunk["variants/CHROM"][i].replace("chr","")
+    #         if chr!=prev_chr:
+    #             self.writeIntoHDF(prev_chr)
+    #             prev_chr=chr
+        
+    #         ref=self.chunk["variants/REF"][i]
+    #         pos=self.chunk["variants/POS"][i]
+    #         GT=self.chunk["calldata/GT"][i].tolist()
+          
+    #         for altIndex in range(len(self.chunk["variants/ALT"][i])):
+    #             alt=self.chunk["variants/ALT"][i][altIndex]
+    #             if alt!="":
+    #                 if tuple((chr, ref, alt)) in self.variantIndex:
+    #                     variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
+    #                     self.getGT(variant_id,GT,altIndex)
+    #                     if len(self.geno_info)>0:
+    #                         self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
+    #                         # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
+    #                         # self.getInfoTable(variant_id,infoDict,altIndex)   
+    #                 else:
+    #                     rec=[str(chr),str(pos),ref,alt]  
+    #                     msg=normalize_variant(RefGenome(self.build).crr, rec, 0, 1, 2, 3)
+    #                     if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
+    #                         variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
+    #                         starttime=time.time()
+    #                         self.getGT(variant_id,GT,altIndex)
+    #                         getGTtime+=time.time()-starttime
+    #                         if len(self.geno_info)>0:
+    #                             # starttime=time.time()
+    #                             self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
+    #                             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
+    #                             # self.getInfoTable(variant_id,infoDict,altIndex)
+    #     self.writeIntoHDF(chr)
+
        
 
 

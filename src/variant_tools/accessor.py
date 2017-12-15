@@ -1317,37 +1317,46 @@ class HDF5Engine_access(Base_Access):
 
     def get_hdf5_geno_field_from_table(self,samples,genotypes,fieldSelect,validGenotypeFields,operations):
         vardict={}
+        chunk=20000
         for chr in range(1,23):
         # for chr in [1,22]:
             try:
                 node=self.file.get_node("/chr"+str(chr))
+                shape=node.shape[:].tolist()
                 colnames=node.colnames[:].tolist()
-                rownames=node.rownames[:].tolist()
-                numrow=len(rownames)
-                numcol=len(colnames)
-                variants=np.zeros(shape=(numrow,len(validGenotypeFields)+5),dtype=np.int32)
-                colpos=list(map(lambda x:colnames.index(x),samples))
+                cycle=int(shape[0]/chunk)
+                startPos=0
+                for i in range(cycle+1):
+                    if i==cycle:
+                        endPos=shape[0]
+                    else:
+                        endPos=startPos+chunk
+                    rownames=node.rownames[startPos:endPos].tolist()
+                    numrow=len(rownames)
+                    numcol=len(colnames)
+                    variants=np.zeros(shape=(numrow,len(validGenotypeFields)+5),dtype=np.int32)
+                    colpos=list(map(lambda x:colnames.index(x),samples))
 
-                if "/chr"+str(chr)+"/GT_geno" in self.file:    
-                    genoinfo=node.GT_geno[:,colpos]
-                    variants[:,3]=np.nansum(~np.isnan(genoinfo),axis=1)
-                    variants[:,0]=np.nansum(genoinfo==1,axis=1)
-                    variants[:,1]=np.nansum(genoinfo==2,axis=1)
-                    variants[:,2]=np.nansum(genoinfo==-1,axis=1)  
+                    if "/chr"+str(chr)+"/GT_geno" in self.file:    
+                        genoinfo=node.GT_geno[startPos:endPos,colpos]
+                        variants[:,3]=np.nansum(~np.isnan(genoinfo),axis=1)
+                        variants[:,0]=np.nansum(genoinfo==1,axis=1)
+                        variants[:,1]=np.nansum(genoinfo==2,axis=1)
+                        variants[:,2]=np.nansum(genoinfo==-1,axis=1)  
 
-                for pos,field in enumerate(validGenotypeFields):
-                    if "/chr"+str(chr)+"/"+field in self.file:
-                        if field=="DP_geno":
-                            genoinfo=node.DP_geno[:,colpos]
-                        elif field=="GQ_geno":
-                            genoinfo=node.GQ_geno[:,colpos]
+                    for pos,field in enumerate(validGenotypeFields):
+                        if "/chr"+str(chr)+"/"+field in self.file:
+                            if field=="DP_geno":
+                                genoinfo=node.DP_geno[startPos:endPos,colpos]
+                            elif field=="GQ_geno":
+                                genoinfo=node.GQ_geno[startPos:endPos,colpos]
 
-                        operation=operations[pos]
-                        if operation==0:
-                            variants[:,5+pos]=np.nansum(genoinfo*(genoinfo>0),axis=1)
-                                    # variants[:,6]=np.nansum(genoinfo>0,axis=1)
-                                    # variants[:,5]=np.insert(genoinfo.sum(axis=1).reshape(numrow,1),1,numcol,axis=1)                 
-                        
+                            operation=operations[pos]
+                            if operation==0:
+                                variants[:,5+pos]=np.nansum(genoinfo*(genoinfo>0),axis=1)
+                                        # variants[:,6]=np.nansum(genoinfo>0,axis=1)
+                                        # variants[:,5]=np.insert(genoinfo.sum(axis=1).reshape(numrow,1),1,numcol,axis=1)                 
+                    startPos=endPos    
                 vardict.update(dict(zip(rownames,variants)))                              
             except Exception as e:
                 print(e)
