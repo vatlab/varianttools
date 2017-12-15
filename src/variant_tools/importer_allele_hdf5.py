@@ -1148,8 +1148,7 @@ class HDF5GenotypeImportWorker(Process):
             for info in self.geno_info:
                 storageEngine.store_genoInfo(np.array(self.info[info.name]),chr,info.name)
                 self.info[info.name]=[]
-        if self.proc_index==1:
-             print(self.proc_index,"infoWrite",time.time()-starttime)
+ 
 
         storageEngine.close()
         self.indptr=[]
