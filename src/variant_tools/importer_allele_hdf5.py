@@ -1132,13 +1132,13 @@ class HDF5GenotypeImportWorker(Process):
         storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
         # if self.proc_index==1:
         #     print(self.proc_index,tolistTime,getGTtime,getInfotime)
-        shape=(len(self.indptr),len(self.colnames))
+        # shape=(len(self.indptr),len(self.colnames))
         # make a HMatrix object which is a matrix with rownames and colnames
-        hmatrix=HMatrix(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames)
+        # hmatrix=HMatrix(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames)
         # write GT into file
       
         # storageEngine.store(hmatrix,chr,"GT")
-        
+        shape=np.array([len(self.rownames),len(self.colnames)])
         storageEngine.store(np.array(self.info["GT_geno"]),chr,"GT_geno")
         storageEngine.store(np.array(self.info["Mask_geno"]),chr,"Mask_geno")
         storageEngine.store(np.array(self.rownames),chr,"rownames")
@@ -1147,6 +1147,7 @@ class HDF5GenotypeImportWorker(Process):
         colmask=np.zeros(len(self.colnames),dtype=np.bool)
         storageEngine.store(np.array(rowmask),chr,"rowmask")
         storageEngine.store(np.array(colmask),chr,"samplemask")
+        storageEngine.store(shape,chr,"shape")
 
 
         self.info["GT_geno"]=[]

@@ -285,6 +285,8 @@ class HDF5Engine_storage(Base_Storage):
                 group.rownames.append(data)
             elif "rowmask" in groupName:
                 group.rowmask.append(data)
+            elif "shape" in groupName:
+                group.shape[0]+=data[0]
 
 
 
