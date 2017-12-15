@@ -732,11 +732,11 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             sampleDict[id]=[record_male_gt,fieldSelect]
             if not fieldSelect or all([x == 'NULL' for x in fieldSelect]):
                 continue
-    print(genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs)
+    # print(genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs)
     variants=store.get_genoType_genoInfo(sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step)
 
-    for key,value in variants.items():
-         print(key,value)
+    # for key,value in variants.items():
+    #      print(key,value)
 
 
     #

@@ -1313,7 +1313,7 @@ class HDF5Engine_access(Base_Access):
                 # print(e)
                 pass
 
-    def get_hdf5_geno_field_from_table(self,samples,genotypes,fieldSelect,operations):
+    def get_hdf5_geno_field_from_table(self,samples,genotypes,fieldSelect,validGenotypeFields,operations):
         vardict={}
         for chr in range(1,23):
         # for chr in [1,22]:
@@ -1323,30 +1323,29 @@ class HDF5Engine_access(Base_Access):
                 rownames=node.rownames[:].tolist()
                 numrow=len(rownames)
                 numcol=len(colnames)
-                variants=np.zeros(shape=(numrow,len(fieldSelect)+4),dtype=np.int32)
+                variants=np.zeros(shape=(numrow,len(validGenotypeFields)+5),dtype=np.int32)
                 colpos=list(map(lambda x:colnames.index(x),samples))
 
-                for field in fieldSelect:
-                    if field=="GT":
-                        field="GT_geno"
+                if "/chr"+str(chr)+"/GT_geno" in self.file:    
+                    genoinfo=node.GT_geno[:,colpos]
+                    variants[:,3]=np.nansum(~np.isnan(genoinfo),axis=1)
+                    variants[:,0]=np.nansum(genoinfo==1,axis=1)
+                    variants[:,1]=np.nansum(genoinfo==2,axis=1)
+                    variants[:,2]=np.nansum(genoinfo==-1,axis=1)  
 
+                for pos,field in enumerate(validGenotypeFields):
                     if "/chr"+str(chr)+"/"+field in self.file:
-                        if field=="GT_geno":
-                            genoinfo=node.GT_geno[:,colpos]
-                            variants[:,3]=np.nansum(~np.isnan(genoinfo),axis=1)
-                            variants[:,0]=np.nansum(genoinfo==1,axis=1)
-                            variants[:,1]=np.nansum(genoinfo==2,axis=1)
-                            variants[:,2]=np.nansum(genoinfo==-1,axis=1)  
-                 
-                        elif field=="DP_geno":
+                        if field=="DP_geno":
                             genoinfo=node.DP_geno[:,colpos]
-                            for operation in operations:
-                                if operation==0:
-                                    variants[:,5]=np.nansum(genoinfo*(genoinfo>0),axis=1)
+                        elif field=="GQ_geno":
+                            genoinfo=node.GQ_geno[:,colpos]
+
+                        operation=operations[pos]
+                        if operation==0:
+                            variants[:,5+pos]=np.nansum(genoinfo*(genoinfo>0),axis=1)
                                     # variants[:,6]=np.nansum(genoinfo>0,axis=1)
                                     # variants[:,5]=np.insert(genoinfo.sum(axis=1).reshape(numrow,1),1,numcol,axis=1)                 
-                        elif field=="GQ_geno":
-                            genoinfo=node.GQ_geno
+                        
                 vardict.update(dict(zip(rownames,variants)))                              
             except Exception as e:
                 print(e)

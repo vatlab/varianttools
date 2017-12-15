@@ -1007,7 +1007,7 @@ class HDF5_Store(Base_Store):
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
             samplesInfile=sampleFileMap[HDFfileName.split("/")[-1]]
             accessEngine=Engine_Access.choose_access_engine(HDFfileName)
-            result=accessEngine.get_hdf5_geno_field_from_table(list(set(sampleDict.keys()).intersection(samplesInfile)),genotypes,fieldSelect,operations)
+            result=accessEngine.get_hdf5_geno_field_from_table(list(set(sampleDict.keys()).intersection(samplesInfile)),genotypes,fieldSelect,validGenotypeFields,operations)
             for key,value in result.items():
                 if key not in master:
                     master[key]=value
