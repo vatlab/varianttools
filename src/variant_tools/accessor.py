@@ -1353,11 +1353,13 @@ class HDF5Engine_access(Base_Access):
 
                             operation=operations[pos]
                             if operation==0:
+                                genoinfo=np.nan_to_num(genoinfo)
+                                # variants[:,5+pos]=np.nansum(genoinfo*(genoinfo>0),axis=1)
                                 variants[:,5+pos]=np.nansum(genoinfo*(genoinfo>0),axis=1)
                                         # variants[:,6]=np.nansum(genoinfo>0,axis=1)
                                         # variants[:,5]=np.insert(genoinfo.sum(axis=1).reshape(numrow,1),1,numcol,axis=1)                 
                     startPos=endPos    
-                vardict.update(dict(zip(rownames,variants)))                              
+                    vardict.update(dict(zip(rownames,variants)))                              
             except Exception as e:
                 print(e)
                 pass
