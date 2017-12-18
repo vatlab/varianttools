@@ -27,7 +27,7 @@
 import os
 import sys
 import time
-from multiprocessing import Process, Value, Lock, Manager
+from multiprocessing import Process, Value, Lock, Manager,Queue
 from .utils import ProgressBar,  delayedAction, \
      DatabaseEngine, env, decodeTableName
 
@@ -992,6 +992,10 @@ class HDF5_Store(Base_Store):
     #     result=accessEngine.get_geno_field_from_table(sampleID,genotypes,fieldSelect)
     #     return result
 
+    def get_genoType_genoInfo_worker(self,queue,accessEngine,samples,genotypes,fieldSelect,validGenotypeFields,operations):
+        queue.put(accessEngine.get_hdf5_geno_field_from_table(samples,genotypes,fieldSelect,validGenotypeFields,operations))
+
+
     def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
         self.cur=self.proj.db.cursor()
         self.cur.execute('SELECT sample_id, HDF5 FROM sample')
@@ -1003,16 +1007,35 @@ class HDF5_Store(Base_Store):
             sampleFileMap[res[1]].append(res[0])
         fieldSelect=list(sampleDict.values())[0][1]
         master={}
+        # for HDFfileName in glob.glob("tmp*genotypes.h5"):
+        #     samplesInfile=sampleFileMap[HDFfileName.split("/")[-1]]
+        #     accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+        #     result=accessEngine.get_hdf5_geno_field_from_table(list(set(sampleDict.keys()).intersection(samplesInfile)),genotypes,fieldSelect,validGenotypeFields,operations)
+        #     for key,value in result.items():
+        #         if key not in master:
+        #             master[key]=value
+        #         else:
+        #             master[key]= [sum(x) for x in zip(master[key], value)]
+        
+        queue=Queue()
+        procs=[]
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
             samplesInfile=sampleFileMap[HDFfileName.split("/")[-1]]
             accessEngine=Engine_Access.choose_access_engine(HDFfileName)
-            result=accessEngine.get_hdf5_geno_field_from_table(list(set(sampleDict.keys()).intersection(samplesInfile)),genotypes,fieldSelect,validGenotypeFields,operations)
+            p=Process(target=self.get_genoType_genoInfo_worker,args=(queue,accessEngine,list(set(sampleDict.keys()).intersection(samplesInfile)),genotypes,fieldSelect,validGenotypeFields,operations)) 
+            procs.append(p)
+            print(HDFfileName)
+            p.start()
+        for _ in procs:
+            result=queue.get()
             for key,value in result.items():
                 if key not in master:
                     master[key]=value
                 else:
                     master[key]= [sum(x) for x in zip(master[key], value)]
-          
+        for p in procs:
+            p.join()
+
         return master
 
 
