@@ -1334,7 +1334,7 @@ class HDF5Engine_access(Base_Access):
                     rownames=node.rownames[startPos:endPos].tolist()
                     numrow=len(rownames)
                     numcol=len(colnames)
-                    variants=np.zeros(shape=(numrow,len(validGenotypeFields)+5),dtype=np.int32)
+                    variants=np.zeros(shape=(numrow,len(validGenotypeFields)+5),dtype=np.int64)
                     colpos=list(map(lambda x:colnames.index(x),samples))
 
                     if "/chr"+str(chr)+"/GT_geno" in self.file:    
@@ -1352,12 +1352,19 @@ class HDF5Engine_access(Base_Access):
                                 genoinfo=node.GQ_geno[startPos:endPos,colpos]
 
                             operation=operations[pos]
-                            if operation==0:
-                                genoinfo=np.nan_to_num(genoinfo)
+                            genoinfo=np.nan_to_num(genoinfo)
+                            if operation==0:                      
                                 # variants[:,5+pos]=np.nansum(genoinfo*(genoinfo>0),axis=1)
                                 variants[:,5+pos]=np.nansum(genoinfo*(genoinfo>0),axis=1)
                                         # variants[:,6]=np.nansum(genoinfo>0,axis=1)
-                                        # variants[:,5]=np.insert(genoinfo.sum(axis=1).reshape(numrow,1),1,numcol,axis=1)                 
+                                        # variants[:,5]=np.insert(genoinfo.sum(axis=1).reshape(numrow,1),1,numcol,axis=1)
+                            if operation==1:
+                                variants[:,5+pos]=np.nansum(genoinfo*(genoinfo>0),axis=1)
+                            if operation==2:
+                                variants[:,5+pos]=np.nanmin(genoinfo*(genoinfo>0),axis=1)
+                            if operation==3:
+                                variants[:,5+pos]=np.nanmax(genoinfo*(genoinfo>0),axis=1)
+
                     startPos=endPos    
                     vardict.update(dict(zip(rownames,variants)))                              
             except Exception as e:

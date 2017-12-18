@@ -1024,8 +1024,11 @@ class HDF5_Store(Base_Store):
             accessEngine=Engine_Access.choose_access_engine(HDFfileName)
             p=Process(target=self.get_genoType_genoInfo_worker,args=(queue,accessEngine,list(set(sampleDict.keys()).intersection(samplesInfile)),genotypes,fieldSelect,validGenotypeFields,operations)) 
             procs.append(p)
-            print(HDFfileName)
             p.start()
+
+        minPos=[i+5 for i, x in enumerate(operations) if x == 2]
+        maxPos=[i+5 for i, x in enumerate(operations) if x == 3]
+
         for _ in procs:
             result=queue.get()
             for key,value in result.items():
@@ -1033,9 +1036,15 @@ class HDF5_Store(Base_Store):
                     master[key]=value
                 else:
                     master[key]= [sum(x) for x in zip(master[key], value)]
+                    if len(minPos)>0 or len(maxPos)>0:
+                        for pos in minPos:
+                            preValue=master[key][pos]-value[pos]
+                            master[key][pos]=value[pos] if preValue>=value[pos] else preValue
+                        for pos in maxPos:
+                            preValue=master[key][pos]-value[pos]
+                            master[key][pos]=value[pos] if preValue<=value[pos] else preValue                 
         for p in procs:
             p.join()
-
         return master
 
 

@@ -910,7 +910,6 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                         res.append(float(operationCalculation) / value[3])
                 else:
                     res.append(operationCalculation)
-            # print(res+[id])
             cur.execute(update_query, res + [id])
         except Exception as e:
             env.logger.debug(e)
