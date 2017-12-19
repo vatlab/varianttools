@@ -420,10 +420,13 @@ class HDF5Engine_storage(Base_Storage):
             genoNode="/chr"+str(chr)
             try:
                 group=self.file.get_node(genoNode)
-                DP_geno=group.DP_geno[:]
-                GQ_geno=group.GQ_geno[:]
+                shape=grouop.shape[:]
+                if "/chr"+str(chr)+"/DP_geno" in self.file:    
+                    DP_geno=group.DP_geno[:]
+                if "/chr"+str(chr)+"/GQ_geno" in self.file:    
+                    GQ_geno=group.GQ_geno[:]
                 # Mask_geno=group.Mask_geno[:]
-                Mask_geno=np.ones(shape=DP_geno.shape,dtype=np.int8)
+                Mask_geno=np.ones(shape=shape,dtype=np.int8)
                 group.Mask_geno[:]=np.where(eval(cond),0,Mask_geno)
                 print(group.Mask_geno[:])
                 print(group.DP_geno[:])
@@ -1315,9 +1318,13 @@ class HDF5Engine_access(Base_Access):
                 # print(e)
                 pass
 
+    
+
+
     def get_hdf5_geno_field_from_table(self,samples,genotypes,fieldSelect,validGenotypeFields,operations):
         vardict={}
         chunk=20000
+
         for chr in range(1,23):
         # for chr in [1,22]:
             try:
@@ -1339,6 +1346,18 @@ class HDF5Engine_access(Base_Access):
 
                     if "/chr"+str(chr)+"/GT_geno" in self.file:    
                         genoinfo=node.GT_geno[startPos:endPos,colpos]
+                        genotypes=genotypes[0]
+                        if len(genotypes)>1:
+                            if "DP_geno" in genotypes and "/chr"+str(chr)+"/DP_geno" in self.file:
+                                DP_geno=node.DP_geno[startPos:endPos,colpos]
+                                #remove -1 value in DP_geno
+                                DP_geno[DP_geno==-1]=0
+                            if "GQ_geno" in genotypes and "/chr"+str(chr)+"/GQ_geno" in self.file:
+                                GQ_geno=node.GQ_geno[startPos:endPos,colpos]
+                                #remove nan value in GQ_geno
+                                GQ_geno=np.nan_to_num(GQ_geno)
+                            genoinfo=np.where(eval("~("+genotypes+")"),np.nan,genoinfo)
+                            
                         variants[:,3]=np.nansum(~np.isnan(genoinfo),axis=1)
                         variants[:,0]=np.nansum(genoinfo==1,axis=1)
                         variants[:,1]=np.nansum(genoinfo==2,axis=1)
@@ -1348,25 +1367,27 @@ class HDF5Engine_access(Base_Access):
                         if "/chr"+str(chr)+"/"+field in self.file:
                             if field=="DP_geno":
                                 genoinfo=node.DP_geno[startPos:endPos,colpos]
+                                genoinfo[genoinfo==-1]=0
                             elif field=="GQ_geno":
                                 genoinfo=node.GQ_geno[startPos:endPos,colpos]
-
+                                genoinfo=np.nan_to_num(genoinfo)
+                            genoinfo=np.where(eval("~("+genotypes+")"),np.nan,genoinfo)
+        
                             operation=operations[pos]
-                            genoinfo=np.nan_to_num(genoinfo)
+                            # genoinfo=np.nan_to_num(genoinfo)
                             if operation==0:                      
-                                # variants[:,5+pos]=np.nansum(genoinfo*(genoinfo>0),axis=1)
-                                variants[:,5+pos]=np.nansum(genoinfo*(genoinfo>0),axis=1)
-                                        # variants[:,6]=np.nansum(genoinfo>0,axis=1)
-                                        # variants[:,5]=np.insert(genoinfo.sum(axis=1).reshape(numrow,1),1,numcol,axis=1)
+                                variants[:,5+pos]=np.nansum(genoinfo,axis=1)
                             if operation==1:
-                                variants[:,5+pos]=np.nansum(genoinfo*(genoinfo>0),axis=1)
+                                variants[:,5+pos]=np.nansum(genoinfo,axis=1)
                             if operation==2:
-                                variants[:,5+pos]=np.nanmin(genoinfo*(genoinfo>0),axis=1)
+                                variants[:,5+pos]=np.nanmin(genoinfo,axis=1)
                             if operation==3:
-                                variants[:,5+pos]=np.nanmax(genoinfo*(genoinfo>0),axis=1)
+                                variants[:,5+pos]=np.nanmax(genoinfo,axis=1)
 
                     startPos=endPos    
-                    vardict.update(dict(zip(rownames,variants)))                              
+                    vardict.update(dict(zip(rownames,variants)))
+            except tb.exceptions.NoSuchNodeError:
+                pass                              
             except Exception as e:
                 print(e)
                 pass
