@@ -613,18 +613,20 @@ class Sqlite_Store(Base_Store):
         # remove the table itself 
         env.logger.info('Removing table {} itself'.format(decodeTableName(table)))
         self.db.removeTable(self.proj.name+"."+table)
+        self.db.commit()
 
     def remove_genotype(self,cond):
         # get sample_ids
-
+        self.db.attach(self.proj.name+".proj",self.proj.name)
         self.cur.execute('SELECT sample_id, sample_name FROM {}.sample;'.format(self.proj.name))
-
         samples = self.cur.fetchall()
         env.logger.info('Removing genotypes from {} samples using criteria "{}"'.format(len(samples), cond))
         for ID, name in samples:
             try:
                 # self.cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE {};'\
                 #     .format(self.proj.name, ID, cond))
+                print('DELETE FROM genotype_{} WHERE {};'\
+                    .format(ID, cond))
                 self.cur.execute('DELETE FROM genotype_{} WHERE {};'\
                     .format(ID, cond))
             except Exception as e:
@@ -632,6 +634,7 @@ class Sqlite_Store(Base_Store):
                     .format(name, e))
                 continue
             env.logger.info('{} genotypes are removed from sample {}'.format(self.cur.rowcount, name))
+        self.db.commit()
 
     def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
         MEAN = 0
@@ -993,7 +996,7 @@ class HDF5_Store(Base_Store):
     #     return result
 
     def get_genoType_genoInfo_worker(self,queue,accessEngine,samples,genotypes,fieldSelect,validGenotypeFields,operations):
-        queue.put(accessEngine.get_hdf5_geno_field_from_table(samples,genotypes,fieldSelect,validGenotypeFields,operations))
+        queue.put(accessEngine.get_geno_field_from_HDF5(samples,genotypes,fieldSelect,validGenotypeFields,operations))
 
 
     def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
