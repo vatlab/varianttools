@@ -1095,7 +1095,7 @@ class HDF5GenotypeImportWorker(Process):
             GT_geno[GT_geno==4]=2
         GT_geno[GT_geno==-10]=np.nan
         self.info["GT_geno"].append(GT_geno)
-        self.info["Mask_geno"].append([1]*len(GT_geno))
+        self.info["Mask_geno"].append([1.0]*len(GT_geno))
         if len(self.geno_info)>0:
             # self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])

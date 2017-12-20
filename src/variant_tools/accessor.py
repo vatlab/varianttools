@@ -372,7 +372,8 @@ class HDF5Engine_storage(Base_Storage):
                     GQ_geno=np.nan_to_num(GQ_geno)
                 # Mask_geno=group.Mask_geno[:]
                 Mask_geno=np.ones(shape=shape,dtype=np.int8)
-                group.Mask_geno[:]=np.where(eval(cond),0,Mask_geno)
+                group.Mask_geno[:]=np.where(eval(cond),np.nan,Mask_geno)
+                print("mask",group.Mask_geno[:])
                 # print(group.Mask_geno[:])
                 # print(group.DP_geno[:])
                 # print(group.GQ_geno[:])
@@ -936,7 +937,7 @@ class HDF5Engine_access(Base_Access):
 
 
 
-    def get_geno_by_variant_IDs(self,rowIDs,rowPos,chr,field,groupName=""):
+    def get_geno_by_variant_IDs(self,rowIDs,chr,groupName=""):
 
         #assume rowIDs are sorted by genome position
         group=self.getGroup(chr,groupName)
@@ -957,26 +958,20 @@ class HDF5Engine_access(Base_Access):
                     break
                 except ValueError:
                     continue
-        if len(rowPos)>0:
-            minPos=rowPos[0]
-            maxPos=rowPos[1]-1
         try:
             minPos
             maxPos
             update_rownames=rownames[minPos:maxPos+1]
-            if field=="GT_geno":
-                sub_geno=group.GT_geno[minPos:maxPos+1,:]
-            if field=="DP_geno":
-                sub_geno=group.DP_geno[minPos:maxPos+1,:]
-            if field=="GQ_geno":
-                sub_geno=group.GQ_geno[minPos:maxPos+1,:]
+            
+            sub_geno=group.GT_geno[minPos:maxPos+1,:]
+            
             sub_Mask=group.Mask_geno[minPos:maxPos+1,:]
-            if field=="GQ_geno":
-                print(self.fileName,"mask",sub_Mask[0,:50])
-                print(self.fileName,"beforemask",sub_geno[0,:50])
+            # if field=="GQ_geno":
+            #     print(self.fileName,"mask",sub_Mask[0,:50])
+            #     print(self.fileName,"beforemask",sub_geno[0,:50])
             sub_geno=np.multiply(sub_geno,sub_Mask)
-            if field=="GQ_geno":
-                print(self.fileName,"aftermask",sub_geno[0,:50])
+            # if field=="GQ_geno":
+            #     print(self.fileName,"aftermask",sub_geno[0,:50])
         
             update_rowMask=rowMask[minPos:maxPos+1]
             rowMasked=np.where(update_rowMask==True)[0]
@@ -995,6 +990,40 @@ class HDF5Engine_access(Base_Access):
             return np.array(update_rownames),colnames,np.array(sub_geno)
         except NameError:
             env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
+
+    def filter_removed_genotypes(self,chr,minPos,maxPos,genoinfo,field):
+        #assume rowIDs are sorted by genome position
+        group=self.getGroup(chr,"")
+        rownames=group.rownames[minPos:maxPos].tolist()
+        colnames=group.colnames[:]
+        rowMask=group.rowmask[minPos:maxPos]
+        sampleMask=group.samplemask[:]
+        try:
+            sub_geno=genoinfo
+            sub_Mask=group.Mask_geno[minPos:maxPos,:]
+            if field=="DP_geno" and self.fileName=="tmp_1751_2000_genotypes.h5":
+                print(self.fileName,"mask",sub_Mask[0,:50])
+                print(self.fileName,"beforemask",sub_geno[0,:50])
+            sub_geno=np.multiply(sub_geno,sub_Mask)
+            if field=="DP_geno" and self.fileName=="tmp_1751_2000_genotypes.h5":
+                print(self.fileName,"aftermask",sub_geno[0,:50])       
+            rowMasked=np.where(rowMask==True)[0]
+            sampleMasked=np.where(sampleMask==True)[0]+1
+            if len(rowMasked)>0:
+                for i in rowMasked:
+                    rownames[i:-1] = rownames[i+1:]
+                    rownames =rownames[:-1]
+                    np.delete(sub_geno, i, 0)
+            if len(sampleMasked)>0:
+                for i in sampleMasked:
+                    colnames[i:-1] = colnames[i+1:]
+                    colnames =colnames[:-1]
+                    np.delete(sub_geno, i, 1)
+
+            return np.array(rownames),colnames,np.array(sub_geno)
+        except Exception as e:
+            print(e)
+
 
 
     def filter_on_genotypes(self,genotypes,chr,node,field,startPos,endPos,colpos):
@@ -1016,10 +1045,10 @@ class HDF5Engine_access(Base_Access):
                 GQ_geno=node.GQ_geno[startPos:endPos,colpos]
                 GQ_geno=np.nan_to_num(GQ_geno)
             genoinfo=np.where(eval("~("+genotypes+")"),np.nan,genoinfo)
-        if field=="GQ_geno":
+        if field=="DP_geno" and self.fileName=="tmp_1751_2000_genotypes.h5":
             print(self.fileName,"beforefilter",genoinfo[0,:50])
-        rownames,colnames,genoinfo=self.get_geno_by_variant_IDs([],[startPos,endPos],str(chr),field)
-        if field=="GQ_geno":    
+        rownames,colnames,genoinfo=self.filter_removed_genotypes(str(chr),startPos,endPos,genoinfo,field)
+        if field=="DP_geno" and self.fileName=="tmp_1751_2000_genotypes.h5":   
             print(self.fileName,"afterfilter",genoinfo[0,:50])
         return rownames,colnames,genoinfo
 
