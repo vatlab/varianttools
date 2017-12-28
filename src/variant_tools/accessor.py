@@ -969,7 +969,7 @@ class HDF5Engine_access(Base_Access):
 
             update_rowMask=rowMask[minPos:maxPos+1]
             rowMasked=np.where(update_rowMask==True)[0]
-            sampleMasked=np.where(sampleMask==True)[0]+1
+            sampleMasked=np.where(sampleMask==True)[0]
             if len(rowMasked)>0:
                 for i in rowMasked:
                     update_rownames[i:-1] = update_rownames[i+1:]
@@ -985,19 +985,19 @@ class HDF5Engine_access(Base_Access):
         except NameError:
             env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
 
-    def filter_removed_genotypes(self,minPos,maxPos,genoinfo,field,node):
+    def filter_removed_genotypes(self,minPos,maxPos,genoinfo,field,node,colpos):
         #assume rowIDs are sorted by genome position
         
         rownames=node.rownames[minPos:maxPos].tolist()
-        colnames=node.colnames[:]
+        colnames=node.colnames[colpos]
         rowMask=node.rowmask[minPos:maxPos]
-        sampleMask=node.samplemask[:]
+        sampleMask=node.samplemask[colpos]
         try:
             sub_geno=genoinfo
             sub_Mask=node.Mask_geno[minPos:maxPos,:]
             sub_geno=np.multiply(sub_geno,sub_Mask)
             rowMasked=np.where(rowMask==True)[0]
-            sampleMasked=np.where(sampleMask==True)[0]+1
+            sampleMasked=np.where(sampleMask==True)[0]
             if len(rowMasked)>0:
                 for i in rowMasked:
                     rownames[i:-1] = rownames[i+1:]
@@ -1034,7 +1034,7 @@ class HDF5Engine_access(Base_Access):
                 GQ_geno=node.GQ_geno[startPos:endPos,colpos]
                 GQ_geno=np.nan_to_num(GQ_geno)
             genoinfo=np.where(eval("~("+genotypes+")"),np.nan,genoinfo)
-        rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,field,node)
+        rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,field,node,colpos)
         return rownames,colnames,genoinfo
 
 
