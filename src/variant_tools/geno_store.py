@@ -625,8 +625,6 @@ class Sqlite_Store(Base_Store):
             try:
                 # self.cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE {};'\
                 #     .format(self.proj.name, ID, cond))
-                print('DELETE FROM genotype_{} WHERE {};'\
-                    .format(ID, cond))
                 self.cur.execute('DELETE FROM genotype_{} WHERE {};'\
                     .format(ID, cond))
             except Exception as e:

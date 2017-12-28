@@ -1001,12 +1001,12 @@ class HDF5Engine_access(Base_Access):
         try:
             sub_geno=genoinfo
             sub_Mask=group.Mask_geno[minPos:maxPos,:]
-            if field=="DP_geno" and self.fileName=="tmp_1751_2000_genotypes.h5":
-                print(self.fileName,"mask",sub_Mask[0,:50])
-                print(self.fileName,"beforemask",sub_geno[0,:50])
+            # if field=="GT_geno" and self.fileName=="tmp_1751_2000_genotypes.h5":
+            #     print(self.fileName,"mask",sub_Mask[0,:50])
+            #     print(self.fileName,"beforemask",sub_geno[0,:50])
             sub_geno=np.multiply(sub_geno,sub_Mask)
-            if field=="DP_geno" and self.fileName=="tmp_1751_2000_genotypes.h5":
-                print(self.fileName,"aftermask",sub_geno[0,:50])       
+            # if field=="GT_geno" and self.fileName=="tmp_1751_2000_genotypes.h5":
+            #     print(self.fileName,"aftermask",sub_geno[0,:50])       
             rowMasked=np.where(rowMask==True)[0]
             sampleMasked=np.where(sampleMask==True)[0]+1
             if len(rowMasked)>0:
@@ -1045,11 +1045,11 @@ class HDF5Engine_access(Base_Access):
                 GQ_geno=node.GQ_geno[startPos:endPos,colpos]
                 GQ_geno=np.nan_to_num(GQ_geno)
             genoinfo=np.where(eval("~("+genotypes+")"),np.nan,genoinfo)
-        if field=="DP_geno" and self.fileName=="tmp_1751_2000_genotypes.h5":
-            print(self.fileName,"beforefilter",genoinfo[0,:50])
+        # if field=="GT_geno" and self.fileName=="tmp_1751_2000_genotypes.h5":
+        #     print(self.fileName,"beforefilter",genoinfo[0,:50])
         rownames,colnames,genoinfo=self.filter_removed_genotypes(str(chr),startPos,endPos,genoinfo,field)
-        if field=="DP_geno" and self.fileName=="tmp_1751_2000_genotypes.h5":   
-            print(self.fileName,"afterfilter",genoinfo[0,:50])
+        # if field=="GT_geno" and self.fileName=="tmp_1751_2000_genotypes.h5":   
+        #     print(self.fileName,"afterfilter",genoinfo[0,:50])
         return rownames,colnames,genoinfo
 
 
