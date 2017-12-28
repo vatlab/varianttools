@@ -682,6 +682,8 @@ class Sqlite_Store(Base_Store):
                     variants[rec[0]][0] += 1
                 # type homozygote
                 elif rec[1] == 2:
+                    if rec[0]==8:
+                        print(id)
                     variants[rec[0]][1] += 1
                 # type double heterozygote with two different alternative alleles
                 elif rec[1] == -1:

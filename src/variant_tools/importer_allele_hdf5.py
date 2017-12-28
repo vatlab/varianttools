@@ -1408,9 +1408,9 @@ def importGenotypesInParallel(importer,num_sample=0):
         # print(fields[6:])
         start=time.time()
         for chunk, _, _, _ in it:
-            print(chunk["calldata/GT"][0][:10])
-            print(chunk["calldata/DP"][0][:10])
-            print("start "+str(time.time()-start)) 
+            # print(chunk["calldata/GT"][0][:10])
+            # print(chunk["calldata/DP"][0][:10])
+            # print("start "+str(time.time()-start)) 
               
             start_sample =0
             for job in range(numTasks):
@@ -1435,7 +1435,7 @@ def importGenotypesInParallel(importer,num_sample=0):
             starttime=time.time()   
             for worker in importers:
                 worker.join()
-            print("jointime "+str(time.time()-starttime))
+            # print("jointime "+str(time.time()-starttime))
             starttime=time.time()  
             lines+=chunk_length
             prog.update(lines)
