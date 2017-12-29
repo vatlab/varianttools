@@ -304,83 +304,9 @@ def select(args, reverse=False):
                 # we save genotype in a separate database to keep the main project size tolerable.
                 proj.db.attach(proj.name + '_genotype')
                 IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.samples]))
-                if proj.store=="sqlite":    
-                    #
-                    # check if genotype table has field GT and select only variants with non-wildtype genotype
-                    # if genotype information is available.
-                    #
-                    hasGT = {id: 'GT' in [x[0] for x in proj.db.fieldsOfTable('{}_genotype.genotype_{}'.format(proj.name, id))] for id in IDs}
-                    noWT_clause = {id : 'WHERE {0}_genotype.genotype_{1}.GT != 0'.format(proj.name, id) if hasGT[id] else '' for id in IDs}
-                    #
-                    if len(IDs) == 0:
-                        env.logger.warning('No sample is selected by condition: {}'.format(' AND '.join(['({})'.format(x) for x in args.samples])))
-                        # nothing will be selected
-                        where_clause += ' AND 0'
-                    #
-                    # This special case does not hold because sometimes variants are imported without sample information.
-                    #
-                    #elif len(IDs) == proj.db.numOfRows('sample'):
-                    #    env.logger.info('All {} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
-                    #    # we do not have to add anything to where_clause
-                    elif len(IDs) < 50:  
-                        # we allow 14 tables in other 'union' or from condition...
-                        env.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
-                        where_clause += ' AND ({}.variant_id IN ({}))'.format(
-                            encodeTableName(args.from_table), 
-                            '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{} {}'
-                                .format(proj.name, id, noWT_clause[id]) for id in IDs])) 
-                    else:
-                        # we have to create a temporary table and select variants sample by sample
-                        # this could be done in parallel if there are a large number of samples, but that needs a lot more
-                        # code, and perhaps RAM
-                        env.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
-                        cur = proj.db.cursor()
-                        BLOCK_SIZE = 64
-                        NUM_BLOCKS = len(IDs) // BLOCK_SIZE + 1
-                        myIDs = list(IDs)
-                        myIDs.sort()
-                        merged_table = '__variants_from_samples'
-                        query = 'CREATE TEMPORARY TABLE {} (variant_id INT);'.format(merged_table)
-                        # env.logger.debug(query)
-                        # print(query)
-                        cur.execute(query)
-                        prog = ProgressBar('Collecting sample variants', len(IDs)) if NUM_BLOCKS > 1 else None
-                        count = 0
-                        for i in range(NUM_BLOCKS):
-                            # step 1: create a table that holds all
-                            block_IDs = myIDs[(i*BLOCK_SIZE):((i+1)*BLOCK_SIZE)]
-                            if len(block_IDs) == 0:
-                                continue
-                            query = 'INSERT INTO {} {};'.format(merged_table,
-                                '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{} {}'
-                                    .format(proj.name, id, noWT_clause[id]) for id in block_IDs]))
-                            #env.logger.debug(query)
-                            # print(query)
-                            cur.execute(query)
-                            count += len(block_IDs)
-                            if prog:
-                                prog.update(count)
-                        if prog:
-                            prog.done()
-                        where_clause += ' AND ({}.variant_id IN (SELECT variant_id FROM {}))'.format(
-                            encodeTableName(args.from_table), merged_table)
-                elif proj.store=="hdf5":
-                    store=GenoStore(proj)
-                    variantIDs=store.get_noWT_variants(IDs)
-                    cur = proj.db.cursor()
-                    merged_table = '__variants_from_samples'
-                    query = 'CREATE TEMPORARY TABLE {} (variant_id INT);'.format(merged_table)
-                    cur.execute(query)
-                    divData=chunks(variantIDs)
-                    for chunk in divData:
-                        cur.execute('BEGIN TRANSACTION')
-                        for id in chunk:
-                            # query = 'INSERT INTO {}({}) VALUES {};'.format(merged_table,
-                            #         'variant_id', ",".join([ "("+str(id)+")" for id in variantIDs[:1]])) 
-                            query = 'INSERT OR IGNORE INTO {}({}) VALUES {};'.format(merged_table,'variant_id', "("+str(id)+")" ) 
-                            cur.execute(query)
-                    where_clause += ' AND ({}.variant_id IN (SELECT variant_id FROM {}))'.format(
-                            encodeTableName(args.from_table), merged_table)                 
+                store=GenoStore(proj)
+                where_clause=store.get_noWT_variants(IDs,proj,where_clause,args)
+                       
             #
             # we are treating different outcomes different, for better performance
             #
