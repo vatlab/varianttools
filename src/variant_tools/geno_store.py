@@ -1008,12 +1008,21 @@ class HDF5_Store(Base_Store):
             storageEngine.close()
 
 
+    def remove_genotype_workder(self,storageEngine,cond):
+        storageEngine.remove_genotype(cond)
+        storageEngine.close()
+
+
     def remove_genotype(self,cond):
-        HDFfileNames=glob.glob("tmp*_genotypes.h5")
-        for HDFfileName in HDFfileNames:
+        procs=[]
+        for HDFfileName in glob.glob("tmp*genotypes.h5"):
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
-            storageEngine.remove_genotype(cond)
-            storageEngine.close()
+            p=Process(target=self.remove_genotype_workder,args=(storageEngine,cond)) 
+            procs.append(p)
+            p.start()
+        for p in procs:
+            p.join()
+
 
     def num_variants(self, sampleID,HDFfileName):
         storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)

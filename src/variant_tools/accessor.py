@@ -361,20 +361,30 @@ class HDF5Engine_storage(Base_Storage):
 
 
     def remove_genotype(self,cond):
+        chunk=200
         for chr in range(1,23):
             genoNode="/chr"+str(chr)
             try:
-                group=self.file.get_node(genoNode)
-                shape=group.shape[:]
-                if "DP_geno" in cond and "/chr"+str(chr)+"/DP_geno" in self.file:    
-                    DP_geno=group.DP_geno[:]
-                    DP_geno[DP_geno==-1]=0
-                if "GQ_geno" in cond and "/chr"+str(chr)+"/GQ_geno" in self.file:    
-                    GQ_geno=group.GQ_geno[:]
-                    GQ_geno=np.nan_to_num(GQ_geno)
-                # Mask_geno=group.Mask_geno[:]
-                Mask_geno=np.ones(shape=shape,dtype=np.int8)
-                group.Mask_geno[:]=np.where(eval(cond),np.nan,Mask_geno)
+                node=self.file.get_node(genoNode)
+                shape=node.shape[:].tolist()
+                colnames=node.colnames[:].tolist()
+                cycle=int(shape[0]/chunk)
+                startPos=0
+                for i in range(cycle+1):
+                    if i==cycle:
+                        endPos=shape[0]
+                    else:
+                        endPos=startPos+chunk
+                    if "DP_geno" in cond and "/chr"+str(chr)+"/DP_geno" in self.file:    
+                        DP_geno=node.DP_geno[startPos:endPos,:]
+                        DP_geno[DP_geno==-1]=0
+                    if "GQ_geno" in cond and "/chr"+str(chr)+"/GQ_geno" in self.file:    
+                        GQ_geno=node.GQ_geno[startPos:endPos,:]
+                        GQ_geno=np.nan_to_num(GQ_geno)
+                    # Mask_geno=group.Mask_geno[:]
+                    Mask_geno=np.ones(shape=(endPos-startPos,shape[1]),dtype=np.int8)
+                    node.Mask_geno[startPos:endPos,:]=np.where(eval(cond),np.nan,Mask_geno)
+                    startPos=endPos
                 # print("mask",group.Mask_geno[:])
                 # print(group.Mask_geno[:])
                 # print(group.DP_geno[:])
@@ -1043,14 +1053,13 @@ class HDF5Engine_access(Base_Access):
 
     def get_geno_field_from_HDF5(self,samples,genotypes,fieldSelect,validGenotypeFields,operations):
         vardict={}
-        chunk=20000
+        chunk=200
 
         for chr in range(1,23):
         # for chr in [1,22]:
             try:
                 node=self.file.get_node("/chr"+str(chr))
-                shape=node.shape[:].tolist()
-                colnames=node.colnames[:].tolist()
+                shape=node.shape[:].tolist()          
                 cycle=int(shape[0]/chunk)
                 startPos=0
                 for i in range(cycle+1):
@@ -1060,6 +1069,7 @@ class HDF5Engine_access(Base_Access):
                         endPos=startPos+chunk
                     # rownames=node.rownames[startPos:endPos].tolist()
                     samples.sort()
+                    colnames=node.colnames[:].tolist()
                     colpos=list(map(lambda x:colnames.index(x),samples))
                     if "/chr"+str(chr)+"/GT_geno" in self.file:    
                         rownames,colnames,genoinfo=self.filter_on_genotypes(genotypes,chr,node,"GT_geno",startPos,endPos,colpos)
@@ -1097,7 +1107,7 @@ class HDF5Engine_access(Base_Access):
 
     def get_noWT_variants(self,samples):
         noWT=[]
-        chunk=20000
+        chunk=200
         for chr in range(1,23):
             try:
                 #haven't dealt with data==-1
