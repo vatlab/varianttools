@@ -581,20 +581,21 @@ class Sqlite_Store(Base_Store):
         self.cur = self.db.cursor()
 
 
-    def num_variants(self, sample_id,file=""):
+    def num_variants(self, sample_id):
         self.cur.execute('SELECT count(*) FROM genotype_{};'.format(sample_id))
         return self.cur.fetchone()[0]
 
-    def geno_fields(self, sample_id,file=""):
+    def geno_fields(self, sample_id):
         sampleGenotypeHeader = [x.lower() for x in self.db.getHeaders('genotype_{}'.format(sample_id))]
         return sampleGenotypeHeader[1:]  # the first field is variant id, second is GT
 
     def get_typeOfColumn(self,sample_id,field):
         return self.db.typeOfColumn('genotype_{}'.format(sample_id), field) 
 
-    def remove_sample(self, sample_id,file=""):
-        self.db.removeTable('genotype_{}'.format(sample_id))
-        self.db.commit()
+    def remove_sample(self, IDs):
+        for sample_id in IDS:
+            self.db.removeTable('genotype_{}'.format(sample_id))
+            self.db.commit()
 
     def remove_variants(self,variantIDs,table):
          # get sample_ids
@@ -990,12 +991,12 @@ class HDF5_Store(Base_Store):
         super(HDF5_Store, self).__init__(proj)
 
 
-    def remove_sample(self,sampleID,HDFfileName):
-        storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
-        storageEngine.remove_sample(sampleID)
-        storageEngine.close()
-
-        
+    def remove_sample(self,IDs):
+        for ID in IDs:
+            hdf5file=self.get_sampleFileName(ID)
+            storageEngine=Engine_Storage.choose_storage_engine(hdf5file)
+            storageEngine.remove_sample(ID)
+            storageEngine.close()
 
 
     def remove_variants(self,variantIDs,table):
@@ -1022,7 +1023,8 @@ class HDF5_Store(Base_Store):
             p.join()
 
 
-    def num_variants(self, sampleID,HDFfileName):
+    def num_variants(self, sampleID):
+        HDFfileName=self.get_sampleFileName(sampleID)
         storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
         num=storageEngine.num_variants(sampleID)
         storageEngine.close()

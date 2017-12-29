@@ -342,7 +342,7 @@ class HDF5Engine_storage(Base_Storage):
                 # i=self.rownames.index(variant_id)
                 colnames=group.colnames[:]
                 i=np.where(colnames==sample_id)[0][0]
-                group.samplemask[i]=True
+                group.samplemask[i-1]=True
             except:
                 pass
         
@@ -976,16 +976,14 @@ class HDF5Engine_access(Base_Access):
             rowMasked=np.where(update_rowMask==True)[0]
             sampleMasked=np.where(sampleMask==True)[0]
             if len(rowMasked)>0:
+                update_rownames=update_rownames[np.where(rowMask==False)]
                 for i in rowMasked:
-                    update_rownames[i:-1] = update_rownames[i+1:]
-                    update_rownames =update_rownames[:-1]
                     np.delete(sub_geno, i, 0)
             if len(sampleMasked)>0:
+                colnames=colnames[np.where(sampleMask==False)]
                 for i in sampleMasked:
-                    colnames[i:-1] = colnames[i+1:]
-                    colnames =colnames[:-1]
                     np.delete(sub_geno, i, 1)
-
+            # print(self.fileName,len(update_rownames),len(colnames),sub_geno.shape)
             return np.array(update_rownames),colnames,np.array(sub_geno)
         except NameError:
             env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
@@ -1004,14 +1002,12 @@ class HDF5Engine_access(Base_Access):
             rowMasked=np.where(rowMask==True)[0]
             sampleMasked=np.where(sampleMask==True)[0]
             if len(rowMasked)>0:
+                rownames=rownames[np.where(rowMask==False)]
                 for i in rowMasked:
-                    rownames[i:-1] = rownames[i+1:]
-                    rownames =rownames[:-1]
                     np.delete(sub_geno, i, 0)
             if len(sampleMasked)>0:
+                colnames=colnames[np.where(sampleMask==False)]
                 for i in sampleMasked:
-                    colnames[i:-1] = colnames[i+1:]
-                    colnames =colnames[:-1]
                     np.delete(sub_geno, i, 1)
 
             return np.array(rownames),colnames,np.array(sub_geno)

@@ -2208,15 +2208,12 @@ class Project:
             else:
                 env.logger.info('Removing {} imported from {}'.format('{} samples'.format(len(samples[f])) if len(samples[f]) > 1 else 'sample {}'.format(samples[f][0]), f)) 
         #
+        
+        
         store = GenoStore(self)
+        store.remove_sample(IDs)
         for ID in IDs:
-            hdf5file=None
-            if isinstance(store,HDF5_Store):
-                cur.execute('SELECT HDF5 FROM sample WHERE sample_id = ?;', (ID,))
-                res=cur.fetchone()
-                hdf5file=res[0]
             cur.execute('DELETE FROM sample WHERE sample_id = ?;', (ID,))
-            store.remove_sample(ID,hdf5file)
         self.db.commit()
         
     def removeVariants(self, table):
@@ -4596,14 +4593,9 @@ def show(args):
                     # now get sample genotype counts and sample specific fields
                     sampleId = rec[0]
                     store = GenoStore(proj)
-                    hdf5file=None
-                    if isinstance(store,HDF5_Store):
-                        cur.execute('SELECT HDF5 FROM sample WHERE sample_id = ?;', (sampleId,))
-                        res=cur.fetchone()
-                        hdf5file=res[0]
-                    numGenotypes = store.num_variants(sampleId,hdf5file)
+                    numGenotypes = store.num_variants(sampleId)
                     # get fields for each genotype table
-                    sampleGenotypeFields = ','.join(store.geno_fields(sampleId,hdf5file))
+                    sampleGenotypeFields = ','.join(store.geno_fields(sampleId))
                     prt.write([rec[1], rec[2], str(numGenotypes), sampleGenotypeFields])
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
