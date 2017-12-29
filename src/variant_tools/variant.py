@@ -342,7 +342,7 @@ def select(args, reverse=False):
                         merged_table = '__variants_from_samples'
                         query = 'CREATE TEMPORARY TABLE {} (variant_id INT);'.format(merged_table)
                         # env.logger.debug(query)
-                        print(query)
+                        # print(query)
                         cur.execute(query)
                         prog = ProgressBar('Collecting sample variants', len(IDs)) if NUM_BLOCKS > 1 else None
                         count = 0
@@ -355,7 +355,7 @@ def select(args, reverse=False):
                                 '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{} {}'
                                     .format(proj.name, id, noWT_clause[id]) for id in block_IDs]))
                             #env.logger.debug(query)
-                            print(query)
+                            # print(query)
                             cur.execute(query)
                             count += len(block_IDs)
                             if prog:
@@ -366,16 +366,8 @@ def select(args, reverse=False):
                             encodeTableName(args.from_table), merged_table)
                 elif proj.store=="hdf5":
                     store=GenoStore(proj)
+                    variantIDs=store.get_noWT_variants(IDs)
                     cur = proj.db.cursor()
-                    cur.execute('SELECT sample_id,HDF5 from sample')
-                    results=cur.fetchall()
-                    filedict={}
-                    for result in results:
-                        filedict[result[0]]=result[1]
-                    variantIDs=[]
-                    for ID in IDs:
-                        variantIDs=list(set(variantIDs).union(store.get_noWT_variants(ID,filedict[ID]).tolist()))
-
                     merged_table = '__variants_from_samples'
                     query = 'CREATE TEMPORARY TABLE {} (variant_id INT);'.format(merged_table)
                     cur.execute(query)
@@ -409,7 +401,7 @@ def select(args, reverse=False):
             if args.count and not args.to_table and not args.output:
                 query = 'SELECT COUNT(DISTINCT {}.variant_id) {} {};'.format(encodeTableName(args.from_table),
                     from_clause, where_clause)
-                print(query)
+                
                 env.logger.trace('Running query {}'.format(query))
                 proj.db.startProgress('Counting variants')
                 cur = proj.db.cursor()
@@ -435,7 +427,7 @@ def select(args, reverse=False):
                 env.logger.trace('Running query {}'.format(query))
                 #
                 cur = proj.db.cursor()
-                print(query)
+                
                 proj.db.startProgress('Running')
                 cur.execute(query)
                 proj.db.stopProgress()
@@ -451,7 +443,7 @@ def select(args, reverse=False):
             elif args.output: 
                 query = 'SELECT DISTINCT {}.variant_id {} {}'.format(encodeTableName(args.from_table),
                     from_clause, where_clause)
-                print(query)
+               
                 outputVariants(proj, args.from_table, args.output, args, query, reverse)
             # 
             # clean up temporary table

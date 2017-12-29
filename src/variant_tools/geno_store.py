@@ -995,11 +995,7 @@ class HDF5_Store(Base_Store):
     #     result=accessEngine.get_geno_field_from_table(sampleID,genotypes,fieldSelect)
     #     return result
 
-    def get_genoType_genoInfo_worker(self,queue,accessEngine,samples,genotypes,fieldSelect,validGenotypeFields,operations):
-        queue.put(accessEngine.get_geno_field_from_HDF5(samples,genotypes,fieldSelect,validGenotypeFields,operations))
-
-
-    def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
+    def get_HDF5_sampleMap(self):
         self.cur=self.proj.db.cursor()
         self.cur.execute('SELECT sample_id, HDF5 FROM sample')
         result=self.cur.fetchall()
@@ -1008,17 +1004,40 @@ class HDF5_Store(Base_Store):
             if res[1] not in sampleFileMap:
                 sampleFileMap[res[1]]=[]
             sampleFileMap[res[1]].append(res[0])
+        return sampleFileMap
+
+
+
+    def get_noWT_variants_worker(self,queue,accessEngine,samples):
+        queue.put(accessEngine.get_noWT_variants(samples))
+
+    def get_noWT_variants(self,samples):
+        sampleFileMap=self.get_HDF5_sampleMap()
+        queue=Queue()
+        procs=[]
+        noWT=set()
+        for HDFfileName in glob.glob("tmp*genotypes.h5"):
+            samplesInfile=sampleFileMap[HDFfileName.split("/")[-1]]
+            accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+            p=Process(target=self.get_noWT_variants_worker,args=(queue,accessEngine,list(set(samples).intersection(samplesInfile)))) 
+            procs.append(p)
+            p.start()
+        for _ in procs:
+            result=queue.get()
+            noWT=noWT.union(set(result))     
+        for p in procs:
+            p.join()
+        return list(noWT)
+
+
+    def get_genoType_genoInfo_worker(self,queue,accessEngine,samples,genotypes,fieldSelect,validGenotypeFields,operations):
+        queue.put(accessEngine.get_geno_field_from_HDF5(samples,genotypes,fieldSelect,validGenotypeFields,operations))
+
+
+    def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
+        sampleFileMap=self.get_HDF5_sampleMap()
         fieldSelect=list(sampleDict.values())[0][1]
         master={}
-        # for HDFfileName in glob.glob("tmp*genotypes.h5"):
-        #     samplesInfile=sampleFileMap[HDFfileName.split("/")[-1]]
-        #     accessEngine=Engine_Access.choose_access_engine(HDFfileName)
-        #     result=accessEngine.get_hdf5_geno_field_from_table(list(set(sampleDict.keys()).intersection(samplesInfile)),genotypes,fieldSelect,validGenotypeFields,operations)
-        #     for key,value in result.items():
-        #         if key not in master:
-        #             master[key]=value
-        #         else:
-        #             master[key]= [sum(x) for x in zip(master[key], value)]
         
         queue=Queue()
         procs=[]

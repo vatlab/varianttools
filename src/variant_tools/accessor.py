@@ -268,29 +268,31 @@ class HDF5Engine_storage(Base_Storage):
     def to_csr_matrix(self,group):
         return csr_matrix((group.data[:],group.indices[:],group.indptr[:]),shape=group.shape[:])
 
-    def get_noWT_variants(self,sampleID):
-        noWT=None
-        for chr in range(1,23):
-            try:
-                #haven't dealt with data==-1
-                group=self.file.get_node("/chr"+str(chr)+"/GT/")
-                matrix=self.to_csr_matrix(group)
-                colnames=group.colnames[:]
-                rownames=group.rownames[:]
-                samplePos=np.where(colnames==sampleID)
-                nonZero=matrix.nonzero()
-                sampleLoc=np.where(nonZero[1]==samplePos)
-                rowLoc=nonZero[0][sampleLoc[1]]
-                noWT=rownames[rowLoc]
-                # colPos=np.where(indices==samplePos[0][0])
-                # data=group.data[colPos]
-                # print(data)
-                # noNan=rownames[np.where(~np.isnan(data))]
-                # noNone=rownames[np.where(data!=-1)]
-                # noWT=np.intersect1d(noNan,noNone)
-            except Exception as e:
-                pass
-        return noWT
+    # def get_sparse_noWT_variants(self,sampleID):
+    #     noWT=None
+    #     for chr in range(1,23):
+    #         try:
+    #             #haven't dealt with data==-1
+    #             group=self.file.get_node("/chr"+str(chr)+"/GT/")
+    #             matrix=self.to_csr_matrix(group)
+    #             colnames=group.colnames[:]
+    #             rownames=group.rownames[:]
+    #             samplePos=np.where(colnames==sampleID)
+    #             nonZero=matrix.nonzero()
+    #             sampleLoc=np.where(nonZero[1]==samplePos)
+    #             rowLoc=nonZero[0][sampleLoc[1]]
+    #             noWT=rownames[rowLoc]
+    #             # colPos=np.where(indices==samplePos[0][0])
+    #             # data=group.data[colPos]
+    #             # print(data)
+    #             # noNan=rownames[np.where(~np.isnan(data))]
+    #             # noNone=rownames[np.where(data!=-1)]
+    #             # noWT=np.intersect1d(noNan,noNone)
+    #         except Exception as e:
+    #             pass
+    #     return noWT
+
+   
 
 
 
@@ -985,7 +987,7 @@ class HDF5Engine_access(Base_Access):
         except NameError:
             env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
 
-    def filter_removed_genotypes(self,minPos,maxPos,genoinfo,field,node,colpos):
+    def filter_removed_genotypes(self,minPos,maxPos,genoinfo,node,colpos):
         #assume rowIDs are sorted by genome position
         
         rownames=node.rownames[minPos:maxPos].tolist()
@@ -994,7 +996,7 @@ class HDF5Engine_access(Base_Access):
         sampleMask=node.samplemask[colpos]
         try:
             sub_geno=genoinfo
-            sub_Mask=node.Mask_geno[minPos:maxPos,:]
+            sub_Mask=node.Mask_geno[minPos:maxPos,colpos]
             sub_geno=np.multiply(sub_geno,sub_Mask)
             rowMasked=np.where(rowMask==True)[0]
             sampleMasked=np.where(sampleMask==True)[0]
@@ -1034,7 +1036,7 @@ class HDF5Engine_access(Base_Access):
                 GQ_geno=node.GQ_geno[startPos:endPos,colpos]
                 GQ_geno=np.nan_to_num(GQ_geno)
             genoinfo=np.where(eval("~("+genotypes+")"),np.nan,genoinfo)
-        rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,field,node,colpos)
+        rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos)
         return rownames,colnames,genoinfo
 
 
@@ -1091,6 +1093,41 @@ class HDF5Engine_access(Base_Access):
                 print(e)
                 pass
         return vardict
+
+
+    def get_noWT_variants(self,samples):
+        noWT=[]
+        chunk=20000
+        for chr in range(1,23):
+            try:
+                #haven't dealt with data==-1
+                node=self.file.get_node("/chr"+str(chr))
+
+                shape=node.shape[:].tolist()
+                colnames=node.colnames[:].tolist()
+                samples.sort()
+                colpos=list(map(lambda x:colnames.index(x),samples))
+                cycle=int(shape[0]/chunk)
+                startPos=0
+                for i in range(cycle+1):
+                    if i==cycle:
+                        endPos=shape[0]
+                    else:
+                        endPos=startPos+chunk
+                    if "/chr"+str(chr)+"/GT_geno" in self.file:
+                        genoinfo=node.GT_geno[startPos:endPos,colpos]
+                        
+                        rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos)
+                        genoinfo[genoinfo==-1]=0
+                        rowsum=np.nansum(genoinfo,axis=1)
+                        noWTvariants=rownames[np.where(rowsum>0)].tolist()
+                        noWT.extend(noWTvariants)
+                    startPos=endPos
+            except tb.exceptions.NoSuchNodeError:
+                pass  
+            except Exception as e:
+                pass
+        return noWT
 
 
     def get_geno_by_row_pos(self,rowpos,chr,groupName=""):
