@@ -593,7 +593,7 @@ class Sqlite_Store(Base_Store):
         return self.db.typeOfColumn('genotype_{}'.format(sample_id), field) 
 
     def remove_sample(self, IDs):
-        for sample_id in IDS:
+        for sample_id in IDs:
             self.db.removeTable('genotype_{}'.format(sample_id))
             self.db.commit()
 

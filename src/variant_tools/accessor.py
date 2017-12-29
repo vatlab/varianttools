@@ -977,13 +977,13 @@ class HDF5Engine_access(Base_Access):
             sampleMasked=np.where(sampleMask==True)[0]
             if len(rowMasked)>0:
                 update_rownames=update_rownames[np.where(rowMask==False)]
-                for i in rowMasked:
-                    np.delete(sub_geno, i, 0)
+                sub_geno=np.delete(sub_geno,rowMasked,0)
+
             if len(sampleMasked)>0:
                 colnames=colnames[np.where(sampleMask==False)]
-                for i in sampleMasked:
-                    np.delete(sub_geno, i, 1)
-            # print(self.fileName,len(update_rownames),len(colnames),sub_geno.shape)
+                sub_geno=np.delete(sub_geno,sampleMasked,1)
+
+            
             return np.array(update_rownames),colnames,np.array(sub_geno)
         except NameError:
             env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
@@ -1003,12 +1003,10 @@ class HDF5Engine_access(Base_Access):
             sampleMasked=np.where(sampleMask==True)[0]
             if len(rowMasked)>0:
                 rownames=rownames[np.where(rowMask==False)]
-                for i in rowMasked:
-                    np.delete(sub_geno, i, 0)
+                sub_geno=np.delete(sub_geno,rowMasked,0)
             if len(sampleMasked)>0:
                 colnames=colnames[np.where(sampleMask==False)]
-                for i in sampleMasked:
-                    np.delete(sub_geno, i, 1)
+                sub_geno=np.delete(sub_geno,sampleMasked,1)
 
             return np.array(rownames),colnames,np.array(sub_geno)
         except Exception as e:
