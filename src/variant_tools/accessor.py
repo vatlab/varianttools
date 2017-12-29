@@ -6,7 +6,7 @@ import math
 
 import os
 import sys
-from .utils import env
+from .utils import env,chunks_start_stop
 
 from multiprocessing import Process,Manager
 import queue
@@ -361,20 +361,13 @@ class HDF5Engine_storage(Base_Storage):
 
 
     def remove_genotype(self,cond):
-        chunk=200
         for chr in range(1,23):
             genoNode="/chr"+str(chr)
             try:
                 node=self.file.get_node(genoNode)
                 shape=node.shape[:].tolist()
-                colnames=node.colnames[:].tolist()
-                cycle=int(shape[0]/chunk)
-                startPos=0
-                for i in range(cycle+1):
-                    if i==cycle:
-                        endPos=shape[0]
-                    else:
-                        endPos=startPos+chunk
+                chunkPos=chunks_start_stop(shape[0])
+                for startPos,endPos in chunkPos:
                     if "DP_geno" in cond and "/chr"+str(chr)+"/DP_geno" in self.file:    
                         DP_geno=node.DP_geno[startPos:endPos,:]
                         DP_geno[DP_geno==-1]=0
@@ -1053,24 +1046,20 @@ class HDF5Engine_access(Base_Access):
 
     def get_geno_field_from_HDF5(self,samples,genotypes,fieldSelect,validGenotypeFields,operations):
         vardict={}
-        chunk=200
+
 
         for chr in range(1,23):
         # for chr in [1,22]:
             try:
                 node=self.file.get_node("/chr"+str(chr))
                 shape=node.shape[:].tolist()          
-                cycle=int(shape[0]/chunk)
-                startPos=0
-                for i in range(cycle+1):
-                    if i==cycle:
-                        endPos=shape[0]
-                    else:
-                        endPos=startPos+chunk
-                    # rownames=node.rownames[startPos:endPos].tolist()
-                    samples.sort()
-                    colnames=node.colnames[:].tolist()
-                    colpos=list(map(lambda x:colnames.index(x),samples))
+                chunkPos=chunks_start_stop(shape[0])
+                samples.sort()
+                colnames=node.colnames[:].tolist()
+                colpos=list(map(lambda x:colnames.index(x),samples))
+                for startPos,endPos in chunkPos:
+                    # rownames=node.rownames[startPos:endPos].tolist()              
+                    
                     if "/chr"+str(chr)+"/GT_geno" in self.file:    
                         rownames,colnames,genoinfo=self.filter_on_genotypes(genotypes,chr,node,"GT_geno",startPos,endPos,colpos)
                         numrow=len(rownames)
@@ -1107,26 +1096,18 @@ class HDF5Engine_access(Base_Access):
 
     def get_noWT_variants(self,samples):
         noWT=[]
-        chunk=200
         for chr in range(1,23):
             try:
                 #haven't dealt with data==-1
                 node=self.file.get_node("/chr"+str(chr))
-
                 shape=node.shape[:].tolist()
-                colnames=node.colnames[:].tolist()
                 samples.sort()
+                colnames=node.colnames[:].tolist()
                 colpos=list(map(lambda x:colnames.index(x),samples))
-                cycle=int(shape[0]/chunk)
-                startPos=0
-                for i in range(cycle+1):
-                    if i==cycle:
-                        endPos=shape[0]
-                    else:
-                        endPos=startPos+chunk
+                chunkPos=chunks_start_stop(shape[0])
+                for startPos,endPos in chunkPos:
                     if "/chr"+str(chr)+"/GT_geno" in self.file:
-                        genoinfo=node.GT_geno[startPos:endPos,colpos]
-                        
+                        genoinfo=node.GT_geno[startPos:endPos,colpos]           
                         rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos)
                         genoinfo[genoinfo==-1]=0
                         rowsum=np.nansum(genoinfo,axis=1)

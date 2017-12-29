@@ -4155,7 +4155,19 @@ def dehtml(text):
         env.logger.warning('Failed to dehtml text: {}'.format(e))
         return text
 
-def chunks(data, rows=10000):
+def chunks_start_stop(length,rows=20000):
+    cycle=int(length/rows)
+    startPos=0
+    endPos=0
+    for i in range(cycle+1):
+        startPos=endPos
+        if i==cycle:
+            endPos=length
+        else:
+            endPos=startPos+rows
+        yield startPos,endPos
+
+def chunks(data, rows=20000):
     for i in range(0, len(data), rows):
         yield data[i:i+rows]
 

@@ -742,8 +742,6 @@ class Sqlite_Store(Base_Store):
                     variants[rec[0]][0] += 1
                 # type homozygote
                 elif rec[1] == 2:
-                    if rec[0]==8:
-                        print(id)
                     variants[rec[0]][1] += 1
                 # type double heterozygote with two different alternative alleles
                 elif rec[1] == -1:
@@ -1099,6 +1097,7 @@ class HDF5_Store(Base_Store):
         divData=chunks(list(noWT))
         for chunk in divData:
             cur.execute('BEGIN TRANSACTION')
+            print(len(chunk))
             for id in chunk:
                 # query = 'INSERT INTO {}({}) VALUES {};'.format(merged_table,
                 #         'variant_id', ",".join([ "("+str(id)+")" for id in variantIDs[:1]])) 
