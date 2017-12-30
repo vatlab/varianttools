@@ -342,7 +342,7 @@ class HDF5Engine_storage(Base_Storage):
                 # i=self.rownames.index(variant_id)
                 colnames=group.colnames[:]
                 i=np.where(colnames==sample_id)[0][0]
-                group.samplemask[i-1]=True
+                group.samplemask[i]=True
             except:
                 pass
         
@@ -992,12 +992,12 @@ class HDF5Engine_access(Base_Access):
         #assume rowIDs are sorted by genome position
         
         rownames=node.rownames[minPos:maxPos].tolist()
-        colnames=node.colnames[colpos]
+        colnames=node.colnames[:]
         rowMask=node.rowmask[minPos:maxPos]
-        sampleMask=node.samplemask[colpos]
+        sampleMask=node.samplemask[:]
         try:
             sub_geno=genoinfo
-            sub_Mask=node.Mask_geno[minPos:maxPos,colpos]
+            sub_Mask=node.Mask_geno[minPos:maxPos,:]
             sub_geno=np.multiply(sub_geno,sub_Mask)
             rowMasked=np.where(rowMask==True)[0]
             sampleMasked=np.where(sampleMask==True)[0]
@@ -1006,7 +1006,11 @@ class HDF5Engine_access(Base_Access):
                 sub_geno=np.delete(sub_geno,rowMasked,0)
             if len(sampleMasked)>0:
                 colnames=colnames[np.where(sampleMask==False)]
+                print("before",sub_geno.shape)
                 sub_geno=np.delete(sub_geno,sampleMasked,1)
+                if self.fileName=="tmp_1_250_genotypes.h5":
+                    print(sampleMasked,colnames)
+                    print("after",sub_geno.shape)
 
             return np.array(rownames),colnames,np.array(sub_geno)
         except Exception as e:
@@ -1017,20 +1021,20 @@ class HDF5Engine_access(Base_Access):
     def filter_on_genotypes(self,genotypes,chr,node,field,startPos,endPos,colpos):
         genoinfo=None
         if field=="GT_geno":
-            genoinfo=node.GT_geno[startPos:endPos,colpos]
+            genoinfo=node.GT_geno[startPos:endPos,:]
         if field=="DP_geno" and "/chr"+str(chr)+"/DP_geno" in self.file:
-            genoinfo=node.DP_geno[startPos:endPos,colpos]
+            genoinfo=node.DP_geno[startPos:endPos,:]
             genoinfo[genoinfo==-1]=0
         if field=="GQ_geno" and "/chr"+str(chr)+"/GQ_geno" in self.file:
-            genoinfo=node.GQ_geno[startPos:endPos,colpos]
+            genoinfo=node.GQ_geno[startPos:endPos,:]
             genoinfo=np.nan_to_num(genoinfo)
         genotypes=genotypes[0]
         if len(genotypes)>1:
             if "DP_geno" in genotypes and "/chr"+str(chr)+"/DP_geno" in self.file:
-                DP_geno=node.DP_geno[startPos:endPos,colpos]
+                DP_geno=node.DP_geno[startPos:endPos,:]
                 DP_geno[DP_geno==-1]=0
             if "GQ_geno" in genotypes and "/chr"+str(chr)+"/GQ_geno" in self.file:
-                GQ_geno=node.GQ_geno[startPos:endPos,colpos]
+                GQ_geno=node.GQ_geno[startPos:endPos,:]
                 GQ_geno=np.nan_to_num(GQ_geno)
             genoinfo=np.where(eval("~("+genotypes+")"),np.nan,genoinfo)
         rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos)
