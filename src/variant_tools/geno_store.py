@@ -712,14 +712,14 @@ class Sqlite_Store(Base_Store):
             if genotypes is not None and len(genotypes) != 0:
                 where_cond.extend(genotypes)
             if variant_table != 'variant':
-                where_cond.append('variant_id in (SELECT variant_id FROM {})'.format(variant_table))
+                where_cond.append('variant_id in (SELECT variant_id FROM {})'.format(self.proj.name+"."+variant_table))
             whereClause = 'WHERE ' + ' AND '.join(['({})'.format(x) for x in where_cond]) if where_cond else ''
             
           
             query = 'SELECT variant_id {} FROM {}_genotype.genotype_{} {};'.format(' '.join([',' + x for x in fieldSelect]),
                     self.proj.name, id, whereClause)
             self.db.attach(self.proj.name+"_genotype.DB",self.proj.name+"_genotype")
-            # self.db.attach(self.proj.name+".proj",self.proj.name)
+            self.db.attach(self.proj.name+".proj",self.proj.name)
             # self.cur.execute('select * from sqlite_master')
             # result=self.cur.fetchall()
             # for line in result:
@@ -729,6 +729,7 @@ class Sqlite_Store(Base_Store):
             result=self.cur.fetchall()
             self.db.commit()
             self.db.detach(self.proj.name+"_genotype")
+            self.db.detach(self.proj.name)
 
             id_idx+=1
 
