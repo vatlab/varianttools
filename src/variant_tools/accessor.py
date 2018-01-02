@@ -1004,13 +1004,22 @@ class HDF5Engine_access(Base_Access):
             if len(rowMasked)>0:
                 rownames=rownames[np.where(rowMask==False)]
                 sub_geno=np.delete(sub_geno,rowMasked,0)
-            if len(sampleMasked)>0:
-                colnames=colnames[np.where(sampleMask==False)]
-                print("before",sub_geno.shape)
-                sub_geno=np.delete(sub_geno,sampleMasked,1)
-                if self.fileName=="tmp_1_250_genotypes.h5":
-                    print(sampleMasked,colnames)
-                    print("after",sub_geno.shape)
+            colnames=colnames[colpos]
+            sub_geno=sub_geno[:,colpos]
+
+            
+            # if len(sampleMasked)>0:
+            #     # colnames=colnames[np.where(sampleMask==False)]
+            #     # sub_geno=np.delete(sub_geno,sampleMasked,1)
+            #     colnames=colnames[colpos]
+            #     sub_geno=sub_geno[:,colpos]
+
+                # if self.fileName=="tmp_1_250_genotypes.h5":
+                    # print(sub_colnames)
+                    # print(colpos)
+                    # print(colnames)
+                    # print("after",self.fileName,sub_geno[0,:50])
+    
 
             return np.array(rownames),colnames,np.array(sub_geno)
         except Exception as e:
@@ -1054,6 +1063,7 @@ class HDF5Engine_access(Base_Access):
                 chunkPos=chunks_start_stop(shape[0])
                 samples.sort()
                 colnames=node.colnames[:].tolist()
+
                 colpos=list(map(lambda x:colnames.index(x),samples))
                 for startPos,endPos in chunkPos:
                     # rownames=node.rownames[startPos:endPos].tolist()              
@@ -1066,12 +1076,14 @@ class HDF5Engine_access(Base_Access):
                         variants[:,3]=np.nansum(~np.isnan(genoinfo),axis=1)
                         variants[:,0]=np.nansum(genoinfo==1,axis=1)
                         variants[:,1]=np.nansum(genoinfo==2,axis=1)
-                        variants[:,2]=np.nansum(genoinfo==-1,axis=1)  
+                        variants[:,2]=np.nansum(genoinfo==-1,axis=1) 
+                        # print(self.fileName,genoinfo.shape,variants[6,1],np.where(genoinfo[6,:]==2)) 
 
                         for pos,field in enumerate(validGenotypeFields):
                             if "/chr"+str(chr)+"/"+field in self.file:
                                 rownames,colnames,genoinfo=self.filter_on_genotypes(genotypes,chr,node,field,startPos,endPos,colpos)
-
+                                # if field=="DP_geno":
+                                #     print(self.fileName,genoinfo[0,:100])
                                 operation=operations[pos]
                                 if operation==0:                      
                                     variants[:,5+pos]=np.nansum(genoinfo,axis=1)

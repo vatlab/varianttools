@@ -727,7 +727,7 @@ class Sqlite_Store(Base_Store):
 
             id_idx+=1
 
-            for rec in result:          
+            for rec in result:  
                 if rec[0] not in variants:
                     # the last item is for number of genotype for male individual
                     variants[rec[0]] = [0, 0, 0, 0, 0]
@@ -743,6 +743,8 @@ class Sqlite_Store(Base_Store):
                     variants[rec[0]][0] += 1
                 # type homozygote
                 elif rec[1] == 2:
+                    # if rec[0]==7:
+                    #     print(id)
                     variants[rec[0]][1] += 1
                 # type double heterozygote with two different alternative alleles
                 elif rec[1] == -1:
