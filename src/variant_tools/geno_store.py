@@ -719,6 +719,11 @@ class Sqlite_Store(Base_Store):
             query = 'SELECT variant_id {} FROM {}_genotype.genotype_{} {};'.format(' '.join([',' + x for x in fieldSelect]),
                     self.proj.name, id, whereClause)
             self.db.attach(self.proj.name+"_genotype.DB",self.proj.name+"_genotype")
+            # self.db.attach(self.proj.name+".proj",self.proj.name)
+            # self.cur.execute('select * from sqlite_master')
+            # result=self.cur.fetchall()
+            # for line in result:
+            #     print(line)
             env.logger.trace(query)
             self.cur.execute(query)
             result=self.cur.fetchall()
@@ -1072,6 +1077,15 @@ class HDF5_Store(Base_Store):
             sampleFileMap[res[1]].append(res[0])
         return sampleFileMap
 
+    def get_selected_variants(self,variant_table):
+        self.cur=self.proj.db.cursor()
+        self.cur.execute('SELECT variant_id FROM {}'.format(variant_table))
+        result=self.cur.fetchall()
+        variants=[]
+        for res in result:
+            variants.append(res[0])
+        return variants
+
 
 
     def get_noWT_variants_worker(self,queue,accessEngine,samples):
@@ -1112,21 +1126,24 @@ class HDF5_Store(Base_Store):
         return where_clause
 
 
-    def get_genoType_genoInfo_worker(self,queue,accessEngine,samples,genotypes,fieldSelect,validGenotypeFields,operations):
-        queue.put(accessEngine.get_geno_field_from_HDF5(samples,genotypes,fieldSelect,validGenotypeFields,operations))
+    def get_genoType_genoInfo_worker(self,queue,accessEngine,samples,variants,genotypes,fieldSelect,validGenotypeFields,operations):
+        queue.put(accessEngine.get_geno_field_from_HDF5(samples,variants,genotypes,fieldSelect,validGenotypeFields,operations))
 
 
     def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
         sampleFileMap=self.get_HDF5_sampleMap()
         fieldSelect=list(sampleDict.values())[0][1]
+        variants=[]
+        if variant_table != 'variant':
+            variants=self.get_selected_variants(variant_table)
+    
         master={}
-        
         queue=Queue()
         procs=[]
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
             samplesInfile=sampleFileMap[HDFfileName.split("/")[-1]]
             accessEngine=Engine_Access.choose_access_engine(HDFfileName)
-            p=Process(target=self.get_genoType_genoInfo_worker,args=(queue,accessEngine,list(set(sampleDict.keys()).intersection(samplesInfile)),genotypes,fieldSelect,validGenotypeFields,operations)) 
+            p=Process(target=self.get_genoType_genoInfo_worker,args=(queue,accessEngine,list(set(sampleDict.keys()).intersection(samplesInfile)),variants,genotypes,fieldSelect,validGenotypeFields,operations)) 
             procs.append(p)
             p.start()
 
