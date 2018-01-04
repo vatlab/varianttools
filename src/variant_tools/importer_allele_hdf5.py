@@ -1354,10 +1354,6 @@ def importGenotypesInParallel(importer,num_sample=0):
 
         # env.logger.debug('Workload of processes: {}'.format(workload))
 
-        line_no = 0
-        num_lines=0    
-        readQueue=[]
-
         taskQueue=queue.Queue()
         task=None
 
@@ -1489,5 +1485,126 @@ def importGenotypesInParallel(importer,num_sample=0):
         #         worker.join()
 
         #     prog.update(chunk_length)
+
+class HDF5GenotypeUpdateWorker(Process):
+
+    def __init__(self, chunk,variantIndex, start_sample,end_sample,sample_ids,geno_info,HDFfile,build,fields):
+        Process.__init__(self, name='GenotypeUpdater')
+        # self.daemon=True
+        self.chunk=chunk
+        self.variantIndex = variantIndex
+        self.start_sample=start_sample
+        self.end_sample=end_sample
+        self.geno_info=geno_info
+        self.HDFfile=HDFfile
+        self.build=build
+        self.fields=fields
+
+        self.info={}
+        self.namedict={"DP_geno":"calldata/DP","GQ_geno":"calldata/GQ"}
+        if len(self.geno_info)>0:
+            for info in self.geno_info:
+                #indptr,indices,data,shape,rownames
+                # self.info[info.name]=[[],[],[],[],[]]
+                self.info[info.name]=[]
+
+    def writeIntoHDF(self,chr):
+        storageEngine=Engine_Storage.choose_storage_engine(self.HDFfile)
+        if len(self.geno_info)>0:
+            for info in self.geno_info:
+                storageEngine.store_genoInfo(np.array(self.info[info.name]),chr,info.name)
+                self.info[info.name]=[]
+        storageEngine.close()
+    
+
+
+
+    def run(self):
+        prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
+        for i in range(len(self.chunk["variants/ID"])):
+            infoDict={}
+            chr=self.chunk["variants/CHROM"][i].replace("chr","")
+            if chr!=prev_chr:
+                self.writeIntoHDF(prev_chr)
+                prev_chr=chr             
+            ref=self.chunk["variants/REF"][i]
+            pos=self.chunk["variants/POS"][i]
+
+            for altIndex in range(len(self.chunk["variants/ALT"][i])):
+                alt=self.chunk["variants/ALT"][i][altIndex]
+                if alt!="":
+                    if tuple((chr, ref, alt)) in self.variantIndex:
+                        variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
+                        # self.getGT(variant_id,i,altIndex)
+                        for info in self.geno_info:
+                            self.info[info.name].append(self.chunk[self.namedict[info.name]][i,self.start_sample:self.end_sample])                   
+                    else:
+                        rec=[str(chr),str(pos),ref,alt]  
+                        msg=normalize_variant(RefGenome(self.build).crr, rec, 0, 1, 2, 3)
+                        if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
+                            variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
+                            # self.getGT(variant_id,i,altIndex)
+                            for info in self.geno_info:
+                                self.info[info.name].append(self.chunk[self.namedict[info.name]][i,self.start_sample:self.end_sample])                   
+        self.writeIntoHDF(chr)
+
+def UpdateGenotypeInParallel(proj,input_filename,sample_ids,genotype_info):
+
+        
+    jobs=8
+
+    numTasks=jobs
+    updaters=[None]*jobs
+    taskQueue=queue.Queue()
+    task=None
+    variantIndex = proj.createVariantMap('variant', False)
+
+    fields=['variants/ID','variants/REF','variants/ALT','variants/POS','variants/CHROM']
+  
+  
+    if (len(genotype_info)>0):
+        for field in genotype_info:          
+            fields.append("calldata/"+field.name.replace("_geno",""))
+    print(fields)
+    types=None
+    numbers=None
+    alt_number=DEFAULT_ALT_NUMBER
+    fills=None
+    region=None
+    tabix='tabix'
+    samples=None
+    transformers=None
+    buffer_size=DEFAULT_BUFFER_SIZE
+    chunk_length=DEFAULT_CHUNK_LENGTH
+    chunk_width=DEFAULT_CHUNK_WIDTH
+
+    log=None
+    _, samples, headers, it = iter_vcf_chunks(
+            input_filename, fields=fields, types=types, numbers=numbers, alt_number=alt_number,
+            buffer_size=buffer_size, chunk_length=chunk_length, fills=fills, region=region,
+            tabix=tabix, samples=samples, transformers=transformers
+        )
+
+        
+    for chunk, _, _, _ in it:
+        for HDFfileName in glob.glob("tmp*genotypes.h5"):
+            cur=proj.db.cursor()
+            cur.execute('SELECT MIN(sample_id),Max(sample_id) FROM sample where HDF5="{}" '.format(HDFfileName))
+            result=cur.fetchone()
+            start_sample=result[0]
+            end_sample=result[1]
+            print(HDFfileName,start_sample,end_sample)
+     
+            taskQueue.put(HDF5GenotypeUpdateWorker(chunk, variantIndex, start_sample, end_sample, 
+                 sample_ids, genotype_info,HDFfileName,proj.build,fields[5:]))
+        while taskQueue.qsize()>0:
+            for i in range(jobs):    
+                if updaters[i] is None or not updaters[i].is_alive():     
+                    task=taskQueue.get()
+                    updaters[i]=task
+                    updaters[i].start()           
+                    break 
+        for worker in updaters:
+            worker.join()
 
    

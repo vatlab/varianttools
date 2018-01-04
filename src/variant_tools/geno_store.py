@@ -720,10 +720,6 @@ class Sqlite_Store(Base_Store):
                     self.proj.name, id, whereClause)
             self.db.attach(self.proj.name+"_genotype.DB",self.proj.name+"_genotype")
             self.db.attach(self.proj.name+".proj",self.proj.name)
-            # self.cur.execute('select * from sqlite_master')
-            # result=self.cur.fetchall()
-            # for line in result:
-            #     print(line)
             env.logger.trace(query)
             self.cur.execute(query)
             result=self.cur.fetchall()

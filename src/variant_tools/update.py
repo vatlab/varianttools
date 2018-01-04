@@ -38,6 +38,7 @@ from .importer import LineProcessor, probeSampleName
 from .text_reader import TextReader
 from .geno_store import *
 import sqlite3
+from .importer_allele_hdf5 import *
 #
 #
 #  Command update
@@ -334,11 +335,25 @@ class Updater:
         self.db.commit()
         prog.done(self.count[0])
 
+    def updateHDF5FromFile(self,input_filename):
+        print(self.genotype_info)
+        print(self.genotype_field)
+        sample_ids = self.getSampleIDs(input_filename) if self.genotype_info else []
+        UpdateGenotypeInParallel(self.proj,input_filename,sample_ids,self.genotype_info)
+
+
+        
+
     def update(self):
         '''Start updating'''
         for count,f in enumerate(self.files):
             env.logger.info('{} variants from {} ({}/{})'.format('Updating', f, count + 1, len(self.files)))
-            self.updateFromFile(f)
+            
+            if self.proj.store=="sqlite":
+                self.updateFromFile(f)
+            elif self.proj.store=="hdf5":
+                self.updateHDF5FromFile(f)
+
             env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.count[8],
                     '' if self.count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.count[1])))
             for i in range(len(self.count)):
