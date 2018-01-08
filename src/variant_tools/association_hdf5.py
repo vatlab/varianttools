@@ -58,6 +58,7 @@ class GroupHDFGenerator(Process):
             HDFfileGroupName=HDFfileName.replace(".h5","_multi_genes.h5")
             if (os.path.isfile(HDFfileGroupName)):
                 os.remove(HDFfileGroupName)
+                
 
             
             accessEngine=Engine_Access.choose_access_engine(HDFfileName)
