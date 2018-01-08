@@ -91,7 +91,8 @@ class GroupHDFGenerator(Process):
                     if subMatrix is not None:
                         storageEngine.store(subMatrix,chr,geneSymbol+"/GT_geno")
                         storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
-                        storageEngine.store(colnames,chr,"/colnames")
+                        if not storageEngine.checkGroup(chr,"colnames"):
+                            storageEngine.store(colnames,chr,"colnames")
                     # storageEngine.close() 
                 accessEngine.close()
                 storageEngine.close()

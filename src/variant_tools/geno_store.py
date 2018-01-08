@@ -1039,8 +1039,6 @@ class HDF5_Store(Base_Store):
         HDFfileName=self.get_sampleFileName(sampleID)
         storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
         genoFields=storageEngine.geno_fields(sampleID)
-        genoFields=["dp_geno" if x=="DP" else x for x in genoFields]
-        genoFields=["gq_geno" if x=="GQ" else x for x in genoFields]
         genoFields=[x.lower() for x in genoFields]
         storageEngine.close()
         return genoFields

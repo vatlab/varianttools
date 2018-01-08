@@ -336,10 +336,8 @@ class Updater:
         prog.done(self.count[0])
 
     def updateHDF5FromFile(self,input_filename):
-        print(self.genotype_info)
-        print(self.genotype_field)
         sample_ids = self.getSampleIDs(input_filename) if self.genotype_info else []
-        UpdateGenotypeInParallel(self.proj,input_filename,sample_ids,self.genotype_info)
+        UpdateGenotypeInParallel(self,input_filename,sample_ids)
 
 
         
@@ -351,14 +349,14 @@ class Updater:
             
             if self.proj.store=="sqlite":
                 self.updateFromFile(f)
+                env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.count[8],
+                    '' if self.count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.count[1])))
+                for i in range(len(self.count)):
+                    self.total_count[i] += self.count[i]
+                    self.count[i] = 0
             elif self.proj.store=="hdf5":
                 self.updateHDF5FromFile(f)
-
-            env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.count[8],
-                    '' if self.count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.count[1])))
-            for i in range(len(self.count)):
-                self.total_count[i] += self.count[i]
-                self.count[i] = 0
+        
         if len(self.files) > 1:
             env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.total_count[8],
                     '' if self.total_count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.total_count[1])))

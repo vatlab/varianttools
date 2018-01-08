@@ -224,21 +224,11 @@ class HDF5Engine_storage(Base_Storage):
                 ds = self.file.create_earray(group, groupName, tb.Atom.from_dtype(data.dtype), (0,),filters=filters)
             ds.append(data)
 
-        else:   
-            if "DP_geno" in groupName:
-                group.DP_geno.append(data)
-            elif "GQ_geno" in groupName:
-                group.GQ_geno.append(data)
-            elif "GT_geno" in groupName:
-                group.GT_geno.append(data)
-            elif "Mask_geno" in groupName:
-                group.Mask_geno.append(data)
-            elif "rownames" in groupName:
-                group.rownames.append(data)
-            elif "rowmask" in groupName:
-                group.rowmask.append(data)
-            elif "shape" in groupName:
+        else:
+            if "shape" in groupName:
                 group.shape[0]+=data[0]
+            else:
+                self.getGroup(chr,groupName).append(data)
 
 
 
@@ -976,11 +966,11 @@ class HDF5Engine_access(Base_Access):
             rowMasked=np.where(update_rowMask==True)[0]
             sampleMasked=np.where(sampleMask==True)[0]
             if len(rowMasked)>0:
-                update_rownames=update_rownames[np.where(rowMask==False)]
+                update_rownames=np.array(update_rownames)[np.where(update_rowMask==False)[0]]
                 sub_geno=np.delete(sub_geno,rowMasked,0)
 
             if len(sampleMasked)>0:
-                colnames=colnames[np.where(sampleMask==False)]
+                colnames=colnames[np.where(sampleMask==False)[0]]
                 sub_geno=np.delete(sub_geno,sampleMasked,1)
 
             
