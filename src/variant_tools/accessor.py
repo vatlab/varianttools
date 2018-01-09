@@ -220,6 +220,7 @@ class HDF5Engine_storage(Base_Storage):
                 # group=self.file.create_group("/chr"+chr+"/"+groups[0],groups[-1])
             if len(data.shape)>1:
                 ds = self.file.create_earray(group, groupName, tb.Atom.from_dtype(data.dtype), (0,data.shape[-1]),filters=filters,expectedrows=len(data))
+                print("insert")
             else:
                 ds = self.file.create_earray(group, groupName, tb.Atom.from_dtype(data.dtype), (0,),filters=filters)
             ds.append(data)
@@ -229,9 +230,8 @@ class HDF5Engine_storage(Base_Storage):
                 group.shape[0]+=data[0]
             else:
                 self.getGroup(chr,groupName).append(data)
-
-
-
+                print("append")
+               
 
 
     def num_variants(self,sampleID):
@@ -248,8 +248,7 @@ class HDF5Engine_storage(Base_Storage):
                 data=group.data[colPos]
                 numNan=np.where(np.isnan(data))
                 numNone=np.where(data==-1)
-                print("Here",numVariants,numNan,numNone)
-                print(group.rownames[:])
+    
                 totalNum+=numVariants-len(numNan[0])-len(numNone[0])
             except:
                 pass
@@ -404,9 +403,18 @@ class HDF5Engine_storage(Base_Storage):
         #         # data[indptr[pos]+samplePos]=np.nan
         #     except Exception as e:
         #             pass
-                    
-                
-           
+
+    def removeNode(self,info):
+        for chr in range(1,23):
+            try:
+                if self.checkGroup(str(chr),info):
+                    self.file.remove_node("/chr"+str(chr)+"/"+info)
+            except tb.exceptions.NoSuchNodeError:
+                pass                              
+            except Exception as e:
+                print(e)
+                pass
+        
 
     def store_HDF5(self,hmatrix,chr,groupName=""):
         """The implementation of store API

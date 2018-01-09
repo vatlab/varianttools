@@ -338,6 +338,9 @@ class Updater:
     def updateHDF5FromFile(self,input_filename):
         sample_ids = self.getSampleIDs(input_filename) if self.genotype_info else []
         UpdateGenotypeInParallel(self,input_filename,sample_ids)
+        # for HDFfileName in glob.glob("tmp*genotypes.h5"):
+        #     storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+        #     print(storageEngine.file)
 
 
         

@@ -62,7 +62,7 @@ from variant_tools.io_vcf_read import VCFChunkIterator, FileInputStream
 
 
 DEFAULT_BUFFER_SIZE = 2**14
-DEFAULT_CHUNK_LENGTH = 2**13
+DEFAULT_CHUNK_LENGTH = 2**8
 DEFAULT_CHUNK_WIDTH = 2**6
 DEFAULT_ALT_NUMBER = 3
 
@@ -1048,11 +1048,14 @@ class HDF5GenotypeImportWorker(Process):
         storageEngine.store(np.array(self.info["GT_geno"]),chr,"GT_geno")
         storageEngine.store(np.array(self.info["Mask_geno"]),chr,"Mask_geno")
         storageEngine.store(np.array(self.rownames),chr,"rownames")
-        storageEngine.store(np.array(self.colnames),chr,"colnames")
         rowmask=np.zeros(len(self.rownames),dtype=np.bool)
-        colmask=np.zeros(len(self.colnames),dtype=np.bool)
         storageEngine.store(np.array(rowmask),chr,"rowmask")
-        storageEngine.store(np.array(colmask),chr,"samplemask")
+        
+        if not storageEngine.checkGroup(chr,"colnames"):
+            storageEngine.store(np.array(self.colnames),chr,"colnames")
+            colmask=np.zeros(len(self.colnames),dtype=np.bool)
+            storageEngine.store(np.array(colmask),chr,"samplemask")
+        
         storageEngine.store(shape,chr,"shape")
 
         self.info["GT_geno"]=[]
@@ -1443,6 +1446,7 @@ class HDF5GenotypeUpdateWorker(Process):
         self.variantIndex = variantIndex
         self.start_sample=start_sample
         self.end_sample=end_sample
+        self.sample_ids=sample_ids
         self.geno_info=geno_info
         self.HDFfile=HDFfile
         self.build=build
@@ -1463,6 +1467,7 @@ class HDF5GenotypeUpdateWorker(Process):
                 storageEngine.store_genoInfo(np.array(self.info[info.name]),chr,info.name)
                 self.info[info.name]=[]
         storageEngine.close()
+
     
 
     def run(self):
@@ -1491,7 +1496,6 @@ class HDF5GenotypeUpdateWorker(Process):
                             for info in self.geno_info:
                                 self.info[info.name].append(self.chunk[self.namedict[info.name]][i,self.start_sample:self.end_sample])                   
         self.writeIntoHDF(chr)
-
 
 
 
@@ -1530,14 +1534,22 @@ def UpdateGenotypeInParallel(updater,input_filename,sample_ids):
             tabix=tabix, samples=samples, transformers=transformers
         )
 
-        
+    for HDFfileName in glob.glob("tmp*genotypes.h5"):
+        storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+        for info in updater.genotype_info:
+            storageEngine.removeNode(info.name)
+            storageEngine.close()
+
     for chunk, _, _, _ in it:
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
-            cur=updater.proj.db.cursor()
-            cur.execute('SELECT MIN(sample_id),Max(sample_id) FROM sample where HDF5="{}" '.format(HDFfileName))
-            result=cur.fetchone()
-            start_sample=result[0]-1
-            end_sample=result[1]
+            # cur=updater.proj.db.cursor()
+            # cur.execute('SELECT MIN(sample_id),Max(sample_id) FROM sample where HDF5="{}" '.format(HDFfileName))
+            # result=cur.fetchone()
+            # start_sample=result[0]-1
+            # end_sample=result[1]
+            cols=HDFfileName.split("_")
+            start_sample=int(cols[1])-1
+            end_sample=int(cols[2])
             taskQueue.put(HDF5GenotypeUpdateWorker(chunk, variantIndex, start_sample, end_sample, 
                  sample_ids, updater.genotype_info,HDFfileName,updater.proj.build))
         while taskQueue.qsize()>0:
@@ -1550,5 +1562,7 @@ def UpdateGenotypeInParallel(updater,input_filename,sample_ids):
         for worker in updaters:
             if worker is not None:
                 worker.join()
+        
+    
 
    

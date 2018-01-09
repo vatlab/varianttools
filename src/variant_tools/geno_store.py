@@ -1002,14 +1002,21 @@ class HDF5_Store(Base_Store):
             storageEngine.remove_sample(ID)
             storageEngine.close()
 
+    def remove_variants_worker(self,storageEngine,variantIDs):
+        storageEngine.remove_variants(variantIDs)
+        storageEngine.close()
+
 
     def remove_variants(self,variantIDs,table):
         HDFfileNames=glob.glob("tmp*_genotypes.h5")
         for HDFfileName in HDFfileNames:
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
-            storageEngine.remove_variants(variantIDs)
-            storageEngine.close()
-
+            p=Process(target=self.remove_variants_worker,args=(storageEngine,variantIDs)) 
+            p.start()
+        env.logger.info('Removing table {} itself'.format(decodeTableName(table)))
+        self.proj.db.removeTable(table)
+        self.proj.db.commit()
+            
 
     def remove_genotype_workder(self,storageEngine,cond):
         storageEngine.remove_genotype(cond)
