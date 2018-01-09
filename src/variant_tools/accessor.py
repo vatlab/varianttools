@@ -1033,8 +1033,9 @@ class HDF5Engine_access(Base_Access):
         if field=="GQ_geno" and "/chr"+str(chr)+"/GQ_geno" in self.file:
             genoinfo=node.GQ_geno[startPos:endPos,:]
             genoinfo=np.nan_to_num(genoinfo)
-        genotypes=genotypes[0]
-        if len(genotypes)>1:
+
+        if len(genotypes)>0:
+            genotypes=genotypes[0]
             if "DP_geno" in genotypes and "/chr"+str(chr)+"/DP_geno" in self.file:
                 DP_geno=node.DP_geno[startPos:endPos,:]
                 DP_geno[DP_geno==-1]=0
@@ -1042,6 +1043,7 @@ class HDF5Engine_access(Base_Access):
                 GQ_geno=node.GQ_geno[startPos:endPos,:]
                 GQ_geno=np.nan_to_num(GQ_geno)
             genoinfo=np.where(eval("~("+genotypes+")"),np.nan,genoinfo)
+        
         rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,rowpos)
         return rownames,colnames,genoinfo
 
@@ -1067,9 +1069,9 @@ class HDF5Engine_access(Base_Access):
                     rowpos=list(map(lambda x:rownames.index(x),varids))
                 for startPos,endPos in chunkPos:
                     # rownames=node.rownames[startPos:endPos].tolist()              
-                    
                     if "/chr"+str(chr)+"/GT_geno" in self.file:    
                         rownames,colnames,genoinfo=self.filter_on_genotypes(genotypes,chr,node,"GT_geno",startPos,endPos,colpos,rowpos)
+                    
                         numrow=len(rownames)
                         variants=np.zeros(shape=(numrow,len(validGenotypeFields)+5),dtype=np.int64)   
                         
