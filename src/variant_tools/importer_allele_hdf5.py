@@ -1455,8 +1455,6 @@ class HDF5GenotypeUpdateWorker(Process):
 
         if len(self.geno_info)>0:
             for info in self.geno_info:
-                #indptr,indices,data,shape,rownames
-                # self.info[info.name]=[[],[],[],[],[]]
                 self.info[info.name]=[]
                 self.namedict[info.name]="calldata/"+info.name.replace("_geno","")
 
@@ -1484,17 +1482,9 @@ class HDF5GenotypeUpdateWorker(Process):
             for altIndex in range(len(self.chunk["variants/ALT"][i])):
                 alt=self.chunk["variants/ALT"][i][altIndex]
                 if alt!="":
-                    if tuple((chr, ref, alt)) in self.variantIndex:
-                        variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
-                        for info in self.geno_info:
-                            self.info[info.name].append(self.chunk[self.namedict[info.name]][i,self.start_sample:self.end_sample])                   
-                    else:
-                        rec=[str(chr),str(pos),ref,alt]  
-                        msg=normalize_variant(RefGenome(self.build).crr, rec, 0, 1, 2, 3)
-                        if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
-                            variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
-                            for info in self.geno_info:
-                                self.info[info.name].append(self.chunk[self.namedict[info.name]][i,self.start_sample:self.end_sample])                   
+                    for info in self.geno_info:
+                        self.info[info.name].append(self.chunk[self.namedict[info.name]][i,self.start_sample:self.end_sample]) 
+                    
         self.writeIntoHDF(chr)
 
 
