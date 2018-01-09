@@ -639,6 +639,7 @@ default_types = {
     'calldata/AD': 'i2',
     'calldata/MQ0': 'i2',
     'calldata/MQ': 'f2',
+    'calldata/PL': 'i2'
 }
 
 

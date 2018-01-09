@@ -218,9 +218,10 @@ class HDF5Engine_storage(Base_Storage):
             if len(groups)>1:
                 group=self.getGroup(chr,groups[0])
                 # group=self.file.create_group("/chr"+chr+"/"+groups[0],groups[-1])
-            if len(data.shape)>1:
-                ds = self.file.create_earray(group, groupName, tb.Atom.from_dtype(data.dtype), (0,data.shape[-1]),filters=filters,expectedrows=len(data))
-                print("insert")
+            if len(data.shape)==2:
+                ds = self.file.create_earray(group, groupName, tb.Atom.from_dtype(data.dtype), (0,data.shape[1]),filters=filters,expectedrows=len(data))
+            elif len(data.shape)>2:
+                ds = self.file.create_earray(group, groupName, tb.Atom.from_dtype(data.dtype), (0,data.shape[1],data.shape[2]),filters=filters,expectedrows=len(data))
             else:
                 ds = self.file.create_earray(group, groupName, tb.Atom.from_dtype(data.dtype), (0,),filters=filters)
             ds.append(data)
@@ -230,7 +231,6 @@ class HDF5Engine_storage(Base_Storage):
                 group.shape[0]+=data[0]
             else:
                 self.getGroup(chr,groupName).append(data)
-                print("append")
                
 
 
