@@ -716,7 +716,8 @@ default_numbers = {
     'calldata/GT': 1,
     'calldata/GQ': 1,
     'calldata/HQ': 2,
-    'calldata/AD': 'R',
+    'calldata/AD': 2,
+    'calldata/PL': 4,
     'calldata/MQ0': 1,
     'calldata/MQ': 1,
 }
