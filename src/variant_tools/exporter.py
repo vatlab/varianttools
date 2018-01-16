@@ -44,11 +44,11 @@ import glob as glob
 MAX_COLUMN = 62
 def VariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
         export_alt_build, IDs, jobs):
-    if jobs == 0 and len(IDs) < MAX_COLUMN:
+    if jobs == 0 and len(IDs) < MAX_COLUMN and proj.store=="sqlite":
         # using a single thread
         return EmbeddedVariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build, IDs)
-    elif jobs > 0 and len(IDs) < MAX_COLUMN:
+    elif jobs > 0 and len(IDs) < MAX_COLUMN and proj.store=="sqlite":
         # using a standalone process to read things and
         # pass information using a pipe
         return StandaloneVariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
@@ -334,11 +334,13 @@ class MultiVariantReader(BaseVariantReader):
             samplefiles.sort(key=lambda x:x.split("_")[1])
       
             for HDFfileName in samplefiles:
-                samplesInfile=sampleFileMap[HDFfileName.split("/")[-1]]
-                r, w = Pipe(False)
-                p=VariantWorker_HDF5(HDFfileName,samplesInfile,self.geno_fields,w)
-                self.workers.append(p)
-                self.readers.append(r)
+                filename=HDFfileName.split("/")[-1]
+                if filename in sampleFileMap:
+                    samplesInfile=sampleFileMap[filename]
+                    r, w = Pipe(False)
+                    p=VariantWorker_HDF5(HDFfileName,samplesInfile,self.geno_fields,w)
+                    self.workers.append(p)
+                    self.readers.append(r)
        
 
 
@@ -375,6 +377,7 @@ class MultiVariantReader(BaseVariantReader):
             try:
                 for idx, reader in enumerate(self.readers):
                     val = reader.recv()
+                    # print(val[:10])
                     if val is None:
                         all_done = True
                         break

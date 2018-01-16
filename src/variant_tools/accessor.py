@@ -991,12 +991,12 @@ class HDF5Engine_access(Base_Access):
         
         rownames=node.rownames[minPos:maxPos]
         colnames=node.colnames[:]
-        # rowMask=node.rowmask[minPos:maxPos]
+        rowMask=node.rowmask[minPos:maxPos]
         # sampleMask=node.samplemask[:]
         try:
             sub_Mask=node.Mask_geno[minPos:maxPos,:]
             sub_geno=np.multiply(genoinfo,sub_Mask)
-            # rowMasked=np.where(rowMask==True)[0]
+            rowMasked=np.where(rowMask==True)[0]
             # sampleMasked=np.where(sampleMask==True)[0]     
             
             if len(rowpos)>0:
@@ -1005,9 +1005,9 @@ class HDF5Engine_access(Base_Access):
             colnames=colnames[colpos]
             sub_geno=sub_geno[:,colpos]
 
-            # if len(rowMasked)>0:
-            #     rownames=rownames[np.where(rowMask==False)]
-            #     sub_geno=np.delete(sub_geno,rowMasked,0)
+            if len(rowpos)==0 and len(rowMasked)>0:
+                rownames=rownames[np.where(rowMask==False)]
+                sub_geno=np.delete(sub_geno,rowMasked,0)
 
             
             # if len(sampleMasked)>0:
@@ -1125,17 +1125,16 @@ class HDF5Engine_access(Base_Access):
                         rownames,colnames,genoinfo=self.filter_on_genotypes("",chr,node,"GT_geno",startPos,endPos,colpos,rowpos)
                         numrow,numcol=genoinfo.shape[0],genoinfo.shape[1]
                         info=np.zeros(shape=(numrow,numcol*len(validGenotypeFields)),dtype=float)   
-                        for row in range(genoinfo.shape[0]):
-                            for col in range(genoinfo.shape[1]):
-                                info[row,col*len(validGenotypeFields)]=genoinfo[row,col]
+                        for col in range(numcol):
+                                info[:,col*len(validGenotypeFields)]=genoinfo[:,col]
 
                         for pos,field in enumerate(validGenotypeFields):
                             if "/chr"+str(chr)+"/"+field in self.file:
                                 rownames,colnames,genoinfo=self.filter_on_genotypes("",chr,node,field,startPos,endPos,colpos,rowpos)
-                                for row in range(genoinfo.shape[0]):
-                                    for col in range(genoinfo.shape[1]):
-                                        info[row,col*len(validGenotypeFields)+pos]=genoinfo[row,col]
+                                for col in range(numcol):
+                                    info[:,col*len(validGenotypeFields)+pos]=genoinfo[:,col]
                         startPos=endPos
+                        print(len(rownames),genoinfo.shape)
                         vardict.update(dict(zip(rownames,info)))  
             except tb.exceptions.NoSuchNodeError:
                 pass                              
