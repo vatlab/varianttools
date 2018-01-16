@@ -304,6 +304,7 @@ class MultiVariantReader(BaseVariantReader):
         self.workers = [p]
         self.readers = [r]
         IDs = list(IDs)
+        print(IDs)
         # we may need more jobs due to the limit of max columns
         # but we will only have self.jobs active jobs
         jobs = min(1, jobs)
@@ -338,7 +339,7 @@ class MultiVariantReader(BaseVariantReader):
                 if filename in sampleFileMap:
                     samplesInfile=sampleFileMap[filename]
                     r, w = Pipe(False)
-                    p=VariantWorker_HDF5(HDFfileName,samplesInfile,self.geno_fields,w)
+                    p=VariantWorker_HDF5(HDFfileName,list(set(IDs).intersection(samplesInfile)),self.geno_fields,w)
                     self.workers.append(p)
                     self.readers.append(r)
        
