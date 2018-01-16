@@ -37,6 +37,9 @@ from .utils import ProgressBar, delayedAction, \
     splitField
 
 from .preprocessor import *
+from .geno_store import GenoStore
+from .accessor import *
+import glob as glob
 
 MAX_COLUMN = 62
 def VariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
@@ -307,22 +310,37 @@ class MultiVariantReader(BaseVariantReader):
         self.jobs = max(jobs, len(IDs) // MAX_COLUMN + 2)
         block = len(IDs) // (self.jobs-1) + 1
         #
-        with delayedAction(env.logger.info, 'Checking indexes'):
-            ID_needed_idx = [id for id in IDs if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id))]
-        if len(ID_needed_idx) > 0:
-            prog = ProgressBar('Creating indexes', len(ID_needed_idx))
-            cur = self.proj.db.cursor()
-            for idx, id in enumerate(ID_needed_idx):
-                if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id)):
-                    cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
-                prog.update(idx)
-            prog.done()            
-        for i in range(self.jobs - 1):
-            r, w = Pipe(False)
-            subIDs = IDs[(block*i):(block *(i + 1))]
-            p = VariantWorker(proj.name, proj.annoDB, self.getSampleQuery(subIDs), w, lock)
-            self.workers.append(p)
-            self.readers.append(r)
+        if self.proj.store=="sqlite":
+            with delayedAction(env.logger.info, 'Checking indexes'):
+                ID_needed_idx = [id for id in IDs if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id))]
+            if len(ID_needed_idx) > 0:
+                prog = ProgressBar('Creating indexes', len(ID_needed_idx))
+                cur = self.proj.db.cursor()
+                for idx, id in enumerate(ID_needed_idx):
+                    if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id)):
+                        cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
+                    prog.update(idx)
+                prog.done()            
+            for i in range(self.jobs - 1):
+                r, w = Pipe(False)
+                subIDs = IDs[(block*i):(block *(i + 1))]
+                p = VariantWorker(proj.name, proj.annoDB, self.getSampleQuery(subIDs), w, lock)
+                self.workers.append(p)
+                self.readers.append(r)
+        elif self.proj.store=="hdf5":
+            store = GenoStore(proj)    
+            sampleFileMap=store.get_HDF5_sampleMap()
+            samplefiles=glob.glob("tmp*genotypes.h5")      
+            samplefiles.sort(key=lambda x:x.split("_")[1])
+      
+            for HDFfileName in samplefiles:
+                samplesInfile=sampleFileMap[HDFfileName.split("/")[-1]]
+                r, w = Pipe(False)
+                p=VariantWorker_HDF5(HDFfileName,samplesInfile,self.geno_fields,w)
+                self.workers.append(p)
+                self.readers.append(r)
+       
+
 
     def start(self):
         prog = ProgressBar('Selecting genotypes', len(self.readers))
@@ -367,6 +385,7 @@ class MultiVariantReader(BaseVariantReader):
                         raise ValueError('Read different IDs from multiple processes')
                     rec.extend(val[1:])
                     if idx == last:
+                        # print(id,rec[:20])
                         yield rec
                         rec = []
                 if all_done:
@@ -375,6 +394,32 @@ class MultiVariantReader(BaseVariantReader):
                 env.logger.debug('Failed to get record: {}'.format(e))
         for p in self.workers:
             p.terminate()
+
+
+
+class VariantWorker_HDF5(Process):
+    # this class starts a process and used passed query to read variants
+    def __init__(self,HDFfileName,samples, geno_fields,output):
+        self.fileName=HDFfileName
+        self.samples=samples
+        self.geno_fields=geno_fields
+        self.output = output    
+        Process.__init__(self)
+
+    def run(self):
+        accessEngine=Engine_Access.choose_access_engine(self.fileName)
+        result=accessEngine.get_genoType_forExport_from_HDF5(self.samples,self.geno_fields)  
+        self.output.send(None)
+        last_id = None
+        for key,val in result.items():
+            if key!=last_id:
+                last_id=key
+                val=np.where(np.isnan(val), None, val)
+                self.output.send([key]+val.tolist())
+        self.output.send(None)
+    
+
+
 
 class VariantWorker(Process):
     # this class starts a process and used passed query to read variants
@@ -588,12 +633,16 @@ class Exporter:
             field_indexes[(-1, fld.lower())] = idx
         #
         idx = len(var_fields)
+      
         if geno_fields:
             for id in self.IDs:
-                header = [x.lower() for x in self.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
+                if self.proj.store=="sqlite":
+                    header = [x.lower() for x in self.db.getHeaders('{}_genotype.genotype_{}'.format(self.proj.name, id))]
                 for fld in geno_fields:
                     field_indexes[(id, fld.lower())] = idx
                     idx += 1
+
+      
         # 
         # how to process each column
         sep = '\t' if self.format.delimiter is None else self.format.delimiter
@@ -635,9 +684,14 @@ class Exporter:
         # if export_by_fields is empty
         nFieldBy = len([x for x in self.format.export_by_fields.split(',') if x])
         #
+ 
         reader = VariantReader(self.proj, self.table, self.format.export_by_fields, self.format.order_by_fields,
             var_fields, geno_fields, self.export_alt_build, self.IDs, max(self.jobs - 1, 0))
         reader.start()
+
+
+
+
         prog = ProgressBar(self.filename if self.filename else 'Writing', nr)
         #
         # we cannot use a with statement here because we cannot close sys.stdout
@@ -663,6 +717,7 @@ class Exporter:
             header = header.replace('%(command)s',
                 env.command_line)
             print(header.rstrip(), file=output)
+            print(header.rstrip())
         global rec_alleles
         for idx, raw_rec in enumerate(reader.records()):
             multi_records = False

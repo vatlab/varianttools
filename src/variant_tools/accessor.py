@@ -1051,8 +1051,6 @@ class HDF5Engine_access(Base_Access):
 
     def get_geno_field_from_HDF5(self,samples,varids,genotypes,fieldSelect,validGenotypeFields,operations):
         vardict={}
-
-
         for chr in range(1,23):
         # for chr in [1,22]:
             try:
@@ -1104,6 +1102,48 @@ class HDF5Engine_access(Base_Access):
                 print(e)
                 pass
         return vardict
+
+
+    def get_genoType_forExport_from_HDF5(self,samples,validGenotypeFields):
+        vardict={}
+        for chr in range(1,23):
+        # for chr in [1,22]:
+            try:
+                node=self.file.get_node("/chr"+str(chr))
+                shape=node.shape[:].tolist()          
+                chunkPos=chunks_start_stop(shape[0])
+                samples.sort()
+                colnames=node.colnames[:].tolist()
+                colpos=list(map(lambda x:colnames.index(x),samples))
+                rownames=node.rownames[:].tolist()
+                # print(self.fileName,samples,colpos)
+                rowpos=[]
+             
+                for startPos,endPos in chunkPos:
+                    # rownames=node.rownames[startPos:endPos].tolist()              
+                    if "/chr"+str(chr)+"/GT_geno" in self.file:    
+                        rownames,colnames,genoinfo=self.filter_on_genotypes("",chr,node,"GT_geno",startPos,endPos,colpos,rowpos)
+                        numrow,numcol=genoinfo.shape[0],genoinfo.shape[1]
+                        info=np.zeros(shape=(numrow,numcol*len(validGenotypeFields)),dtype=float)   
+                        for row in range(genoinfo.shape[0]):
+                            for col in range(genoinfo.shape[1]):
+                                info[row,col*len(validGenotypeFields)]=genoinfo[row,col]
+
+                        for pos,field in enumerate(validGenotypeFields):
+                            if "/chr"+str(chr)+"/"+field in self.file:
+                                rownames,colnames,genoinfo=self.filter_on_genotypes("",chr,node,field,startPos,endPos,colpos,rowpos)
+                                for row in range(genoinfo.shape[0]):
+                                    for col in range(genoinfo.shape[1]):
+                                        info[row,col*len(validGenotypeFields)+pos]=genoinfo[row,col]
+                        startPos=endPos
+                        vardict.update(dict(zip(rownames,info)))  
+            except tb.exceptions.NoSuchNodeError:
+                pass                              
+            except Exception as e:
+                print(e)
+                pass
+        return vardict
+
 
 
     def get_noWT_variants(self,samples):

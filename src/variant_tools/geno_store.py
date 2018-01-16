@@ -1130,6 +1130,8 @@ class HDF5_Store(Base_Store):
 
 
     def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
+        print(genotypes)
+        print(validGenotypeFields)
         sampleFileMap=self.get_HDF5_sampleMap()
         fieldSelect=list(sampleDict.values())[0][1]
         variants=[]
@@ -1166,6 +1168,40 @@ class HDF5_Store(Base_Store):
         for p in procs:
             p.join()
         return master
+
+
+
+    def get_genoType_forExport_worker(self,queue,accessEngine,samples,validGenotypeFields):
+        queue.put(accessEngine.get_genoType_forExport_from_HDF5(samples,validGenotypeFields))
+
+
+    def get_genoType_forExport(self,validGenotypeFields):
+        sampleFileMap=self.get_HDF5_sampleMap()
+        validGenotypeFields=["DP_geno","GQ_geno"]
+    
+        master={}
+        queue=Queue()
+        procs=[]
+        for HDFfileName in glob.glob("tmp*genotypes.h5"):
+            samplesInfile=sampleFileMap[HDFfileName.split("/")[-1]]
+            accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+            p=Process(target=self.get_genoType_forExport_worker,args=(queue,accessEngine,samplesInfile,validGenotypeFields)) 
+            procs.append(p)
+            p.start()
+
+        for _ in procs:
+            result=queue.get()
+            # print(result)
+            # for key,value in result.items():
+            #     if key not in master:
+            #         master[key]=value
+           
+        for p in procs:
+            p.join()
+        return master
+
+
+
 
 
     def importGenotypes(self, importer):
