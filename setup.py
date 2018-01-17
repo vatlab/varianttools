@@ -614,8 +614,8 @@ else:
     libs = []
     gccargs = ['-O3', '-Wno-unused-local-typedef', '-Wno-return-type']
 
-ENV_INCLUDE_DIRS = os.environ.get('LD_INCLUDE_PATH', '').split(os.pathsep)
-ENV_LIBRARY_DIRS = os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep)
+ENV_INCLUDE_DIRS = [x for x in os.environ.get('LD_INCLUDE_PATH', '').split(os.pathsep) if x]
+ENV_LIBRARY_DIRS = [x for x in os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep) if x]
 
 if EMBEDDED_BOOST:
     try:
