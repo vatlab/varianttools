@@ -84,12 +84,12 @@ action=RunCommand('mv %(var_table)s.tfam ${CACHE_DIR}/%(jobname)s.tfam',
 comment=Rename tfam file to match tped file
 
 [king_30]
-action=RunCommand('${PLINK} --noweb --tped %(jobname)s.tped --tfam %(jobname)s.tfam --indep-pairwise 50 5 0.5 --allow-no-sex --out %(jobname)s.LD.50',
+action=RunCommand('${PLINK} --tped %(jobname)s.tped --tfam %(jobname)s.tfam --indep-pairwise 50 5 0.5 --allow-no-sex --out %(jobname)s.LD.50',
   working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s.LD.50.prune.in')
 comment=Calculate LD pruning candidate list with a cutoff of R^2=0.5
 
 [king_31]
-action=RunCommand('${PLINK} --noweb --tped %(jobname)s.tped --tfam %(jobname)s.tfam --extract %(jobname)s.LD.50.prune.in --no-parents --no-sex --no-pheno --maf %(maf)s --make-bed --out %(jobname)s',
+action=RunCommand('${PLINK} --tped %(jobname)s.tped --tfam %(jobname)s.tfam --extract %(jobname)s.LD.50.prune.in --no-parents --no-sex --no-pheno --maf %(maf)s --make-bed --out %(jobname)s',
   working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s.bed')
 comment=LD pruning from pre-calculated list 
 
