@@ -357,6 +357,9 @@ class HDF5Engine_storage(Base_Storage):
                 shape=node.shape[:].tolist()
                 chunkPos=chunks_start_stop(shape[0])
                 for startPos,endPos in chunkPos:
+
+                    if "GT_geno" in cond and "/chr"+str(chr)+"/GT_geno" in self.file: 
+                        GT_geno=node.GT_geno[startPos:endPos,:]
                     if "DP_geno" in cond and "/chr"+str(chr)+"/DP_geno" in self.file:    
                         DP_geno=node.DP_geno[startPos:endPos,:]
                         DP_geno[DP_geno==-1]=0
@@ -1502,52 +1505,52 @@ class HDF5Engine_access(Base_Access):
         group=self.getGroup(chr,groupName)
         return group.shape[:]
 
-    def get_indptr(self,chr,groupName=""):
-        """This function gets indptr array of specified group.
+    # def get_indptr(self,chr,groupName=""):
+    #     """This function gets indptr array of specified group.
             
-            Args:
+    #         Args:
 
-                - chr (string): the chromosome 
-                - groupName (string): the group name, for example gene name
+    #             - chr (string): the chromosome 
+    #             - groupName (string): the group name, for example gene name
 
-            Return:
-                - indptr ndarray
+    #         Return:
+    #             - indptr ndarray
 
-        """
-        group=self.getGroup(chr,groupName)
-        return group.indptr[:]
+    #     """
+    #     group=self.getGroup(chr,groupName)
+    #     return group.indptr[:]
 
-    def get_indices(self,chr,groupName=""):
-        """This function gets indptr array of specified group.
+    # def get_indices(self,chr,groupName=""):
+    #     """This function gets indptr array of specified group.
             
-            Args:
+    #         Args:
 
-                - chr (string): the chromosome 
-                - groupName (string): the group name, for example gene name
+    #             - chr (string): the chromosome 
+    #             - groupName (string): the group name, for example gene name
 
-            Return:
-                - indptr ndarray
+    #         Return:
+    #             - indptr ndarray
 
-        """
-        group=self.getGroup(chr,groupName)
-        return group.indices[:]
+    #     """
+    #     group=self.getGroup(chr,groupName)
+    #     return group.indices[:]
 
 
 
-    def get_data(self,chr,groupName=""):
-        """This function gets data array of specified group.
+    # def get_data(self,chr,groupName=""):
+    #     """This function gets data array of specified group.
             
-            Args:
+    #         Args:
 
-                - chr (string): the chromosome 
-                - groupName (string): the group name, for example gene name
+    #             - chr (string): the chromosome 
+    #             - groupName (string): the group name, for example gene name
 
-            Return:
-                - data ndarray
+    #         Return:
+    #             - data ndarray
 
-        """
-        group=self.getGroup(chr,groupName)
-        return group.data[:]
+    #     """
+    #     group=self.getGroup(chr,groupName)
+    #     return group.data[:]
 
 
     def close(self):
