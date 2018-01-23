@@ -31,6 +31,7 @@ from argparse import SUPPRESS
 from .project import Project
 from .utils import ProgressBar, env, encodeTableName, decodeTableName, matchName
 from collections import defaultdict
+from .geno_store import GenoStore
 
 def compareArguments(parser):
     parser.add_argument('tables', nargs='*',
@@ -164,19 +165,21 @@ def countGenotypeDifference(proj, args):
         env.logger.warning('Only the first two specified tables will be compared for option --count.')
     # read variants in tables[0]
     for table, sample_name, sample_ID in zip(args.tables, args.samples, args.sample_IDs):
-        g = set()
+        # g = set()
         env.logger.info('Reading genotype of sample {} of approximately {:,} variants in {}...'
             .format(sample_name, proj.db.numOfRows(encodeTableName(table),
                 exact=False), table))
-        cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
-            '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
-                .format(encodeTableName(table), proj.name, sample_ID))
-        for id, GT in cur:
-            if GT is None:
-                if NULL_to_0:
-                    g.add((id, 0))
-            else:
-                g.add((id, GT))
+        # cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
+        #     '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
+        #         .format(encodeTableName(table), proj.name, sample_ID))
+        # for id, GT in cur:
+        #     if GT is None:
+        #         if NULL_to_0:
+        #             g.add((id, 0))
+        #     else:
+        #         g.add((id, GT))
+        store=GenoStore(proj)
+        g=store.get_Genotype(cur,encodeTableName(table),proj,sample_ID)
         geno.append(g)
         env.logger.debug('There are {} genotypes with variants in table {} in sample {}'
             .format(len(g), table, sample_name))
@@ -324,17 +327,19 @@ def compareTables(proj, args):
             # read geno in tables[0]
             env.logger.info('Reading genotypes of sample {} of approximately {:,} geno in {}...'
                 .format(sample, proj.db.numOfRows(encodeTableName(table), exact=False), table))
-            cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
-                '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
-                    .format(encodeTableName(table), proj.name, id))
-            #
-            v = set()
-            for id, GT in cur:
-                if GT is None:
-                    if NULL_to_0:
-                        v.add((id, 0))
-                else:
-                    v.add((id, GT))
+            # cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
+            #     '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
+            #         .format(encodeTableName(table), proj.name, id))
+            # #
+            # v = set()
+            # for id, GT in cur:
+            #     if GT is None:
+            #         if NULL_to_0:
+            #             v.add((id, 0))
+            #     else:
+            #         v.add((id, GT))
+            store=GenoStore(proj)
+            v=store.get_Genotype(cur,encodeTableName(table),proj,sample_ID)
             #
             if idx == 0:
                 if args.difference is not None:
@@ -528,8 +533,9 @@ def compare(args):
                         raise ValueError("No sample with name '{}' is identified.".format(name))
                     elif len(IDs) > 1:
                         raise ValueError("More than one sample with name '{}' is identified.".format(name))
-                    if not 'GT' in proj.db.getHeaders('{}_genotype.genotype_{}'.format(proj.name, IDs[0])):
-                        raise ValueError('Sample {} does not have any genotype.'.format(name))
+                    if proj.store=="sqlite":
+                        if not 'GT' in proj.db.getHeaders('{}_genotype.genotype_{}'.format(proj.name, IDs[0])):
+                            raise ValueError('Sample {} does not have any genotype.'.format(name))
                     args.sample_IDs.append(IDs[0])
             elif args.mode == 'genotype':
                 raise ValueError('Please specify samples to be compared for genotype comparison.')

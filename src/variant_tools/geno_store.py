@@ -987,6 +987,20 @@ class Sqlite_Store(Base_Store):
                         'deletions', 'complex variants', 'unsupported']) if x > 0]),
                     importer.total_count[0], status.total_sample_count))
 
+    def get_Genotype(self,cur,table,proj,sample_ID):
+        g=set()
+        NULL_to_0 = env.treat_missing_as_wildtype
+        cur.execute('SELECT {0}.variant_id, geno.GT FROM {0} LEFT OUTER JOIN '
+            '{1}_genotype.genotype_{2} geno ON {0}.variant_id = geno.variant_id'
+                .format(encodeTableName(table), proj.name, sample_ID))
+        for id, GT in cur:
+            if GT is None:
+                if NULL_to_0:
+                    g.add((id, 0))
+            else:
+                g.add((id, GT))
+        return g
+
 
 
 class HDF5_Store(Base_Store):
@@ -1173,6 +1187,14 @@ class HDF5_Store(Base_Store):
             p.join()
         return master
 
+    def get_Genotype(self,cur,table,proj,sample_ID):
+        HDFfileName=self.get_sampleFileName(sample_ID)
+        ids=[]
+        cur.execute('SELECT variant_id FROM {0}'.format(encodeTableName(table)))
+        for id in cur:
+            ids.append(id[0])
+        accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+        return accessEngine.get_geno_by_variant_IDs_sample(ids,sample_ID)
 
 
 

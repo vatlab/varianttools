@@ -946,6 +946,7 @@ class HDF5Engine_access(Base_Access):
     def get_geno_by_variant_IDs(self,rowIDs,chr,groupName=""):
 
         #assume rowIDs are sorted by genome position
+     
         group=self.getGroup(chr,groupName)
         rownames=group.rownames[:].tolist()
         colnames=group.colnames[:]
@@ -988,6 +989,35 @@ class HDF5Engine_access(Base_Access):
             return np.array(update_rownames),colnames,np.array(sub_geno)
         except NameError:
             env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
+
+    
+    def get_geno_by_variant_IDs_sample(self,rowIDs,sampleName):
+        NULL_to_0 = env.treat_missing_as_wildtype
+        g=set()
+        for chr in range(1,23):
+            try:
+                node=self.file.get_node("/chr"+str(chr))
+                updated_rownames,colnames,subMatrix=self.get_geno_by_variant_IDs(rowIDs,str(chr))
+                # print(updated_rownames,colnames,subMatrix)
+                colPos=colnames.tolist().index(sampleName)
+                GT_geno=subMatrix[:,colPos]
+                # print(GT_geno)
+                for idx,id in enumerate(updated_rownames):
+                    GT=GT_geno[idx]
+                    if np.isnan(GT):
+                        if NULL_to_0:
+                            g.add((id, 0))
+                    else:
+                        g.add((id, GT))
+                # print(g)
+            except tb.exceptions.NoSuchNodeError:
+                pass                              
+            except Exception as e:
+                print(e)
+                pass
+        return g
+
+
 
     def filter_removed_genotypes(self,minPos,maxPos,genoinfo,node,colpos,rowpos):
         #assume rowIDs are sorted by genome position
