@@ -2633,6 +2633,7 @@ class Project:
         #
         # close project
         self.db.close()
+        store = GenoStore(self)
         prog = ProgressBar('Extracting {}'.format(name),
             os.path.getsize(snapshot_file))
         try:
@@ -2657,28 +2658,31 @@ class Project:
                 else:
                     raise ValueError('Invalid snapshot. Missing project database')
                 # genotype
-                if os.path.isfile('{}_genotype.DB'.format(self.name)):
-                    os.remove('{}_genotype.DB'.format(self.name))
-                if 'snapshot_genotype.DB' in all_files:
-                    os.rename(os.path.join(env.cache_dir, 'snapshot_genotype.DB'),
-                        '{}_genotype.DB'.format(self.name))
-                    all_files.remove('snapshot_genotype.DB')
-                elif '{}_genotype.DB'.format(self.name) in all_files:
-                    # an old version of snapshot saves $name.proj
-                    os.rename(os.path.join(env.cache_dir, '{}_genotype.DB'.format(self.name)),
-                        '{}_genotype.DB'.format(self.name))
-                    all_files.remove('{}_genotype.DB'.format(self.name))
-                else:
-                    # this is ok because a project might not have any genotype
-                    pass
 
-                hdf5files=glob.glob("tmp*h5")
-                for hdf5file in hdf5files:
-                    os.remove(hdf5file)
-                for file in all_files:
-                    if re.search(r'tmp(.*)h5',file):
-                        os.rename(os.path.join(env.cache_dir, file), file)
-                        all_files.remove(file)
+                all_files=store.loadGenotypeFromTar(all_files)
+
+                # if os.path.isfile('{}_genotype.DB'.format(self.name)):
+                #     os.remove('{}_genotype.DB'.format(self.name))
+                # if 'snapshot_genotype.DB' in all_files:
+                #     os.rename(os.path.join(env.cache_dir, 'snapshot_genotype.DB'),
+                #         '{}_genotype.DB'.format(self.name))
+                #     all_files.remove('snapshot_genotype.DB')
+                # elif '{}_genotype.DB'.format(self.name) in all_files:
+                #     # an old version of snapshot saves $name.proj
+                #     os.rename(os.path.join(env.cache_dir, '{}_genotype.DB'.format(self.name)),
+                #         '{}_genotype.DB'.format(self.name))
+                #     all_files.remove('{}_genotype.DB'.format(self.name))
+                # else:
+                #     # this is ok because a project might not have any genotype
+                #     pass
+
+                # hdf5files=glob.glob("tmp*h5")
+                # for hdf5file in hdf5files:
+                #     os.remove(hdf5file)
+                # for file in all_files:
+                #     if re.search(r'tmp(.*)h5',file):
+                #         os.rename(os.path.join(env.cache_dir, file), file)
+                #         all_files.remove(file)
                         
                 # other files
                 for f in all_files:

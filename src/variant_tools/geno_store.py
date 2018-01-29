@@ -25,6 +25,7 @@
 #
 
 import os
+import re
 import sys
 import time
 from multiprocessing import Process, Value, Lock, Manager,Queue
@@ -586,6 +587,24 @@ class Sqlite_Store(Base_Store):
             filesize= os.path.getsize('{}_genotype.DB'.format(self.proj.name))
         return filesize
 
+    def loadGenotypeFromTar(self,all_files):
+        if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
+            os.remove('{}_genotype.DB'.format(self.proj.name))
+        if 'snapshot_genotype.DB' in all_files:
+            os.rename(os.path.join(env.cache_dir, 'snapshot_genotype.DB'),
+                '{}_genotype.DB'.format(self.proj.name))
+            all_files.remove('snapshot_genotype.DB')
+        elif '{}_genotype.DB'.format(self.proj.name) in all_files:
+            # an old version of snapshot saves $name.proj
+            os.rename(os.path.join(env.cache_dir, '{}_genotype.DB'.format(self.proj.name)),
+                '{}_genotype.DB'.format(self.proj.name))
+            all_files.remove('{}_genotype.DB'.format(self.proj.name))
+        else:
+            # this is ok because a project might not have any genotype
+            pass
+        return all_files
+
+
 
     def addGenotypeToTar(self,tarfile,prog):
         if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
@@ -1029,6 +1048,17 @@ class HDF5_Store(Base_Store):
             for hdf5file in hdf5files:
                 filesizes += os.path.getsize(hdf5file)
         return filesizes
+
+
+    def loadGenotypeFromTar(self,all_files):
+        hdf5files=glob.glob("tmp*h5")
+        for hdf5file in hdf5files:
+            os.remove(hdf5file)
+        for file in all_files:
+            if re.search(r'tmp(.*)h5',file):
+                os.rename(os.path.join(env.cache_dir, file), file)
+                all_files.remove(file)
+        return all_files
 
 
     def addGenotypeToTar(self,tarfile,prog):
