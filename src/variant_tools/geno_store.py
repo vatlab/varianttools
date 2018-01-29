@@ -29,7 +29,7 @@ import sys
 import time
 from multiprocessing import Process, Value, Lock, Manager,Queue
 from .utils import ProgressBar,  delayedAction, \
-     DatabaseEngine, env, decodeTableName,encodeTableName,chunks
+     DatabaseEngine, env, decodeTableName,encodeTableName,chunks,ProgressFileObj
 
 from .text_reader import TextReader
 from datetime import datetime
@@ -581,6 +581,19 @@ class Sqlite_Store(Base_Store):
         self.cur = self.db.cursor()
 
 
+    def getGenotypeFileSize(self):
+        if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
+            filesize= os.path.getsize('{}_genotype.DB'.format(self.proj.name))
+        return filesize
+
+
+    def addGenotypeToTar(self,tarfile,prog):
+        if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
+                tarinfo = tarfile.gettarinfo('{}_genotype.DB'.format(self.proj.name), arcname='snapshot_genotype.DB')
+                tarfile.addfile(tarinfo, ProgressFileObj(prog, '{}_genotype.DB'.format(self.proj.name), 'rb'))
+        return tarfile
+
+
     def num_variants(self, sample_id):
         self.cur.execute('SELECT count(*) FROM genotype_{};'.format(sample_id))
         return self.cur.fetchone()[0]
@@ -1007,6 +1020,24 @@ class HDF5_Store(Base_Store):
     def __init__(self, proj):
         self.proj=proj
         super(HDF5_Store, self).__init__(proj)
+
+
+    def getGenotypeFileSize(self):
+        hdf5files=glob.glob("tmp*h5")
+        filesizes=0
+        if len(hdf5files)>0:
+            for hdf5file in hdf5files:
+                filesizes += os.path.getsize(hdf5file)
+        return filesizes
+
+
+    def addGenotypeToTar(self,tarfile,prog):
+        hdf5files=glob.glob("tmp*h5")
+        if len(hdf5files)>0:
+            for hdf5file in hdf5files:
+                tarinfo = tarfile.gettarinfo(hdf5file, arcname=hdf5file)
+                tarfile.addfile(tarinfo, ProgressFileObj(prog, hdf5file, 'rb'))
+        return tarfile
 
 
     def remove_sample(self,IDs):

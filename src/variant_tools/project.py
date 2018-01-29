@@ -2575,8 +2575,10 @@ class Project:
         compresslevel = 9 if name.startswith('vt_') else 5
         # getting file size to create progress bar
         filesizes = os.path.getsize('{}.proj'.format(self.name))
-        if os.path.isfile('{}_genotype.DB'.format(self.name)):
-            filesizes += os.path.getsize('{}_genotype.DB'.format(self.name))
+
+        store = GenoStore(self)
+        filesizes+=store.getGenotypeFileSize()
+        
         if files is not None:
             for f in files:
                 filesizes += os.path.getsize(f)
@@ -2593,9 +2595,10 @@ class Project:
             snapshot.add(readme_file, '.snapshot.info')
             tarinfo = snapshot.gettarinfo('{}.proj'.format(self.name), arcname='snapshot.proj')
             snapshot.addfile(tarinfo, ProgressFileObj(prog, '{}.proj'.format(self.name), 'rb'))
-            if os.path.isfile('{}_genotype.DB'.format(self.name)):
-                tarinfo = snapshot.gettarinfo('{}_genotype.DB'.format(self.name), arcname='snapshot_genotype.DB')
-                snapshot.addfile(tarinfo, ProgressFileObj(prog, '{}_genotype.DB'.format(self.name), 'rb'))
+
+            
+            store.addGenotypeToTar(snapshot,prog)
+
             os.remove(readme_file)
             if files is not None:
                 for f in files:
@@ -2668,6 +2671,15 @@ class Project:
                 else:
                     # this is ok because a project might not have any genotype
                     pass
+
+                hdf5files=glob.glob("tmp*h5")
+                for hdf5file in hdf5files:
+                    os.remove(hdf5file)
+                for file in all_files:
+                    if re.search(r'tmp(.*)h5',file):
+                        os.rename(os.path.join(env.cache_dir, file), file)
+                        all_files.remove(file)
+                        
                 # other files
                 for f in all_files:
                     if os.path.isfile(f):
