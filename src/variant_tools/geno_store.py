@@ -1084,8 +1084,7 @@ class HDF5_Store(Base_Store):
             for geno_field in validGenotypeFields:
                 geno_field=geno_field.replace("_geno","")
                 chunk["calldata/"+geno_field]=[]
-   
-            
+          
             for idx, raw_rec in enumerate(reader.records()):
                 # print(idx,len(raw_rec),raw_rec[3])
                 chunk["variants/REF"].append(raw_rec[0])
