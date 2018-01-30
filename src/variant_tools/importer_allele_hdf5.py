@@ -19,8 +19,8 @@ from multiprocessing import Queue as mpQueue
 import queue
 from itertools import repeat
 from collections import defaultdict
-from .project import Project, fileFMT
-from .liftOver import LiftOverTool
+# from .project import Project, fileFMT
+# from .liftOver import LiftOverTool
 from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
     openFile, DatabaseEngine, hasCommand, \
     downloadFile, env, RefGenome
@@ -994,7 +994,7 @@ class HDF5GenotypeImportWorker(Process):
         self.proc_index = proc_index
         self.start_sample=start_sample
         self.end_sample=end_sample
-        self.geno_info=geno_info
+        # self.geno_info=geno_info
         self.indptr=[]
         self.indices=[]
         self.data=[]
@@ -1009,12 +1009,17 @@ class HDF5GenotypeImportWorker(Process):
         self.info["GT_geno"]=[]
         self.info["Mask_geno"]=[]
         self.namedict={}
-        if len(self.geno_info)>0:
-            for info in self.geno_info:
+        self.geno_info=[]
+        if len(geno_info)>0:
+            for info in geno_info:
                 #indptr,indices,data,shape,rownames
-                # self.info[info.name]=[[],[],[],[],[]]
-                self.info[info.name]=[]
-                self.namedict[info.name]="calldata/"+info.name.replace("_geno","")
+                if not isinstance(info,str):
+                    self.geno_info.append(info.name)
+                else:
+                    self.geno_info.append(info)
+        for info in self.geno_info:    
+            self.info[info]=[]
+            self.namedict[info]="calldata/"+info.replace("_geno","")
         
    
 
@@ -1038,7 +1043,7 @@ class HDF5GenotypeImportWorker(Process):
             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
             # self.getInfoTable(variant_id,infoDict,altIndex)
             for info in self.geno_info:
-                self.info[info.name].append(self.chunk[self.namedict[info.name]][pos,self.start_sample:self.end_sample])
+                self.info[info].append(self.chunk[self.namedict[info]][pos,self.start_sample:self.end_sample])
 
 
    
@@ -1065,8 +1070,9 @@ class HDF5GenotypeImportWorker(Process):
 
         if len(self.geno_info)>0:
             for info in self.geno_info:
-                storageEngine.store_genoInfo(np.array(self.info[info.name]),chr,info.name)
-                self.info[info.name]=[]
+                print(info)
+                storageEngine.store_genoInfo(np.array(self.info[info]),chr,info)
+                self.info[info]=[]
  
         storageEngine.close()       
         self.rownames=[]
@@ -1393,6 +1399,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                 buffer_size=buffer_size, chunk_length=chunk_length, fills=fills, region=region,
                 tabix=tabix, samples=samples, transformers=transformers
             )
+        print(importer.genotype_info)
 
         #Put tasks in the queue first
         for job in range(numTasks):      

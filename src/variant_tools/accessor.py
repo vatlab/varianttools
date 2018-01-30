@@ -218,6 +218,7 @@ class HDF5Engine_storage(Base_Storage):
             if len(groups)>1:
                 group=self.getGroup(chr,groups[0])
                 # group=self.file.create_group("/chr"+chr+"/"+groups[0],groups[-1])
+            
             if len(data.shape)==2:
                 ds = self.file.create_earray(group, groupName, tb.Atom.from_dtype(data.dtype), (0,data.shape[1]),filters=filters,expectedrows=len(data))
             elif len(data.shape)>2:
@@ -1030,13 +1031,15 @@ class HDF5Engine_access(Base_Access):
             sub_Mask=node.Mask_geno[minPos:maxPos,:]
             sub_geno=np.multiply(genoinfo,sub_Mask)
             rowMasked=np.where(rowMask==True)[0]
-            # sampleMasked=np.where(sampleMask==True)[0]     
+            # sampleMasked=np.where(sampleMask==True)[0]  
+
             
             if len(rowpos)>0:
                 rownames=rownames[rowpos]
                 sub_geno=sub_geno[rowpos,:]
             colnames=colnames[colpos]
             sub_geno=sub_geno[:,colpos]
+    
 
             if len(rowpos)==0 and len(rowMasked)>0:
                 rownames=rownames[np.where(rowMask==False)]
@@ -1077,7 +1080,9 @@ class HDF5Engine_access(Base_Access):
                 GQ_geno=np.nan_to_num(GQ_geno)
             genoinfo=np.where(eval("~("+genotypes+")"),np.nan,genoinfo)
         
+
         rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,rowpos)
+
         return rownames,colnames,genoinfo
 
 

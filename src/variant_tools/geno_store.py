@@ -35,7 +35,9 @@ from .utils import ProgressBar,  delayedAction, \
 from .text_reader import TextReader
 from datetime import datetime
 from .accessor import *
+from .exporter_reader import *
 import glob
+from .importer_allele_hdf5 import HDF5GenotypeImportWorker
 
 
 class Base_Store(object):
@@ -1052,12 +1054,111 @@ class HDF5_Store(Base_Store):
 
     def loadGenotypeFromTar(self,all_files):
         hdf5files=glob.glob("tmp*h5")
-        for hdf5file in hdf5files:
-            os.remove(hdf5file)
-        for file in all_files:
-            if re.search(r'tmp(.*)h5',file):
-                os.rename(os.path.join(env.cache_dir, file), file)
-                all_files.remove(file)
+        if len(hdf5files)==0 and (os.path.isfile('{}_genotype.DB'.format(self.proj.name)) or 'snapshot_genotype.DB' in all_files): 
+            if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
+                os.remove('{}_genotype.DB'.format(self.proj.name))
+            if 'snapshot_genotype.DB' in all_files:
+                os.rename(os.path.join(env.cache_dir, 'snapshot_genotype.DB'),
+                    '{}_genotype.DB'.format(self.proj.name))
+                all_files.remove('snapshot_genotype.DB')
+            elif '{}_genotype.DB'.format(self.proj.name) in all_files:
+                # an old version of snapshot saves $name.proj
+                os.rename(os.path.join(env.cache_dir, '{}_genotype.DB'.format(self.proj.name)),
+                    '{}_genotype.DB'.format(self.proj.name))
+                all_files.remove('{}_genotype.DB'.format(self.proj.name))
+            else:
+                pass
+            print("Current storage mode is HDF5, transfrom genotype storage mode.....")
+            self.proj.db = DatabaseEngine()
+            self.proj.db.connect(self.proj.proj_file)
+            self.proj.build="hg19"
+            IDs = self.proj.selectSampleByPhenotype("")
+            
+            IDs=list(IDs)
+            IDs.sort()
+            validGenotypeFields=['GT', 'DP_geno', 'GQ_geno']
+            reader = MultiVariantReader(self.proj, "variant", "chr,pos,ref", "",['chr', 'pos', 'ref', 'vcf_variant(chr,pos,ref,alt,".")'], validGenotypeFields, False, IDs, 4, True)
+            reader.start()
+
+            chunk={'variants/CHROM':[],"variants/POS":[],"variants/REF":[],"variants/ALT":[],"variants/ID":[]}
+            for geno_field in validGenotypeFields:
+                geno_field=geno_field.replace("_geno","")
+                chunk["calldata/"+geno_field]=[]
+   
+            
+            for idx, raw_rec in enumerate(reader.records()):
+                # print(idx,len(raw_rec),raw_rec[3])
+                chunk["variants/REF"].append(raw_rec[0])
+                chunk["variants/ALT"].append([raw_rec[1]])
+                chunk["variants/CHROM"].append(raw_rec[2])
+                chunk["variants/POS"].append(raw_rec[3])
+                chunk["variants/ID"].append(raw_rec[5])
+                for genoID,geno_field in enumerate(validGenotypeFields):
+                    colpos=[6+genoID+pos*len(validGenotypeFields) for pos in range(len(IDs))]
+                    geno_field=geno_field.replace("_geno","")
+                    chunk["calldata/"+geno_field].append([raw_rec[pos] if raw_rec[pos] is not None else -10 for pos in colpos])
+            
+            for key,value in chunk.items():
+                dtype=np.dtype(object)
+                if key=="variants/POS":
+                    dtype=np.dtype(np.int32)
+                elif key=="calldata/DP":
+                    dtype=np.dtype(np.int16)
+                elif key=="calldata/GT":
+                    dtype=np.dtype(np.int8)
+                elif key=="calldata/GQ":
+                    dtype=np.dtype(np.float32)
+                chunk[key]=np.array(value,dtype=dtype)
+
+            jobs=8
+            importers=[None]*jobs
+            task=None
+            taskQueue=queue.Queue()
+            workload = [int(float(len(IDs)) / jobs)] * jobs
+          
+            unallocated = max(0, len(IDs) - sum(workload))
+            for i in range(unallocated):
+                workload[i % importer.jobs] += 1
+            # print(workload)
+            numTasks=len(workload)
+            variantIndex = self.proj.createVariantMap('variant', False)
+            # print(variantIndex)
+
+            start_sample =0
+            for job in range(numTasks):
+                # readQueue[job].put(chunk)
+                if workload[job] == 0:
+                    continue
+                end_sample = min(start_sample + workload[job], len(IDs))
+                if end_sample <= start_sample:
+                    continue
+                HDFfile_Merge="tmp_"+str(start_sample)+"_"+str(end_sample)+"_genotypes.h5"
+                # print(HDFfile_Merge)
+                # updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge)
+                taskQueue.put(HDF5GenotypeImportWorker(chunk, variantIndex, start_sample, end_sample, 
+                    IDs,0, job, validGenotypeFields ,HDFfile_Merge,self.proj.build))
+                start_sample = end_sample 
+            while taskQueue.qsize()>0:
+                for i in range(jobs):    
+                    if importers[i] is None or not importers[i].is_alive():     
+                        task=taskQueue.get()
+                        importers[i]=task
+                        importers[i].start()         
+                        break 
+            for worker in importers:
+                if worker is not None:
+                    worker.join()
+                   
+            
+
+        else:
+            for hdf5file in hdf5files:
+                os.remove(hdf5file)
+            for file in all_files:
+                if re.search(r'tmp(.*)h5',file):
+                    os.rename(os.path.join(env.cache_dir, file), file)
+                    all_files.remove(file)
+        self.proj.db.close()
         return all_files
 
 
