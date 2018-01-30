@@ -133,7 +133,7 @@ comment=Total number of alternate alleles in called genotypes
 [AF_INFO]
 index=8
 adj=ExtractValue('AF=', ';')
-type=varchar(255)
+type=FLOAT
 comment=Estimated allele frequency in the range (0,1)
 
 [NS_INFO]
@@ -151,31 +151,31 @@ comment=Total number of alleles in called genotypes
 [EAS_AF_INFO]
 index=8
 adj=ExtractValue('EAS_AF=', ';')
-type=varchar(255)
+type=FLOAT
 comment=Allele frequency in the EAS populations calculated from AC and AN, in the range (0,1)
 
 [EUR_AF_INFO]
 index=8
 adj=ExtractValue('EUR_AF=', ';')
-type=varchar(255)
+type=FLOAT
 comment=Allele frequency in the EUR populations calculated from AC and AN, in the range (0,1)
 
 [AFR_AF_INFO]
 index=8
 adj=ExtractValue('AFR_AF=', ';')
-type=varchar(255)
+type=FLOAT
 comment=Allele frequency in the AFR populations calculated from AC and AN, in the range (0,1)
 
 [AMR_AF_INFO]
 index=8
 adj=ExtractValue('AMR_AF=', ';')
-type=varchar(255)
+type=FLOAT
 comment=Allele frequency in the AMR populations calculated from AC and AN, in the range (0,1)
 
 [SAS_AF_INFO]
 index=8
 adj=ExtractValue('SAS_AF=', ';')
-type=varchar(255)
+type=FLOAT
 comment=Allele frequency in the SAS populations calculated from AC and AN, in the range (0,1)
 
 [DP_INFO]
