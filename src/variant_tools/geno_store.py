@@ -1354,6 +1354,18 @@ class HDF5_Store(Base_Store):
         accessEngine=Engine_Access.choose_access_engine(HDFfileName)
         return accessEngine.get_geno_by_variant_IDs_sample(ids,sample_ID)
 
+    def validate_sex(self,proj,sample_ID,sex):
+        HDFfileName=self.get_sampleFileName(sample_ID)
+        accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+        if sex==2:
+            geno=accessEngine.get_geno_by_sample_ID(sample_ID,"X")
+            geno=np.array(geno)
+            invalidate=geno[geno==2]
+            return len(invalidate)
+        if sex==1:
+            geno=accessEngine.get_geno_by_sample_ID(sample_ID,"Y")
+            return len(geno)
+        accessEngine.close()
 
 
 
@@ -1364,6 +1376,7 @@ class HDF5_Store(Base_Store):
         # return importGenotypes(importer)
         from .importer_allele_hdf5 import importGenotypesInParallel
         return importGenotypesInParallel(importer)
+
 
 
 

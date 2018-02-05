@@ -5032,66 +5032,72 @@ x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in list(_user_opt
                     # do not report error
                     sys.exit(0)
                 # attach genotype tables as __geno
-                proj.db.attach(proj.name + '_genotype', '__geno')
-                prog = ProgressBar('Validate sample sex', len(sample_sex))
-                count = 0
-                err_count = 0
-                cur = proj.db.cursor()
-                for ID, sex in list(sample_sex.items()):
-                    count += 1
-                    # allow missing values for sex
-                    if sex is None:
-                        continue
-                    geno_table = '__geno.genotype_{}'.format(ID)
-                    # if there is no genotype ok,
-                    if 'GT' not in [x[0].upper() for x in proj.db.fieldsOfTable(geno_table)]:
-                        continue
-                    if sex == 1:
-                        # for male, check if there is any 2 on chromosome X
-                        cur.execute("SELECT variant.variant_id FROM {0}, variant WHERE "
-                            "{0}.variant_id = variant.variant_id AND "
-                            "variant.chr in ('X', 'x', '23') AND {0}.GT=2"
-                            .format(geno_table))
-                        for rec in cur:
-                            # var_chrX do not have variants in psudo-autosomal regions
-                            if rec[0] in var_chrX:
-                                cur.execute('SELECT sample_name FROM sample WHERE sample_id = {}'
-                                    .format(ID))
-                                sample_name = cur.fetchone()[0]
-                                cur.execute('SELECT chr, pos, ref, alt FROM variant WHERE variant_id = {}'
-                                    .format(rec[0]))
-                                variant = cur.fetchone()
-                                env.logger.warning('Homozygous variants on chromosome X is detected for male sample {}: {} {} {} {}'
-                                    .format(sample_name, variant[0], variant[1], variant[2], variant[3]))
-                                err_count += 1
-                                break
+                if proj.store=="sqlite":
+                    proj.db.attach(proj.name + '_genotype', '__geno')
+                    prog = ProgressBar('Validate sample sex', len(sample_sex))
+                    count = 0
+                    err_count = 0
+                    cur = proj.db.cursor()
+                    for ID, sex in list(sample_sex.items()):
+                        count += 1
+                        # allow missing values for sex
+                        if sex is None:
+                            continue
+                        geno_table = '__geno.genotype_{}'.format(ID)
+                        # if there is no genotype ok,
+                        if 'GT' not in [x[0].upper() for x in proj.db.fieldsOfTable(geno_table)]:
+                            continue
+                        if sex == 1:
+                            # for male, check if there is any 2 on chromosome X
+                            cur.execute("SELECT variant.variant_id FROM {0}, variant WHERE "
+                                "{0}.variant_id = variant.variant_id AND "
+                                "variant.chr in ('X', 'x', '23') AND {0}.GT=2"
+                                .format(geno_table))
+                            for rec in cur:
+                                # var_chrX do not have variants in psudo-autosomal regions
+                                if rec[0] in var_chrX:
+                                    cur.execute('SELECT sample_name FROM sample WHERE sample_id = {}'
+                                        .format(ID))
+                                    sample_name = cur.fetchone()[0]
+                                    cur.execute('SELECT chr, pos, ref, alt FROM variant WHERE variant_id = {}'
+                                        .format(rec[0]))
+                                    variant = cur.fetchone()
+                                    env.logger.warning('Homozygous variants on chromosome X is detected for male sample {}: {} {} {} {}'
+                                        .format(sample_name, variant[0], variant[1], variant[2], variant[3]))
+                                    err_count += 1
+                                    break
+                        else:
+                            # for female, check if there is any genotype on chromosome Y
+                            cur.execute("SELECT variant.variant_id FROM {0}, variant WHERE "
+                                "{0}.variant_id = variant.variant_id AND "
+                                "variant.chr in ('Y', 'y', '24')"
+                                .format(geno_table))
+                            for rec in cur:
+                                # var_chrY does not have variants in psudo-autosomal regions
+                                if rec[0] in var_chrY:
+                                    cur.execute('SELECT sample_name FROM sample WHERE sample_id = {}'
+                                        .format(ID))
+                                    sample_name = cur.fetchone()[0]
+                                    cur.execute('SELECT chr, pos, ref, alt FROM variant WHERE variant_id = {}'
+                                        .format(rec[0]))
+                                    variant = cur.fetchone()
+                                    env.logger.warning('Variant on chromosome Y is detected for female sample {}: {} {} {} {}'
+                                        .format(sample_name, variant[0], variant[1], variant[2], variant[3]))
+                                    err_count += 1
+                                    break
+                        prog.update(count, err_count)
+                    prog.done()
+                    if err_count > 0:
+                        env.logger.info('{} out of {} samples show inconsistency in reported sex'
+                            .format(err_count, count))
                     else:
-                        # for female, check if there is any genotype on chromosome Y
-                        cur.execute("SELECT variant.variant_id FROM {0}, variant WHERE "
-                            "{0}.variant_id = variant.variant_id AND "
-                            "variant.chr in ('Y', 'y', '24')"
-                            .format(geno_table))
-                        for rec in cur:
-                            # var_chrY does not have variants in psudo-autosomal regions
-                            if rec[0] in var_chrY:
-                                cur.execute('SELECT sample_name FROM sample WHERE sample_id = {}'
-                                    .format(ID))
-                                sample_name = cur.fetchone()[0]
-                                cur.execute('SELECT chr, pos, ref, alt FROM variant WHERE variant_id = {}'
-                                    .format(rec[0]))
-                                variant = cur.fetchone()
-                                env.logger.warning('Variant on chromosome Y is detected for female sample {}: {} {} {} {}'
-                                    .format(sample_name, variant[0], variant[1], variant[2], variant[3]))
-                                err_count += 1
-                                break
-                    prog.update(count, err_count)
-                prog.done()
-                if err_count > 0:
-                    env.logger.info('{} out of {} samples show inconsistency in reported sex'
-                        .format(err_count, count))
+                        env.logger.info('No inconsistency of sex has been detected from {} samples.'
+                            .format(count))
                 else:
-                    env.logger.info('No inconsistency of sex has been detected from {} samples.'
-                        .format(count))
+                    store = GenoStore(proj)
+                    for ID, sex in list(sample_sex.items()):
+                        result=store.validate_sex(proj,ID,sex)
+                        print(ID,sex,result)
             elif args.set_runtime_option is not None:
                 for option in args.set_runtime_option:
                     if '=' not in option:

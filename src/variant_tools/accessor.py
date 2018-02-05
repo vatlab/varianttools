@@ -992,10 +992,13 @@ class HDF5Engine_access(Base_Access):
             env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
 
     
-    def get_geno_by_variant_IDs_sample(self,rowIDs,sampleName):
+    def get_geno_by_variant_IDs_sample(self,rowIDs,sampleName,chr=""):
         NULL_to_0 = env.treat_missing_as_wildtype
         g=set()
-        for chr in range(1,23):
+        chrs=range(1,23)
+        if len(chr)>0:
+            chrs=[chr]
+        for chr in chrs:
             try:
                 node=self.file.get_node("/chr"+str(chr))
                 updated_rownames,colnames,subMatrix=self.get_geno_by_variant_IDs(rowIDs,str(chr))
@@ -1197,7 +1200,7 @@ class HDF5Engine_access(Base_Access):
                 for startPos,endPos in chunkPos:
                     if "/chr"+str(chr)+"/GT_geno" in self.file:
                         genoinfo=node.GT_geno[startPos:endPos,colpos]           
-                        rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos)
+                        rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
                         genoinfo[genoinfo==-1]=0
                         rowsum=np.nansum(genoinfo,axis=1)
                         noWTvariants=rownames[np.where(rowsum>0)].tolist()
@@ -1219,7 +1222,22 @@ class HDF5Engine_access(Base_Access):
 
 
     def get_geno_by_sample_ID(self,sampleID,chr,groupName=""):
-        pass
+        geno=[]
+        if self.checkGroup(chr):
+            node=self.file.get_node("/chr"+str(chr))
+            colnames=node.colnames[:].tolist()
+            colpos=list(map(lambda x:colnames.index(x),colnames))
+            shape=node.shape[:].tolist()
+            chunkPos=chunks_start_stop(shape[0])
+            for startPos,endPos in chunkPos:
+                if "/chr"+str(chr)+"/GT_geno" in self.file:
+                    genoinfo=node.GT_geno[startPos:endPos,colpos]           
+                    rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
+                    samplePos=colnames.tolist().index(sampleID)
+                    sampleGeno=genoinfo[:,samplePos]
+                    geno.extend(sampleGeno)
+        return geno
+        
         
 
 
