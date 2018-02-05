@@ -1399,7 +1399,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                 buffer_size=buffer_size, chunk_length=chunk_length, fills=fills, region=region,
                 tabix=tabix, samples=samples, transformers=transformers
             )
-        print(importer.genotype_info)
+        # print(importer.genotype_info)
 
         #Put tasks in the queue first
         for job in range(numTasks):      

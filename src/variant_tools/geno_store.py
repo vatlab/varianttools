@@ -1147,9 +1147,6 @@ class HDF5_Store(Base_Store):
             for worker in importers:
                 if worker is not None:
                     worker.join()
-                   
-            
-
         else:
             for hdf5file in hdf5files:
                 os.remove(hdf5file)

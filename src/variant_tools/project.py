@@ -2332,117 +2332,119 @@ class Project:
         # a separate database to speed up merging.
         inPlace=(count != sum([len(x) for x in list(samples.values())]))
         #
-        self.db.attach(self.name + '_genotype')
-        if not inPlace:
-            if os.path.isfile('{}/{}_genotype_merged.DB'.format(env.cache_dir, self.name)):
-                os.remove('{}/{}_genotype_merged.DB'.format(env.cache_dir, self.name))
-            self.db.attach('{}/{}_genotype_merged.DB'.format(env.cache_dir, self.name),
-                '{}_genotype_merged'.format(self.name))
-        # merge genotypes
-        prog = ProgressBar('Merging samples', count)
-        copied = 0
-        for name, ids in merged.items():
-            #
-            # ranges of variant_id is used to check overlap of genotypes. If the ranges
-            # overlap, a more thorough check will be used.
-            if inPlace:
-                new_table = '{}_genotype._tmp_{}'.format(self.name, ids[0])
-            else:
-                new_table = '{}_genotype_merged.genotype_{}'.format(self.name, ids[0])
-            #
-            try:
-                # remove existing temporary table if exists
-                self.db.removeTable(new_table)
-            except:
-                pass
-            #
-            # get schema
-            new_fields = []
-            # get a list of fields for old ids
-            old_fields = {}
-            cur.execute('SELECT name, sql FROM {}_genotype.sqlite_master '
-                    'WHERE type="table" AND name in ({})'
-                    .format(self.name, 
-                    ', '.join(["'genotype_{}'".format(x) for x in ids])))
-            for name, schema in cur:
+        if self.store=="sqlite":
+
+            self.db.attach(self.name + '_genotype')
+            if not inPlace:
+                if os.path.isfile('{}/{}_genotype_merged.DB'.format(env.cache_dir, self.name)):
+                    os.remove('{}/{}_genotype_merged.DB'.format(env.cache_dir, self.name))
+                self.db.attach('{}/{}_genotype_merged.DB'.format(env.cache_dir, self.name),
+                    '{}_genotype_merged'.format(self.name))
+            # merge genotypes
+            prog = ProgressBar('Merging samples', count)
+            copied = 0
+            for name, ids in merged.items():
+                #
+                # ranges of variant_id is used to check overlap of genotypes. If the ranges
+                # overlap, a more thorough check will be used.
+                if inPlace:
+                    new_table = '{}_genotype._tmp_{}'.format(self.name, ids[0])
+                else:
+                    new_table = '{}_genotype_merged.genotype_{}'.format(self.name, ids[0])
+                #
                 try:
-                    fields = [x.strip() for x in schema.split(',')]
-                    fields[0] = fields[0].split('(')[1].strip()
-                    fields[-1] = fields[-1].rsplit(')', 1)[0].strip()
-                    old_fields[int(name.rsplit('_', 1)[-1])] = ', '.join([fld.split(None, 1)[0] for fld in fields])
-                    # if two fields have the same name and different types, they will be merged silently.
-                    new_fields.extend([fld for fld in fields if fld.split(None, 1)[0] not in [x.split(None, 1)[0] for x in new_fields]])
-                except Exception as e:
-                    raise RuntimeError('Corrupted genotype database: Failed to '
-                        'get structure of genotype table {}'.format(id))
-            #
-            query = 'CREATE TABLE {} ({})'.format(new_table, ', '.join(new_fields))
-            env.logger.trace('Executing {}'.format(query))
-            try:
-                cur.execute(query)
-            except Exception as e:
-                raise RuntimeError('Failed to create new genotype table: {}'.format(e))
-            # copying genotypes to the temp table
-            ranges = []
-            for id in ids:
-                query = ('SELECT MIN(variant_id), MAX(variant_id) FROM {0}_genotype.genotype_{1}'
-                    .format(self.name, id))
+                    # remove existing temporary table if exists
+                    self.db.removeTable(new_table)
+                except:
+                    pass
+                #
+                # get schema
+                new_fields = []
+                # get a list of fields for old ids
+                old_fields = {}
+                cur.execute('SELECT name, sql FROM {}_genotype.sqlite_master '
+                        'WHERE type="table" AND name in ({})'
+                        .format(self.name, 
+                        ', '.join(["'genotype_{}'".format(x) for x in ids])))
+                for name, schema in cur:
+                    try:
+                        fields = [x.strip() for x in schema.split(',')]
+                        fields[0] = fields[0].split('(')[1].strip()
+                        fields[-1] = fields[-1].rsplit(')', 1)[0].strip()
+                        old_fields[int(name.rsplit('_', 1)[-1])] = ', '.join([fld.split(None, 1)[0] for fld in fields])
+                        # if two fields have the same name and different types, they will be merged silently.
+                        new_fields.extend([fld for fld in fields if fld.split(None, 1)[0] not in [x.split(None, 1)[0] for x in new_fields]])
+                    except Exception as e:
+                        raise RuntimeError('Corrupted genotype database: Failed to '
+                            'get structure of genotype table {}'.format(id))
+                #
+                query = 'CREATE TABLE {} ({})'.format(new_table, ', '.join(new_fields))
+                env.logger.trace('Executing {}'.format(query))
                 try:
                     cur.execute(query)
                 except Exception as e:
-                    raise RuntimeError('Failed to get ID range of table {}: {}'
-                        .format(id, e))
-                ranges.append(cur.fetchone())
-                try:
-                    cur.execute('INSERT INTO {1} ({3}) SELECT * FROM {0}_genotype.genotype_{2};'.format(
-                        self.name, new_table, id, old_fields[id]))
-                except Exception as e:
+                    raise RuntimeError('Failed to create new genotype table: {}'.format(e))
+                # copying genotypes to the temp table
+                ranges = []
+                for id in ids:
+                    query = ('SELECT MIN(variant_id), MAX(variant_id) FROM {0}_genotype.genotype_{1}'
+                        .format(self.name, id))
                     try:
-                        # remove existing temporary table if exists
-                        self.db.removeTable(new_table)
-                    except:
-                        pass
-                    prog.done()
-                    raise RuntimeError('Failed to merge genotype tables: {}'.format(e))
-                copied += 1
-                prog.update(copied)
-            #
-            # verify table if the ranges overlap
-            check_overlap = False
-            for i in range(len(ranges) - 1):
-                for j in range(i + 1, len(ranges)):
-                    # skip when either range (a,b) or (c,d) are empty
-                    # i.e., no variants for a sample from a particular file
-                    if not any(ranges[i]) or not any(ranges[j]):
-                        continue
-                    # range overlap (a,b) with (c,d) <===> a <= d and b >= c 
-                    if ranges[i][0] <= ranges[j][1] and ranges[i][1] >= ranges[j][0]:
-                        check_overlap = True
+                        cur.execute(query)
+                    except Exception as e:
+                        raise RuntimeError('Failed to get ID range of table {}: {}'
+                            .format(id, e))
+                    ranges.append(cur.fetchone())
+                    try:
+                        cur.execute('INSERT INTO {1} ({3}) SELECT * FROM {0}_genotype.genotype_{2};'.format(
+                            self.name, new_table, id, old_fields[id]))
+                    except Exception as e:
+                        try:
+                            # remove existing temporary table if exists
+                            self.db.removeTable(new_table)
+                        except:
+                            pass
+                        prog.done()
+                        raise RuntimeError('Failed to merge genotype tables: {}'.format(e))
+                    copied += 1
+                    prog.update(copied)
+                #
+                # verify table if the ranges overlap
+                check_overlap = False
+                for i in range(len(ranges) - 1):
+                    for j in range(i + 1, len(ranges)):
+                        # skip when either range (a,b) or (c,d) are empty
+                        # i.e., no variants for a sample from a particular file
+                        if not any(ranges[i]) or not any(ranges[j]):
+                            continue
+                        # range overlap (a,b) with (c,d) <===> a <= d and b >= c 
+                        if ranges[i][0] <= ranges[j][1] and ranges[i][1] >= ranges[j][0]:
+                            check_overlap = True
+                            break
+                    if check_overlap:
                         break
+                #
                 if check_overlap:
-                    break
-            #
-            if check_overlap:
-                query = ('SELECT COUNT(*), COUNT(DISTINCT variant_id) FROM {};'
-                    .format(new_table))
-                try:
-                    cur.execute(query)
-                except Exception as e:
-                    raise RuntimeError('Failed to check overlap of table {}: {}'
-                        .format(new_table, e))
-                counts = cur.fetchone()
-                if counts[0] != counts[1]:
+                    query = ('SELECT COUNT(*), COUNT(DISTINCT variant_id) FROM {};'
+                        .format(new_table))
                     try:
-                        # remove existing temporary table if exists
-                        self.db.removeTable(new_table)
-                    except:
-                        pass
-                    prog.done()
-                    raise ValueError('Failed to merge samples with name {} because '
-                        'there are {} genotypes for {} unique variants.'
-                        .format(name, counts[0], counts[1]))
-        #
-        prog.done()
+                        cur.execute(query)
+                    except Exception as e:
+                        raise RuntimeError('Failed to check overlap of table {}: {}'
+                            .format(new_table, e))
+                    counts = cur.fetchone()
+                    if counts[0] != counts[1]:
+                        try:
+                            # remove existing temporary table if exists
+                            self.db.removeTable(new_table)
+                        except:
+                            pass
+                        prog.done()
+                        raise ValueError('Failed to merge samples with name {} because '
+                            'there are {} genotypes for {} unique variants.'
+                            .format(name, counts[0], counts[1]))
+            #
+            prog.done()
         # the above steps are slow but will not affect project (process can be terminated)
         # the following will be fast
         for name, ids in merged.items():
@@ -2476,7 +2478,7 @@ class Project:
                     cur.execute('UPDATE sample SET file_id=? WHERE sample_id = ?',
                         (file_id, ids[0]))
             # step 5: prepare tables to be removed
-            if inPlace:
+            if inPlace and self.store=="sqlite":
                 for idx, id in enumerate(ids):
                     self.db.renameTable('{}_genotype.genotype_{}'.format(self.name, id),
                         '__genotype_{}'.format(id))
@@ -2486,7 +2488,7 @@ class Project:
         # be imported again, which I am not sure is good or bad
         self.db.execute('DELETE FROM filename WHERE filename.file_id NOT IN (SELECT file_id FROM sample)')
         self.db.commit()
-        if not inPlace:
+        if not inPlace and self.store=="sqlite":
             self.db.detach('{}_genotype_merged'.format(self.name))
             self.db.detach('{}_genotype'.format(self.name))
             os.remove('{}_genotype.DB'.format(self.name))
@@ -2495,7 +2497,7 @@ class Project:
         # 
         # actually remove obsolete tables, this can be slow but interruption of
         # command will not break the database
-        if inPlace:
+        if inPlace and self.store=="sqlite":
             prog = ProgressBar('Removing obsolete tables', count)
             for idx, (name, ids) in enumerate(merged.items()):
                 for id in ids:
