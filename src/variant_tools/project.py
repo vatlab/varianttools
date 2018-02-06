@@ -5095,9 +5095,20 @@ x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in list(_user_opt
                             .format(count))
                 else:
                     store = GenoStore(proj)
+                    err_count=0
+                    count=0
                     for ID, sex in list(sample_sex.items()):
                         result=store.validate_sex(proj,ID,sex)
-                        print(ID,sex,result)
+                        count+=1
+                        if result >0:
+                            err_count+=1
+                    if err_count>0:
+                        env.logger.info('{} out of {} samples show inconsistency in reported sex'
+                            .format(err_count, count))
+                    else:
+                        env.logger.info('No inconsistency of sex has been detected from {} samples.'
+                            .format(count))
+
             elif args.set_runtime_option is not None:
                 for option in args.set_runtime_option:
                     if '=' not in option:

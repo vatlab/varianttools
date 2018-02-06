@@ -1357,15 +1357,15 @@ class HDF5_Store(Base_Store):
     def validate_sex(self,proj,sample_ID,sex):
         HDFfileName=self.get_sampleFileName(sample_ID)
         accessEngine=Engine_Access.choose_access_engine(HDFfileName)
-        if sex==2:
+        if sex==1:
             geno=accessEngine.get_geno_by_sample_ID(sample_ID,"X")
             geno=np.array(geno)
             invalidate=geno[geno==2]
-            return len(invalidate)
-        if sex==1:
-            geno=accessEngine.get_geno_by_sample_ID(sample_ID,"Y")
-            return len(geno)
+        if sex==2:
+            invalidate=accessEngine.get_geno_by_sample_ID(sample_ID,"Y")
         accessEngine.close()
+        return len(invalidate)
+        
 
 
 
