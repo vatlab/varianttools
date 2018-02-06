@@ -1070,7 +1070,7 @@ class HDF5GenotypeImportWorker(Process):
 
         if len(self.geno_info)>0:
             for info in self.geno_info:
-                print(info)
+                # print(info)
                 storageEngine.store_genoInfo(np.array(self.info[info]),chr,info)
                 self.info[info]=[]
  

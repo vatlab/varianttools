@@ -1117,7 +1117,7 @@ class HDF5_Store(Base_Store):
           
             unallocated = max(0, len(IDs) - sum(workload))
             for i in range(unallocated):
-                workload[i % importer.jobs] += 1
+                workload[i % jobs] += 1
             # print(workload)
             numTasks=len(workload)
             variantIndex = self.proj.createVariantMap('variant', False)
@@ -1154,7 +1154,7 @@ class HDF5_Store(Base_Store):
                 if re.search(r'tmp(.*)h5',file):
                     os.rename(os.path.join(env.cache_dir, file), file)
                     all_files.remove(file)
-        self.proj.db.close()
+        # self.proj.db.close()
         return all_files
 
 

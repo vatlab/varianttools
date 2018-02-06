@@ -1715,6 +1715,7 @@ class Project:
         self.variant_meta = self.db.getHeaders('variant_meta')
         self.sample_meta = self.db.getHeaders('sample_meta')
         #
+   
         if self.version != VTOOLS_VERSION:
             proj_version = tuple(int(re.sub('\D', '', x)) for x in self.version.split('.'))
             vtools_version = tuple(int(re.sub('\D', '', x)) for x in VTOOLS_VERSION.split('.'))
@@ -4022,8 +4023,8 @@ def init(args):
 
         temp_dirs = []
         if args.parent and not os.path.isdir(args.parent):
-            if args.store != 'sqlite':
-                raise NotImplemented('Option --parent is not supported yet with non-sqlite storage model')
+            # if args.store != 'sqlite':
+            #     raise NotImplemented('Option --parent is not supported yet with non-sqlite storage model')
             if (not args.samples) and (not args.genotypes) and args.variants == 'variant':
                 # directly create a project from snapshot
                 parent_path = '.'
@@ -4103,12 +4104,20 @@ def init(args):
             mode=['NEW_PROJ', 'REMOVE_EXISTING'] if args.force else 'NEW_PROJ', 
             verbosity='1' if args.verbosity is None else args.verbosity) as proj:
             if args.parent:
-                if args.store != 'sqlite':
-                    raise NotImplemented('Option --parent is not supported yet with non-sqlite storage model')
+                # if args.store != 'sqlite':
+                #     raise NotImplemented('Option --parent is not supported yet with non-sqlite storage model')
                 copier = ProjCopier(proj, args.parent, args.variants,
                     ' AND '.join(['({})'.format(x) for x in args.samples]),
                     ' AND '.join(['({})'.format(x) for x in args.genotypes]))
                 copier.copy()
+                if args.store!='sqlite':
+                    store=GenoStore(proj)
+                    
+                    all_files=[proj.name+".proj",proj.name+"_genotype.DB"]
+                    for file in all_files:
+                        shutil.copyfile(file,env.cache_dir+"/"+file)
+                    store.loadGenotypeFromTar(all_files)
+
             elif args.children:
                 # A default value 4 is given for args.jobs because more threads usually
                 # do not improve effiency
