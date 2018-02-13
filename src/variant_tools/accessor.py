@@ -408,16 +408,19 @@ class HDF5Engine_storage(Base_Storage):
         #     except Exception as e:
         #             pass
 
-    def removeNode(self,info):
-        for chr in range(1,23):
-            try:
-                if self.checkGroup(str(chr),info):
+    def removeNode(self,chr,info=""):
+        # for chr in range(1,23):
+        try:
+            if self.checkGroup(str(chr),info):
+                if len(info)>0:
                     self.file.remove_node("/chr"+str(chr)+"/"+info)
-            except tb.exceptions.NoSuchNodeError:
-                pass                              
-            except Exception as e:
-                print(e)
-                pass
+                else:
+                    self.file.remove_node("/chr"+str(chr),recursive=True)
+        except tb.exceptions.NoSuchNodeError:
+            pass                              
+        except Exception as e:
+            print(e)
+            pass
         
 
     def store_HDF5(self,hmatrix,chr,groupName=""):

@@ -31,6 +31,7 @@ import tables as tb
 import glob
 from shutil import copyfile
 from .accessor import *
+from subprocess import call
 
 try:
     from variant_tools.cgatools import normalize_variant
@@ -65,6 +66,8 @@ DEFAULT_BUFFER_SIZE = 2**14
 DEFAULT_CHUNK_LENGTH = 2**8
 DEFAULT_CHUNK_WIDTH = 2**6
 DEFAULT_ALT_NUMBER = 3
+
+READ_EXISTING_CHUNK_LENGTH=2**9
 
 
 
@@ -1267,7 +1270,7 @@ class HDF5GenotypeImportWorker(Process):
 class HDF5GenotypeSortWorker(Process):
     
     def __init__(self, chunk,importer, start_sample,end_sample,sample_ids,variant_count, 
-        proc_index,dbLocation,estart,eend):
+        proc_index,dbLocation,estart,eend,efirst):
 
         Process.__init__(self, name='GenotypeSorter')
         # self.daemon=True
@@ -1298,7 +1301,8 @@ class HDF5GenotypeSortWorker(Process):
         self.geno_info=[]
         self.estart=estart
         self.eend=eend
-        if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
+        self.efirst=efirst
+        if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
             print("new process",estart.value,eend.value)
         if len(importer.genotype_info)>0:
             for info in importer.genotype_info:
@@ -1341,7 +1345,7 @@ class HDF5GenotypeSortWorker(Process):
 
 
     def writeIntoHDF(self,chr):
-        if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
+        if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
             print("writing",len(self.info["GT_geno"]),len(self.rownames))
         storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
         shape=np.array([len(self.rownames),len(self.colnames)])
@@ -1367,7 +1371,7 @@ class HDF5GenotypeSortWorker(Process):
                 storageEngine.store_genoInfo(np.array(self.info[info]),chr,info)
                 self.info[info]=[]
  
-        storageEngine.close()       
+        storageEngine.close()
         self.rownames=[]
 
     def get_existing_geno(self,chr,startPos,endPos):
@@ -1404,7 +1408,7 @@ class HDF5GenotypeSortWorker(Process):
                 self.info["GT_geno"].append(info)
                 self.info["Mask_geno"].append([1.0]*len(info))
             self.writeIntoHDF(chr)
-            if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
+            if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
                 print("remaining",startPos,endPos)
             startPos=endPos
         accessEngine.close()
@@ -1413,6 +1417,13 @@ class HDF5GenotypeSortWorker(Process):
    
     def run(self):
         prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
+        if self.efirst.value==True:
+            storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
+            storageEngine.removeNode(prev_chr)
+            # command = ["ptrepack", "-o", "--chunkshape=auto", "--propindexes", self.dbLocation, self.dbLocation+"test"]
+            # call(command)
+            storageEngine.close()
+            self.efirst.value=False
         erowpos,erownames,egenoinfo=self.get_existing_geno(prev_chr,self.estart.value,self.eend.value)
         last=0
         chunksize=len(self.chunk["variants/ID"])
@@ -1426,26 +1437,28 @@ class HDF5GenotypeSortWorker(Process):
                 prev_chr=chr             
             ref=self.chunk["variants/REF"][i]
             pos=self.chunk["variants/POS"][i]
+
             while last<len(erowpos) and pos>erowpos[last]:
-                if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
-                    print("2",erowpos[last],erownames[last],last,i)
+                # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+                #     print("2",erowpos[last],erownames[last],last,i)
                 self.rownames.append(erownames[last])
                 self.info["GT_geno"].append(egenoinfo[last,:])
                 self.info["Mask_geno"].append([1.0]*len(egenoinfo[last,:]))
                 last+=1
-                # if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
-                #     print("before",last)
-            if last==len(erowpos):
+            # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+            #         print("before",last,len(erowpos))
+                
+            if last==len(erowpos) and last!=0:
                 
                 ##left over in new file
                 self.estart.value=self.eend.value
                 self.eend.value+=READ_EXISTING_CHUNK_LENGTH
-                if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
+                if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
                     print("read more from existing",self.estart.value,self.eend.value)
                 erowpos,erownames,egenoinfo=self.get_existing_geno(prev_chr,self.estart.value,self.eend.value)
                 last=0
-                # if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
-                #     print("after",last)
+                # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+                #     print("after",last,len(erowpos))
 
 
             for altIndex in range(len(self.chunk["variants/ALT"][i])):
@@ -1461,12 +1474,12 @@ class HDF5GenotypeSortWorker(Process):
                         if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
                             variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
                             self.get_geno(variant_id,i,altIndex)
-                    if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
-                        print("1",pos,variant_id)
+                    # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+                    #     print("1",pos,variant_id)
         if last<len(erowpos):
             self.estart.value=self.estart.value+last
             self.eend.value=self.estart.value+READ_EXISTING_CHUNK_LENGTH
-            if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
+            if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
                 print("process end, restart from new position",self.estart.value,self.eend.value)
         self.writeIntoHDF(chr)
         if chunksize<DEFAULT_CHUNK_LENGTH:
@@ -1536,8 +1549,6 @@ def importGenotypesInParallel(importer,num_sample=0):
             continue
         allNames=manageHDF5(importer,allNames)
         sample_ids=[int(allNames[name]) for name in names]
-
-       
         workload=None
        
         #determine number of samples to be processed in each process
@@ -1593,8 +1604,6 @@ def importGenotypesInParallel(importer,num_sample=0):
             for genoinfo in importer.genotype_info:
                 fields.append("calldata/"+genoinfo.name.replace("_geno",""))
 
-
-
         alt_number=DEFAULT_ALT_NUMBER
         fills=None
         region=None
@@ -1627,6 +1636,7 @@ def importGenotypesInParallel(importer,num_sample=0):
 
         estart=[Value('L', 0) for x in range(numTasks)]
         eend=[Value('L', READ_EXISTING_CHUNK_LENGTH) for x in range(numTasks)]
+        efirst=[Value('b',True) for x in range(numTasks)]
       
         start=time.time()
         for chunk, _, _, _ in it:
@@ -1645,11 +1655,13 @@ def importGenotypesInParallel(importer,num_sample=0):
                     taskQueue.put(HDF5GenotypeImportWorker(chunk, importer.variantIndex, start_sample, end_sample, 
                         sample_ids,variant_import_count[job], job, importer.genotype_info,HDFfile_Merge,importer.build))
                 else:
-
+                    originalFile="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
                     HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_sort_genotypes.h5"
+                    if not os.path.isfile(HDFfile_Merge):
+                        copyfile(originalFile,HDFfile_Merge)
                     updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge.replace("_sort",""))
                     taskQueue.put(HDF5GenotypeSortWorker(chunk, importer, start_sample, end_sample, 
-                        sample_ids,variant_import_count[job], job, HDFfile_Merge,estart[job],eend[job]))
+                        sample_ids,variant_import_count[job], job, HDFfile_Merge,estart[job],eend[job],efirst[job]))
                 start_sample = end_sample 
             while taskQueue.qsize()>0:
                 for i in range(importer.jobs):    
@@ -1667,34 +1679,6 @@ def importGenotypesInParallel(importer,num_sample=0):
             lines+=chunk_length
             prog.update(lines)
             start=time.time()
-        # if importer.sort:
-        #     start_sample =0
-        #     for job in range(numTasks):
-        #         if workload[job] == 0:
-        #             continue
-        #         end_sample = min(start_sample + workload[job], len(sample_ids))
-        #         if end_sample <= start_sample:
-        #             continue
-        #         HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
-        #         accessEngine=Engine_Access.choose_access_engine(HDFfile_Merge)
-        #         node=accessEngine.file.get_node("/chr"+str(chr))
-        #         rownames=node.rownames[:].tolist()
-        #         accessEngine.close()
-        #         if eestart[job]<len(rownames):
-        #             taskQueue.put(ImportRemaning(eestart[job]),start_sample, end_sample, HDFfile_Merge)
-
-        #     while taskQueue.qsize()>0:
-        #     for i in range(importer.jobs):    
-        #         if importers[i] is None or not importers[i].is_alive():     
-        #             task=taskQueue.get()
-        #             importers[i]=task
-        #             importers[i].start()         
-        #             break 
-        #     for worker in importers:
-        #         if worker is not None:
-        #             worker.join()
-
-
 
         prog.done()
 
