@@ -67,6 +67,7 @@ DEFAULT_CHUNK_WIDTH = 2**6
 DEFAULT_ALT_NUMBER = 3
 
 
+
 def _prep_fields_param(fields):
     """Prepare the `fields` parameter, and determine whether or not to store samples."""
 
@@ -1263,6 +1264,218 @@ class HDF5GenotypeImportWorker(Process):
     #                             # self.getInfoTable(variant_id,infoDict,altIndex)
     #     self.writeIntoHDF(chr)
 
+class HDF5GenotypeSortWorker(Process):
+    
+    def __init__(self, chunk,importer, start_sample,end_sample,sample_ids,variant_count, 
+        proc_index,dbLocation,estart,eend):
+
+        Process.__init__(self, name='GenotypeSorter')
+        # self.daemon=True
+        self.importer=importer
+        self.chunk=chunk
+        self.variantIndex = importer.variantIndex
+        self.variant_count = variant_count
+        self.proc_index = proc_index
+        self.start_sample=start_sample
+        self.end_sample=end_sample
+        # self.geno_info=geno_info
+        self.indptr=[]
+        self.indices=[]
+        self.data=[]
+        self.rownames=[]
+        self.sample_ids=sample_ids
+        self.colnames=[sample_ids[i] for i in range(start_sample,end_sample)]
+        self.genoCount=0
+        self.dbLocation=dbLocation
+        
+        self.originLocation=dbLocation.replace("_sort","")
+        self.build=importer.build
+        self.info={}
+        self.rowData=[]
+        self.info["GT_geno"]=[]
+        self.info["Mask_geno"]=[]
+        self.namedict={}
+        self.geno_info=[]
+        self.estart=estart
+        self.eend=eend
+        if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
+            print("new process",estart.value,eend.value)
+        if len(importer.genotype_info)>0:
+            for info in importer.genotype_info:
+                #indptr,indices,data,shape,rownames
+                if not isinstance(info,str):
+                    self.geno_info.append(info.name)
+                else:
+                    self.geno_info.append(info)
+        for info in self.geno_info:    
+            self.info[info]=[]
+            self.namedict[info]="calldata/"+info.replace("_geno","")
+        
+   
+
+    # check io_vcf_read.pyx function vcf_genotype_parse to see the meaning of coding
+    def get_geno(self,variant_id,pos,altIndex):
+
+        self.rownames.append(variant_id)
+        
+        GT_geno=self.chunk["calldata/GT"][pos,self.start_sample:self.end_sample]
+        GT_geno=GT_geno.astype(float)
+        if altIndex==0:
+            GT_geno[np.logical_or(GT_geno==3, GT_geno==4)]=np.nan          
+        elif altIndex==1:
+            GT_geno[np.logical_and(GT_geno!=3, GT_geno!=4)]=np.nan
+            GT_geno[GT_geno==3]=1
+            GT_geno[GT_geno==4]=2
+        GT_geno[GT_geno==-10]=np.nan
+        self.info["GT_geno"].append(GT_geno)
+        self.info["Mask_geno"].append([1.0]*len(GT_geno))
+        if len(self.geno_info)>0:
+            # self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
+            # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
+            # self.getInfoTable(variant_id,infoDict,altIndex)
+            for info in self.geno_info:
+                self.info[info].append(self.chunk[self.namedict[info]][pos,self.start_sample:self.end_sample])
+
+
+   
+
+
+    def writeIntoHDF(self,chr):
+        if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
+            print("writing",len(self.info["GT_geno"]),len(self.rownames))
+        storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
+        shape=np.array([len(self.rownames),len(self.colnames)])
+        storageEngine.store(np.array(self.info["GT_geno"]),chr,"GT_geno")
+        storageEngine.store(np.array(self.info["Mask_geno"]),chr,"Mask_geno")
+        storageEngine.store(np.array(self.rownames),chr,"rownames")
+        rowmask=np.zeros(len(self.rownames),dtype=np.bool)
+        storageEngine.store(np.array(rowmask),chr,"rowmask")
+        
+        if not storageEngine.checkGroup(chr,"colnames"):
+            storageEngine.store(np.array(self.colnames),chr,"colnames")
+            colmask=np.zeros(len(self.colnames),dtype=np.bool)
+            storageEngine.store(np.array(colmask),chr,"samplemask")
+        
+        storageEngine.store(shape,chr,"shape")
+
+        self.info["GT_geno"]=[]
+        self.info["Mask_geno"]=[]
+
+        if len(self.geno_info)>0:
+            for info in self.geno_info:
+                # print(info)
+                storageEngine.store_genoInfo(np.array(self.info[info]),chr,info)
+                self.info[info]=[]
+ 
+        storageEngine.close()       
+        self.rownames=[]
+
+    def get_existing_geno(self,chr,startPos,endPos):
+        accessEngine=Engine_Access.choose_access_engine(self.originLocation)
+        node=accessEngine.file.get_node("/chr"+str(chr))
+        colnames=node.colnames[:].tolist()
+        colpos=list(map(lambda x:colnames.index(x),colnames))
+        rownames,colnames,genoinfo=accessEngine.filter_on_genotypes("",chr,node,"GT_geno",startPos,endPos,colpos,[])
+        accessEngine.close()
+        cur=self.importer.db.cursor()
+        sql="SELECT variant_id,pos from variant where variant_id in ("+",".join([str(rowname) for rowname in rownames])+")"
+        rowpos=[]
+        rownames=[]
+        for rec in cur.execute(sql):
+            rownames.append(rec[0])
+            rowpos.append(rec[1])
+        return rowpos,rownames,genoinfo
+
+    def get_remaining(self,chr,startPos):
+        accessEngine=Engine_Access.choose_access_engine(self.originLocation)
+        node=accessEngine.file.get_node("/chr"+str(chr))
+        rownames=node.rownames[:].tolist()
+        colnames=node.colnames[:].tolist()
+        colpos=list(map(lambda x:colnames.index(x),colnames))
+
+        while startPos<len(rownames):
+            endPos=startPos+READ_EXISTING_CHUNK_LENGTH
+            if endPos>=len(rownames):
+                endPos=len(rownames)
+            chunk_rownames,colnames,genoinfo=accessEngine.filter_on_genotypes("",chr,node,"GT_geno",startPos,endPos,colpos,[])
+            for rowname in chunk_rownames:
+                self.rownames.append(rowname)
+            for info in genoinfo:
+                self.info["GT_geno"].append(info)
+                self.info["Mask_geno"].append([1.0]*len(info))
+            self.writeIntoHDF(chr)
+            if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
+                print("remaining",startPos,endPos)
+            startPos=endPos
+        accessEngine.close()
+
+ 
+   
+    def run(self):
+        prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
+        erowpos,erownames,egenoinfo=self.get_existing_geno(prev_chr,self.estart.value,self.eend.value)
+        last=0
+        chunksize=len(self.chunk["variants/ID"])
+        for i in range(len(self.chunk["variants/ID"])):
+            infoDict={}
+            chr=self.chunk["variants/CHROM"][i].replace("chr","")
+            if chr!=prev_chr:
+                self.estart.value=self.estart.value+last
+                self.get_remaining(prev_chr,self.estart.value)
+                
+                prev_chr=chr             
+            ref=self.chunk["variants/REF"][i]
+            pos=self.chunk["variants/POS"][i]
+            while last<len(erowpos) and pos>erowpos[last]:
+                if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
+                    print("2",erowpos[last],erownames[last],last,i)
+                self.rownames.append(erownames[last])
+                self.info["GT_geno"].append(egenoinfo[last,:])
+                self.info["Mask_geno"].append([1.0]*len(egenoinfo[last,:]))
+                last+=1
+                # if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
+                #     print("before",last)
+            if last==len(erowpos):
+                
+                ##left over in new file
+                self.estart.value=self.eend.value
+                self.eend.value+=READ_EXISTING_CHUNK_LENGTH
+                if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
+                    print("read more from existing",self.estart.value,self.eend.value)
+                erowpos,erownames,egenoinfo=self.get_existing_geno(prev_chr,self.estart.value,self.eend.value)
+                last=0
+                # if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
+                #     print("after",last)
+
+
+            for altIndex in range(len(self.chunk["variants/ALT"][i])):
+                alt=self.chunk["variants/ALT"][i][altIndex]
+                if alt!="":
+                    if tuple((chr, ref, alt)) in self.variantIndex:
+                        variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
+                        self.get_geno(variant_id,i,altIndex)
+                        
+                    else:
+                        rec=[str(chr),str(pos),ref,alt]  
+                        msg=normalize_variant(RefGenome(self.build).crr, rec, 0, 1, 2, 3)
+                        if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
+                            variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
+                            self.get_geno(variant_id,i,altIndex)
+                    if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
+                        print("1",pos,variant_id)
+        if last<len(erowpos):
+            self.estart.value=self.estart.value+last
+            self.eend.value=self.estart.value+READ_EXISTING_CHUNK_LENGTH
+            if self.dbLocation=="tmp_1_125_sort_genotypes.h5":
+                print("process end, restart from new position",self.estart.value,self.eend.value)
+        self.writeIntoHDF(chr)
+        if chunksize<DEFAULT_CHUNK_LENGTH:
+            self.get_remaining(prev_chr,self.estart.value)
+
+
+
+
+
        
 
 
@@ -1410,6 +1623,11 @@ def importGenotypesInParallel(importer,num_sample=0):
         prog = ProgressBar('Importing genotypes', importer.total_count[2],initCount=0)
         lines=0
         # print(fields[6:])
+
+
+        estart=[Value('L', 0) for x in range(numTasks)]
+        eend=[Value('L', READ_EXISTING_CHUNK_LENGTH) for x in range(numTasks)]
+      
         start=time.time()
         for chunk, _, _, _ in it:
 
@@ -1421,10 +1639,17 @@ def importGenotypesInParallel(importer,num_sample=0):
                 end_sample = min(start_sample + workload[job], len(sample_ids))
                 if end_sample <= start_sample:
                     continue
-                HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
-                updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge)
-                taskQueue.put(HDF5GenotypeImportWorker(chunk, importer.variantIndex, start_sample, end_sample, 
-                    sample_ids,variant_import_count[job], job, importer.genotype_info,HDFfile_Merge,importer.build))
+                if not importer.sort:
+                    HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
+                    updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge)
+                    taskQueue.put(HDF5GenotypeImportWorker(chunk, importer.variantIndex, start_sample, end_sample, 
+                        sample_ids,variant_import_count[job], job, importer.genotype_info,HDFfile_Merge,importer.build))
+                else:
+
+                    HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_sort_genotypes.h5"
+                    updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge.replace("_sort",""))
+                    taskQueue.put(HDF5GenotypeSortWorker(chunk, importer, start_sample, end_sample, 
+                        sample_ids,variant_import_count[job], job, HDFfile_Merge,estart[job],eend[job]))
                 start_sample = end_sample 
             while taskQueue.qsize()>0:
                 for i in range(importer.jobs):    
@@ -1442,6 +1667,35 @@ def importGenotypesInParallel(importer,num_sample=0):
             lines+=chunk_length
             prog.update(lines)
             start=time.time()
+        # if importer.sort:
+        #     start_sample =0
+        #     for job in range(numTasks):
+        #         if workload[job] == 0:
+        #             continue
+        #         end_sample = min(start_sample + workload[job], len(sample_ids))
+        #         if end_sample <= start_sample:
+        #             continue
+        #         HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
+        #         accessEngine=Engine_Access.choose_access_engine(HDFfile_Merge)
+        #         node=accessEngine.file.get_node("/chr"+str(chr))
+        #         rownames=node.rownames[:].tolist()
+        #         accessEngine.close()
+        #         if eestart[job]<len(rownames):
+        #             taskQueue.put(ImportRemaning(eestart[job]),start_sample, end_sample, HDFfile_Merge)
+
+        #     while taskQueue.qsize()>0:
+        #     for i in range(importer.jobs):    
+        #         if importers[i] is None or not importers[i].is_alive():     
+        #             task=taskQueue.get()
+        #             importers[i]=task
+        #             importers[i].start()         
+        #             break 
+        #     for worker in importers:
+        #         if worker is not None:
+        #             worker.join()
+
+
+
         prog.done()
 
      

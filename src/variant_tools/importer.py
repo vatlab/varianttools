@@ -362,7 +362,7 @@ def probeSampleName(filename, prober, encoding):
 
 class Importer:
     '''A general class for importing variants'''
-    def __init__(self, proj, files, build, format, sample_name=None, force=False, jobs=1, fmt_args=[]):
+    def __init__(self, proj, files, build, format, sample_name=None, force=False, jobs=1, fmt_args=[],sort=False):
         self.proj = proj
         self.db = proj.db
         self.sample_in_file = []
@@ -523,6 +523,7 @@ class Importer:
         self.variantIndex = self.proj.createVariantMap('variant', self.import_alt_build)
         # drop index here after all possible exceptions have been raised.
         self.proj.dropIndexOnMasterVariantTable()
+        self.sort=sort
 
 
 
@@ -792,6 +793,7 @@ def importVariantsArguments(parser):
             parallel, and you can use more or less processes by adjusting this
             parameter. Due to the overhead of inter-process communication, more
             jobs do not automatically lead to better performance.'''),
+    parser.add_argument('--sort',action='store_true',help='''Import another VCF file.''')
 
 def importVariants(args):
 
@@ -802,7 +804,7 @@ def importVariants(args):
         with Project(verbosity=args.verbosity, mode='SKIP_VERIFICATION') as proj:
             importer = Importer(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
-                force=args.force, jobs=args.jobs, fmt_args=args.unknown_args)
+                force=args.force, jobs=args.jobs, fmt_args=args.unknown_args,sort=args.sort)
             store = GenoStore(proj)
             store.importGenotypes(importer)
             importer.finalize()
