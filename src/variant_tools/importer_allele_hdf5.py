@@ -1702,6 +1702,8 @@ def importGenotypesInParallel(importer,num_sample=0):
             lines+=chunk_length
             prog.update(lines)
             start=time.time()
+        for sortFile in glob.glob("tmp*_sort_genotypes.h5"):
+            os.rename(sortFile,sortFile.replace("_sort",""))
 
         prog.done()
 
