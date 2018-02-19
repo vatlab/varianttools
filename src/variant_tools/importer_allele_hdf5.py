@@ -1302,8 +1302,8 @@ class HDF5GenotypeSortWorker(Process):
         self.estart=estart
         self.eend=eend
         self.efirst=efirst
-        if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
-            print("new process",estart.value,eend.value)
+        # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+        #     print("new process",estart.value,eend.value)
         if len(importer.genotype_info)>0:
             for info in importer.genotype_info:
                 #indptr,indices,data,shape,rownames
@@ -1345,8 +1345,8 @@ class HDF5GenotypeSortWorker(Process):
 
 
     def writeIntoHDF(self,chr):
-        if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
-            print("writing ",chr,len(self.rownames))
+        # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+        #     print("writing ",chr,len(self.rownames))
         storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
         shape=np.array([len(self.rownames),len(self.colnames)])
         storageEngine.store(np.array(self.info["GT_geno"]),chr,"GT_geno")
@@ -1419,8 +1419,8 @@ class HDF5GenotypeSortWorker(Process):
                     for rec in genoinfo:
                         self.info[info].append(rec)
             self.writeIntoHDF(chr)
-            if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
-                print("remaining",startPos,endPos)
+            # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+            #     print("remaining",startPos,endPos)
             startPos=endPos
         accessEngine.close()
 
@@ -1475,8 +1475,8 @@ class HDF5GenotypeSortWorker(Process):
                 ##left over in new file
                 self.estart.value=self.eend.value
                 self.eend.value+=READ_EXISTING_CHUNK_LENGTH
-                if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
-                    print("read more from existing",self.estart.value,self.eend.value)
+                # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+                #     print("read more from existing",self.estart.value,self.eend.value)
                 erowpos,erownames,egenoinfo=self.get_existing_geno(prev_chr,self.estart.value,self.eend.value)
                 last=0
                 # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
@@ -1502,8 +1502,8 @@ class HDF5GenotypeSortWorker(Process):
         if last<len(erowpos):
             self.estart.value=self.estart.value+last
             self.eend.value=self.estart.value+READ_EXISTING_CHUNK_LENGTH
-            if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
-                print("process end, restart from new position",self.estart.value,self.eend.value)
+            # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+            #     print("process end, restart from new position",self.estart.value,self.eend.value)
         self.writeIntoHDF(chr)
         if chunksize<DEFAULT_CHUNK_LENGTH:
             self.get_remaining(prev_chr,self.estart.value)
