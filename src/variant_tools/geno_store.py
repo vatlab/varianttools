@@ -589,7 +589,7 @@ class Sqlite_Store(Base_Store):
             filesize= os.path.getsize('{}_genotype.DB'.format(self.proj.name))
         return filesize
 
-    def loadGenotypeFromTar(self,all_files):
+    def load_Genotype_From_SQLite(self,all_files,proj):
         if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
             os.remove('{}_genotype.DB'.format(self.proj.name))
         if 'snapshot_genotype.DB' in all_files:
@@ -1052,26 +1052,32 @@ class HDF5_Store(Base_Store):
         return filesizes
 
 
-    def loadGenotypeFromTar(self,all_files):
+    def load_Genotype_From_SQLite(self,all_files,proj):
         hdf5files=glob.glob("tmp*h5")
         if len(hdf5files)==0 and (os.path.isfile('{}_genotype.DB'.format(self.proj.name)) or 'snapshot_genotype.DB' in all_files): 
-            if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
-                os.remove('{}_genotype.DB'.format(self.proj.name))
+            # if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
+            #     os.remove('{}_genotype.DB'.format(self.proj.name))
             if 'snapshot_genotype.DB' in all_files:
                 os.rename(os.path.join(env.cache_dir, 'snapshot_genotype.DB'),
                     '{}_genotype.DB'.format(self.proj.name))
                 all_files.remove('snapshot_genotype.DB')
             elif '{}_genotype.DB'.format(self.proj.name) in all_files:
                 # an old version of snapshot saves $name.proj
-                os.rename(os.path.join(env.cache_dir, '{}_genotype.DB'.format(self.proj.name)),
-                    '{}_genotype.DB'.format(self.proj.name))
+                tempFile=os.path.join(env.cache_dir, '{}_genotype.DB'.format(self.proj.name))
+                if os.path.isfile(tempFile) and os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
+                    os.remove('{}_genotype.DB'.format(self.proj.name))
+                    os.rename(tempFile,'{}_genotype.DB'.format(self.proj.name))
                 all_files.remove('{}_genotype.DB'.format(self.proj.name))
             else:
                 pass
             print("Current storage mode is HDF5, transfrom genotype storage mode.....")
+            jobs=8
             self.proj.db = DatabaseEngine()
             self.proj.db.connect(self.proj.proj_file)
-            self.proj.build="hg19"
+            if proj.build is not None:
+                self.proj.build=proj.build
+            else:
+                self.proj.build="hg19"
             IDs = self.proj.selectSampleByPhenotype("")
             
             IDs=list(IDs)
@@ -1109,7 +1115,7 @@ class HDF5_Store(Base_Store):
                     dtype=np.dtype(np.float32)
                 chunk[key]=np.array(value,dtype=dtype)
 
-            jobs=8
+            
             importers=[None]*jobs
             task=None
             taskQueue=queue.Queue()
@@ -1118,7 +1124,6 @@ class HDF5_Store(Base_Store):
             unallocated = max(0, len(IDs) - sum(workload))
             for i in range(unallocated):
                 workload[i % jobs] += 1
-            # print(workload)
             numTasks=len(workload)
             variantIndex = self.proj.createVariantMap('variant', False)
             # print(variantIndex)
@@ -1131,7 +1136,7 @@ class HDF5_Store(Base_Store):
                 end_sample = min(start_sample + workload[job], len(IDs))
                 if end_sample <= start_sample:
                     continue
-                HDFfile_Merge="tmp_"+str(start_sample)+"_"+str(end_sample)+"_genotypes.h5"
+                HDFfile_Merge="tmp_"+str(start_sample+1)+"_"+str(end_sample)+"_genotypes.h5"
                 # print(HDFfile_Merge)
                 # updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge)
                 taskQueue.put(HDF5GenotypeImportWorker(chunk, variantIndex, start_sample, end_sample, 
@@ -1380,10 +1385,13 @@ class HDF5_Store(Base_Store):
 
 
 
-def GenoStore(proj):
+def GenoStore(proj,format="vcf"):
     if proj.store == 'sqlite':
         return Sqlite_Store(proj)
     elif proj.store == 'hdf5':
-        return HDF5_Store(proj)
+        if format=="vcf":
+            return HDF5_Store(proj)
+        elif format is None:
+            return Sqlite_Store(proj)
     else:
         raise RuntimeError('Unsupported genotype storage model {}'.format(proj.store))

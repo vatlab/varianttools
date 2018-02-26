@@ -2636,7 +2636,7 @@ class Project:
                 raise ValueError('Snapshot {} does not exist locally.'.format(name))
         #
         # close project
-        self.db.close()
+        # self.db.close()
         store = GenoStore(self)
         prog = ProgressBar('Extracting {}'.format(name),
             os.path.getsize(snapshot_file))
@@ -2663,7 +2663,7 @@ class Project:
                     raise ValueError('Invalid snapshot. Missing project database')
                 # genotype
 
-                all_files=store.loadGenotypeFromTar(all_files)
+                all_files=store.load_Genotype_From_SQLite(all_files,self)
                         
                 # other files
                 for f in all_files:
@@ -4103,6 +4103,8 @@ def init(args):
         with Project(name=args.project, store=args.store,
             mode=['NEW_PROJ', 'REMOVE_EXISTING'] if args.force else 'NEW_PROJ', 
             verbosity='1' if args.verbosity is None else args.verbosity) as proj:
+            if args.build is not None:
+                proj.setRefGenome(args.build)
             if args.parent:
                 # if args.store != 'sqlite':
                 #     raise NotImplemented('Option --parent is not supported yet with non-sqlite storage model')
@@ -4116,15 +4118,14 @@ def init(args):
                     all_files=[proj.name+".proj",proj.name+"_genotype.DB"]
                     for file in all_files:
                         shutil.copyfile(file,env.cache_dir+"/"+file)
-                    store.loadGenotypeFromTar(all_files)
+                    store.load_Genotype_From_SQLite(all_files,proj)
 
             elif args.children:
                 # A default value 4 is given for args.jobs because more threads usually
                 # do not improve effiency
                 merger = ProjectsMerger(proj, args.children, 4)
                 merger.merge()
-            if args.build is not None:
-                proj.setRefGenome(args.build)
+            
         # clean up directories created from snapshots
         for temp_dir in temp_dirs:
             try:

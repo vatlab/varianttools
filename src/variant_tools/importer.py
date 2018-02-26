@@ -409,10 +409,12 @@ class Importer:
             raise ValueError('Please specify the reference genome of the input data.')
         #
         # try to guess file type
+        self.format=None
         if not format:
             filename = files[0].lower()
             if filename.endswith('.vcf') or filename.endswith('.vcf.gz'):
                 format = 'vcf'
+                self.format=format
             else:
                 raise ValueError('Cannot guess input file format from filename "{}"'
                     .format(files[0]))
@@ -805,9 +807,14 @@ def importVariants(args):
             importer = Importer(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args,sort=args.sort)
-            store = GenoStore(proj)
+            store = GenoStore(proj,importer.format)
             store.importGenotypes(importer)
             importer.finalize()
+            #transform genotype stored in sqlite to hdf5
+            if proj.store=="hdf5" and importer.format!="vcf":
+                format="vcf"
+                store = GenoStore(proj,format)
+                store.load_Genotype_From_SQLite([proj.name+"_genotype.DB"],proj)
         proj.close()
     except Exception as e:
         env.logger.error(e,exc_info=True)
