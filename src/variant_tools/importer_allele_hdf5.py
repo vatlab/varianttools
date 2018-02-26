@@ -63,11 +63,11 @@ from variant_tools.io_vcf_read import VCFChunkIterator, FileInputStream
 
 
 DEFAULT_BUFFER_SIZE = 2**14
-DEFAULT_CHUNK_LENGTH = 2**8
+DEFAULT_CHUNK_LENGTH = 2**11
 DEFAULT_CHUNK_WIDTH = 2**6
 DEFAULT_ALT_NUMBER = 3
 
-READ_EXISTING_CHUNK_LENGTH=2**9
+READ_EXISTING_CHUNK_LENGTH=2**10
 
 
 
@@ -1302,8 +1302,11 @@ class HDF5GenotypeSortWorker(Process):
         self.estart=estart
         self.eend=eend
         self.efirst=efirst
-        # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
-        #     print("new process",estart.value,eend.value)
+        self.checkfileName="tmp_1501_1750_sort_genotypes.h5"
+        self.countcheck=0
+        self.readcheck=0
+        # if self.dbLocation==self.checkfileName:
+        #     print("new process")
         if len(importer.genotype_info)>0:
             for info in importer.genotype_info:
                 #indptr,indices,data,shape,rownames
@@ -1319,7 +1322,7 @@ class HDF5GenotypeSortWorker(Process):
 
     # check io_vcf_read.pyx function vcf_genotype_parse to see the meaning of coding
     def get_geno(self,variant_id,pos,altIndex):
-
+        self.readcheck+=1
         self.rownames.append(variant_id)
         
         GT_geno=self.chunk["calldata/GT"][pos,self.start_sample:self.end_sample]
@@ -1345,8 +1348,11 @@ class HDF5GenotypeSortWorker(Process):
 
 
     def writeIntoHDF(self,chr):
-        # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
-        #     print("writing ",chr,len(self.rownames))
+        # if self.dbLocation==self.checkfileName:
+        print("writing ",self.dbLocation, self.countcheck,self.readcheck,chr,len(self.rownames))
+        # if self.countcheck<2000:
+        #     print(self.rownames)
+        #     sys.exit()
         storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
         shape=np.array([len(self.rownames),len(self.colnames)])
         storageEngine.store(np.array(self.info["GT_geno"]),chr,"GT_geno")
@@ -1378,23 +1384,42 @@ class HDF5GenotypeSortWorker(Process):
         accessEngine=Engine_Access.choose_access_engine(self.originLocation)
         node=accessEngine.file.get_node("/chr"+str(chr))
         colnames=node.colnames[:].tolist()
+        shape=node.shape[:]
         colpos=list(map(lambda x:colnames.index(x),colnames))
         allgenoinfo={}
+        # if endPos>shape[0]:
+        #     print(endPos,shape[0])
+        #     endPos=shape[0]
         rownames,colnames,genotype=accessEngine.filter_on_genotypes("",chr,node,"GT_geno",startPos,endPos,colpos,[])
         allgenoinfo["GT_geno"]=genotype
         if len(self.geno_info)>0:
             for info in self.geno_info:
                 _,_,genoinfo=accessEngine.filter_on_genotypes("",chr,node,info,startPos,endPos,colpos,[])
                 allgenoinfo[info]=genoinfo
-        accessEngine.close()
-        cur=self.importer.db.cursor()
+        
+        # cur=self.importer.db.cursor()
+        proj_file = self.importer.proj.name+'.proj'
+        #
+        # create a temporary directory
+        db = DatabaseEngine()
+        db.connect(proj_file)
+        cur=db.cursor()
+
         sql="SELECT variant_id,pos from variant where variant_id in ("+",".join([str(rowname) for rowname in rownames])+")"
         rowpos=[]
-        rownames=[]
-        for rec in cur.execute(sql):
-            rownames.append(rec[0])
-            rowpos.append(rec[1])
-        return rowpos,rownames,allgenoinfo
+        updatedrownames=[]
+        count=0
+        rows=cur.execute(sql)
+        for row in rows:
+            updatedrownames.append(row[0])
+            rowpos.append(row[1])
+            count+=1
+        accessEngine.close()
+        db.close()
+        if count!=len(rownames):
+            print("alert", self.dbLocation,len(rowpos),len(updatedrownames),len(rownames),startPos,endPos,count)
+
+        return rowpos,updatedrownames,allgenoinfo
 
     def get_remaining(self,chr,startPos):
         accessEngine=Engine_Access.choose_access_engine(self.originLocation)
@@ -1419,7 +1444,7 @@ class HDF5GenotypeSortWorker(Process):
                     for rec in genoinfo:
                         self.info[info].append(rec)
             self.writeIntoHDF(chr)
-            # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+            # if self.dbLocation==self.checkfileName:
             #     print("remaining",startPos,endPos)
             startPos=endPos
         accessEngine.close()
@@ -1438,6 +1463,7 @@ class HDF5GenotypeSortWorker(Process):
         erowpos,erownames,egenoinfo=self.get_existing_geno(prev_chr,self.estart.value,self.eend.value)
         last=0
         chunksize=len(self.chunk["variants/ID"])
+
         for i in range(len(self.chunk["variants/ID"])):
             infoDict={}
             chr=self.chunk["variants/CHROM"][i].replace("chr","")
@@ -1457,16 +1483,18 @@ class HDF5GenotypeSortWorker(Process):
                 last=0
             ref=self.chunk["variants/REF"][i]
             pos=self.chunk["variants/POS"][i]
-
+            # if self.dbLocation==self.checkfileName:
+            #     print("new file",pos)
             while last<len(erowpos) and pos>erowpos[last]:
-                # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
-                #     print("2",erowpos[last],erownames[last],last,i)
+                self.countcheck+=1
+                # if self.dbLocation==self.checkfileName:
+                #     print("add old file",erowpos[last],last,i)
                 self.rownames.append(erownames[last])
                 for info in egenoinfo.keys():
                     self.info[info].append(egenoinfo[info][last,:])
                 self.info["Mask_geno"].append([1.0]*len(egenoinfo["GT_geno"][last,:]))
                 last+=1
-            # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+            # if self.dbLocation==self.checkfileName:
             #         print("before",last,len(erowpos))
                 
             # if last==len(erowpos) and last!=0:
@@ -1475,11 +1503,11 @@ class HDF5GenotypeSortWorker(Process):
                 ##left over in new file
                 self.estart.value=self.eend.value
                 self.eend.value+=READ_EXISTING_CHUNK_LENGTH
-                # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+                # if self.dbLocation==self.checkfileName:
                 #     print("read more from existing",self.estart.value,self.eend.value)
                 erowpos,erownames,egenoinfo=self.get_existing_geno(prev_chr,self.estart.value,self.eend.value)
                 last=0
-                # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+                # if self.dbLocation==self.checkfileName:
                 #     print("after",last,len(erowpos))
             elif last==len(erowpos) and last!=0:
                 self.estart.value=self.eend.value
@@ -1497,12 +1525,12 @@ class HDF5GenotypeSortWorker(Process):
                         if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
                             variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
                             self.get_geno(variant_id,i,altIndex)
-                    # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+                    # if self.dbLocation==self.checkfileName:
                     #     print("1",pos,variant_id)
         if last<len(erowpos):
             self.estart.value=self.estart.value+last
             self.eend.value=self.estart.value+READ_EXISTING_CHUNK_LENGTH
-            # if self.dbLocation=="tmp_1_250_sort_genotypes.h5":
+            # if self.dbLocation==self.checkfileName:
             #     print("process end, restart from new position",self.estart.value,self.eend.value)
         self.writeIntoHDF(chr)
         if chunksize<DEFAULT_CHUNK_LENGTH:
