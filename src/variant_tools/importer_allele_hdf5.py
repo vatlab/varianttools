@@ -1543,8 +1543,8 @@ class HDF5GenotypeSortWorker(Process):
        
 
 
-def updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDF5fileName):
-    cur=importer.db.cursor()
+def updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDF5fileName):
+    
     
     for id in range(start_sample,end_sample):
         sql="UPDATE sample SET HDF5=? WHERE sample_id=? and sample_name=?"
@@ -1555,9 +1555,9 @@ def updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDF5
     
 
 
-def manageHDF5(importer,allNames={}):
+def manageHDF5(cur,allNames={}):
 
-    cur=importer.db.cursor()
+   
     sql="ALTER TABLE sample ADD COLUMN HDF5 CHAR(25)"
     try:
         cur.execute(sql)
@@ -1566,7 +1566,6 @@ def manageHDF5(importer,allNames={}):
    
     sql="SELECT sample_name,sample_id from sample"
 
-  
     for rec in cur.execute(sql):
         if rec[0] not in allNames:
             allNames[rec[0]]=int(rec[1])
@@ -1577,9 +1576,9 @@ def manageHDF5(importer,allNames={}):
 
 
 def importGenotypesInParallel(importer,num_sample=0):
-
-    allNames=manageHDF5(importer)
-
+    cur=importer.db.cursor()
+    allNames=manageHDF5(cur)
+    
     for count, input_filename in enumerate(importer.files):
 
         
@@ -1598,7 +1597,7 @@ def importGenotypesInParallel(importer,num_sample=0):
         sample_ids, genotype_status,names = importer.getSampleIDs(input_filename)
         if len(sample_ids) == 0:
             continue
-        allNames=manageHDF5(importer,allNames)
+        allNames=manageHDF5(cur,allNames)
         sample_ids=[int(allNames[name]) for name in names]
         workload=None
        
@@ -1702,7 +1701,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                     continue
                 if not importer.sort:
                     HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
-                    updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge)
+                    updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge)
                     taskQueue.put(HDF5GenotypeImportWorker(chunk, importer.variantIndex, start_sample, end_sample, 
                         sample_ids,variant_import_count[job], job, importer.genotype_info,HDFfile_Merge,importer.build))
                 else:
@@ -1710,7 +1709,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                     HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_sort_genotypes.h5"
                     if not os.path.isfile(HDFfile_Merge):
                         copyfile(originalFile,HDFfile_Merge)
-                    updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge.replace("_sort",""))
+                    updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge.replace("_sort",""))
                     taskQueue.put(HDF5GenotypeSortWorker(chunk, importer, start_sample, end_sample, 
                         sample_ids,variant_import_count[job], job, HDFfile_Merge,estart[job],eend[job],efirst[job]))
                 start_sample = end_sample 

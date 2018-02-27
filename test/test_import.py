@@ -30,7 +30,7 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase 
 
-@unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
+# @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
 class TestImport(ProcessTestCase):
     def testInvalidVariant(self):
         'Test importing invalid variants (<DEL>)'
@@ -107,11 +107,12 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import --build hg18 --format ../resources/format/CASAVA18_snps txt/CASAVA18_SNP.txt --force --sample_name casavasnp')
         # both samples exist
         self.assertProj(numOfSamples= 2, numOfVariants=21, sampleNames=['max_gt', 'casavasnp'])
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         # test for using user specified genotype information. Have to init a test because of efficiency problem using --force
         self.assertSucc('vtools import --build hg18 --format ../resources/format/CASAVA18_snps txt/CASAVA18_SNP.txt --geno max_gt --geno_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
         # now we have 1 genotype field and 3 info field, plus the variant ID: 5 fields in the genotype_x table
-        self.assertProj(numOfColumns={'genotype_1': 5})
+        if self.storeMode=="sqlite":
+            self.assertProj(numOfColumns={'genotype_1': 5})
         # only 1 sample here. Set num=1
         self.assertProj(genotype={1: ['1']*10 + ['2'] + ['1']*10})
         

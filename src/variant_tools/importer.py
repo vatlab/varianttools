@@ -807,14 +807,15 @@ def importVariants(args):
             importer = Importer(proj=proj, files=args.input_files,
                 build=args.build, format=args.format, sample_name=args.sample_name,
                 force=args.force, jobs=args.jobs, fmt_args=args.unknown_args,sort=args.sort)
-            store = GenoStore(proj,importer.format)
+            store = GenoStore(proj,importer)
             store.importGenotypes(importer)
             importer.finalize()
             #transform genotype stored in sqlite to hdf5
             if proj.store=="hdf5" and importer.format!="vcf":
-                format="vcf"
-                store = GenoStore(proj,format)
-                store.load_Genotype_From_SQLite([proj.name+"_genotype.DB"],proj)
+                importer.format="vcf"
+                store = GenoStore(proj,importer)
+                if os.path.isfile(proj.name+"_genotype.DB") and os.path.getsize(proj.name+"_genotype.DB")>0:
+                    store.load_Genotype_From_SQLite([proj.name+"_genotype.DB"],proj)
         proj.close()
     except Exception as e:
         env.logger.error(e,exc_info=True)

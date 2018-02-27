@@ -293,7 +293,7 @@ class HDF5Engine_storage(Base_Storage):
                 for field in ["GT_geno","DP_geno","GQ_geno"]:
                     group=self.file.get_node("/chr"+str(chr)+"/"+field)  
                     if field=="GT_geno":
-                        field="gt"     
+                        field="GT"     
                     fields.append(field)
             except:
                 pass
@@ -1212,8 +1212,30 @@ class HDF5Engine_access(Base_Access):
             except tb.exceptions.NoSuchNodeError:
                 pass  
             except Exception as e:
-                pass
+                print(e)
         return noWT
+
+
+
+    def get_geno_by_sample_ID(self,sampleID,chrs=range(1,23),groupName=""):
+        geno=[]
+        for chr in chrs:
+            try:
+                node=self.file.get_node("/chr"+str(chr))
+                colnames=node.colnames[:].tolist()
+                colpos=list(map(lambda x:colnames.index(x),colnames))
+                shape=node.shape[:].tolist()
+                chunkPos=chunks_start_stop(shape[0])
+                for startPos,endPos in chunkPos:
+                    if "/chr"+str(chr)+"/GT_geno" in self.file:
+                        genoinfo=node.GT_geno[startPos:endPos,colpos]           
+                        rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
+                        samplePos=colnames.tolist().index(sampleID)
+                        sampleGeno=genoinfo[:,samplePos]
+                        geno.extend(sampleGeno)
+            except tb.exceptions.NoSuchNodeError:
+                pass  
+        return geno
 
 
     def get_geno_by_row_pos(self,rowpos,chr,groupName=""):
@@ -1224,22 +1246,6 @@ class HDF5Engine_access(Base_Access):
         pass
 
 
-    def get_geno_by_sample_ID(self,sampleID,chr,groupName=""):
-        geno=[]
-        if self.checkGroup(chr):
-            node=self.file.get_node("/chr"+str(chr))
-            colnames=node.colnames[:].tolist()
-            colpos=list(map(lambda x:colnames.index(x),colnames))
-            shape=node.shape[:].tolist()
-            chunkPos=chunks_start_stop(shape[0])
-            for startPos,endPos in chunkPos:
-                if "/chr"+str(chr)+"/GT_geno" in self.file:
-                    genoinfo=node.GT_geno[startPos:endPos,colpos]           
-                    rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
-                    samplePos=colnames.tolist().index(sampleID)
-                    sampleGeno=genoinfo[:,samplePos]
-                    geno.extend(sampleGeno)
-        return geno
         
         
 

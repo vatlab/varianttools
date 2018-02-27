@@ -37,7 +37,7 @@ from datetime import datetime
 from .accessor import *
 from .exporter_reader import *
 import glob
-from .importer_allele_hdf5 import HDF5GenotypeImportWorker
+from .importer_allele_hdf5 import HDF5GenotypeImportWorker,updateSample,manageHDF5
 
 
 class Base_Store(object):
@@ -620,7 +620,9 @@ class Sqlite_Store(Base_Store):
         return self.cur.fetchone()[0]
 
     def geno_fields(self, sample_id):
-        sampleGenotypeHeader = [x.lower() for x in self.db.getHeaders('genotype_{}'.format(sample_id))]
+        # sampleGenotypeHeader = [x.lower() for x in self.db.getHeaders('genotype_{}'.format(sample_id))]
+        sampleGenotypeHeader = [x for x in self.db.getHeaders('genotype_{}'.format(sample_id))]
+
         return sampleGenotypeHeader[1:]  # the first field is variant id, second is GT
 
     def get_typeOfColumn(self,sample_id,field):
@@ -1054,9 +1056,12 @@ class HDF5_Store(Base_Store):
 
     def load_Genotype_From_SQLite(self,all_files,proj):
         hdf5files=glob.glob("tmp*h5")
+        cur=self.proj.db.cursor()
+        allNames=manageHDF5(cur)
         if len(hdf5files)==0 and (os.path.isfile('{}_genotype.DB'.format(self.proj.name)) or 'snapshot_genotype.DB' in all_files): 
             # if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
             #     os.remove('{}_genotype.DB'.format(self.proj.name))
+
             if 'snapshot_genotype.DB' in all_files:
                 os.rename(os.path.join(env.cache_dir, 'snapshot_genotype.DB'),
                     '{}_genotype.DB'.format(self.proj.name))
@@ -1067,13 +1072,16 @@ class HDF5_Store(Base_Store):
                 if os.path.isfile(tempFile) and os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
                     os.remove('{}_genotype.DB'.format(self.proj.name))
                     os.rename(tempFile,'{}_genotype.DB'.format(self.proj.name))
+                    os.remove(tempFile)
                 all_files.remove('{}_genotype.DB'.format(self.proj.name))
             else:
                 pass
             print("Current storage mode is HDF5, transfrom genotype storage mode.....")
+            
             jobs=8
-            self.proj.db = DatabaseEngine()
-            self.proj.db.connect(self.proj.proj_file)
+            # self.proj.db = DatabaseEngine()
+            # self.proj.db.connect(self.proj.proj_file)
+
             if proj.build is not None:
                 self.proj.build=proj.build
             else:
@@ -1129,6 +1137,7 @@ class HDF5_Store(Base_Store):
             # print(variantIndex)
 
             start_sample =0
+            
             for job in range(numTasks):
                 # readQueue[job].put(chunk)
                 if workload[job] == 0:
@@ -1138,7 +1147,8 @@ class HDF5_Store(Base_Store):
                     continue
                 HDFfile_Merge="tmp_"+str(start_sample+1)+"_"+str(end_sample)+"_genotypes.h5"
                 # print(HDFfile_Merge)
-                # updateSample(importer,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge)
+                names=[key for key in allNames.keys()]
+                updateSample(cur,start_sample,end_sample,IDs,names,allNames,HDFfile_Merge)
                 taskQueue.put(HDF5GenotypeImportWorker(chunk, variantIndex, start_sample, end_sample, 
                     IDs,0, job, validGenotypeFields ,HDFfile_Merge,self.proj.build))
                 start_sample = end_sample 
@@ -1363,11 +1373,11 @@ class HDF5_Store(Base_Store):
         HDFfileName=self.get_sampleFileName(sample_ID)
         accessEngine=Engine_Access.choose_access_engine(HDFfileName)
         if sex==1:
-            geno=accessEngine.get_geno_by_sample_ID(sample_ID,"X")
+            geno=accessEngine.get_geno_by_sample_ID(sample_ID,["X"])
             geno=np.array(geno)
             invalidate=geno[geno==2]
         if sex==2:
-            invalidate=accessEngine.get_geno_by_sample_ID(sample_ID,"Y")
+            invalidate=accessEngine.get_geno_by_sample_ID(sample_ID,["Y"])
         accessEngine.close()
         return len(invalidate)
         
@@ -1385,13 +1395,13 @@ class HDF5_Store(Base_Store):
 
 
 
-def GenoStore(proj,format="vcf"):
+def GenoStore(proj,importer=None):
     if proj.store == 'sqlite':
         return Sqlite_Store(proj)
     elif proj.store == 'hdf5':
-        if format=="vcf":
+        if importer is None or importer.format=="vcf":
             return HDF5_Store(proj)
-        elif format is None:
+        elif importer.format is None:
             return Sqlite_Store(proj)
     else:
         raise RuntimeError('Unsupported genotype storage model {}'.format(proj.store))
