@@ -1220,18 +1220,22 @@ class HDF5_Store(Base_Store):
 
     def num_variants(self, sampleID):
         HDFfileName=self.get_sampleFileName(sampleID)
-        storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
-        num=storageEngine.num_variants(sampleID)
-        storageEngine.close()
+        num=0
+        if HDFfileName is not None:
+            storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+            num=storageEngine.num_variants(sampleID)
+            storageEngine.close()
         return num
 
 
     def geno_fields(self, sampleID):
         HDFfileName=self.get_sampleFileName(sampleID)
-        storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
-        genoFields=storageEngine.geno_fields(sampleID)
-        genoFields=[x.lower() for x in genoFields]
-        storageEngine.close()
+        genoFields=""
+        if HDFfileName is not None:
+            storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+            genoFields=storageEngine.geno_fields(sampleID)
+            # genoFields=[x.lower() for x in genoFields]
+            storageEngine.close()
         return genoFields
 
     def get_sampleFileName(self,id):
