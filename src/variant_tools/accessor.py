@@ -237,21 +237,24 @@ class HDF5Engine_storage(Base_Storage):
 
     def num_variants(self,sampleID):
         totalNum=0
-        for chr in range(1,23):
+        chrs=["X","Y"]
+        chrs.extend(range(1,23))
+        for chr in chrs:
             try:
-                group=self.file.get_node("/chr"+str(chr)+"/GT/")
-                indices=group.indices[:]
+                group=self.file.get_node("/chr"+str(chr))
+                # indices=group.indices[:]
                 colnames=group.colnames[:]
-                
                 numVariants=len(group.rownames[:])
-                samplePos=np.where(colnames==sampleID)
-                colPos=np.where(indices==samplePos[0][0])
-                data=group.data[colPos]
+                # samplePos=np.where(colnames==sampleID)
+                # colPos=np.where(indices==samplePos[0][0])
+                colPos=np.where(colnames==sampleID)[0]
+                # data=group.data[colPos]
+                data=group.GT_geno[:,colPos]
                 numNan=np.where(np.isnan(data))
-                numNone=np.where(data==-1)
-    
-                totalNum+=numVariants-len(numNan[0])-len(numNone[0])
-            except:
+                numNone=np.where(data==-1) 
+                # totalNum+=numVariants-len(numNan[0])-len(numNone[0])
+                totalNum+=numVariants
+            except tb.exceptions.NoSuchNodeError:
                 pass
         return totalNum
 
@@ -288,14 +291,16 @@ class HDF5Engine_storage(Base_Storage):
 
     def geno_fields(self,sampleID):
         fields=[]
-        for chr in range(1,23):
+        chrs=["X","Y"]
+        chrs.extend(range(1,23))
+        for chr in chrs:
             try:
                 for field in ["GT_geno","DP_geno","GQ_geno"]:
                     group=self.file.get_node("/chr"+str(chr)+"/"+field)  
                     if field=="GT_geno":
                         field="GT"     
                     fields.append(field)
-            except:
+            except tb.exceptions.NoSuchNodeError:
                 pass
         return list(set(fields))
 
@@ -325,7 +330,9 @@ class HDF5Engine_storage(Base_Storage):
 
     
     def remove_sample(self,sample_id):
-        for chr in range(1,23):
+        chrs=["X","Y"]
+        chrs.extend(range(1,23))
+        for chr in chrs:
             try:
                 # group=self.file.get_node("/chr"+str(chr)+"/GT/")
                 group=self.file.get_node("/chr"+str(chr))
@@ -351,7 +358,9 @@ class HDF5Engine_storage(Base_Storage):
 
 
     def remove_genotype(self,cond):
-        for chr in range(1,23):
+        chrs=["X","Y"]
+        chrs.extend(range(1,23))
+        for chr in chrs:
             genoNode="/chr"+str(chr)
             try:
                 node=self.file.get_node(genoNode)
@@ -1095,7 +1104,9 @@ class HDF5Engine_access(Base_Access):
 
     def get_geno_field_from_HDF5(self,samples,varids,genotypes,fieldSelect,validGenotypeFields,operations):
         vardict={}
-        for chr in range(1,23):
+        chrs=["X","Y"]
+        chrs.extend(range(1,23))
+        for chr in chrs:
         # for chr in [1,22]:
             try:
                 node=self.file.get_node("/chr"+str(chr))
@@ -1150,7 +1161,9 @@ class HDF5Engine_access(Base_Access):
 
     def get_genoType_forExport_from_HDF5(self,samples,validGenotypeFields):
         vardict={}
-        for chr in range(1,23):
+        chrs=["X","Y"]
+        chrs.extend(range(1,23))
+        for chr in chrs:
         # for chr in [1,22]:
             try:
                 node=self.file.get_node("/chr"+str(chr))
@@ -1191,7 +1204,9 @@ class HDF5Engine_access(Base_Access):
 
     def get_noWT_variants(self,samples):
         noWT=[]
-        for chr in range(1,23):
+        chrs=["X","Y"]
+        chrs.extend(range(1,23))
+        for chr in chrs:
             try:
                 #haven't dealt with data==-1
                 node=self.file.get_node("/chr"+str(chr))
