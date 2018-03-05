@@ -324,21 +324,28 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import txt/CGA.tsv.bz2 --format ../resources/format/CGA.fmt --build hg19 --sample_name samp_csv')
         self.assertProj(numOfSamples=1, numOfVariants=95)
         self.assertOutput('vtools output variant chr pos ref alt', 'output/import_cga.txt') 
-        self.assertOutput('vtools show genotypes', 'output/import_cga_phenotype.txt')
+        if self.storeMode=="sqlite":
+            self.assertOutput('vtools show genotypes', 'output/import_cga_phenotype.txt')
 
     def testMultiSamples_1(self):
         #the files are coming from one custmer
         self.assertSucc('vtools import --format fmt/multi_index.fmt txt/sample_chr22.txt  --build hg19')
         self.assertProj(numOfSamples=3)
         self.assertOutput('vtools show table variant', 'output/import_multi_sample_variant.txt', -4)
-        self.assertOutput('vtools show samples', 'output/import_multi_sample_samples.txt')
+        if self.storeMode=="sqlite":
+            self.assertOutput('vtools show samples', 'output/import_multi_sample_samples.txt')
+        elif self.storeMode=="hdf5":
+            self.assertOutput('vtools show samples', 'output/import_multi_sample_samples_hdf5.txt')
 
     def testMultiSamples_2(self):
         #the files are coming from one custmer
         self.assertSucc('vtools import --format fmt/multi_index.fmt txt/sample_1_chr22.txt  --build hg19')
         self.assertProj(numOfSamples=3)
         self.assertOutput('vtools show table variant', 'output/import_multi_sample2_variant.txt', -4)
-        self.assertOutput('vtools show samples', 'output/import_multi_sample2_samples.txt')
+        if self.storeMode=="sqlite":
+            self.assertOutput('vtools show samples', 'output/import_multi_sample2_samples.txt')
+        elif self.storeMode=="hdf5":
+            self.assertOutput('vtools show samples', 'output/import_multi_sample2_samples_hdf5.txt')
      
 
 if __name__ == '__main__':
