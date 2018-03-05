@@ -1093,7 +1093,6 @@ class HDF5GenotypeImportWorker(Process):
                 prev_chr=chr             
             ref=self.chunk["variants/REF"][i]
             pos=self.chunk["variants/POS"][i]
-
             for altIndex in range(len(self.chunk["variants/ALT"][i])):
                 alt=self.chunk["variants/ALT"][i][altIndex]
                 if alt!="":
@@ -1600,7 +1599,7 @@ def importGenotypesInParallel(importer,num_sample=0):
         allNames=manageHDF5(cur,allNames)
         sample_ids=[int(allNames[name]) for name in names]
         workload=None
-       
+        
         #determine number of samples to be processed in each process
         if num_sample>0:
             #if number of samples in each HDF5 is determined
@@ -1620,7 +1619,6 @@ def importGenotypesInParallel(importer,num_sample=0):
             unallocated = max(0, len(sample_ids) - sum(workload))
             for i in range(unallocated):
                 workload[i % importer.jobs] += 1
-
 
         env.logger.debug("work load {}".format(workload))
         numTasks=len(workload)
@@ -1690,7 +1688,6 @@ def importGenotypesInParallel(importer,num_sample=0):
       
         start=time.time()
         for chunk, _, _, _ in it:
-
             start_sample =0
             for job in range(numTasks):
                 # readQueue[job].put(chunk)
@@ -1710,6 +1707,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                     if not os.path.isfile(HDFfile_Merge):
                         copyfile(originalFile,HDFfile_Merge)
                     updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge.replace("_sort",""))
+
                     taskQueue.put(HDF5GenotypeSortWorker(chunk, importer, start_sample, end_sample, 
                         sample_ids,variant_import_count[job], job, HDFfile_Merge,estart[job],eend[job],efirst[job]))
                 start_sample = end_sample 

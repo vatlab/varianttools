@@ -628,6 +628,7 @@ class Importer:
                     return ([], 0,[])
         else:
             self.sample_in_file = [x for x in self.sample_name]
+            
             if not self.genotype_field:
                 # if no genotype, but a sample name is given
                 env.logger.debug('Input file does not contain any genotype. Only the variant ownership information is recorded.')
@@ -635,6 +636,7 @@ class Importer:
             else:
                 try:
                     numSample, names = probeSampleName(input_filename, self.prober, self.encoding)
+
                 except ValueError as e:
                     env.logger.debug(e)
                     numSample = 0
