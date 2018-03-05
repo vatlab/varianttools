@@ -1,0 +1,4 @@
+sample_name	filename              	HDF5
+SMP1       	txt/sample_1_chr22.txt	tmp_1_1_genotypes.h5
+SMP2       	txt/sample_1_chr22.txt	tmp_2_2_genotypes.h5
+SMP3       	txt/sample_1_chr22.txt	tmp_3_3_genotypes.h5
