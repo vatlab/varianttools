@@ -649,7 +649,7 @@ class Importer:
                         raise ValueError("When there is no sample genotype, only one sample name is allowed.")
                 elif len(self.sample_name) != numSample:
                     raise ValueError('{} sample detected but only {} sample names are specified'.format(numSample, len(self.sample_name)))                        
-                return (self.recordFileAndSample(input_filename, self.sample_name), 1 if numSample == 0 else 2,names)
+                return (self.recordFileAndSample(input_filename, self.sample_name), 1 if numSample == 0 else 2,self.sample_in_file)
  
     def importVariant(self, input_filename):
         # reset text processor to allow the input of files with different number of columns

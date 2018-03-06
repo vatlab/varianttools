@@ -1085,6 +1085,7 @@ class HDF5GenotypeImportWorker(Process):
    
     def run(self):
         prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
+        prev_variant_id=-1
         for i in range(len(self.chunk["variants/ID"])):
             infoDict={}
             chr=self.chunk["variants/CHROM"][i].replace("chr","")
@@ -1098,14 +1099,18 @@ class HDF5GenotypeImportWorker(Process):
                 if alt!="":
                     if tuple((chr, ref, alt)) in self.variantIndex:
                         variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
-                        self.get_geno(variant_id,i,altIndex)
+                        if variant_id!=prev_variant_id:
+                            self.get_geno(variant_id,i,altIndex)
+                            prev_variant_id=variant_id
                         
                     else:
                         rec=[str(chr),str(pos),ref,alt]  
                         msg=normalize_variant(RefGenome(self.build).crr, rec, 0, 1, 2, 3)
                         if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
                             variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
-                            self.get_geno(variant_id,i,altIndex)
+                            if variant_id!=prev_variant_id:
+                                self.get_geno(variant_id,i,altIndex)
+                                prev_variant_id=variant_id
         self.writeIntoHDF(chr)
 
 
