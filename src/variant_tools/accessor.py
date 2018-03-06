@@ -1247,9 +1247,13 @@ class HDF5Engine_access(Base_Access):
                         rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
                         samplePos=colnames.tolist().index(sampleID)
                         sampleGeno=genoinfo[:,samplePos]
-                        geno.extend(sampleGeno)
+                        for idx,rowname in enumerate(rownames):
+                            genotype=sampleGeno[idx]
+                            if np.isnan(genotype):
+                                genotype=-1
+                            geno.append([rowname,genotype])
             except tb.exceptions.NoSuchNodeError:
-                pass  
+                pass
         return geno
 
 

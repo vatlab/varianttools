@@ -29,6 +29,7 @@ import glob
 import unittest
 import subprocess
 from testUtils import ProcessTestCase 
+from variant_tools.accessor import *
 
 # @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
 class TestImport(ProcessTestCase):
@@ -167,7 +168,7 @@ class TestImport(ProcessTestCase):
         
     def testMPImport(self):
         'Test multi-processing import'
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j1')
         self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
         self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
@@ -177,7 +178,7 @@ class TestImport(ProcessTestCase):
         #
         # compare results with -j3
         #
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         # if more than one reader is used, the order of mutants in some cases will be changed, leading
         # to different variant ids.
         self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
@@ -190,7 +191,7 @@ class TestImport(ProcessTestCase):
         #
         # compare results with -j10
         #
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j10')
         self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
@@ -199,8 +200,9 @@ class TestImport(ProcessTestCase):
         self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
                 'output/import_mpi_genotype.txt')
     
-    def testMPImportMultiFiles(self):
-        self.runCmd('vtools init test -f')
+    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
+    def testMPImportMultiFiles_sqlite(self):
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j1')
         self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
         self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_multi_genotypes.txt')
@@ -210,7 +212,7 @@ class TestImport(ProcessTestCase):
         #
         # compare results with -j3
         #
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
         self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j4')
         self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
@@ -218,7 +220,28 @@ class TestImport(ProcessTestCase):
         self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
         self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(3)],
                 'output/import_mpi_multi_genotype.txt')
- 
+
+    @unittest.skipIf(os.getenv("STOREMODE")=="sqlite","sqlite version is not implemented for this test")
+    def testMPImportMultiFiles_hdf5(self):
+        self.runCmd('vtools init test -f --store '+self.storeMode)
+        self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j1')
+        # self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
+        # self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_multi_genotypes.txt')
+        # self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
+        with open(os.devnull, 'w') as fnull:
+            fileResult = subprocess.check_output('vtools execute "SELECT HDF5 FROM sample WHERE sample_id =1"', shell=True,
+                            stderr=fnull).decode()
+            HDF5FileName=fileResult.rstrip()
+            accessEngine=Engine_Access.choose_access_engine(HDF5FileName)
+            geno=accessEngine.get_geno_by_sample_ID(1)
+            proj_output="".join([str(val[0])+"\t"+str(int(val[1]))+"\n" for val in geno])
+            output='output/import_mpi_multi_genotype_hdf5.txt'
+            if os.path.isfile(output):
+                with open(output, 'r') as cf:
+                    output = cf.read()
+            self.compare(proj_output, output)
+
+
     def testMixedBuild(self):
         'Test importing vcf files with different reference genomes'
         self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18')
