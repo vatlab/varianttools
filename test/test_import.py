@@ -77,7 +77,7 @@ class TestImport(ProcessTestCase):
     def testDupGenotype1(self):
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18')
         self.assertProj(numOfVariants=288)
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         self.assertSucc('vtools import vcf/CEU_dup.vcf.gz --build hg18')
         self.assertProj(numOfVariants=288)
 
@@ -154,10 +154,12 @@ class TestImport(ProcessTestCase):
         self.assertProj(numOfSamples= 62, numOfVariants=698)
         # import additional information on variants and on genotypes.
         # DP and DP_geno are fields provided in the default vcf.fmt
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         self.assertSucc('vtools import vcf/CEU.vcf.gz --var_info DP --geno_info DP_geno --build hg18')
         self.assertSucc('vtools output variant DP')
-        self.assertProj(numOfSamples= 60, numOfVariants=288, numOfColumns={'genotype_1': 3})
+        if self.storeMode=="sqlite":
+            self.assertProj(numOfColumns={'genotype_1': 3})
+        self.assertProj(numOfSamples= 60, numOfVariants=288)
 
     def testImportVCFIndel(self):
         'Test importing Indel from VCF files'
