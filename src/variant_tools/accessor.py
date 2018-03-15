@@ -253,7 +253,7 @@ class HDF5Engine_storage(Base_Storage):
                 numNan=np.where(np.isnan(data))
                 numNone=np.where(data==-1) 
                 # totalNum+=numVariants-len(numNan[0])-len(numNone[0])
-                totalNum+=numVariants
+                totalNum+=numVariants-len(numNan[0])
             except tb.exceptions.NoSuchNodeError:
                 pass
         return totalNum
@@ -1232,7 +1232,7 @@ class HDF5Engine_access(Base_Access):
 
 
 
-    def get_geno_by_sample_ID(self,sampleID,chrs=range(1,23),groupName=""):
+    def get_geno_by_sample_ID(self,sampleID,type,chrs=range(1,23),groupName=""):
         geno=[]
         for chr in chrs:
             try:
@@ -1242,7 +1242,7 @@ class HDF5Engine_access(Base_Access):
                 shape=node.shape[:].tolist()
                 chunkPos=chunks_start_stop(shape[0])
                 for startPos,endPos in chunkPos:
-                    if "/chr"+str(chr)+"/GT_geno" in self.file:
+                    if "/chr"+str(chr)+"/"+type in self.file:
                         genoinfo=node.GT_geno[startPos:endPos,colpos]           
                         rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
                         samplePos=colnames.tolist().index(sampleID)

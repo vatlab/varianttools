@@ -167,7 +167,8 @@ class TestImport(ProcessTestCase):
         self.assertProj(numOfSamples= 0, numOfVariants=134)
         self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno_info')
         self.assertProj(numOfSamples= 0, numOfVariants=11877)
-        
+    
+    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")   
     def testMPImport(self):
         'Test multi-processing import'
         self.runCmd('vtools init test -f --store '+self.storeMode)
@@ -235,7 +236,7 @@ class TestImport(ProcessTestCase):
                             stderr=fnull).decode()
             HDF5FileName=fileResult.rstrip()
             accessEngine=Engine_Access.choose_access_engine(HDF5FileName)
-            geno=accessEngine.get_geno_by_sample_ID(1)
+            geno=accessEngine.get_geno_by_sample_ID(1,"GT_geno")
             proj_output="".join([str(val[0])+"\t"+str(int(val[1]))+"\n" for val in geno])
             output='output/import_mpi_multi_genotype_hdf5.txt'
             if os.path.isfile(output):
@@ -282,9 +283,10 @@ class TestImport(ProcessTestCase):
             FIC LQR MQ0 MQ10 MQ20 MQ30 ANNO SVM', 'output/import_customized.txt')
         # test importing self-defined genotypes with VcfGenotype(default=('0',))
         # code missing genotypes as None and wild-type as '0'
-        self.assertProj(genotype={1: ['-1', '-1'], 2: ['0', '2'], 3: ['0', '-1', '-1'], 4: ['0', '-1', '-1']},
-            genoInfo={(1, 'GT'): ['-1', '-1'], (1, 'GQ'): ['3', '3'], (1, 'GD'): ['1', '1'], 
-                (1, 'PL_1'): ['None', 'None'], (1, 'PL_2'): ['None', 'None'], (1, 'PL3_1'): ['0', '3']})
+        if self.storeMode=="sqlite":
+            self.assertProj(genotype={1: ['-1', '-1'], 2: ['0', '2'], 3: ['0', '-1', '-1'], 4: ['0', '-1', '-1']},
+                genoInfo={(1, 'GT'): ['-1', '-1'], (1, 'GQ'): ['3', '3'], (1, 'GD'): ['1', '1'], 
+                    (1, 'PL_1'): ['None', 'None'], (1, 'PL_2'): ['None', 'None'], (1, 'PL3_1'): ['0', '3']})
 
     def testInsertDelete(self):
         'Testing the number of insertions and deletions'

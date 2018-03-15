@@ -1024,12 +1024,14 @@ class HDF5GenotypeImportWorker(Process):
         for info in self.geno_info:    
             self.info[info]=[]
             self.namedict[info]="calldata/"+info.replace("_geno","")
+  
         
    
 
     # check io_vcf_read.pyx function vcf_genotype_parse to see the meaning of coding
     def get_geno(self,variant_id,pos,altIndex):
         self.rownames.append(variant_id)
+
         if "calldata/GT" in self.chunk:
             GT_geno=self.chunk["calldata/GT"][pos,self.start_sample:self.end_sample]
             GT_geno=GT_geno.astype(float)
@@ -1042,16 +1044,17 @@ class HDF5GenotypeImportWorker(Process):
             GT_geno[GT_geno==-10]=np.nan
             self.info["GT_geno"].append(GT_geno)
             self.info["Mask_geno"].append([1.0]*len(GT_geno))
-            if len(self.geno_info)>0:
-                # self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
-                # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
-                # self.getInfoTable(variant_id,infoDict,altIndex)
-                for info in self.geno_info:
-                    self.info[info].append(self.chunk[self.namedict[info]][pos,self.start_sample:self.end_sample])
         else:
             GT_geno=[np.nan]
             self.info["GT_geno"].append(GT_geno)
             self.info["Mask_geno"].append([1.0]*len(GT_geno))
+        if len(self.geno_info)>0:
+            # self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
+            # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
+            # self.getInfoTable(variant_id,infoDict,altIndex)
+            for info in self.geno_info:
+                self.info[info].append(self.chunk[self.namedict[info]][pos,self.start_sample:self.end_sample])
+        
 
 
    
@@ -1078,7 +1081,6 @@ class HDF5GenotypeImportWorker(Process):
 
         if len(self.geno_info)>0:
             for info in self.geno_info:
-                # print(info)
                 storageEngine.store_genoInfo(np.array(self.info[info]),chr,info)
                 self.info[info]=[]
  
@@ -1103,7 +1105,7 @@ class HDF5GenotypeImportWorker(Process):
                 if alt!="":
                     if tuple((chr, ref, alt)) in self.variantIndex:
                         variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
-                        if variant_id>prev_variant_id:
+                        if variant_id!=prev_variant_id:
                             self.get_geno(variant_id,i,altIndex)
                             prev_variant_id=variant_id
                         
@@ -1112,7 +1114,7 @@ class HDF5GenotypeImportWorker(Process):
                         msg=normalize_variant(RefGenome(self.build).crr, rec, 0, 1, 2, 3)
                         if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
                             variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
-                            if variant_id>prev_variant_id:
+                            if variant_id!=prev_variant_id:
                                 self.get_geno(variant_id,i,altIndex)
                                 prev_variant_id=variant_id
         self.writeIntoHDF(chr)
@@ -1589,7 +1591,6 @@ def importGenotypesInParallel(importer,num_sample=0):
     
     for count, input_filename in enumerate(importer.files):
 
-        
         env.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(importer.files)))
         importer.importVariant(input_filename)
 
@@ -1628,7 +1629,7 @@ def importGenotypesInParallel(importer,num_sample=0):
             unallocated = max(0, len(sample_ids) - sum(workload))
             for i in range(unallocated):
                 workload[i % importer.jobs] += 1
-
+   
         env.logger.debug("work load {}".format(workload))
         numTasks=len(workload)
         # importers = [None] * numProcess

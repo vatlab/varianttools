@@ -335,16 +335,25 @@ class ProcessTestCase(unittest.TestCase):
                             stderr=fnull).decode()
                         HDF5FileName=fileResult.rstrip()
                         accessEngine=Engine_Access.choose_access_engine(HDF5FileName)
-                        proj_geno=accessEngine.get_geno_by_sample_ID(table)
+                        proj_geno=accessEngine.get_geno_by_sample_ID(table,"GT_geno")
                         self.compare([int(x[1]) for x in proj_geno], list([int(x) for x in geno]), partial=partial, negate=negate)
                         
 
         if genoInfo is not None:
             with open(os.devnull, 'w') as fnull:
                 for table, geno in genoInfo.items():
-                    proj_geno = subprocess.check_output('vtools execute "SELECT {} FROM genotype_{}"'.format(table[1], table[0]), shell=True,
-                        stderr=fnull).decode()
-                    self.compare([x.strip() for x in proj_geno.strip().split('\n')], list(geno), partial=partial, negate=negate)
+                    if self.storeMode=="sqlite":
+                        proj_geno = subprocess.check_output('vtools execute "SELECT {} FROM genotype_{}"'.format(table[1], table[0]), shell=True,
+                            stderr=fnull).decode()
+                        self.compare([x.strip() for x in proj_geno.strip().split('\n')], list(geno), partial=partial, negate=negate)
+                    elif self.storeMode=="hdf5":
+                        fileResult = subprocess.check_output('vtools execute "SELECT HDF5 FROM sample WHERE sample_id ={}"'.format(table[0]), shell=True,
+                            stderr=fnull).decode()
+                        HDF5FileName=fileResult.rstrip()
+                        accessEngine=Engine_Access.choose_access_engine(HDF5FileName)
+                        proj_geno=accessEngine.get_geno_by_sample_ID(table[0],table[1])
+                        self.compare([int(x[1]) for x in proj_geno], list([int(x) for x in geno]), partial=partial, negate=negate)
+
         if hasTable is not None:
             with open(os.devnull, 'w') as fnull:
                 proj_tables = subprocess.check_output('vtools show tables -v0', shell=True).decode().strip().split('\n')

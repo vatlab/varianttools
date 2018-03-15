@@ -817,7 +817,7 @@ def importVariants(args):
                 importer.format="vcf"
                 store = GenoStore(proj,importer)
                 if os.path.isfile(proj.name+"_genotype.DB") and os.path.getsize(proj.name+"_genotype.DB")>0:
-                    store.load_Genotype_From_SQLite([proj.name+"_genotype.DB"],proj)
+                    store.load_Genotype_From_SQLite([proj.name+"_genotype.DB"],proj,importer)
         proj.close()
     except Exception as e:
         env.logger.error(e,exc_info=True)

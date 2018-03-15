@@ -589,7 +589,7 @@ class Sqlite_Store(Base_Store):
             filesize= os.path.getsize('{}_genotype.DB'.format(self.proj.name))
         return filesize
 
-    def load_Genotype_From_SQLite(self,all_files,proj):
+    def load_Genotype_From_SQLite(self,all_files,proj,importer=None):
         if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
             os.remove('{}_genotype.DB'.format(self.proj.name))
         if 'snapshot_genotype.DB' in all_files:
@@ -1054,7 +1054,7 @@ class HDF5_Store(Base_Store):
         return filesizes
 
 
-    def load_Genotype_From_SQLite(self,all_files,proj):
+    def load_Genotype_From_SQLite(self,all_files,proj,importer=None):
         hdf5files=glob.glob("tmp*h5")
         cur=self.proj.db.cursor()
         allNames=manageHDF5(cur)
@@ -1077,8 +1077,12 @@ class HDF5_Store(Base_Store):
             else:
                 pass
             print("Current storage mode is HDF5, transfrom genotype storage mode.....")
-            
             jobs=8
+            validGenotypeFields=['GT']
+            if importer is not None:
+                jobs=importer.jobs
+                for info in importer.genotype_info:
+                    validGenotypeFields.append(info.name)
             # self.proj.db = DatabaseEngine()
             # self.proj.db.connect(self.proj.proj_file)
 
@@ -1087,10 +1091,9 @@ class HDF5_Store(Base_Store):
             else:
                 self.proj.build="hg19"
             IDs = self.proj.selectSampleByPhenotype("")
-            
             IDs=list(IDs)
             IDs.sort()
-            validGenotypeFields=['GT', 'DP_geno', 'GQ_geno']
+            
             reader = MultiVariantReader(self.proj, "variant", "chr,pos,ref", "",['chr', 'pos', 'ref', 'vcf_variant(chr,pos,ref,alt,".")'], validGenotypeFields, False, IDs, 4, True)
             reader.start()
 
@@ -1121,9 +1124,11 @@ class HDF5_Store(Base_Store):
                     dtype=np.dtype(np.int8)
                 elif key=="calldata/GQ":
                     dtype=np.dtype(np.float32)
+                elif "calldata" in key:
+                    dtype=np.dtype(np.int16)
+                    value=[ [0] if val[0]=='' else [val[0]] for val in value]
                 chunk[key]=np.array(value,dtype=dtype)
 
-            
             importers=[None]*jobs
             task=None
             taskQueue=queue.Queue()
@@ -1377,11 +1382,11 @@ class HDF5_Store(Base_Store):
         HDFfileName=self.get_sampleFileName(sample_ID)
         accessEngine=Engine_Access.choose_access_engine(HDFfileName)
         if sex==1:
-            geno=accessEngine.get_geno_by_sample_ID(sample_ID,["X"])
+            geno=accessEngine.get_geno_by_sample_ID(sample_ID,"GT_geno",["X"])
             geno=np.array(geno)
             invalidate=geno[geno==2]
         if sex==2:
-            invalidate=accessEngine.get_geno_by_sample_ID(sample_ID,["Y"])
+            invalidate=accessEngine.get_geno_by_sample_ID(sample_ID,"GT_geno",["Y"])
         accessEngine.close()
         return len(invalidate)
         
