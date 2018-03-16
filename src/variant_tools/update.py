@@ -348,9 +348,10 @@ class Updater:
     def update(self):
         '''Start updating'''
         for count,f in enumerate(self.files):
+            filetype=f.split(".")[-1]
             env.logger.info('{} variants from {} ({}/{})'.format('Updating', f, count + 1, len(self.files)))
             
-            if self.proj.store=="sqlite":
+            if self.proj.store=="sqlite" or (self.proj.store=="hdf5" and filetype!="vcf"):
                 self.updateFromFile(f)
                 env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.count[8],
                     '' if self.count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.count[1])))

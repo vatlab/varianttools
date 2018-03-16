@@ -1093,6 +1093,7 @@ class HDF5_Store(Base_Store):
             IDs = self.proj.selectSampleByPhenotype("")
             IDs=list(IDs)
             IDs.sort()
+       
             
             reader = MultiVariantReader(self.proj, "variant", "chr,pos,ref", "",['chr', 'pos', 'ref', 'vcf_variant(chr,pos,ref,alt,".")'], validGenotypeFields, False, IDs, 4, True)
             reader.start()

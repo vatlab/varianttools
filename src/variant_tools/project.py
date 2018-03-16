@@ -2662,6 +2662,9 @@ class Project:
                 else:
                     raise ValueError('Invalid snapshot. Missing project database')
                 # genotype
+                self.db = DatabaseEngine()
+                self.db.connect(self.proj_file)
+                self.saveProperty('store', self.store)
                 
                 all_files=store.load_Genotype_From_SQLite(all_files,self)
                         
@@ -2677,7 +2680,7 @@ class Project:
             # re-connect the main database for proper cleanup
             self.db = DatabaseEngine()
             self.db.connect(self.proj_file)
-            self.saveProperty('store', self.store)
+  
 
         #
         prog.done()

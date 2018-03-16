@@ -55,7 +55,7 @@ class SetMafTester(ActionTester):
         print(data)
         return True
 
-@unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
+
 class TestAssociate(ProcessTestCase):
     def setUp(self):
         ProcessTestCase.setUp(self)
