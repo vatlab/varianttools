@@ -82,18 +82,29 @@ class GroupHDFGenerator(Process):
                     ids=[int(x) for x in ids]
                     # ids.sort()
                     chr= getChr(ids[0],db.cursor())
+                    chrEnd=getChr(ids[-1],db.cursor())
                     
                     # subMatrix=accessEngine.get_geno_info_by_variant_IDs(ids,chr,"GT")
                     # if subMatrix is not None and subMatrix.indices is not None:
                     #     storageEngine.store(subMatrix,chr,geneSymbol) 
 
+                    if chr==chrEnd:
+                        updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
+                        if subMatrix is not None:
+                            storageEngine.store(subMatrix,chr,geneSymbol+"/GT_geno")
+                            storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
+                            if not storageEngine.checkGroup(chr,"colnames"):
+                                storageEngine.store(colnames,chr,"colnames")
+                    else:
+                        varDict=getChrs(ids,db.cursor())
+                        for chr,vids in varDict.items():
+                            updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_sep_variant_ids(vids,chr)
+                            if subMatrix is not None:
+                                storageEngine.store(subMatrix,chr,geneSymbol+"/GT_geno")
+                                storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
+                                if not storageEngine.checkGroup(chr,"colnames"):
+                                    storageEngine.store(colnames,chr,"colnames")
 
-                    updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
-                    if subMatrix is not None:
-                        storageEngine.store(subMatrix,chr,geneSymbol+"/GT_geno")
-                        storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
-                        if not storageEngine.checkGroup(chr,"colnames"):
-                            storageEngine.store(colnames,chr,"colnames")
                     # storageEngine.close() 
                 accessEngine.close()
                 storageEngine.close()
@@ -132,7 +143,7 @@ def generateHDFbyGroup(testManager,njobs):
                 break
     for groupHDFGenerator in groupGenerators:
         groupHDFGenerator.join()
-    print(("group time: ",time.time()-start))
+    # print(("group time: ",time.time()-start))
 
 
 
@@ -328,6 +339,16 @@ def getChr(variantID,cur):
     chr= [rec[0] for rec in cur.execute(find_chr)]
     return chr[0]
 
+def getChrs(variantIDs,cur):
+    idString="("+",".join([str(variantID) for variantID in variantIDs])+")"
+    find_chr="SELECT chr,variant_id from variant where variant_id in "+idString
+    varDict={}
+    for rec in cur.execute(find_chr):
+        if rec[0] not in varDict:
+            varDict[rec[0]]=[]
+        varDict[rec[0]].append(rec[1])
+    return varDict
+
 
 def getGenotype_HDF5(worker, group):
     """This function gets genotype of variants in specified group.
@@ -335,9 +356,17 @@ def getGenotype_HDF5(worker, group):
     where_clause = ' AND '.join(['{0}={1}'.format(x, worker.db.PH) for x in worker.group_names])
     cur = worker.db.cursor()
     # variant info
-    var_info, variant_id = worker.getVarInfo(group, where_clause)
+    var_info, variant_ids = worker.getVarInfo(group, where_clause)
     
-    chr=getChr(variant_id[0],cur)
+    chr=getChr(variant_ids[0],cur)
+    chrEnd=getChr(variant_ids[-1],cur)
+    if chr!=chrEnd:
+        varDict=getChrs(variant_ids,cur)
+        chrs=list(varDict.keys())
+    else:
+        varDict={chr:variant_ids}
+        chrs=[chr]
+
     # get genotypes / genotype info
     genotype = []
     geno_info = {x:[] for x in worker.geno_info}
@@ -353,24 +382,45 @@ def getGenotype_HDF5(worker, group):
 
         # colnames=accessEngine.get_colnames(chr,geneSymbol)
         # snpdict=accessEngine.get_geno_info_by_group(geneSymbol,chr)
-        
-        colnames=accessEngine.get_colnames(chr)
-        snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
-        
-        accessEngine.close()
-        for ID in colnames:
-            data=snpdict[ID]
+
+        # for chr in chrs:
             
-            gtmp = [data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in variant_id]
-            # handle -1 coding (double heterozygotes)     
+        #     colnames=accessEngine.get_colnames(chr)
+        #     snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
+     
+        #     for ID in colnames:
+        #         data=snpdict[ID]
+                
+        #         gtmp = [data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]]
+        #         # handle -1 coding (double heterozygotes)     
+        #         genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
+
+        #         #
+        #         # handle genotype_info
+        #         #
+        #         for idx, key in enumerate(worker.geno_info):
+        #             geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
+
+       
+            
+        colnames=accessEngine.get_colnames(chrs[0])
+            
+        for ID in colnames:
+            gtmp=[]
+            for chr in chrs:
+                snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
+                data=snpdict[ID]
+                
+                gtmp.extend([data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]])
+                # handle -1 coding (double heterozygotes)     
             genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
             #
             # handle genotype_info
             #
             for idx, key in enumerate(worker.geno_info):
                 geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
-            
+
+        accessEngine.close()
     gname = ':'.join(list(map(str, group)))
-  
     return worker.filterGenotype(genotype, geno_info, var_info, gname)
 
