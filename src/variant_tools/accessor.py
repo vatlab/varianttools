@@ -954,6 +954,42 @@ class HDF5Engine_access(Base_Access):
                 snpdict[colID][rowID]=(self.GT[rowidx,colidx],)
         return snpdict
 
+     
+    def get_geno_by_sep_variant_ids(self,rowIDs,chr,groupName=""):
+
+        #assume rowIDs are sorted by genome position
+     
+        group=self.getGroup(chr,groupName)
+        # rownames=group.rownames[:].tolist()
+        rownames=group.rownames[:]
+        colnames=group.colnames[:]
+        rowMask=group.rowmask[:]
+        sampleMask=group.samplemask[:]
+
+        # rowPos=[rownames.index(id) for id in rowIDs]
+        rowPos=[np.where(rownames==id)[0][0] for id in rowIDs]
+       
+        try:
+            update_rownames=rownames[rowPos]
+            sub_geno=group.GT_geno[rowPos,:]    
+            sub_Mask=group.Mask_geno[rowPos,:]
+            sub_geno=np.multiply(sub_geno,sub_Mask)
+
+            update_rowMask=rowMask[rowPos]
+            rowMasked=np.where(update_rowMask==True)[0]
+            sampleMasked=np.where(sampleMask==True)[0]
+            if len(rowMasked)>0:
+                update_rownames=np.array(update_rownames)[np.where(update_rowMask==False)[0]]
+                sub_geno=np.delete(sub_geno,rowMasked,0)
+
+            if len(sampleMasked)>0:
+                colnames=colnames[np.where(sampleMask==False)[0]]
+                sub_geno=np.delete(sub_geno,sampleMasked,1)
+        
+            return np.array(update_rownames),colnames,np.array(sub_geno)
+        except NameError:
+            env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
+
 
 
     def get_geno_by_variant_IDs(self,rowIDs,chr,groupName=""):
