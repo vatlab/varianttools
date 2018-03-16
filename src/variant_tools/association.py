@@ -121,8 +121,8 @@ def associateArguments(parser):
             the result database.''')
     parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
         help='''Number of processes to carry out association tests.'''),
-    parser.add_argument('--HDF5', action='store_true',
-        help='''Store genotypes into HDF5 files'''),
+    # parser.add_argument('--HDF5', action='store_true',
+    #     help='''Store genotypes into HDF5 files'''),
 
 class AssociationTestManager:
     '''Parse command line and get data for association testing. This class will provide
@@ -795,6 +795,7 @@ class AssoTestsWorker(Process):
         #
         # filter samples/variants for missingness
         gname = ':'.join(list(map(str, group)))
+        
         return self.filterGenotype(genotype, geno_info, var_info, gname)
 
 
@@ -967,9 +968,9 @@ class AssoTestsWorker(Process):
 
             try:
                 # select variants from each group:
-                if not self.args.HDF5:
+                if self.proj.store=="sqlite":
                     genotype, which, var_info, geno_info = self.getGenotype(grp)
-                else:
+                elif self.proj.store=="hdf5":
                     genotype, which, var_info, geno_info = getGenotype_HDF5(self,grp)
                 # if I throw an exception here, the program completes in 5 minutes, indicating
                 # the data collection part takes an insignificant part of the process.
@@ -1027,7 +1028,7 @@ def runAssociation(args,asso,proj,results):
         
         # use SQLite DB 
 
-        if not args.HDF5:
+        if proj.store=="sqlite":
             if not os.path.isfile(asso.proj.name + '_genotype.DB') or os.stat(asso.proj.name + '_genotype.DB').st_size == 0:
                 env.logger.error("The genotype DB is not generated, please run vtools import without --HDF5 tag to generate sqlite genotype DB first.")
                 sys.exit()
@@ -1189,7 +1190,7 @@ def associate(args):
                             cur.execute(query, grp)
                         proj.db.commit()
             
-            if args.HDF5:
+            if proj.store=="hdf5":
                 HDFfileNames=glob.glob("tmp*_genotypes.h5")
                 if len(HDFfileNames)==0:
                     env.logger.error("No HDF5 file found. Please run vtools import with --HDF5 tag first.")
