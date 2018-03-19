@@ -1004,7 +1004,13 @@ class HDF5GenotypeImportWorker(Process):
         self.data=[]
         self.rownames=[]
         self.sample_ids=sample_ids
-        self.colnames=[sample_ids[i] for i in range(start_sample,end_sample)]
+        self.firstID=0
+        if sample_ids[0]!=1:
+            self.firstID=sample_ids[0]
+            self.start_sample=self.start_sample+1
+            self.end_sample=self.end_sample+1
+        self.colnames=[self.sample_ids[i-self.firstID] for i in range(self.start_sample,self.end_sample)]
+  
         self.genoCount=0
         self.dbLocation=dbLocation
         self.build=build
@@ -1033,7 +1039,7 @@ class HDF5GenotypeImportWorker(Process):
         self.rownames.append(variant_id)
 
         if "calldata/GT" in self.chunk:
-            GT_geno=self.chunk["calldata/GT"][pos,self.start_sample:self.end_sample]
+            GT_geno=self.chunk["calldata/GT"][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]
             GT_geno=GT_geno.astype(float)
             if altIndex==0:
                 GT_geno[np.logical_or(GT_geno==3, GT_geno==4)]=np.nan          
@@ -1053,7 +1059,7 @@ class HDF5GenotypeImportWorker(Process):
             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
             # self.getInfoTable(variant_id,infoDict,altIndex)
             for info in self.geno_info:
-                self.info[info].append(self.chunk[self.namedict[info]][pos,self.start_sample:self.end_sample])
+                self.info[info].append(self.chunk[self.namedict[info]][pos,self.start_sample-self.firstID:self.end_sample-self.firstID])
         
 
 
@@ -1063,6 +1069,7 @@ class HDF5GenotypeImportWorker(Process):
     def writeIntoHDF(self,chr):
         storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
         shape=np.array([len(self.rownames),len(self.colnames)])
+       
         storageEngine.store(np.array(self.info["GT_geno"]),chr,"GT_geno")
         storageEngine.store(np.array(self.info["Mask_geno"]),chr,"Mask_geno")
         storageEngine.store(np.array(self.rownames),chr,"rownames")
@@ -1297,7 +1304,12 @@ class HDF5GenotypeSortWorker(Process):
         self.data=[]
         self.rownames=[]
         self.sample_ids=sample_ids
-        self.colnames=[sample_ids[i] for i in range(start_sample,end_sample)]
+        self.firstID=0
+        if sample_ids[0]!=1:
+            self.firstID=sample_ids[0]
+            self.start_sample=self.start_sample+1
+            self.end_sample=self.end_sample+1
+        self.colnames=[self.sample_ids[i-self.firstID] for i in range(self.start_sample,self.end_sample)]
         self.genoCount=0
         self.dbLocation=dbLocation
         
@@ -1335,7 +1347,7 @@ class HDF5GenotypeSortWorker(Process):
         self.readcheck+=1
         self.rownames.append(variant_id)
         
-        GT_geno=self.chunk["calldata/GT"][pos,self.start_sample:self.end_sample]
+        GT_geno=self.chunk["calldata/GT"][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]
         GT_geno=GT_geno.astype(float)
         if altIndex==0:
             GT_geno[np.logical_or(GT_geno==3, GT_geno==4)]=np.nan          
@@ -1351,7 +1363,7 @@ class HDF5GenotypeSortWorker(Process):
             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
             # self.getInfoTable(variant_id,infoDict,altIndex)
             for info in self.geno_info:
-                self.info[info].append(self.chunk[self.namedict[info]][pos,self.start_sample:self.end_sample])
+                self.info[info].append(self.chunk[self.namedict[info]][pos,self.start_sample-self.firstID:self.end_sample-self.firstID])
 
 
    
@@ -1554,12 +1566,15 @@ class HDF5GenotypeSortWorker(Process):
 
 
 def updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDF5fileName):
-    
-    
+    firstID=0
+    if sample_ids[0]!=1:
+        firstID=sample_ids[0]
+        start_sample=start_sample+1
+        end_sample=end_sample+1
     for id in range(start_sample,end_sample):
         sql="UPDATE sample SET HDF5=? WHERE sample_id=? and sample_name=?"
         # task=(HDF5fileName,allNames[names[id]],sample_ids[id],names[id])
-        task=(HDF5fileName,sample_ids[id],names[id])
+        task=(HDF5fileName,sample_ids[id-firstID],names[id-firstID])
         cur.execute(sql,task)
         
     

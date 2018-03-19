@@ -28,7 +28,7 @@ import unittest
 from testUtils import ProcessTestCase
 import os
 
-@unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
+# @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
 class TestAvgDepth(ProcessTestCase):
     def setUp(self):
         'Create a project'

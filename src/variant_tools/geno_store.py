@@ -1058,7 +1058,7 @@ class HDF5_Store(Base_Store):
         hdf5files=glob.glob("tmp*h5")
         cur=self.proj.db.cursor()
         allNames=manageHDF5(cur)
-        if len(hdf5files)==0 and (os.path.isfile('{}_genotype.DB'.format(self.proj.name)) or 'snapshot_genotype.DB' in all_files): 
+        if os.path.isfile('{}_genotype.DB'.format(self.proj.name)) or 'snapshot_genotype.DB' in all_files: 
             # if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
             #     os.remove('{}_genotype.DB'.format(self.proj.name))
 
@@ -1090,7 +1090,7 @@ class HDF5_Store(Base_Store):
                 self.proj.build=proj.build
             else:
                 self.proj.build="hg19"
-            IDs = self.proj.selectSampleByPhenotype("")
+            IDs = self.proj.selectSampleByPhenotype("hdf5 is null")
             IDs=list(IDs)
             IDs.sort()
        
@@ -1142,13 +1142,17 @@ class HDF5_Store(Base_Store):
             variantIndex = self.proj.createVariantMap('variant', False)
             # print(variantIndex)
 
-            start_sample =0
+            if IDs[0]==1:
+                start_sample =0
+            else:
+                start_sample=IDs[0]-1
             
             for job in range(numTasks):
                 # readQueue[job].put(chunk)
                 if workload[job] == 0:
                     continue
-                end_sample = min(start_sample + workload[job], len(IDs))
+                
+                end_sample = min(start_sample + workload[job], start_sample+len(IDs))
                 if end_sample <= start_sample:
                     continue
                 HDFfile_Merge="tmp_"+str(start_sample+1)+"_"+str(end_sample)+"_genotypes.h5"

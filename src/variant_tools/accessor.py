@@ -370,6 +370,9 @@ class HDF5Engine_storage(Base_Storage):
 
                     if "GT_geno" in cond and "/chr"+str(chr)+"/GT_geno" in self.file: 
                         GT_geno=node.GT_geno[startPos:endPos,:]
+                        if "nan" in cond:
+                            GT_geno=np.nan_to_num(GT_geno)
+                            cond="GT_geno==0"
                     if "DP_geno" in cond and "/chr"+str(chr)+"/DP_geno" in self.file:    
                         DP_geno=node.DP_geno[startPos:endPos,:]
                         DP_geno[DP_geno==-1]=0
