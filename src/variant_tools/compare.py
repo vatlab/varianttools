@@ -323,7 +323,7 @@ def compareTables(proj, args):
     else:
         # genotype
         NULL_to_0 = env.treat_missing_as_wildtype
-        for idx, (table, sample, id) in enumerate(zip(args.tables, args.samples, args.sample_IDs)):
+        for idx, (table, sample, sample_ID) in enumerate(zip(args.tables, args.samples, args.sample_IDs)):
             # read geno in tables[0]
             env.logger.info('Reading genotypes of sample {} of approximately {:,} geno in {}...'
                 .format(sample, proj.db.numOfRows(encodeTableName(table), exact=False), table))
@@ -338,6 +338,7 @@ def compareTables(proj, args):
             #             v.add((id, 0))
             #     else:
             #         v.add((id, GT))
+
             store=GenoStore(proj)
             v=store.get_Genotype(cur,encodeTableName(table),proj,sample_ID)
             #
