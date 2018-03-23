@@ -36,7 +36,7 @@ class TestOutput(ProcessTestCase):
         ProcessTestCase.setUp(self)
         self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18')
      
-    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")   
+    # @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")   
     def testOutputContents(self):
         'Test command vtools output'
         self.assertFail('vtools output')
@@ -72,7 +72,7 @@ class TestOutput(ProcessTestCase):
         self.assertEqual(len(out2), 2873)
      
 
-    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")   
+    # @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")   
     def testOutputExpression(self):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')

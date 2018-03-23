@@ -1058,7 +1058,7 @@ class HDF5_Store(Base_Store):
         hdf5files=glob.glob("tmp*h5")
         cur=self.proj.db.cursor()
         allNames=manageHDF5(cur)
-        if os.path.isfile('{}_genotype.DB'.format(self.proj.name)) or 'snapshot_genotype.DB' in all_files: 
+        if (os.path.isfile('{}_genotype.DB'.format(self.proj.name)) and os.path.getsize('{}_genotype.DB'.format(self.proj.name))>0) or 'snapshot_genotype.DB' in all_files: 
             # if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
             #     os.remove('{}_genotype.DB'.format(self.proj.name))
 
@@ -1094,7 +1094,6 @@ class HDF5_Store(Base_Store):
             IDs=list(IDs)
             IDs.sort()
        
-            
             reader = MultiVariantReader(self.proj, "variant", "chr,pos,ref", "",['chr', 'pos', 'ref', 'vcf_variant(chr,pos,ref,alt,".")'], validGenotypeFields, False, IDs, 4, True)
             reader.start()
 
@@ -1159,6 +1158,7 @@ class HDF5_Store(Base_Store):
                 # print(HDFfile_Merge)
                 names=[key for key in allNames.keys()]
                 updateSample(cur,start_sample,end_sample,IDs,names,allNames,HDFfile_Merge)
+
                 taskQueue.put(HDF5GenotypeImportWorker(chunk, variantIndex, start_sample, end_sample, 
                     IDs,0, job, validGenotypeFields ,HDFfile_Merge,self.proj.build))
                 start_sample = end_sample 
@@ -1197,6 +1197,7 @@ class HDF5_Store(Base_Store):
             hdf5file=self.get_sampleFileName(ID)
             storageEngine=Engine_Storage.choose_storage_engine(hdf5file)
             storageEngine.remove_sample(ID)
+
             storageEngine.close()
 
     def remove_variants_worker(self,storageEngine,variantIDs):
@@ -1317,7 +1318,7 @@ class HDF5_Store(Base_Store):
         divData=chunks(list(noWT))
         for chunk in divData:
             cur.execute('BEGIN TRANSACTION')
-            print(len(chunk))
+            # print(len(chunk))
             for id in chunk:
                 # query = 'INSERT INTO {}({}) VALUES {};'.format(merged_table,
                 #         'variant_id', ",".join([ "("+str(id)+")" for id in variantIDs[:1]])) 
@@ -1333,8 +1334,8 @@ class HDF5_Store(Base_Store):
 
 
     def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
-        print(genotypes)
-        print(validGenotypeFields)
+        # print(genotypes)
+        # print(validGenotypeFields)
         sampleFileMap=self.get_HDF5_sampleMap()
         fieldSelect=list(sampleDict.values())[0][1]
         variants=[]

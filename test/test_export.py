@@ -31,7 +31,7 @@ import subprocess
 from testUtils import ProcessTestCase
 
 
-@unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
+# @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
 class TestExport(ProcessTestCase):
     
     # def testExportVcfSnv_single(self):
@@ -208,10 +208,10 @@ class TestExport(ProcessTestCase):
     #     self.runCmd('vtools use dbSNP')
     #     self.assertSucc('vtools export variant --format tped --samples \'sample_name like "NA069%"\' --name dbSNP.name')
 
-    def testTpedMissingGen(self):
-        'Test command export in tped format with missing genotype data'
-        self.runCmd('vtools import vcf/missing_gen.vcf --build hg19')
-        self.assertOutput('vtools export variant --format tped --samples 1', 'output/missing_gen.tped') 
+    # def testTpedMissingGen(self):
+    #     'Test command export in tped format with missing genotype data'
+    #     self.runCmd('vtools import vcf/missing_gen.vcf --build hg19')
+    #     self.assertOutput('vtools export variant --format tped --samples 1', 'output/missing_gen.tped') 
 
 if __name__ == '__main__':
     unittest.main()

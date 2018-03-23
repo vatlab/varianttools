@@ -164,7 +164,7 @@ class BaseVariantReader:
 
 
     def getVariantQuery(self):
-        print(self.proj.build)
+        # print(self.proj.build)
         select_clause, select_fields = consolidateFieldName(self.proj, self.table,
             ','.join(['variant_id', 'variant.ref', 'variant.alt'] + self.var_fields), self.export_alt_build)
         # FROM clause
@@ -234,6 +234,8 @@ class BaseVariantReader:
             order_clause = ' ORDER BY {}.variant_id'.format(self.table)
         #print 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
         return 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
+
+
 
 
 class EmbeddedVariantReader(BaseVariantReader):
@@ -315,6 +317,7 @@ class MultiVariantReader(BaseVariantReader):
         
         
         if self.proj.store=="sqlite" or transformToHDF5:
+
             if transformToHDF5:
                 self.proj.db.attach('{}_genotype.DB'.format(self.proj.name), '{}_genotype'.format(self.proj.name), lock=lock)
 
@@ -331,7 +334,9 @@ class MultiVariantReader(BaseVariantReader):
             for i in range(self.jobs - 1):
                 r, w = Pipe(False)
                 subIDs = IDs[(block*i):(block *(i + 1))]
+             
                 p = VariantWorker(proj.name, proj.annoDB, self.getSampleQuery(subIDs), w, lock)
+                
                 self.workers.append(p)
                 self.readers.append(r)
         elif self.proj.store=="hdf5":
@@ -391,8 +396,8 @@ class MultiVariantReader(BaseVariantReader):
         while True:
             try:
                 for idx, reader in enumerate(self.readers):
+
                     val = reader.recv()
-                    # print(val[:10])
                     if val is None:
                         all_done = True
                         break
@@ -402,6 +407,7 @@ class MultiVariantReader(BaseVariantReader):
                     elif id != val[0]:
                         raise ValueError('Read different IDs from multiple processes')
                     rec.extend(val[1:])
+                    
                     if idx == last:
                         # print(id,rec[:20])
                         yield rec
@@ -457,6 +463,7 @@ class VariantWorker(Process):
         for anno in self.annoDB:
             db.attach(os.path.join(anno.dir, anno.filename), lock=self.lock)
         cur = db.cursor()
+       
         cur.execute(self.query)
         # reporting to the main process that SQL query is done
         self.output.send(None)

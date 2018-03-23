@@ -1005,12 +1005,11 @@ class HDF5GenotypeImportWorker(Process):
         self.rownames=[]
         self.sample_ids=sample_ids
         self.firstID=0
-        if sample_ids[0]!=1:
+        if sample_ids[0]!=1 and start_sample!=0:
             self.firstID=sample_ids[0]
             self.start_sample=self.start_sample+1
             self.end_sample=self.end_sample+1
         self.colnames=[self.sample_ids[i-self.firstID] for i in range(self.start_sample,self.end_sample)]
-  
         self.genoCount=0
         self.dbLocation=dbLocation
         self.build=build
@@ -1305,7 +1304,7 @@ class HDF5GenotypeSortWorker(Process):
         self.rownames=[]
         self.sample_ids=sample_ids
         self.firstID=0
-        if sample_ids[0]!=1:
+        if sample_ids[0]!=1 and start_sample!=0:
             self.firstID=sample_ids[0]
             self.start_sample=self.start_sample+1
             self.end_sample=self.end_sample+1
@@ -1567,14 +1566,17 @@ class HDF5GenotypeSortWorker(Process):
 
 def updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDF5fileName):
     firstID=0
-    if sample_ids[0]!=1:
+    adjust=0
+    if sample_ids[0]!=1 and start_sample!=0:
         firstID=sample_ids[0]
         start_sample=start_sample+1
         end_sample=end_sample+1
+        adjust=1
     for id in range(start_sample,end_sample):
         sql="UPDATE sample SET HDF5=? WHERE sample_id=? and sample_name=?"
         # task=(HDF5fileName,allNames[names[id]],sample_ids[id],names[id])
-        task=(HDF5fileName,sample_ids[id-firstID],names[id-firstID])
+        print(HDF5fileName,sample_ids[id-firstID],names[id-adjust])
+        task=(HDF5fileName,sample_ids[id-firstID],names[id-adjust])
         cur.execute(sql,task)
         
     

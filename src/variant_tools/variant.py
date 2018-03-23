@@ -165,6 +165,7 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
     env.logger.trace('Running query {}'.format(query))
     # if output to a file
     cur = proj.db.cursor()
+
     try:
         cur.execute(query)
     except OperationalError as e:

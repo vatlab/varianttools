@@ -43,7 +43,7 @@ class TestInit(ProcessTestCase):
         # can specify build
         self.assertSucc('vtools init test --build hg19 -f')
     
-    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
+    # @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
     def testInitFromParentalProject(self):
         'Test command init --parent (create a project from a parent project)'
         try:
@@ -56,19 +56,20 @@ class TestInit(ProcessTestCase):
             numOfGenotype={1: 287, 2: 287})
         # move the project to parent directory
         shutil.move('test.proj', 'parent/test.proj')
-        shutil.move('test_genotype.DB', 'parent/test_genotype.DB')
+        if self.storeMode=="sqlite":
+            shutil.move('test_genotype.DB', 'parent/test_genotype.DB')
         # create a project with parent project parent
-        self.assertSucc('vtools init test --parent parent --variants na12')
+        self.assertSucc('vtools init test --parent parent --variants na12 --store '+self.storeMode)
         self.assertProj(numOfVariants={'variant':280, 'na12': 280}, numOfSamples=60,
             numOfGenotype={1: 279, 2: 279})
         # non-existing genotype field
         self.assertFail('vtools init test --parent parent --variants na12 --genotypes GD>10')
         # create project with only homozygous genotype
-        self.assertSucc('vtools init test --parent parent --variants na12 --genotypes GT=1 -f')
+        self.assertSucc('vtools init test --parent parent --variants na12 --genotypes GT=1 -f --store '+self.storeMode)
         self.assertProj(numOfVariants={'variant':280, 'na12': 280}, numOfSamples=60,
             numOfGenotype={1: 30, 2: 64}, genotype={1: [1]*30, 2: [1]*64})
         # init with selected samples
-        self.assertSucc('''vtools init test --parent parent --samples "sample_name like 'NA1%'" -f ''')
+        self.assertSucc('''vtools init test --parent parent --samples "sample_name like 'NA1%'" -f  -store '''+ self.storeMode)
         self.assertProj(numOfVariants= 288, numOfSamples=51)
 
     def testGenotypes_sample(self):
@@ -77,12 +78,12 @@ class TestInit(ProcessTestCase):
            os.mkdir('parent')
         except OSError:
            pass
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools import --format fmt/genotypes txt/genotypes.txt --build hg18')
         shutil.move('test.proj', 'parent/test.proj')
         shutil.move('test_genotype.DB', 'parent/test_genotype.DB') 
-        self.assertSucc('vtools init test --parent parent --variants variant --samples "filename like \'%geno%\'" --genotypes GT=1') 
+        self.assertSucc('vtools init test --parent parent --variants variant --samples "filename like \'%geno%\'" --genotypes GT=1 --store '+self.storeMode) 
         self.assertProj(numOfSamples=49 )
         self.runCmd('vtools phenotype --from_stat "num=#(GT)" "hom=#(hom)" "het=#(het)"')
         #compare the first three lines of the output and result using "output" option
@@ -99,7 +100,7 @@ class TestInit(ProcessTestCase):
            os.mkdir('ceu')
         except OSError:
            pass
-        self.runCmd('vtools init ceu -f')
+        self.runCmd('vtools init ceu -f --store '+self.storeMode)
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools select variant \'ref="A"\' -t refA')
         self.runCmd('vtools select variant \'ref="G"\' -t refG')
@@ -112,7 +113,7 @@ class TestInit(ProcessTestCase):
            os.mkdir('sam1')
         except OSError:
            pass
-        self.runCmd('vtools init sam1 -f')
+        self.runCmd('vtools init sam1 -f --store '+self.storeMode)
         self.runCmd('vtools import vcf/SAMP1.vcf --build hg18')
         self.runCmd('vtools select variant \'ref="A"\' -t refA')
         self.runCmd('vtools select variant \'ref="C"\' -t refC')

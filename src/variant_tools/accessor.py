@@ -339,6 +339,7 @@ class HDF5Engine_storage(Base_Storage):
                 # i=self.rownames.index(variant_id)
                 colnames=group.colnames[:]
                 i=np.where(colnames==sample_id)[0][0]
+     
                 group.samplemask[i]=True
             except:
                 pass
@@ -1230,7 +1231,7 @@ class HDF5Engine_access(Base_Access):
                                 for col in range(numcol):
                                     info[:,col*len(validGenotypeFields)+pos]=genoinfo[:,col]
                         startPos=endPos
-                        print(len(rownames),genoinfo.shape)
+                   
                         vardict.update(dict(zip(rownames,info)))  
             except tb.exceptions.NoSuchNodeError:
                 pass                              
@@ -1245,28 +1246,32 @@ class HDF5Engine_access(Base_Access):
         noWT=[]
         chrs=["X","Y"]
         chrs.extend(range(1,23))
-        for chr in chrs:
-            try:
-                #haven't dealt with data==-1
-                node=self.file.get_node("/chr"+str(chr))
-                shape=node.shape[:].tolist()
-                samples.sort()
-                colnames=node.colnames[:].tolist()
-                colpos=list(map(lambda x:colnames.index(x),samples))
-                chunkPos=chunks_start_stop(shape[0])
-                for startPos,endPos in chunkPos:
-                    if "/chr"+str(chr)+"/GT_geno" in self.file:
-                        genoinfo=node.GT_geno[startPos:endPos,colpos]           
-                        rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
-                        genoinfo[genoinfo==-1]=0
-                        rowsum=np.nansum(genoinfo,axis=1)
-                        noWTvariants=rownames[np.where(rowsum>0)].tolist()
-                        noWT.extend(noWTvariants)
-                    startPos=endPos
-            except tb.exceptions.NoSuchNodeError:
-                pass  
-            except Exception as e:
-                print(e)
+        if len(samples)!=0:
+            for chr in chrs:
+                try:
+                    #haven't dealt with data==-1
+                    node=self.file.get_node("/chr"+str(chr))
+                    shape=node.shape[:].tolist()
+                    samples.sort()
+                    colnames=node.colnames[:].tolist()
+                    colpos=list(map(lambda x:colnames.index(x),samples))
+                    chunkPos=chunks_start_stop(shape[0])
+                    for startPos,endPos in chunkPos:
+                        if "/chr"+str(chr)+"/GT_geno" in self.file:
+                            genoinfo=node.GT_geno[startPos:endPos]
+                            # print(self.fileName,colpos,genoinfo)           
+                            rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
+                            # print(self.fileName,samples,colnames)
+                            genoinfo[genoinfo==-1]=0
+                            rowsum=np.nansum(genoinfo,axis=1)
+                            noWTvariants=rownames[np.where(rowsum>0)].tolist()
+                            noWT.extend(noWTvariants)
+                        startPos=endPos
+                except tb.exceptions.NoSuchNodeError:
+                    pass  
+                except Exception as e:
+                    print(e)
+        self.close()
         return noWT
 
 

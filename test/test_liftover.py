@@ -52,7 +52,7 @@ class TestLiftover(ProcessTestCase):
         #projects are the same.
         
         # self.assertOutput('vtools output variant chr pos ref alt --build hg19 -d"\t"', 'output/liftover.txt')
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         self.assertSucc('vtools import --build hg19 --format ../resources/format/basic output/liftover.txt')
         self.assertSucc('vtools liftover hg18')
         self.assertOutput('vtools output variant alt_bin alt_chr alt_pos bin chr pos -d"\t"',

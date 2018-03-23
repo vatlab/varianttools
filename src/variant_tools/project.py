@@ -2645,6 +2645,7 @@ class Project:
                 snapshot.extractall(path=env.cache_dir)
                 # running getnames before extract will effectively scan the tar file twice
                 all_files = snapshot.getnames()
+
                 # old snapshot uses file README. The new format has .snapshot.info and will
                 # treat README as user-provided file.
                 info_file = '.snapshot.info' if '.snapshot.info' in all_files else 'README'
@@ -2665,9 +2666,7 @@ class Project:
                 self.db = DatabaseEngine()
                 self.db.connect(self.proj_file)
                 self.saveProperty('store', self.store)
-                
-                all_files=store.load_Genotype_From_SQLite(all_files,self)
-                        
+                all_files=store.load_Genotype_From_SQLite(all_files,self)     
                 # other files
                 for f in all_files:
                     if os.path.isfile(f):
@@ -4117,10 +4116,12 @@ def init(args):
                     ' AND '.join(['({})'.format(x) for x in args.samples]),
                     ' AND '.join(['({})'.format(x) for x in args.genotypes]))
                 copier.copy()
+
                 if args.store!='sqlite':
                     store=GenoStore(proj)
                     
                     all_files=[proj.name+".proj",proj.name+"_genotype.DB"]
+
                     for file in all_files:
                         shutil.copyfile(file,env.cache_dir+"/"+file)
                     store.load_Genotype_From_SQLite(all_files,proj)
@@ -5148,6 +5149,11 @@ x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in list(_user_opt
                 proj.removeProperty('__option_{}'.format(args.reset_runtime_option))
                 env.logger.info('Option {} is set to its default value'.format(args.reset_runtime_option))
             elif args.save_snapshot is not None:
+                if proj.store=="hdf5":
+                    if args.extra_files is not None:
+                        args.extra_files.extend(glob.glob("tmp*h5"))
+                    else:
+                        args.extra_files=glob.glob("tmp*h5")
                 if args.extra_files is not None:
                     cur_dir = os.path.realpath(os.getcwd())
                     for f in args.extra_files:

@@ -130,6 +130,8 @@ class Updater:
             self.processor = LineProcessor(fmt.fields, [(RefGenome(self.build), 0, 1, 2, 3)], fmt.delimiter, self.ranges)
         else:  # position or range type
             self.processor = LineProcessor(fmt.fields, [(1,)], fmt.delimiter, self.ranges)
+        
+
         # probe number of sample
         if self.genotype_field or self.genotype_info:
             self.prober = LineProcessor([fmt.fields[fmt.ranges[2]]], [], fmt.delimiter, None)
@@ -160,6 +162,7 @@ class Updater:
         #
         self.variantIndex = self.proj.createVariantMap(table, self.import_alt_build)
         self.table = table
+
 
     def updateVariant(self, cur, bins, rec):
         if self.input_type == 'variant':
@@ -262,6 +265,7 @@ class Updater:
         self.processor.reset()
         if self.genotype_field or self.genotype_info:
             self.prober.reset()
+
         #
         # do we handle genotype info as well?
         sample_ids = self.getSampleIDs(input_filename) if self.genotype_info else []
@@ -305,6 +309,7 @@ class Updater:
             self.genotype_info = []
             self.processor.reset(import_var_info=True, import_sample_range=[self.ranges[2], self.ranges[2]])
         #
+
         cur = self.db.cursor()
         lc = lineCount(input_filename, self.encoding)
         update_after = min(max(lc//200, 100), 100000)
@@ -337,6 +342,7 @@ class Updater:
 
     def updateHDF5FromFile(self,input_filename):
         sample_ids = self.getSampleIDs(input_filename) if self.genotype_info else []
+
         UpdateGenotypeInParallel(self,input_filename,sample_ids)
         # for HDFfileName in glob.glob("tmp*genotypes.h5"):
         #     storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
@@ -348,10 +354,10 @@ class Updater:
     def update(self):
         '''Start updating'''
         for count,f in enumerate(self.files):
-            filetype=f.split(".")[-1]
+           
             env.logger.info('{} variants from {} ({}/{})'.format('Updating', f, count + 1, len(self.files)))
             
-            if self.proj.store=="sqlite" or (self.proj.store=="hdf5" and filetype!="vcf"):
+            if self.proj.store=="sqlite" or (self.proj.store=="hdf5" and "vcf" not in f):
                 self.updateFromFile(f)
                 env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.count[8],
                     '' if self.count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.count[1])))
@@ -750,6 +756,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             if not fieldSelect or all([x == 'NULL' for x in fieldSelect]):
                 continue
     # print(genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs)
+
     variants=store.get_genoType_genoInfo(sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step)
 
     # for key,value in variants.items():
