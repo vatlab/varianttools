@@ -628,6 +628,23 @@ class Sqlite_Store(Base_Store):
     def get_typeOfColumn(self,sample_id,field):
         return self.db.typeOfColumn('genotype_{}'.format(sample_id), field) 
 
+
+    def remove_genofields(self,IDs,items):
+        cnt = 0
+        for table in ['genotype_{}'.format(id) for id in IDs]:
+            header = [x.lower() for x in self.db.getHeaders(table)]
+            items = [x for x in items if x.lower() in header and x.lower not in ['variant_id', 'gt']]
+            if items:
+                cnt += 1
+                env.logger.info('Removing fields {} from genotype table {}'
+                    .format(', '.join(items), table.split('_')[-1]))
+                self.db.removeFields(table, items)
+        if cnt:
+            env.logger.info('Genotype info fields {} are removed from {} samples.'.format(', '.join(items), cnt))
+        else:
+            env.logger.warning('Genotype info fields {} not found in any of the samples.'.format(', '.join(items)))
+
+
     def remove_sample(self, IDs):
         for sample_id in IDs:
             self.db.removeTable('genotype_{}'.format(sample_id))
@@ -1226,6 +1243,14 @@ class HDF5_Store(Base_Store):
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
             p=Process(target=self.remove_genotype_workder,args=(storageEngine,cond)) 
             p.start()
+
+    def remove_genofields(self,IDs,items):
+        HDFfileNames=glob.glob("tmp*_genotypes.h5")
+        for HDFfileName in HDFfileNames:
+            storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+            storageEngine.remove_genofields(items)
+            storageEngine.close()
+
     
 
 
@@ -1245,6 +1270,7 @@ class HDF5_Store(Base_Store):
         if HDFfileName is not None:
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
             genoFields=storageEngine.geno_fields(sampleID)
+            genoFields.sort()
             # genoFields=[x.lower() for x in genoFields]
             storageEngine.close()
         return genoFields

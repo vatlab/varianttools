@@ -40,7 +40,7 @@ class TestSelect(ProcessTestCase):
             self.runCmd('vtools admin --load_snapshot TestSelect.tar.gz')
         else:
             self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-            self.runCmd('vtools import vcf/input.vcf  --sample_name input.vcf --build hg18')
+            self.runCmd('vtools import vcf/input_nogeno.vcf  --sample_name input.tsv --build hg18')
             # self.runCmd('vtools import vcf/input.vcf --build hg18')
             # self.runCmd('vtools import txt/input.tsv --format fmt/basic_hg18.fmt --sample_name input.tsv')
             self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')

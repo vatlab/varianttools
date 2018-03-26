@@ -41,7 +41,8 @@ class TestRemove(ProcessTestCase):
         else:
             self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
             self.runCmd('vtools import vcf/SAMP1.vcf')
-            self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+            # self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+            self.runCmd('vtools import vcf/input_nogeno.vcf --build hg18 --sample_name input.tsv')
             self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
             self.runCmd('vtools use ann/testNSFP.ann') 
             self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
@@ -118,17 +119,26 @@ class TestRemove(ProcessTestCase):
         self.assertSucc('vtools remove phenotypes non_existing')
         if self.storeMode=="hdf5":
             self.assertSucc('vtools remove phenotypes HDF5')
-        self.assertOutput('vtools show samples', 'output/remove_phenotype.txt')
+            self.assertOutput('vtools show samples', 'output/remove_phenotype_output.txt')
+        elif self.storeMode=="sqlite":
+            self.assertOutput('vtools show samples', 'output/remove_phenotype.txt')
     
     def testRemoveGenoField(self):
         #runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP--build hg18')
         self.maxDiff=None
-        self.assertOutput('vtools show genotypes', 'output/remove_genofield_before.txt')
+        if self.storeMode=="sqlite":
+            self.assertOutput('vtools show genotypes', 'output/remove_genofield_before.txt')
+        elif self.storeMode=="hdf5":
+            self.assertOutput('vtools show genotypes', 'output/remove_genofield_before_hdf5.txt')
         self.assertFail('vtools remove geno_fields')
         self.assertFail('vtools remove geno_fields variant_id')
         self.assertFail('vtools remove geno_fields gt')
         self.assertSucc('vtools remove geno_fields DP_geno')
-        self.assertOutput('vtools show genotypes', 'output/remove_genofield_after.txt')
+        if self.storeMode=="sqlite":
+            self.assertOutput('vtools show genotypes', 'output/remove_genofield_after.txt')
+        elif self.storeMode=="hdf5":
+            self.assertOutput('vtools show genotypes', 'output/remove_genofield_after_hdf5.txt')
+                
         self.assertFail('vtools remove projects')
         self.assertSucc('vtools remove project')
 

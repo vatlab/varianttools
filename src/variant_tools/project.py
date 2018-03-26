@@ -2259,7 +2259,11 @@ class Project:
         store.remove_genotype(cond)
 
 
+    def removeGenofields(self,IDs,items):
+        store = GenoStore(self)
+        store.remove_genofields(IDs,items)
         
+
 
     def renameSamples(self, cond, name1, name2=None):
         '''If name2 is none, rename selected samples to specified name1. 
@@ -4236,19 +4240,20 @@ def remove(args):
                 cur = proj.db.cursor()
                 cur.execute('SELECT sample_id FROM sample;')
                 IDs = [x[0] for x in cur.fetchall()]
-                cnt = 0
-                for table in ['{}_genotype.genotype_{}'.format(proj.name, id) for id in IDs]:
-                    header = [x.lower() for x in proj.db.getHeaders(table)]
-                    items = [x for x in args.items if x.lower() in header and x.lower not in ['variant_id', 'gt']]
-                    if items:
-                        cnt += 1
-                        env.logger.info('Removing fields {} from genotype table {}'
-                            .format(', '.join(items), table.split('_')[-1]))
-                        proj.db.removeFields(table, items)
-                if cnt:
-                    env.logger.info('Genotype info fields {} are removed from {} samples.'.format(', '.join(items), cnt))
-                else:
-                    env.logger.warning('Genotype info fields {} not found in any of the samples.'.format(', '.join(items)))
+                proj.removeGenofields(IDs,args.items)
+                # cnt = 0
+                # for table in ['{}_genotype.genotype_{}'.format(proj.name, id) for id in IDs]:
+                #     header = [x.lower() for x in proj.db.getHeaders(table)]
+                #     items = [x for x in args.items if x.lower() in header and x.lower not in ['variant_id', 'gt']]
+                #     if items:
+                #         cnt += 1
+                #         env.logger.info('Removing fields {} from genotype table {}'
+                #             .format(', '.join(items), table.split('_')[-1]))
+                #         proj.db.removeFields(table, items)
+                # if cnt:
+                #     env.logger.info('Genotype info fields {} are removed from {} samples.'.format(', '.join(items), cnt))
+                # else:
+                #     env.logger.warning('Genotype info fields {} not found in any of the samples.'.format(', '.join(items)))
             elif args.type == 'annotations':
                 if len(args.items) == 0:
                     raise ValueError('Please specify conditions to select annotation table to be removed')

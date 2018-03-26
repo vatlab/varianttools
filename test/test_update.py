@@ -33,7 +33,8 @@ from testUtils import ProcessTestCase
 class TestUpdate(ProcessTestCase):
     def testAddField(self):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.runCmd('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv')
+        # self.runCmd('vtools import --build hg18 --format fmt/basic_hg18 txt/input.tsv')
+        self.runCmd('vtools import vcf/input_nogeno.vcf --build hg18 --sample_name input.tsv')
         self.runCmd('vtools import vcf/SAMP1.vcf')
         # no table specified
         self.assertFail('vtools update --format ../resources/format/ANNOVAR_exonic_variant_function --from_file txt/annovar.txt.exonic_variant_function')
@@ -80,7 +81,7 @@ class TestUpdate(ProcessTestCase):
         for to,ho,he,ot in zip(total.strip().split('\n'), hom.strip().split('\n'), het.strip().split('\n'), other.strip().split('\n')):
             self.assertEqual(int(to), int(ho)*2+int(he)+int(ot))
         self.assertSucc('vtools update CEU --from_stat "CEU_num=#(alt)" -s "filename like \'%CEU%\'"')
-        # self.assertOutput("vtools execute 'select sum(CEU_num) from variant'", '6383\n', partial=True)
+        self.assertOutput("vtools execute 'select sum(CEU_num) from variant'", '6383\n', partial=True)
         self.assertSucc('vtools update CEU --from_stat "CEU_num=#(alt)" "CEU_hom=#(hom)" "CEU_het=#(het)" "CEU_other=#(other)"  --samples "filename like \'%CEU%\'"')
         self.assertSucc('vtools update CEU --from_stat "CEU_cases_het=#(het)" --samples "filename like \'%CEU%\' and aff=\'2\'"')
         self.assertOutput("vtools execute 'select sum(CEU_cases_het) from variant'", '1601\n', partial=True)

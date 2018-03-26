@@ -1043,14 +1043,18 @@ class HDF5GenotypeImportWorker(Process):
             if altIndex==0:
                 GT_geno[np.logical_or(GT_geno==3, GT_geno==4)]=np.nan          
             elif altIndex==1:
-                GT_geno[np.logical_and(GT_geno!=3, GT_geno!=4)]=np.nan
+                # GT_geno[GT_geno==3]=1
+                # GT_geno[GT_geno==4]=2
+                GT_geno[(GT_geno!=3)&(GT_geno!=4)&(GT_geno!=-1)]=np.nan
+                # GT_geno[np.logical_and(GT_geno!=3, GT_geno!=4)]=np.nan
                 GT_geno[GT_geno==3]=1
                 GT_geno[GT_geno==4]=2
             GT_geno[GT_geno==-10]=np.nan
             self.info["GT_geno"].append(GT_geno)
             self.info["Mask_geno"].append([1.0]*len(GT_geno))
         else:
-            GT_geno=[np.nan]
+            # GT_geno=[np.nan]
+            GT_geno=[-1]
             self.info["GT_geno"].append(GT_geno)
             self.info["Mask_geno"].append([1.0]*len(GT_geno))
         if len(self.geno_info)>0:
@@ -1354,7 +1358,7 @@ class HDF5GenotypeSortWorker(Process):
             GT_geno[np.logical_and(GT_geno!=3, GT_geno!=4)]=np.nan
             GT_geno[GT_geno==3]=1
             GT_geno[GT_geno==4]=2
-        GT_geno[GT_geno==-10]=np.nan
+        # GT_geno[GT_geno==-10]=np.nan
         self.info["GT_geno"].append(GT_geno)
         self.info["Mask_geno"].append([1.0]*len(GT_geno))
         if len(self.geno_info)>0:

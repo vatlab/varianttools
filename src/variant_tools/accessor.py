@@ -254,6 +254,7 @@ class HDF5Engine_storage(Base_Storage):
                 numNone=np.where(data==-1) 
                 # totalNum+=numVariants-len(numNan[0])-len(numNone[0])
                 totalNum+=numVariants-len(numNan[0])
+                # totalNum+=numVariants
             except tb.exceptions.NoSuchNodeError:
                 pass
         return totalNum
@@ -339,7 +340,7 @@ class HDF5Engine_storage(Base_Storage):
                 # i=self.rownames.index(variant_id)
                 colnames=group.colnames[:]
                 i=np.where(colnames==sample_id)[0][0]
-     
+
                 group.samplemask[i]=True
             except:
                 pass
@@ -434,6 +435,25 @@ class HDF5Engine_storage(Base_Storage):
         except Exception as e:
             print(e)
             pass
+
+
+    def remove_genofields(self,items):
+        for item in items:
+            chrs=["X","Y"]
+            chrs.extend(range(1,23))
+            for chr in chrs:
+                genoNode="/chr"+str(chr)
+                try:
+                    self.file.remove_node("/chr"+str(chr)+"/"+item)
+                   
+                except tb.exceptions.NoSuchNodeError:
+                    pass 
+                except Exception as e:
+                    # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
+                    print(e)
+                    pass        
+
+
         
 
     def store_HDF5(self,hmatrix,chr,groupName=""):
@@ -1140,6 +1160,12 @@ class HDF5Engine_access(Base_Access):
 
         return rownames,colnames,genoinfo
 
+    def find_element_in_list(self,element, list_element):
+        try:
+            index_element = list_element.index(element)
+            return index_element
+        except ValueError:
+            pass
 
 
     def get_geno_field_from_HDF5(self,samples,varids,genotypes,fieldSelect,validGenotypeFields,operations):
@@ -1150,7 +1176,7 @@ class HDF5Engine_access(Base_Access):
         # for chr in [1,22]:
             try:
                 node=self.file.get_node("/chr"+str(chr))
-                shape=node.shape[:].tolist()          
+                shape=node.shape[:].tolist()   
                 chunkPos=chunks_start_stop(shape[0])
                 samples.sort()
                 colnames=node.colnames[:].tolist()
@@ -1159,7 +1185,10 @@ class HDF5Engine_access(Base_Access):
                 rowpos=[]
                 if len(varids)>0:
                     rownames=node.rownames[:].tolist()
-                    rowpos=list(map(lambda x:rownames.index(x),varids))
+                    # rowpos=list(map(lambda x:rownames.index(x),varids))
+                    rowpos=[self.find_element_in_list(id,rownames) for id in varids]
+                    rowpos=[x for x in rowpos if x is not None]
+        
                 for startPos,endPos in chunkPos:
                     # rownames=node.rownames[startPos:endPos].tolist()              
                     if "/chr"+str(chr)+"/GT_geno" in self.file:    
