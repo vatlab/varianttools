@@ -2649,7 +2649,6 @@ class Project:
                 snapshot.extractall(path=env.cache_dir)
                 # running getnames before extract will effectively scan the tar file twice
                 all_files = snapshot.getnames()
-
                 # old snapshot uses file README. The new format has .snapshot.info and will
                 # treat README as user-provided file.
                 info_file = '.snapshot.info' if '.snapshot.info' in all_files else 'README'
@@ -4014,18 +4013,18 @@ def initArguments(parser):
             of the project.''')
     parser.add_argument('-s', '--store', choices=['sqlite', 'hdf5'],
         help='''Storage model used to storage variants and genotype. The default value is
-            the value set by environmental variable VTOOLS_GENO_STORE or sqlite if the
+            the value set by environmental variable STOREMODE or sqlite if the
             variable is not set.''')
 
 
 def init(args):
     try:
         if args.store is None:
-            if 'VTOOLS_GENO_STORE' in os.environ:
-                if os.environ['VTOOLS_GENO_STORE'] not in ['sqlite', 'hdf5']:
-                    env.logger.warning('Ignore incorrect value of variable VTOOLS_GENO_STORE {}'.format(os.environ['VTOOLS_GENO_STORE']))
+            if 'STOREMODE' in os.environ:
+                if os.environ['STOREMODE'] not in ['sqlite', 'hdf5']:
+                    env.logger.warning('Ignore incorrect value of variable STOREMODE {}'.format(os.environ['STOREMODE']))
                 else:
-                    args.store = os.environ['VTOOLS_GENO_STORE']
+                    args.store = os.environ['STOREMODE']
             if args.store is None:
                 args.store = 'sqlite'
 
@@ -4066,8 +4065,8 @@ def init(args):
                 return
         #
         if args.children:
-            if args.store != 'sqlite':
-                raise NotImplemented('Option --parent is not supported yet with non-sqlite storage model')
+            # if args.store != 'sqlite':
+            #     raise NotImplemented('Option --parent is not supported yet with non-sqlite storage model')
             # A default value 4 is given for args.jobs because more threads usually
             # do not improve effiency
             dirs = []

@@ -981,7 +981,6 @@ class HDF5Engine_access(Base_Access):
      
     def get_geno_by_sep_variant_ids(self,rowIDs,chr,groupName=""):
 
-        #assume rowIDs are sorted by genome position
      
         group=self.getGroup(chr,groupName)
         # rownames=group.rownames[:].tolist()
@@ -1097,7 +1096,6 @@ class HDF5Engine_access(Base_Access):
 
     def filter_removed_genotypes(self,minPos,maxPos,genoinfo,node,colpos,rowpos):
         #assume rowIDs are sorted by genome position
-        
         rownames=node.rownames[minPos:maxPos]
         colnames=node.colnames[:]
         rowMask=node.rowmask[minPos:maxPos]
@@ -1127,7 +1125,6 @@ class HDF5Engine_access(Base_Access):
             #     colnames=colnames[colpos]
             #     sub_geno=sub_geno[:,colpos]
     
-
             return np.array(rownames),colnames,np.array(sub_geno)
         except Exception as e:
             print(e)
@@ -1188,7 +1185,8 @@ class HDF5Engine_access(Base_Access):
                     # rowpos=list(map(lambda x:rownames.index(x),varids))
                     rowpos=[self.find_element_in_list(id,rownames) for id in varids]
                     rowpos=[x for x in rowpos if x is not None]
-        
+                    if len(rowpos)==0:
+                        continue
                 for startPos,endPos in chunkPos:
                     # rownames=node.rownames[startPos:endPos].tolist()              
                     if "/chr"+str(chr)+"/GT_geno" in self.file:    
@@ -1219,7 +1217,6 @@ class HDF5Engine_access(Base_Access):
                                     variants[:,5+pos]=np.nanmax(genoinfo,axis=1)
                         startPos=endPos    
                         vardict.update(dict(zip(rownames,variants)))
-
             except tb.exceptions.NoSuchNodeError:
                 pass                              
             except Exception as e:

@@ -86,8 +86,7 @@ class GroupHDFGenerator(Process):
                     
                     # subMatrix=accessEngine.get_geno_info_by_variant_IDs(ids,chr,"GT")
                     # if subMatrix is not None and subMatrix.indices is not None:
-                    #     storageEngine.store(subMatrix,chr,geneSymbol) 
-
+                    #     storageEngine.store(subMatrix,chr,geneSymbol
                     if chr==chrEnd:
                         updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
                         if subMatrix is not None:
@@ -360,6 +359,7 @@ def getGenotype_HDF5(worker, group):
     
     chr=getChr(variant_ids[0],cur)
     chrEnd=getChr(variant_ids[-1],cur)
+
     if chr!=chrEnd:
         varDict=getChrs(variant_ids,cur)
         chrs=list(varDict.keys())
@@ -380,47 +380,46 @@ def getGenotype_HDF5(worker, group):
          
         accessEngine=Engine_Access.choose_access_engine(fileName)
 
-        # colnames=accessEngine.get_colnames(chr,geneSymbol)
-        # snpdict=accessEngine.get_geno_info_by_group(geneSymbol,chr)
+        if len(chrs)==1:
+            # colnames=accessEngine.get_colnames(chr,geneSymbol)
+            # snpdict=accessEngine.get_geno_info_by_group(geneSymbol,chr)
 
-        # for chr in chrs:
-            
-        #     colnames=accessEngine.get_colnames(chr)
-        #     snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
-     
-        #     for ID in colnames:
-        #         data=snpdict[ID]
+            # for chr in chrs:
                 
-        #         gtmp = [data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]]
-        #         # handle -1 coding (double heterozygotes)     
-        #         genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
-
-        #         #
-        #         # handle genotype_info
-        #         #
-        #         for idx, key in enumerate(worker.geno_info):
-        #             geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
-
-       
-            
-        colnames=accessEngine.get_colnames(chrs[0])
-            
-        for ID in colnames:
-            gtmp=[]
-            for chr in chrs:
-                snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
+            colnames=accessEngine.get_colnames(chr)
+            snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
+            accessEngine.close()
+            for ID in colnames:
                 data=snpdict[ID]
                 
-                gtmp.extend([data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]])
+                gtmp = [data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]]
                 # handle -1 coding (double heterozygotes)     
-            genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
-            #
-            # handle genotype_info
-            #
-            for idx, key in enumerate(worker.geno_info):
-                geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
+                genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
 
-        accessEngine.close()
+                #
+                # handle genotype_info
+                #
+                for idx, key in enumerate(worker.geno_info):
+                    geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
+        else:    
+            colnames=accessEngine.get_colnames(chrs[0])
+                
+            for ID in colnames:
+                gtmp=[]
+                for chr in chrs:
+                    snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
+                    data=snpdict[ID]
+                    
+                    gtmp.extend([data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]])
+                    # handle -1 coding (double heterozygotes)     
+                genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
+                #
+                # handle genotype_info
+                #
+                for idx, key in enumerate(worker.geno_info):
+                    geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
+
+            accessEngine.close()
     gname = ':'.join(list(map(str, group)))
     return worker.filterGenotype(genotype, geno_info, var_info, gname)
 

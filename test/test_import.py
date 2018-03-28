@@ -82,6 +82,7 @@ class TestImport(ProcessTestCase):
         self.assertProj(numOfVariants=288)
 
 
+    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","sqlite version is not implemented for this test")
     def testANNOVAR(self):
         'Testing the annovar input format'
         self.assertSucc('vtools import --build hg18 --format ../resources/format/ANNOVAR txt/ANNOVAR.txt')
@@ -297,6 +298,7 @@ class TestImport(ProcessTestCase):
         self.assertOutput('''vtools select variant 'alt="-"' --output chr pos ref alt''', 'output/import_vcf_alt.txt')
         self.assertOutput('''vtools select variant 'alt="-"' --count''', '53\n') 
 
+
     def testSampleName_single(self):
         'Testing the import of sample names'
         #Testing one sample per file with the default setting in vtools import
@@ -316,7 +318,8 @@ class TestImport(ProcessTestCase):
         #Assign a sample name if the sample name is not in file
         self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19 --sample_name vcf_test3')
         self.assertProj(numOfSamples= 1, numOfVariants=134, sampleNames=['vcf_test3'])
-        
+    
+    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","sqlite version is not implemented for this test")    
     def testSampleName_single_assign(self):
         #Testing one sample per file with the --sample_name option
         self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18 --sample_name samp_vcf1')

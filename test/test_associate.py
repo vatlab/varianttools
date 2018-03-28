@@ -55,11 +55,12 @@ class SetMafTester(ActionTester):
         print(data)
         return True
 
-
+ 
 class TestAssociate(ProcessTestCase):
     def setUp(self):
         ProcessTestCase.setUp(self)
         self.runCmd('vtools admin --load_snapshot proj/assoproj.tar.gz')
+
 
     def testInterface(self):
         'Test association module interface'

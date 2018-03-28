@@ -31,6 +31,7 @@ import subprocess
 import shutil
 from testUtils import ProcessTestCase
 
+@unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
 class TestInit(ProcessTestCase):
     def testInit(self):
         'Test command vtools init'
@@ -43,7 +44,7 @@ class TestInit(ProcessTestCase):
         # can specify build
         self.assertSucc('vtools init test --build hg19 -f')
     
-    # @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
+
     def testInitFromParentalProject(self):
         'Test command init --parent (create a project from a parent project)'
         try:
@@ -58,6 +59,9 @@ class TestInit(ProcessTestCase):
         shutil.move('test.proj', 'parent/test.proj')
         if self.storeMode=="sqlite":
             shutil.move('test_genotype.DB', 'parent/test_genotype.DB')
+        elif self.storeMode=="hdf5":
+            shutil.move('tmp*h5', 'parent/')
+
         # create a project with parent project parent
         self.assertSucc('vtools init test --parent parent --variants na12 --store '+self.storeMode)
         self.assertProj(numOfVariants={'variant':280, 'na12': 280}, numOfSamples=60,
@@ -72,6 +76,7 @@ class TestInit(ProcessTestCase):
         self.assertSucc('''vtools init test --parent parent --samples "sample_name like 'NA1%'" -f  -store '''+ self.storeMode)
         self.assertProj(numOfVariants= 288, numOfSamples=51)
 
+   
     def testGenotypes_sample(self):
         'Test command init --genotypes with samples option'
         try:
@@ -108,7 +113,8 @@ class TestInit(ProcessTestCase):
         self.runCmd('vtools update variant --set "ref1=ref"')
         self.assertProj(numOfVariants={'variant': 288, 'refA': 43, 'refG': 96}, numOfSamples=60)
         shutil.move('ceu.proj', 'ceu/ceu.proj')
-        shutil.move('ceu_genotype.DB', 'ceu/ceu_genotype.DB')
+        if self.storeMode=="sqlite":
+            shutil.move('ceu_genotype.DB', 'ceu/ceu_genotype.DB')
         try:
            os.mkdir('sam1')
         except OSError:
@@ -121,8 +127,9 @@ class TestInit(ProcessTestCase):
         self.runCmd('vtools phenotype --set "column_B=sample_name"')
         self.assertProj(numOfVariants={'variant': 289, 'refA': 58, 'refC': 85}, numOfSamples=1)
         shutil.move('sam1.proj', 'sam1/sam1.proj')
-        shutil.move('sam1_genotype.DB', 'sam1/sam1_genotype.DB')
-        self.assertSucc('vtools init test --children ceu sam1') 
+        if self.storeMode=="sqlite":
+            shutil.move('sam1_genotype.DB', 'sam1/sam1_genotype.DB')
+        self.assertSucc('vtools init test --children ceu sam1 --store '+self.storeMode) 
         self.assertProj(numOfVariants={'variant': 577, 'refA': 101, 'refC': 85, 'refG': 96}, numOfSamples=61)
         #
         shutil.rmtree('ceu')

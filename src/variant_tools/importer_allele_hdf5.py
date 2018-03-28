@@ -640,6 +640,7 @@ default_types = {
     'calldata/GQ': 'f4',
     'calldata/HQ': 'i1',
     'calldata/DP': 'i2',
+    'calldata/GD': 'i2',
     'calldata/AD': 'i2',
     'calldata/MQ0': 'i2',
     'calldata/MQ': 'f2',
@@ -717,6 +718,7 @@ default_numbers = {
     'variants/MQ': 1,
     'variants/ANN': 1,
     'calldata/DP': 1,
+    'calldata/GD': 1,
     'calldata/GT': 1,
     'calldata/GQ': 1,
     'calldata/HQ': 2,
@@ -1019,6 +1021,8 @@ class HDF5GenotypeImportWorker(Process):
         self.info["Mask_geno"]=[]
         self.namedict={}
         self.geno_info=[]
+        if "GT" in geno_info:
+            geno_info.remove("GT")
         if len(geno_info)>0:
             for info in geno_info:
                 #indptr,indices,data,shape,rownames
@@ -1026,9 +1030,10 @@ class HDF5GenotypeImportWorker(Process):
                     self.geno_info.append(info.name)
                 else:
                     self.geno_info.append(info)
-        for info in self.geno_info:    
+        for info in self.geno_info:
             self.info[info]=[]
             self.namedict[info]="calldata/"+info.replace("_geno","")
+
   
         
    
@@ -1057,12 +1062,14 @@ class HDF5GenotypeImportWorker(Process):
             GT_geno=[-1]
             self.info["GT_geno"].append(GT_geno)
             self.info["Mask_geno"].append([1.0]*len(GT_geno))
+      
         if len(self.geno_info)>0:
             # self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
             # self.getInfoTable(variant_id,infoDict,altIndex)
             for info in self.geno_info:
                 self.info[info].append(self.chunk[self.namedict[info]][pos,self.start_sample-self.firstID:self.end_sample-self.firstID])
+                # print(self.namedict[info],info,self.start_sample,self.end_sample,pos,(self.chunk[self.namedict[info]][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]))
         
 
 
@@ -1579,7 +1586,7 @@ def updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDF5fileN
     for id in range(start_sample,end_sample):
         sql="UPDATE sample SET HDF5=? WHERE sample_id=? and sample_name=?"
         # task=(HDF5fileName,allNames[names[id]],sample_ids[id],names[id])
-        print(HDF5fileName,sample_ids[id-firstID],names[id-adjust])
+        # print(id,HDF5fileName,sample_ids[id-firstID],names[id-adjust])
         task=(HDF5fileName,sample_ids[id-firstID],names[id-adjust])
         cur.execute(sql,task)
         
@@ -1716,7 +1723,7 @@ def importGenotypesInParallel(importer,num_sample=0):
         estart=[Value('L', 0) for x in range(numTasks)]
         eend=[Value('L', READ_EXISTING_CHUNK_LENGTH) for x in range(numTasks)]
         efirst=[Value('b',True) for x in range(numTasks)]
-      
+        
         start=time.time()
         for chunk, _, _, _ in it:
             start_sample =0

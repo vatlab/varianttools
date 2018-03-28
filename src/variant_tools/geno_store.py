@@ -1075,6 +1075,7 @@ class HDF5_Store(Base_Store):
         hdf5files=glob.glob("tmp*h5")
         cur=self.proj.db.cursor()
         allNames=manageHDF5(cur)
+
         if (os.path.isfile('{}_genotype.DB'.format(self.proj.name)) and os.path.getsize('{}_genotype.DB'.format(self.proj.name))>0) or 'snapshot_genotype.DB' in all_files: 
             # if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
             #     os.remove('{}_genotype.DB'.format(self.proj.name))
@@ -1192,6 +1193,8 @@ class HDF5_Store(Base_Store):
         else:
             for hdf5file in hdf5files:
                 os.remove(hdf5file)
+            all_files=list(set(all_files))
+
             for file in all_files:
                 if re.search(r'tmp(.*)h5',file):
                     os.rename(os.path.join(env.cache_dir, file), file)
@@ -1357,6 +1360,7 @@ class HDF5_Store(Base_Store):
 
     def get_genoType_genoInfo_worker(self,queue,accessEngine,samples,variants,genotypes,fieldSelect,validGenotypeFields,operations):
         queue.put(accessEngine.get_geno_field_from_HDF5(samples,variants,genotypes,fieldSelect,validGenotypeFields,operations))
+
 
 
     def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
