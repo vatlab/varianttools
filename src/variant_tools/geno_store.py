@@ -1096,9 +1096,12 @@ class HDF5_Store(Base_Store):
                 pass
             print("Current storage mode is HDF5, transfrom genotype storage mode.....")
             jobs=8
+
             validGenotypeFields=['GT']
             if importer is not None:
                 jobs=importer.jobs
+                if len(importer.genotype_field)==0:
+                    validGenotypeFields=[]
                 for info in importer.genotype_info:
                     validGenotypeFields.append(info.name)
             # self.proj.db = DatabaseEngine()
@@ -1110,86 +1113,89 @@ class HDF5_Store(Base_Store):
                 self.proj.build="hg19"
             IDs = self.proj.selectSampleByPhenotype("hdf5 is null")
             IDs=list(IDs)
-            IDs.sort()
-       
-            reader = MultiVariantReader(self.proj, "variant", "chr,pos,ref", "",['chr', 'pos', 'ref', 'vcf_variant(chr,pos,ref,alt,".")'], validGenotypeFields, False, IDs, 4, True)
-            reader.start()
+            if len(IDs)==0:
+                os.remove('{}_genotype.DB'.format(self.proj.name))
+            elif len(IDs)>0:
+                IDs.sort()
+           
+                reader = MultiVariantReader(self.proj, "variant", "chr,pos,ref", "",['chr', 'pos', 'ref', 'vcf_variant(chr,pos,ref,alt,".")'], validGenotypeFields, False, IDs, 4, True)
+                reader.start()
 
-            chunk={'variants/CHROM':[],"variants/POS":[],"variants/REF":[],"variants/ALT":[],"variants/ID":[]}
-            for geno_field in validGenotypeFields:
-                geno_field=geno_field.replace("_geno","")
-                chunk["calldata/"+geno_field]=[]
-          
-            for idx, raw_rec in enumerate(reader.records()):
-                # print(idx,len(raw_rec),raw_rec[3])
-                chunk["variants/REF"].append(raw_rec[0])
-                chunk["variants/ALT"].append([raw_rec[1]])
-                chunk["variants/CHROM"].append(raw_rec[2])
-                chunk["variants/POS"].append(raw_rec[3])
-                chunk["variants/ID"].append(raw_rec[5])
-                for genoID,geno_field in enumerate(validGenotypeFields):
-                    colpos=[6+genoID+pos*len(validGenotypeFields) for pos in range(len(IDs))]
+                chunk={'variants/CHROM':[],"variants/POS":[],"variants/REF":[],"variants/ALT":[],"variants/ID":[]}
+                for geno_field in validGenotypeFields:
                     geno_field=geno_field.replace("_geno","")
-                    chunk["calldata/"+geno_field].append([raw_rec[pos] if raw_rec[pos] is not None else -10 for pos in colpos])
-            
-            for key,value in chunk.items():
-                dtype=np.dtype(object)
-                if key=="variants/POS":
-                    dtype=np.dtype(np.int32)
-                elif key=="calldata/DP":
-                    dtype=np.dtype(np.int16)
-                elif key=="calldata/GT":
-                    dtype=np.dtype(np.int8)
-                elif key=="calldata/GQ":
-                    dtype=np.dtype(np.float32)
-                elif "calldata" in key:
-                    dtype=np.dtype(np.int16)
-                    value=[ [0] if val[0]=='' else [val[0]] for val in value]
-                chunk[key]=np.array(value,dtype=dtype)
-
-            importers=[None]*jobs
-            task=None
-            taskQueue=queue.Queue()
-            workload = [int(float(len(IDs)) / jobs)] * jobs
-          
-            unallocated = max(0, len(IDs) - sum(workload))
-            for i in range(unallocated):
-                workload[i % jobs] += 1
-            numTasks=len(workload)
-            variantIndex = self.proj.createVariantMap('variant', False)
-            # print(variantIndex)
-
-            if IDs[0]==1:
-                start_sample =0
-            else:
-                start_sample=IDs[0]-1
-            
-            for job in range(numTasks):
-                # readQueue[job].put(chunk)
-                if workload[job] == 0:
-                    continue
+                    chunk["calldata/"+geno_field]=[]
+              
+                for idx, raw_rec in enumerate(reader.records()):
+                    # print(idx,len(raw_rec),raw_rec[3])
+                    chunk["variants/REF"].append(raw_rec[0])
+                    chunk["variants/ALT"].append([raw_rec[1]])
+                    chunk["variants/CHROM"].append(raw_rec[2])
+                    chunk["variants/POS"].append(raw_rec[3])
+                    chunk["variants/ID"].append(raw_rec[5])
+                    for genoID,geno_field in enumerate(validGenotypeFields):
+                        colpos=[6+genoID+pos*len(validGenotypeFields) for pos in range(len(IDs))]
+                        geno_field=geno_field.replace("_geno","")
+                        chunk["calldata/"+geno_field].append([raw_rec[pos] if raw_rec[pos] is not None else -10 for pos in colpos])
                 
-                end_sample = min(start_sample + workload[job], start_sample+len(IDs))
-                if end_sample <= start_sample:
-                    continue
-                HDFfile_Merge="tmp_"+str(start_sample+1)+"_"+str(end_sample)+"_genotypes.h5"
-                # print(HDFfile_Merge)
-                names=[key for key in allNames.keys()]
-                updateSample(cur,start_sample,end_sample,IDs,names,allNames,HDFfile_Merge)
+                for key,value in chunk.items():
+                    dtype=np.dtype(object)
+                    if key=="variants/POS":
+                        dtype=np.dtype(np.int32)
+                    elif key=="calldata/DP":
+                        dtype=np.dtype(np.int16)
+                    elif key=="calldata/GT":
+                        dtype=np.dtype(np.int8)
+                    elif key=="calldata/GQ":
+                        dtype=np.dtype(np.float32)
+                    elif "calldata" in key:
+                        dtype=np.dtype(np.int16)
+                        value=[ [0] if val[0]=='' else [val[0]] for val in value]
+                    chunk[key]=np.array(value,dtype=dtype)
 
-                taskQueue.put(HDF5GenotypeImportWorker(chunk, variantIndex, start_sample, end_sample, 
-                    IDs,0, job, validGenotypeFields ,HDFfile_Merge,self.proj.build))
-                start_sample = end_sample 
-            while taskQueue.qsize()>0:
-                for i in range(jobs):    
-                    if importers[i] is None or not importers[i].is_alive():     
-                        task=taskQueue.get()
-                        importers[i]=task
-                        importers[i].start()         
-                        break 
-            for worker in importers:
-                if worker is not None:
-                    worker.join()
+                importers=[None]*jobs
+                task=None
+                taskQueue=queue.Queue()
+                workload = [int(float(len(IDs)) / jobs)] * jobs
+              
+                unallocated = max(0, len(IDs) - sum(workload))
+                for i in range(unallocated):
+                    workload[i % jobs] += 1
+                numTasks=len(workload)
+                variantIndex = self.proj.createVariantMap('variant', False)
+                # print(variantIndex)
+
+                if IDs[0]==1:
+                    start_sample =0
+                else:
+                    start_sample=IDs[0]-1
+                
+                for job in range(numTasks):
+                    # readQueue[job].put(chunk)
+                    if workload[job] == 0:
+                        continue
+                    
+                    end_sample = min(start_sample + workload[job], start_sample+len(IDs))
+                    if end_sample <= start_sample:
+                        continue
+                    HDFfile_Merge="tmp_"+str(start_sample+1)+"_"+str(end_sample)+"_genotypes.h5"
+                    # print(HDFfile_Merge)
+                    names=[key for key in allNames.keys()]
+                    updateSample(cur,start_sample,end_sample,IDs,names,allNames,HDFfile_Merge)
+
+                    taskQueue.put(HDF5GenotypeImportWorker(chunk, variantIndex, start_sample, end_sample, 
+                        IDs,0, job, validGenotypeFields ,HDFfile_Merge,self.proj.build))
+                    start_sample = end_sample 
+                while taskQueue.qsize()>0:
+                    for i in range(jobs):    
+                        if importers[i] is None or not importers[i].is_alive():     
+                            task=taskQueue.get()
+                            importers[i]=task
+                            importers[i].start()         
+                            break 
+                for worker in importers:
+                    if worker is not None:
+                        worker.join()
         else:
             for hdf5file in hdf5files:
                 os.remove(hdf5file)
