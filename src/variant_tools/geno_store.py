@@ -621,7 +621,7 @@ class Sqlite_Store(Base_Store):
 
     def geno_fields(self, sample_id):
         # sampleGenotypeHeader = [x.lower() for x in self.db.getHeaders('genotype_{}'.format(sample_id))]
-        sampleGenotypeHeader = [x for x in self.db.getHeaders('genotype_{}'.format(sample_id))]
+        sampleGenotypeHeader = [x.lower() for x in self.db.getHeaders('genotype_{}'.format(sample_id))]
 
         return sampleGenotypeHeader[1:]  # the first field is variant id, second is GT
 
@@ -778,8 +778,7 @@ class Sqlite_Store(Base_Store):
             result=self.cur.fetchall()
             self.db.commit()
             self.db.detach(self.proj.name+"_genotype")
-            self.db.detach(self.proj.name)
-
+            self.db.detach(self.proj.name)  
             id_idx+=1
 
             for rec in result:  

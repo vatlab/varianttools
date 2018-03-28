@@ -712,6 +712,8 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                     # raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
     
     validGenotypeIndices = []
+
+
     for index, field in enumerate(genotypeFields):
         if field.lower() not in [x.lower() for x in list(genotypeFieldTypes.keys())]:
             env.logger.warning("Field {} does not exist in any of the samples.".format(field))
@@ -721,6 +723,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                     .format(field, len(fieldInTable[field.lower()]), len(IDs))) 
             validGenotypeIndices.append(index)
             validGenotypeFields.append(field)
+
     # check GT field
     if not all([x is None for x in coreDestinations]):
         if 'gt' not in [x.lower() for x in list(genotypeFieldTypes.keys())]:
@@ -729,7 +732,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             if len(fieldInTable['gt']) < len(IDs):
                 env.logger.warning('Genotype field GT exists in {} of {} selected samples'
                     .format(len(fieldInTable[field.lower()]), len(IDs))) 
-
+  
     if all([x is None for x in coreDestinations]) and len(validGenotypeFields) == 0:
         env.logger.warning("No valid sample statistics operation has been specified.")
         return
@@ -755,7 +758,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             sampleDict[id]=[record_male_gt,fieldSelect]
             if not fieldSelect or all([x == 'NULL' for x in fieldSelect]):
                 continue
-    # print(genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs)
+   
 
     variants=store.get_genoType_genoInfo(sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step)
 
