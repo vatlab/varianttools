@@ -36,8 +36,10 @@ class TestSelect(ProcessTestCase):
     def setUp(self):
         'Create a project'
         ProcessTestCase.setUp(self)
-        if os.path.isfile('TestSelect.tar.gz'):
-            self.runCmd('vtools admin --load_snapshot TestSelect.tar.gz')
+        if self.storeMode=="sqlite" and os.path.isfile('TestSelect_sqlite.tar.gz'):
+            self.runCmd('vtools admin --load_snapshot TestSelect_sqlite.tar.gz')
+        elif self.storeMode=="hdf5" and os.path.isfile('TestSelect_hdf5.tar.gz'):
+            self.runCmd('vtools admin --load_snapshot TestSelect_hdf5.tar.gz')
         else:
             self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
             self.runCmd('vtools import vcf/input_nogeno.vcf  --sample_name input.tsv --build hg18')
@@ -49,7 +51,14 @@ class TestSelect(ProcessTestCase):
             self.runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
             self.runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_het=#(het)"')
             # # save a snapshot, which will make the test run much faster
-            self.runCmd('vtools admin --save_snapshot TestSelect.tar.gz "initial population for testing of command select"')
+            if self.storeMode=="sqlite":
+                self.runCmd('vtools admin --save_snapshot TestSelect_sqlite.tar.gz "initial population for testing of command select"')
+            elif self.storeMode=="hdf5":
+                self.runCmd('vtools admin --save_snapshot TestSelect_hdf5.tar.gz "initial population for testing of command select"')
+
+
+
+
 
     def testSelect(self):
         'Test command vtools select'

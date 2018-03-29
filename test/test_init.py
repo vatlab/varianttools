@@ -73,7 +73,7 @@ class TestInit(ProcessTestCase):
         self.assertProj(numOfVariants={'variant':280, 'na12': 280}, numOfSamples=60,
             numOfGenotype={1: 30, 2: 64}, genotype={1: [1]*30, 2: [1]*64})
         # init with selected samples
-        self.assertSucc('''vtools init test --parent parent --samples "sample_name like 'NA1%'" -f  -store '''+ self.storeMode)
+        self.assertSucc('''vtools init test --parent parent --samples "sample_name like 'NA1%'" -f  --store '''+ self.storeMode)
         self.assertProj(numOfVariants= 288, numOfSamples=51)
 
    

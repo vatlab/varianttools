@@ -32,8 +32,10 @@ class TestCompare(ProcessTestCase):
     def setUp(self):
         'Create a project'
         ProcessTestCase.setUp(self)
-        if os.path.isfile('TestCompare.tar.gz'):
-            self.runCmd('vtools admin --load_snapshot TestCompare.tar.gz')
+        if self.storeMode=="sqlite" and os.path.isfile('TestCompare_sqlite.tar.gz'):
+            self.runCmd('vtools admin --load_snapshot TestCompare_sqlite.tar.gz')
+        elif self.storeMode=="hdf5" and os.path.isfile('TestCompare_hdf5.tar.gz'):
+            self.runCmd('vtools admin --load_snapshot TestCompare_hdf5.tar.gz')
         else:
             self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
             self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
@@ -43,7 +45,11 @@ class TestCompare(ProcessTestCase):
             self.runCmd('vtools select ns \'sift_score > 0.95\' -t ns_damaging')
             self.runCmd('vtools select ns \'genename = "PLEKHN1"\' -t plekhn1')
             self.runCmd('vtools select plekhn1 "polyphen2_score>0.9 or sift_score>0.9" -t d_plekhn1')
-            self.runCmd('vtools admin --save_snapshot TestCompare.tar.gz "Snapshot for testing comapre command"')
+            if self.storeMode=="sqlite":
+                self.runCmd('vtools admin --save_snapshot TestCompare_sqlite.tar.gz "Snapshot for testing comapre command"')
+            elif self.storeMode=="hdf5":
+                self.runCmd('vtools admin --save_snapshot TestCompare_hdf5.tar.gz "Snapshot for testing comapre command"')
+
 
     def testCompare(self):
         'Test command vtools compare'

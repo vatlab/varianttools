@@ -4612,7 +4612,7 @@ def show(args):
                     numGenotypes = store.num_variants(sampleId)
 
                     # get fields for each genotype table
-                    sampleGenotypeFields = ','.join(store.geno_fields(sampleId))
+                    sampleGenotypeFields = ','.join(store.geno_fields_nolower(sampleId))
                     prt.write([rec[1], rec[2], str(numGenotypes), sampleGenotypeFields])
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')

@@ -622,7 +622,11 @@ class Sqlite_Store(Base_Store):
     def geno_fields(self, sample_id):
         # sampleGenotypeHeader = [x.lower() for x in self.db.getHeaders('genotype_{}'.format(sample_id))]
         sampleGenotypeHeader = [x.lower() for x in self.db.getHeaders('genotype_{}'.format(sample_id))]
+        return sampleGenotypeHeader[1:]  # the first field is variant id, second is GT
 
+    def geno_fields_nolower(self, sample_id):
+        # sampleGenotypeHeader = [x.lower() for x in self.db.getHeaders('genotype_{}'.format(sample_id))]
+        sampleGenotypeHeader = [x for x in self.db.getHeaders('genotype_{}'.format(sample_id))]
         return sampleGenotypeHeader[1:]  # the first field is variant id, second is GT
 
     def get_typeOfColumn(self,sample_id,field):
@@ -1273,6 +1277,17 @@ class HDF5_Store(Base_Store):
 
 
     def geno_fields(self, sampleID):
+        HDFfileName=self.get_sampleFileName(sampleID)
+        genoFields=""
+        if HDFfileName is not None:
+            storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+            genoFields=storageEngine.geno_fields(sampleID)
+            genoFields.sort()
+            # genoFields=[x.lower() for x in genoFields]
+            storageEngine.close()
+        return genoFields
+
+    def geno_fields_nolower(self, sampleID):
         HDFfileName=self.get_sampleFileName(sampleID)
         genoFields=""
         if HDFfileName is not None:

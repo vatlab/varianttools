@@ -38,6 +38,7 @@ class TestFunc(ProcessTestCase):
         self.assertSucc('vtools output variant chr pos ref alt "ref_sequence(chr, pos-10, pos+10)"')
         self.assertSucc('''vtools output variant chr pos ref alt "ref_sequence('1', pos-10, pos+10)" ''')
 
+    @unittest.skipIf(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
     def testVcfTrack(self):
         'Testing vcf track'
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
