@@ -38,15 +38,15 @@ class TestFunc(ProcessTestCase):
         self.assertSucc('vtools output variant chr pos ref alt "ref_sequence(chr, pos-10, pos+10)"')
         self.assertSucc('''vtools output variant chr pos ref alt "ref_sequence('1', pos-10, pos+10)" ''')
 
-    @unittest.skipIf(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
-    def testVcfTrack(self):
-        'Testing vcf track'
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.assertSucc('vtools show track vcf/CEU.vcf.gz')
-        self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'info')" ''')
-        self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'NA12751.GT')" ''')
-        self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'info.AN')" ''')
-        self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'qual')" ''')
+    # @unittest.skipIf(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
+    # def testVcfTrack(self):
+    #     'Testing vcf track'
+    #     self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+    #     self.assertSucc('vtools show track vcf/CEU.vcf.gz')
+    #     self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'info')" ''')
+    #     self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'NA12751.GT')" ''')
+    #     self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'info.AN')" ''')
+    #     self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'qual')" ''')
 
     
     def testGenotype(self):
