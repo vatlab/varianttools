@@ -1007,7 +1007,7 @@ class EvolvePopulation(PipelineAction):
                            r'% (popSize, numOfSegSites, numOfMutants / popSize, (numOfMutants * 50. / numOfSegSites/ popSize) if numOfSegSites else 0)',
                     output=env.logger.info),
                 ] + self.finalOps,
-            gen = self.demoModel.num_gens
+            gen = int(self.demoModel.num_gens)
         )
         #
         env.logger.info('Population simulation takes %.2f seconds' % (time.clock() - startTime))
