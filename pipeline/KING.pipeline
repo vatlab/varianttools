@@ -23,6 +23,7 @@ king_description=This pipeline exports genotypes in specified variant
 # define executables
 KING=${: "%(king_path)s/king" if "%(king_path)s" else "king"}
 PLINK=${: "%(plink_path)s/plink" if "%(plink_path)s" else "plink"}
+SED=${: "gsed" if sys.platform == "darwin" else "sed"}
 
 # Properly format --samples option 
 SAMP=${: convertDoubleQuote('''%(samples)s''')}
@@ -84,12 +85,12 @@ action=RunCommand('mv %(var_table)s.tfam ${CACHE_DIR}/%(jobname)s.tfam',
 comment=Rename tfam file to match tped file
 
 [king_30]
-action=RunCommand('${PLINK} --noweb --tped %(jobname)s.tped --tfam %(jobname)s.tfam --indep-pairwise 50 5 0.5 --allow-no-sex --out %(jobname)s.LD.50',
+action=RunCommand('${PLINK} --tped %(jobname)s.tped --tfam %(jobname)s.tfam --indep-pairwise 50 5 0.5 --allow-no-sex --out %(jobname)s.LD.50',
   working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s.LD.50.prune.in')
 comment=Calculate LD pruning candidate list with a cutoff of R^2=0.5
 
 [king_31]
-action=RunCommand('${PLINK} --noweb --tped %(jobname)s.tped --tfam %(jobname)s.tfam --extract %(jobname)s.LD.50.prune.in --no-parents --no-sex --no-pheno --maf %(maf)s --make-bed --out %(jobname)s',
+action=RunCommand('${PLINK} --tped %(jobname)s.tped --tfam %(jobname)s.tfam --extract %(jobname)s.LD.50.prune.in --no-parents --no-sex --no-pheno --maf %(maf)s --make-bed --out %(jobname)s',
   working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s.bed')
 comment=LD pruning from pre-calculated list 
 
@@ -104,7 +105,7 @@ action=RunCommand('${KING} -b %(jobname)s.bed --kinship --related --degree 3 --p
 comment=Kinship inference
 
 [king_51]
-action=RunCommand('''cut  -f 2,7-`echo $((7+%(num_comp)s))` -d " " %(jobname)s-pc.ped | sed -e "s/ /\\t/g" | gsed 1i"sample_name`seq -s, 1 %(num_comp)s | awk -F, '{if (NF>20) NF=20; for (i=1; i<=NF; ++i) printf("\\t%%s", "%(jobname)s_MDS"$i)}'`" > %(jobname)s-mds.vtools.txt''',
+action=RunCommand('''cut  -f 2,7-`echo $((7+%(num_comp)s))` -d " " %(jobname)s-pc.ped | ${SED} -e "s/ /\\t/g" | ${SED} 1i"sample_name`seq -s, 1 %(num_comp)s | awk -F, '{if (NF>20) NF=20; for (i=1; i<=NF; ++i) printf("\\t%%s", "%(jobname)s_MDS"$i)}'`" > %(jobname)s-mds.vtools.txt''',
   working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s-mds.vtools.txt')
 comment=Extract MDS result for vtools phenotype import
 
