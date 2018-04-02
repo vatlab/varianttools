@@ -317,8 +317,18 @@ class ProcessTestCase(unittest.TestCase):
         if numOfGenotype is not None:
             with open(os.devnull, 'w') as fnull:
                 for table, numGeno in numOfGenotype.items():
-                    proj_num_geno = subprocess.check_output('vtools execute "SELECT count(*) FROM genotype_{}"'.format(table), shell=True,
-                        stderr=fnull).decode()
+                    print(table,numGeno)
+                    if self.storeMode=="sqlite":
+                        proj_num_geno = subprocess.check_output('vtools execute "SELECT count(*) FROM genotype_{}"'.format(table), shell=True,
+                            stderr=fnull).decode()
+                    elif self.storeMode=="hdf5":
+                        fileResult = subprocess.check_output('vtools execute "SELECT HDF5 FROM sample WHERE sample_id ={}"'.format(table), shell=True,
+                            stderr=fnull).decode()
+                        HDF5FileName=fileResult.rstrip()
+                        storageEngine=Engine_Storage.choose_storage_engine(HDF5FileName)
+                        proj_geno,numCount=storageEngine.num_variants(table)
+                        proj_num_geno=proj_geno
+                    
                     if negate:
                         self.assertNotEqual(int(proj_num_geno), numGeno)
                     else:

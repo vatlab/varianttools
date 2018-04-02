@@ -60,7 +60,9 @@ class TestInit(ProcessTestCase):
         if self.storeMode=="sqlite":
             shutil.move('test_genotype.DB', 'parent/test_genotype.DB')
         elif self.storeMode=="hdf5":
-            shutil.move('tmp*h5', 'parent/')
+            hdf5Files=glob.glob("tmp*h5")
+            for hdf5File in hdf5Files:
+                shutil.move(hdf5File, 'parent/')
 
         # create a project with parent project parent
         self.assertSucc('vtools init test --parent parent --variants na12 --store '+self.storeMode)
@@ -76,7 +78,6 @@ class TestInit(ProcessTestCase):
         self.assertSucc('''vtools init test --parent parent --samples "sample_name like 'NA1%'" -f  --store '''+ self.storeMode)
         self.assertProj(numOfVariants= 288, numOfSamples=51)
 
-   
     def testGenotypes_sample(self):
         'Test command init --genotypes with samples option'
         try:

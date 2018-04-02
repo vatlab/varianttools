@@ -239,6 +239,7 @@ class HDF5Engine_storage(Base_Storage):
         totalNum=0
         chrs=["X","Y"]
         chrs.extend(range(1,23))
+        numCount={}
         for chr in chrs:
             try:
                 group=self.file.get_node("/chr"+str(chr))
@@ -254,10 +255,11 @@ class HDF5Engine_storage(Base_Storage):
                 numNone=np.where(data==-1) 
                 # totalNum+=numVariants-len(numNan[0])-len(numNone[0])
                 totalNum+=numVariants-len(numNan[0])
+                numCount[chr]=numVariants-len(numNan[0])
                 # totalNum+=numVariants
             except tb.exceptions.NoSuchNodeError:
                 pass
-        return totalNum
+        return totalNum,numCount
 
     def to_csr_matrix(self,group):
         return csr_matrix((group.data[:],group.indices[:],group.indptr[:]),shape=group.shape[:])

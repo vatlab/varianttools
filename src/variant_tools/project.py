@@ -4115,19 +4115,25 @@ def init(args):
             if args.parent:
                 # if args.store != 'sqlite':
                 #     raise NotImplemented('Option --parent is not supported yet with non-sqlite storage model')
+                # if args.store=="sqlite":
                 copier = ProjCopier(proj, args.parent, args.variants,
                     ' AND '.join(['({})'.format(x) for x in args.samples]),
                     ' AND '.join(['({})'.format(x) for x in args.genotypes]))
                 copier.copy()
-
-                if args.store!='sqlite':
+                if args.store!="sqlite":
                     store=GenoStore(proj)
-                    
-                    all_files=[proj.name+".proj",proj.name+"_genotype.DB"]
+                    # all_files=[proj.name+".proj",proj.name+"_genotype.DB"]
+                    print(args.parent)
+                    src_files = os.listdir(args.parent)
+                    for file_name in src_files:
+                        full_file_name = os.path.join(args.parent, file_name)
+                        if (os.path.isfile(full_file_name)):
+                            shutil.copy(full_file_name, ".")
 
-                    for file in all_files:
-                        shutil.copyfile(file,env.cache_dir+"/"+file)
-                    store.load_Genotype_From_SQLite(all_files,proj)
+
+                    # for file in all_files:
+                    #     shutil.copyfile(file,env.cache_dir+"/"+file)
+                    # store.load_Genotype_From_SQLite(all_files,proj)
 
             elif args.children:
                 # A default value 4 is given for args.jobs because more threads usually

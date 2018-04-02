@@ -1271,7 +1271,7 @@ class HDF5_Store(Base_Store):
         num=0
         if HDFfileName is not None:
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
-            num=storageEngine.num_variants(sampleID)
+            num,_=storageEngine.num_variants(sampleID)
             storageEngine.close()
         return num
 
