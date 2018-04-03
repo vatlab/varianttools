@@ -233,69 +233,7 @@ class HDF5Engine_storage(Base_Storage):
             else:
                 self.getGroup(chr,groupName).append(data)
 
-    def num_genoinfo(self,sampleID,expr,cond):
-        num=0
-        chrs=["X","Y"]
-        chrs.extend(range(1,23))
-        for chr in chrs:
-            try:
-                group=self.file.get_node("/chr"+str(chr))
-                colnames=group.colnames[:]
-                colPos=np.where(colnames==sampleID)[0]
-                exprCols=expr.split("(")
-                method=exprCols[0]
-                info=exprCols[1].replace(")","")
-                # data=group.get_node(info)[:,colPos]
-                data=group.get_node(info)
-                if info=="avg":
-                    num=np.average(data)
-                elif info=="min":
-                    num=np.nanmin(data)
-                elif info=="max":
-                    num=np.nanmax(data)
-            except tb.exceptions.NoSuchNodeError:
-                pass
-            except Exception as e:
-                # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
-                print(e)
-                pass     
-        return num
 
-
-
-    def num_genotypes(self,sampleID,cond):
-        totalNum=0
-        chrs=["X","Y"]
-        chrs.extend(range(1,23))
-        for chr in chrs:
-            try:
-                group=self.file.get_node("/chr"+str(chr))
-                colnames=group.colnames[:]
-                numVariants=len(group.rownames[:])
-                colPos=np.where(colnames==sampleID)[0]
-                data=group.GT_geno[:,colPos]
-                if cond is None:
-                    numNan=np.where(np.isnan(data))
-                    numNone=np.where(data==-1) 
-                    totalNum+=numVariants-len(numNan[0])
-                #     totalNum+=numVariants-len(numNan[0])
-                else:
-                    numNan=np.where(np.isnan(data))
-                    if cond=="GT!=0":
-                        numCond=np.where(data!=0)
-                        totalNum+=len(numCond[0])-len(numNan[0])
-                    else:
-                        GTcond=cond.split("=")[1]
-                        numCond=np.where(data==int(GTcond))
-                        totalNum+=len(numCond[0])
-   
-            except tb.exceptions.NoSuchNodeError:
-                pass
-            except Exception as e:
-                # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
-                print(e)
-                pass     
-        return totalNum
                
 
 
@@ -1029,6 +967,86 @@ class HDF5Engine_access(Base_Access):
         return exist
 
 
+    def num_genoinfo(self,sampleID,expr,cond):
+        num=0
+        chrs=["X","Y"]
+        chrs.extend(range(1,23))
+        for chr in chrs:
+            try:
+                group=self.file.get_node("/chr"+str(chr))
+                colnames=group.colnames[:]
+                colPos=np.where(colnames==sampleID)[0]
+                exprCols=expr.split("(")
+                method=exprCols[0]
+                info=exprCols[1].replace(")","")
+                # data=group.get_node(info)[:,colPos]
+                
+                data=self.file.get_node("/chr"+str(chr)+"/"+info)[:,colPos]
+                data[data==-1]=0
+                if method=="avg":
+                    num=np.average(data)
+                elif method=="min":
+                    num=np.nanmin(data)
+                elif method=="max":
+                    num=np.nanmax(data)
+            except tb.exceptions.NoSuchNodeError:
+                pass
+            except Exception as e:
+                # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
+                print(e)
+                pass     
+        return num
+
+
+
+    def num_genotypes(self,sampleID,cond,genotypes):
+        totalNum=0
+        chrs=["X","Y"]
+        chrs.extend(range(1,23))
+        for chr in chrs:
+            try:
+                group=self.file.get_node("/chr"+str(chr))
+                colnames=group.colnames[:]
+                numVariants=len(group.rownames[:])
+                colPos=np.where(colnames==sampleID)[0]
+                
+                shape=group.shape[:].tolist()   
+                
+                chunkPos=chunks_start_stop(shape[0])
+    
+                for startPos,endPos in chunkPos:
+                    # rownames=node.rownames[startPos:endPos].tolist() 
+                               
+                    if "/chr"+str(chr)+"/GT_geno" in self.file:    
+                        rownames,colnames,data=self.filter_on_genotypes(genotypes,chr,group,"GT_geno",startPos,endPos,colPos,"")
+                 
+                        # data=group.GT_geno[:,colPos]
+                        if cond is None:
+                            numNan=np.where(np.isnan(data))
+                            numNone=np.where(data==-1) 
+                            totalNum+=numVariants-len(numNan[0])
+                        #     totalNum+=numVariants-len(numNan[0])
+                        else:
+                            numNan=np.where(np.isnan(data))
+                            if cond=="GT!=0":
+                                numCond=np.where(data!=0)
+                                totalNum+=len(numCond[0])-len(numNan[0])
+                            else:
+                                GTcond=cond.split("=")[1]
+                                numCond=np.where(data==int(GTcond))
+                                totalNum+=len(numCond[0])
+   
+            except tb.exceptions.NoSuchNodeError:
+                pass
+            except Exception as e:
+                # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
+                print(e)
+                pass     
+        return totalNum
+
+
+
+
     def get_geno_by_group(self,chr,groupName):
         group=self.getGroup(chr)
         self.colnames=group.colnames[:].tolist()
@@ -1209,7 +1227,10 @@ class HDF5Engine_access(Base_Access):
             genoinfo=np.nan_to_num(genoinfo)
 
         if len(genotypes)>0:
-            genotypes=genotypes[0]
+            if type(genotypes) is str:
+                genotypes=genotypes.replace("(","").replace(")","")
+            else:
+                genotypes=genotypes[0]
             if "DP_geno" in genotypes and "/chr"+str(chr)+"/DP_geno" in self.file:
                 DP_geno=node.DP_geno[startPos:endPos,:]
                 DP_geno[DP_geno==-1]=0
@@ -1217,7 +1238,6 @@ class HDF5Engine_access(Base_Access):
                 GQ_geno=node.GQ_geno[startPos:endPos,:]
                 GQ_geno=np.nan_to_num(GQ_geno)
             genoinfo=np.where(eval("~("+genotypes+")"),np.nan,genoinfo)
-        
 
         rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,rowpos)
 

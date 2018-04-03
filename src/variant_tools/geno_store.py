@@ -1267,19 +1267,19 @@ class HDF5_Store(Base_Store):
         HDFfileName=self.get_sampleFileName(sampleID)
         num=0
         if HDFfileName is not None:
-            storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
-            num=storageEngine.num_genoinfo(sampleID,expr,cond)
-            storageEngine.close()
+            accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+            num=accessEngine.num_genoinfo(sampleID,expr,cond)
+            accessEngine.close()
         return num
 
 
-    def num_genotypes(self,sampleID,cond):
+    def num_genotypes(self,sampleID,cond,genotypes):
         HDFfileName=self.get_sampleFileName(sampleID)
         num=0
         if HDFfileName is not None:
-            storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
-            num=storageEngine.num_genotypes(sampleID,cond)
-            storageEngine.close()
+            accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+            num=accessEngine.num_genotypes(sampleID,cond,genotypes)
+            accessEngine.close()
         return num
 
 
