@@ -248,13 +248,18 @@ class HDF5Engine_storage(Base_Storage):
                 if cond is None:
                     numNan=np.where(np.isnan(data))
                     numNone=np.where(data==-1) 
-                    # totalNum+=numVariants-len(numNan[0])-len(numNone[0])
+                    totalNum+=numVariants-len(numNan[0])
                 #     totalNum+=numVariants-len(numNan[0])
                 else:
-                    GTcond=cond.split("=")[1]
-                    numCond=np.where(data==GTcond)
-                    totalNum+=numCond
-                totalNum+=numVariants
+                    numNan=np.where(np.isnan(data))
+                    if cond=="GT!=0":
+                        numCond=np.where(data!=0)
+                        totalNum+=len(numCond[0])-len(numNan[0])
+                    else:
+                        GTcond=cond.split("=")[1]
+                        numCond=np.where(data==int(GTcond))
+                        totalNum+=len(numCond[0])
+   
             except tb.exceptions.NoSuchNodeError:
                 pass
             except Exception as e:
