@@ -27,6 +27,8 @@
 import sys
 import threading
 import queue
+from multiprocessing import Process, Manager
+from multiprocessing import Queue as mpQueue
 
 import time
 import tempfile
@@ -36,6 +38,10 @@ from collections import defaultdict
 from .project import Project
 from .utils import DatabaseEngine, ProgressBar, typeOfValues, SQL_KEYWORDS, env, \
     validFieldName
+from .geno_store import GenoStore,HDF5_Store
+import tables as tb
+import numpy as np
+
 
 class GenotypeStatStatus:
     def __init__(self):
@@ -145,13 +151,75 @@ class GenotypeStatCalculator(threading.Thread):
             # set result
             self.status.set(ID, res)
             self.queue.task_done()
-        db.close()  
+        db.close() 
+
+
+
+class GenotypeStatCalculator_HDF5(Process):
+    def __init__(self, proj, stat, idQueue, status, genotypes):
+        '''Use sql to process sample passed from queue, set results in status'''
+        self.proj = proj
+        # query, where, idx
+        self.stat = []
+        for field, item in stat:
+            if item == '#(GT)':
+                self.stat.append(('count(*)', None))
+            elif item == '#(alt)':
+                self.stat.append(('sum(abs(GT))', None))
+            elif item == '#(hom)':
+                self.stat.append(('count(*)', 'GT=2'))
+            elif item == '#(het)':
+                self.stat.append(('count(*)', 'GT=1'))
+            elif item == '#(other)':
+                self.stat.append(('count(*)', 'GT=-1'))
+            elif item == '#(wtGT)':
+                self.stat.append(('count(*)', 'GT=0'))
+            elif item == '#(mutGT)':
+                self.stat.append(('count(*)', 'GT!=0'))
+            elif item.startswith('#'):
+                raise ValueError('{} is not a valid special function (only #(GT), #(wtGT), #(mutGT), #(alt), #(hom), #(het), and #(other) are allowed).'.format(item))
+            else:
+                self.stat.append((item, None))
+        self.queue = idQueue
+        self.status = status
+        self.genotypes = genotypes
+        # threading.Thread.__init__(self, name='Calculate genotype statistics')
+        Process.__init__(self, name='Calculate genotype statistics')
+
+    def run(self):
+        # db = DatabaseEngine()
+        # db.connect(self.proj.proj_file, readonly=True)
+        # cur = db.cursor()
+        while True:
+            ID = self.queue.get()
+            # finish everything
+            if ID is None:
+                break
+            res = [None] * len(self.stat)
+            try:
+                for idx, (expr, where) in enumerate(self.stat):
+                    if expr=="count(*)":
+                        store=GenoStore(self.proj)
+                        totalNum=store.num_genotypes(ID,where)
+                        res[idx]=totalNum     
+                    elif expr=="sum(abs(GT)":
+                        pass
+            except Exception as e:
+                print(e)
+                env.logger.debug('Failed to evalulate {}: {}. Setting field to NULL.'.format(expr, e))
+            self.status[ID]=res
+        # db.close()  
+
+
+
 
 class Sample:
     def __init__(self, proj, jobs=4):
         self.proj = proj
         self.jobs = jobs
         self.db = proj.db
+        self.proj.db=proj.db
+        self.proj.db.connect(self.proj.proj_file)
 
     def load(self, filename, header, allowed_fields, samples, na_str):
         '''Load phenotype information from a file'''
@@ -380,57 +448,106 @@ class Sample:
         nJobs = max(min(self.jobs, len(IDs)), 1)
         # start all workers
         idQueue = queue.Queue()
+        idmpQueue=mpQueue()
         status = GenotypeStatStatus()
-        for j in range(nJobs):
-            GenotypeStatCalculator('{}_genotype.DB'.format(self.proj.name),
-                stat, idQueue, status, genotypes).start()
-        #
-        # put all jobs to queue, the workers will work on them
-        for ID in IDs:
-            idQueue.put(ID)
-        #
-        count = 0
-        prog = ProgressBar('Calculating phenotype', len(IDs))
-        while True:
-            if status.count() > count:
-                count = status.count()
-                prog.update(count)
-            # if everything is done
-            if status.count() == len(IDs):
-                # stop all threads
-                for j in range(nJobs):
-                    idQueue.put(None)
-                break
-            # wait 1 sec to check status again
-            time.sleep(1)
-        prog.done()
-        # submit all results, these should be quick so no progress bar is used
-        count = [0, 0, 0]
-        cur_fields = self.db.getHeaders('sample')[3:]
-        new_field = {}
-        for field in [x[0] for x in stat]:
-            if field.lower() not in [x.lower() for x in cur_fields]:
-                if field.upper() in SQL_KEYWORDS:
-                    raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(field))
-                new_field[field] = True
-            else:
-                new_field[field] = False
-                count[2] += 1  # updated
-        cur = self.db.cursor()
-        for ID in IDs:
-            res = status.get(ID)
-            for idx, (field, expr) in enumerate(stat):
-                if new_field[field]:
-                    fldtype = typeOfValues([str(status.get(x)[idx]) for x in IDs])
-                    # determine the type of value
-                    self.db.execute('ALTER TABLE sample ADD {} {} NULL;'
-                        .format(field, fldtype))
-                    env.logger.debug('Adding phenotype {} of type {}'
-                        .format(field, fldtype))
+        mpStatus=Manager().dict()
+
+        if self.proj.store=="sqlite":
+            for j in range(nJobs):
+                GenotypeStatCalculator('{}_genotype.DB'.format(self.proj.name),
+                    stat, idQueue, status, genotypes).start()
+            for ID in IDs:
+                idQueue.put(ID)
+            count = 0
+            prog = ProgressBar('Calculating phenotype', len(IDs))
+            while True:
+                if status.count() > count:
+                    count = status.count()
+                    prog.update(count)
+                # if everything is done
+                if status.count() == len(IDs):
+                    # stop all threads
+                    for j in range(nJobs):
+                        idQueue.put(None)
+                    break
+                # wait 1 sec to check status again
+                time.sleep(1)
+            prog.done()
+            # submit all results, these should be quick so no progress bar is used
+            count = [0, 0, 0]
+            cur_fields = self.db.getHeaders('sample')[3:]
+            new_field = {}
+            for field in [x[0] for x in stat]:
+                if field.lower() not in [x.lower() for x in cur_fields]:
+                    if field.upper() in SQL_KEYWORDS:
+                        raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(field))
+                    new_field[field] = True
+                else:
                     new_field[field] = False
-                    count[1] += 1  # new
-                cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[idx], ID])
-                count[0] += 1
+                    count[2] += 1  # updated
+            cur = self.db.cursor()
+            for ID in IDs:
+                res = status.get(ID)
+                for idx, (field, expr) in enumerate(stat):
+                    if new_field[field]:
+                        fldtype = typeOfValues([str(status.get(x)[idx]) for x in IDs])
+                        # determine the type of value
+                        self.db.execute('ALTER TABLE sample ADD {} {} NULL;'
+                            .format(field, fldtype))
+                        env.logger.debug('Adding phenotype {} of type {}'
+                            .format(field, fldtype))
+                        new_field[field] = False
+                        count[1] += 1  # new
+                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[idx], ID])
+                    count[0] += 1
+        elif self.proj.store=="hdf5":
+            for j in range(nJobs):
+                GenotypeStatCalculator_HDF5(self.proj,
+                    stat, idmpQueue, mpStatus, genotypes).start()
+            for ID in IDs:
+                idmpQueue.put(ID)
+            count = 0
+            prog = ProgressBar('Calculating phenotype', len(IDs))
+            while True:
+                if len(mpStatus) > count:
+                    count = len(mpStatus)
+                    prog.update(count)
+                # if everything is done
+                if len(mpStatus) == len(IDs):
+                    # stop all threads
+                    for j in range(nJobs):
+                        idmpQueue.put(None)
+                    break
+                # wait 1 sec to check status again
+                time.sleep(1)
+            prog.done()
+            # submit all results, these should be quick so no progress bar is used
+            count = [0, 0, 0]
+            cur_fields = self.db.getHeaders('sample')[3:]
+            new_field = {}
+            for field in [x[0] for x in stat]:
+                if field.lower() not in [x.lower() for x in cur_fields]:
+                    if field.upper() in SQL_KEYWORDS:
+                        raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(field))
+                    new_field[field] = True
+                else:
+                    new_field[field] = False
+                    count[2] += 1  # updated
+            cur = self.db.cursor()
+            for ID in IDs:
+                res = mpStatus[ID]
+                for idx, (field, expr) in enumerate(stat):
+                    if new_field[field]:
+                        fldtype = typeOfValues([str(mpStatus[x][idx]) for x in IDs])
+                        # determine the type of value
+                        self.db.execute('ALTER TABLE sample ADD {} {} NULL;'
+                            .format(field, fldtype))
+                        env.logger.debug('Adding phenotype {} of type {}'
+                            .format(field, fldtype))
+                        new_field[field] = False
+                        count[1] += 1  # new
+                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[idx], ID])
+                    count[0] += 1
         # report result
         env.logger.info('{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'.format(
             count[0], count[1]+count[2], count[1], count[2], len(IDs)))
