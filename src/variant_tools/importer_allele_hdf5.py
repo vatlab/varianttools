@@ -1588,7 +1588,10 @@ def updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDF5fileN
         # task=(HDF5fileName,allNames[names[id]],sample_ids[id],names[id])
         # print(id,HDF5fileName,sample_ids[id-firstID],names[id-adjust])
         task=(HDF5fileName,sample_ids[id-firstID],names[id-adjust])
-        cur.execute(sql,task)
+        try:
+            cur.execute(sql,task)
+        except Exception as e:
+            print(e)
         
     
 

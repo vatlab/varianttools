@@ -2676,12 +2676,14 @@ class Project:
                         env.logger.warning('Ignore existing file {}.'.format(f))
                         continue
                     os.rename(os.path.join(env.cache_dir, f), f)
+                self.db.commit()
         except Exception as e:
             raise ValueError('Failed to load snapshot: {}'.format(e))
         finally:
             # re-connect the main database for proper cleanup
             self.db = DatabaseEngine()
             self.db.connect(self.proj_file)
+           
   
 
         #
@@ -4065,8 +4067,8 @@ def init(args):
                 return
         #
         if args.children:
-            # if args.store != 'sqlite':
-            #     raise NotImplemented('Option --parent is not supported yet with non-sqlite storage model')
+            if args.store != 'sqlite':
+                raise NotImplemented('Option --parent is not supported yet with non-sqlite storage model')
             # A default value 4 is given for args.jobs because more threads usually
             # do not improve effiency
             dirs = []

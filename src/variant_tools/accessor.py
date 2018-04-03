@@ -1370,10 +1370,8 @@ class HDF5Engine_access(Base_Access):
                     chunkPos=chunks_start_stop(shape[0])
                     for startPos,endPos in chunkPos:
                         if "/chr"+str(chr)+"/GT_geno" in self.file:
-                            genoinfo=node.GT_geno[startPos:endPos]
-                            # print(self.fileName,colpos,genoinfo)           
+                            genoinfo=node.GT_geno[startPos:endPos]       
                             rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
-                            # print(self.fileName,samples,colnames)
                             genoinfo[genoinfo==-1]=0
                             rowsum=np.nansum(genoinfo,axis=1)
                             noWTvariants=rownames[np.where(rowsum>0)].tolist()
