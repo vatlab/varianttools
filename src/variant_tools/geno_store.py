@@ -1263,6 +1263,15 @@ class HDF5_Store(Base_Store):
             storageEngine.remove_genofields(items)
             storageEngine.close()
 
+    def num_genoinfo(self,sampleID,expr,cond):
+        HDFfileName=self.get_sampleFileName(sampleID)
+        num=0
+        if HDFfileName is not None:
+            storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+            num=storageEngine.num_genoinfo(sampleID,expr,cond)
+            storageEngine.close()
+        return num
+
 
     def num_genotypes(self,sampleID,cond):
         HDFfileName=self.get_sampleFileName(sampleID)

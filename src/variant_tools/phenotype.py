@@ -204,6 +204,10 @@ class GenotypeStatCalculator_HDF5(Process):
                         res[idx]=totalNum     
                     elif expr=="sum(abs(GT)":
                         pass
+                    elif expr.startswith("avg") or expr.startswith("min") or expr.startswith("max"):
+                        store=GenoStore(self.proj)
+                        totalNum=store.num_genoinfo(ID,expr,where)
+                        res[idx]=totalNum    
             except Exception as e:
                 print(e)
                 env.logger.debug('Failed to evalulate {}: {}. Setting field to NULL.'.format(expr, e))

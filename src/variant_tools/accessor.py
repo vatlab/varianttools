@@ -233,6 +233,35 @@ class HDF5Engine_storage(Base_Storage):
             else:
                 self.getGroup(chr,groupName).append(data)
 
+    def num_genoinfo(self,sampleID,expr,cond):
+        num=0
+        chrs=["X","Y"]
+        chrs.extend(range(1,23))
+        for chr in chrs:
+            try:
+                group=self.file.get_node("/chr"+str(chr))
+                colnames=group.colnames[:]
+                colPos=np.where(colnames==sampleID)[0]
+                exprCols=expr.split("(")
+                method=exprCols[0]
+                info=exprCols[1].replace(")","")
+                # data=group.get_node(info)[:,colPos]
+                data=group.get_node(info)
+                if info=="avg":
+                    num=np.average(data)
+                elif info=="min":
+                    num=np.nanmin(data)
+                elif info=="max":
+                    num=np.nanmax(data)
+            except tb.exceptions.NoSuchNodeError:
+                pass
+            except Exception as e:
+                # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
+                print(e)
+                pass     
+        return num
+
+
 
     def num_genotypes(self,sampleID,cond):
         totalNum=0
