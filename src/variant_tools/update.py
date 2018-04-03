@@ -342,6 +342,35 @@ class Updater:
 
     def updateHDF5FromFile(self,input_filename):
         sample_ids = self.getSampleIDs(input_filename) if self.genotype_info else []
+        reader = TextReader(self.processor, input_filename,
+            # in the case of variant, we filter from the reading stage to save some time
+            None if (self.table == 'variant' or self.input_type != 'variant') else self.variantIndex,
+            # getNew is False so we only get variants that are available in variantIndex
+            False, self.jobs - 1, self.encoding, self.header)
+        cur = self.db.cursor()
+        lc = lineCount(input_filename, self.encoding)
+        update_after = min(max(lc//200, 100), 100000)
+        fld_cols = None
+        prog = ProgressBar(os.path.split(input_filename)[-1], lc)
+        last_count = 0
+
+        for self.count[0], bins, rec in reader.records():
+            variant_id = self.updateVariant(cur, bins, rec[0:self.ranges[2]])
+            # variant might not exist
+            if variant_id is not None and sample_ids:
+                if fld_cols is None:
+                    col_rngs = [reader.columnRange[x] for x in range(self.ranges[3], self.ranges[4])]
+                    fld_cols = []
+                    for idx in range(len(sample_ids)):
+                        fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
+               
+            if self.count[0] - last_count > update_after:
+                last_count = self.count[0]
+                self.db.commit()
+                prog.update(self.count[0])
+        self.count[7] = reader.unprocessable_lines
+        self.db.commit()
+        prog.done(self.count[0])
 
         UpdateGenotypeInParallel(self,input_filename,sample_ids)
         # for HDFfileName in glob.glob("tmp*genotypes.h5"):
@@ -359,13 +388,14 @@ class Updater:
             
             if self.proj.store=="sqlite" or (self.proj.store=="hdf5" and "vcf" not in f):
                 self.updateFromFile(f)
-                env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.count[8],
-                    '' if self.count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.count[1])))
-                for i in range(len(self.count)):
-                    self.total_count[i] += self.count[i]
-                    self.count[i] = 0
+                
             elif self.proj.store=="hdf5":
                 self.updateHDF5FromFile(f)
+            env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.count[8],
+                    '' if self.count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.count[1])))
+            for i in range(len(self.count)):
+                self.total_count[i] += self.count[i]
+                self.count[i] = 0
         
         if len(self.files) > 1:
             env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.total_count[8],
