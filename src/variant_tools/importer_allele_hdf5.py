@@ -1794,13 +1794,21 @@ class HDF5GenotypeUpdateWorker(Process):
         if len(self.geno_info)>0:
             for info in self.geno_info:
                 self.info[info.name]=[]
-                self.namedict[info.name]="calldata/"+info.name.replace("_geno","")
+                if "_geno" in info.name:
+                    self.namedict[info.name]="calldata/"+info.name.replace("_geno","")
+                else:
+                    self.namedict[info.name]="variants/"+info.name.replace("_geno","")
+                
 
     def writeIntoHDF(self,chr):
         storageEngine=Engine_Storage.choose_storage_engine(self.HDFfile)
         if len(self.geno_info)>0:
             for info in self.geno_info:
-                storageEngine.store_genoInfo(np.array(self.info[info.name]),chr,info.name)
+                if "_geno" in info.name:
+                    storageEngine.store_genoInfo(np.array(self.info[info.name]),chr,info.name)
+                else:
+                    ar=np.array(self.info[info.name])
+                    storageEngine.store_genoInfo(np.reshape(ar,(len(ar),-1)),chr,info.name+"_geno")
                 self.info[info.name]=[]
         storageEngine.close()
 
@@ -1821,8 +1829,11 @@ class HDF5GenotypeUpdateWorker(Process):
                 alt=self.chunk["variants/ALT"][i][altIndex]
                 if alt!="":
                     for info in self.geno_info:
-                        self.info[info.name].append(self.chunk[self.namedict[info.name]][i,self.start_sample:self.end_sample]) 
-                    
+                        if "_geno" in info.name:
+                            self.info[info.name].append(self.chunk[self.namedict[info.name]][i,self.start_sample:self.end_sample]) 
+                        else:
+                            self.info[info.name].append(self.chunk[self.namedict[info.name]][i]) 
+
         self.writeIntoHDF(chr)
 
 
@@ -1838,7 +1849,7 @@ def UpdateGenotypeInParallel(updater,input_filename,sample_ids):
     task=None
     variantIndex = updater.proj.createVariantMap('variant', False)
 
-    fields=['variants/ID','variants/REF','variants/ALT','variants/POS','variants/CHROM']
+    fields=['variants/ID','variants/REF','variants/ALT','variants/POS','variants/CHROM','variants/DP']
     if (len(updater.genotype_info)>0):
         for field in updater.genotype_info:          
             fields.append("calldata/"+field.name.replace("_geno",""))
