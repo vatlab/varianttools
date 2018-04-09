@@ -550,7 +550,7 @@ class Sample:
                             .format(field, fldtype))
                         new_field[field] = False
                         count[1] += 1  # new
-                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[idx], ID])
+                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[idx].item(), ID])
                     count[0] += 1
         # report result
         env.logger.info('{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'.format(
