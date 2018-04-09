@@ -984,11 +984,11 @@ class HDF5Engine_access(Base_Access):
                 data=self.file.get_node("/chr"+str(chr)+"/"+info)[:,colPos]
                 data[data==-1]=0
                 if method=="avg":
-                    num=np.average(data)
+                    num=np.average(data).item()
                 elif method=="min":
-                    num=np.nanmin(data)
+                    num=np.nanmin(data).item()
                 elif method=="max":
-                    num=np.nanmax(data)
+                    num=np.nanmax(data).item()
             except tb.exceptions.NoSuchNodeError:
                 pass
             except Exception as e:
