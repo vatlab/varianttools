@@ -1078,11 +1078,11 @@ class HDF5_Store(Base_Store):
         hdf5files=glob.glob("tmp*h5")
         cur=self.proj.db.cursor()
         allNames=manageHDF5(cur)
-
+        proj.saveProperty('store', proj.store)
+       
         if (os.path.isfile('{}_genotype.DB'.format(self.proj.name)) and os.path.getsize('{}_genotype.DB'.format(self.proj.name))>0) or 'snapshot_genotype.DB' in all_files: 
             # if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
             #     os.remove('{}_genotype.DB'.format(self.proj.name))
-
             if 'snapshot_genotype.DB' in all_files:
                 os.rename(os.path.join(env.cache_dir, 'snapshot_genotype.DB'),
                     '{}_genotype.DB'.format(self.proj.name))
@@ -1116,10 +1116,13 @@ class HDF5_Store(Base_Store):
                 self.proj.build="hg19"
             IDs = self.proj.selectSampleByPhenotype("hdf5 is null")
             IDs=list(IDs)
+
             if len(IDs)==0:
                 os.remove('{}_genotype.DB'.format(self.proj.name))
             elif len(IDs)>0:
                 IDs.sort()
+                if len(IDs)<100:
+                    jobs=1
            
                 reader = MultiVariantReader(self.proj, "variant", "chr,pos,ref", "",['chr', 'pos', 'ref', 'vcf_variant(chr,pos,ref,alt,".")'], validGenotypeFields, False, IDs, 4, True)
                 reader.start()
@@ -1160,19 +1163,18 @@ class HDF5_Store(Base_Store):
                 task=None
                 taskQueue=queue.Queue()
                 workload = [int(float(len(IDs)) / jobs)] * jobs
-              
+                
                 unallocated = max(0, len(IDs) - sum(workload))
                 for i in range(unallocated):
                     workload[i % jobs] += 1
                 numTasks=len(workload)
                 variantIndex = self.proj.createVariantMap('variant', False)
                 # print(variantIndex)
-
                 if IDs[0]==1:
                     start_sample =0
                 else:
                     start_sample=IDs[0]-1
-                
+        
                 for job in range(numTasks):
                     # readQueue[job].put(chunk)
                     if workload[job] == 0:
@@ -1182,10 +1184,9 @@ class HDF5_Store(Base_Store):
                     if end_sample <= start_sample:
                         continue
                     HDFfile_Merge="tmp_"+str(start_sample+1)+"_"+str(end_sample)+"_genotypes.h5"
-                    # print(HDFfile_Merge)
                     names=[key for key in allNames.keys()]
                     updateSample(cur,start_sample,end_sample,IDs,names,allNames,HDFfile_Merge)
-
+                   
                     taskQueue.put(HDF5GenotypeImportWorker(chunk, variantIndex, start_sample, end_sample, 
                         IDs,0, job, validGenotypeFields ,HDFfile_Merge,self.proj.build))
                     start_sample = end_sample 

@@ -995,6 +995,7 @@ class HDF5GenotypeImportWorker(Process):
         Process.__init__(self, name='GenotypeImporter')
         # self.daemon=True
         self.chunk=chunk
+
         self.variantIndex = variantIndex
         self.variant_count = variant_count
         self.proc_index = proc_index
@@ -1023,8 +1024,10 @@ class HDF5GenotypeImportWorker(Process):
         self.geno_info=[]
         if "GT" in geno_info:
             geno_info.remove("GT")
+
         if len(geno_info)>0:
             for info in geno_info:
+
                 #indptr,indices,data,shape,rownames
                 if not isinstance(info,str):
                     self.geno_info.append(info.name)
@@ -1034,6 +1037,7 @@ class HDF5GenotypeImportWorker(Process):
             self.info[info]=[]
             self.namedict[info]="calldata/"+info.replace("_geno","")
 
+
   
         
    
@@ -1041,7 +1045,6 @@ class HDF5GenotypeImportWorker(Process):
     # check io_vcf_read.pyx function vcf_genotype_parse to see the meaning of coding
     def get_geno(self,variant_id,pos,altIndex):
         self.rownames.append(variant_id)
-
         if "calldata/GT" in self.chunk:
             GT_geno=self.chunk["calldata/GT"][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]
             GT_geno=GT_geno.astype(float)
@@ -1107,8 +1110,10 @@ class HDF5GenotypeImportWorker(Process):
 
    
     def run(self):
+        
         prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
         prev_variant_id=-1
+       
         for i in range(len(self.chunk["variants/ID"])):
             infoDict={}
             chr=self.chunk["variants/CHROM"][i].replace("chr","")
@@ -1122,6 +1127,7 @@ class HDF5GenotypeImportWorker(Process):
                 if alt!="":
                     if tuple((chr, ref, alt)) in self.variantIndex:
                         variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
+                        
                         if variant_id!=prev_variant_id:
                             self.get_geno(variant_id,i,altIndex)
                             prev_variant_id=variant_id

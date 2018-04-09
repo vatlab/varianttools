@@ -4122,20 +4122,32 @@ def init(args):
                     ' AND '.join(['({})'.format(x) for x in args.samples]),
                     ' AND '.join(['({})'.format(x) for x in args.genotypes]))
                 copier.copy()
-                if args.store!="sqlite":
-                    store=GenoStore(proj)
+                if args.store=="hdf5":
                     # all_files=[proj.name+".proj",proj.name+"_genotype.DB"]
-                    print(args.parent)
                     src_files = os.listdir(args.parent)
-                    for file_name in src_files:
-                        full_file_name = os.path.join(args.parent, file_name)
-                        if (os.path.isfile(full_file_name)):
-                            shutil.copy(full_file_name, ".")
-
-
-                    # for file in all_files:
-                    #     shutil.copyfile(file,env.cache_dir+"/"+file)
-                    # store.load_Genotype_From_SQLite(all_files,proj)
+                    parent_proj_file=glob.glob(args.parent+"*.proj")
+                    parentdb = DatabaseEngine()
+                    parentdb.connect(parent_proj_file[0])
+                    parent_cur=parentdb.cursor()
+                    result=parent_cur.execute('select value from project where name="store"')
+                    parent_store=result.fetchone()[0]
+                    result=parent_cur.execute("select value from project where name='name'")
+                    parent_name=result.fetchone()[0]
+                    parentdb.close()
+                    
+                    if parent_store=="hdf5":
+                        for file_name in src_files:
+                            full_file_name = os.path.join(args.parent, file_name)
+                            if (os.path.isfile(full_file_name)):
+                                shutil.copy(full_file_name, ".")
+                    elif parent_store=="sqlite":
+                        store=GenoStore(proj)
+                        all_files=[parent_name+".proj",parent_name+"_genotype.DB"]
+                        for file_name in all_files:
+                            full_file_name = os.path.join(args.parent, file_name)
+                            if (os.path.isfile(full_file_name)):
+                                shutil.copy(full_file_name, env.cache_dir)
+                        store.load_Genotype_From_SQLite(all_files,proj)
 
             elif args.children:
                 # A default value 4 is given for args.jobs because more threads usually
