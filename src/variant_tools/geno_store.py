@@ -1447,17 +1447,22 @@ class HDF5_Store(Base_Store):
     def get_Genotype(self,cur,table,proj,sample_ID):
         HDFfileName=self.get_sampleFileName(sample_ID)
         ids=[]
+        chrs=[]
         cur.execute('SELECT variant_id FROM {0}'.format(encodeTableName(table)))
         for id in cur:
             ids.append(id[0])
+        cur.execute('SELECT distinct(chr) from {0}'.format(encodeTableName(table)))
+        for chr in cur:
+            chrs.append(chr[0])
         accessEngine=Engine_Access.choose_access_engine(HDFfileName)
-        return accessEngine.get_geno_by_variant_IDs_sample(ids,sample_ID)
+        return accessEngine.get_geno_by_variant_IDs_sample(ids,sample_ID,chrs)
 
     def validate_sex(self,proj,sample_ID,sex):
         HDFfileName=self.get_sampleFileName(sample_ID)
         accessEngine=Engine_Access.choose_access_engine(HDFfileName)
         if sex==1:
             geno=accessEngine.get_geno_by_sample_ID(sample_ID,"GT_geno",["X"])
+            # updated_rownames,colnames,sub_geno=accessEngine.get_genotype("",[sample_ID],["X"])
             geno=np.array(geno)
             invalidate=geno[geno==2]
         if sex==2:

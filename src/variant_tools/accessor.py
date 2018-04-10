@@ -12,98 +12,6 @@ from multiprocessing import Process,Manager
 import queue
 
 
-# from .importer_vcf_to_hdf5 import _hdf5_setup_datasets,_hdf5_store_chunk,\
-# DEFAULT_ALT_NUMBER,DEFAULT_BUFFER_SIZE,DEFAULT_CHUNK_LENGTH,DEFAULT_CHUNK_WIDTH
-
-class HMatrix:
-    """This class accepts three arrays which represent the matrix (or sparse matrix,check below for example), the shape of the matrix,
-        rownames (variant_ids), colnames (sample names) to create an object to be used as input for storage into HDF5.
-
-            Args:
-            
-               - data (list): the genotype value for row i are stored in data[indptr[i]:indptr[i+1]]
-               - indices (list): the column indices for row i are stored in indices[indptr[i]:indptr[i+1]]
-               - indptr (list): the position for each row in the data and indices array
-               - shape (tuple): the shape of the matrix
-               - rownames (list): variant_id for each variant
-               - colnames (list): sample name for each sample
-
-            An example of indptr,indices and data
-
-            >>> indptr = np.array([0, 2, 3, 6])
-            >>> indices = np.array([0, 2, 2, 0, 1, 2])
-            >>> data = np.array([1, 2, 3, 4, 5, 6])
-            >>> csr_matrix((data, indices, indptr), shape=(3, 3)).toarray()
-            array([[1, 0, 2],
-                   [0, 0, 3],
-                   [4, 5, 6]])
-
-    """
-    def __init__(self,data,indices,indptr,shape,rownames,colnames):
-        self.rownames=rownames
-        self.colnames=colnames
-        self.indptr=indptr
-        self.indices=indices
-        self.data=data
-        self.shape=shape
-
-    @property
-    def rownames(self):
-        return self.__rownames
-
-    @property
-    def colnames(self):
-        return self.__colnames
-
-    @property
-    def indptr(self):
-        return self.__indptr
-
-    @property
-    def indices(self):
-        return self.__indices
-
-    @property
-    def data(self):
-        return self.__data
-
-    @property
-    def shape(self):
-        return self.__shape
-
-    # @property
-    # def rowMask(self):
-    #     return self.__rowMask
-
-    @rownames.setter
-    def rownames(self,rownames):
-        self.__rownames=rownames
-
-    @colnames.setter
-    def colnames(self,colnames):
-        self.__colnames=colnames
-
-    @indptr.setter
-    def indptr(self,indptr):
-        self.__indptr=indptr
-
-    @indices.setter
-    def indices(self,indices):
-        self.__indices=indices
-
-    @data.setter
-    def data(self,data):
-        self.__data=data
-
-    @shape.setter
-    def shape(self,shape):
-        self.__shape=shape
-
-    # @rowMask.setter
-    # def rowMask(self,rowMask):
-    #     self.__rowMask=rowMask
-
-
 
 
 class Engine_Storage(object):
@@ -150,19 +58,6 @@ class Base_Storage(object):
 
         raise NotImplementedError()
 
-class GenoCallData(tb.IsDescription):
-    entryMask=tb.BoolCol(pos=1)
-    variant_id=tb.Int32Col(dflt=1,pos=2)
-    sample_id=tb.Int16Col(dflt=1,pos=3)
-    DP=tb.Int8Col(dflt=1,pos=4)
-    GQ=tb.Float16Col(dflt=1,pos=5)
-    # AD1=tb.Int8Col(dflt=1,pos=6)
-    # AD2=tb.Int8Col(dflt=1,pos=7)
-    # PL1=tb.Int8Col(dflt=1,pos=8)
-    # PL2=tb.Int8Col(dflt=1,pos=9)
-    # PL3=tb.Int8Col(dflt=1,pos=10)
-
-
 
 
 
@@ -183,30 +78,7 @@ class HDF5Engine_storage(Base_Storage):
 
         self.store_genoInfo(data,chr,groupName)
         
-        # if not self.checkGroup(chr,groupName):
-        #     self.store_HDF5(data,chr,groupName) 
-        # else:
-        #     self.append_HDF5(data,chr,groupName)
-          
-
-    # def store_table(self,data,tableName,chr="",groupName=""):
-    #     filters = tb.Filters(complevel=9, complib='blosc')
-    #     if not self.checkGroup(chr,tableName):
-    #         group=self.getGroup(chr,tableName)
-    #         table=self.file.create_table(group,tableName,GenoCallData,filters=filters)
-
-    #     group=self.getGroup(chr,tableName)
-    #     table=group.genoInfo
-    #     row=table.row
-    #     row["entryMask"]=False
-    #     for dataRow in data:
-    #         if (len(dataRow)==4):
-    #             # for idx,var in enumerate(["variant_id","sample_id","DP","GQ","AD1","AD2","PL1","PL2","PL3"]):
-    #             for idx,var in enumerate(["variant_id","sample_id","DP","GQ"]):
-    #                 row[var]=dataRow[idx]
-    #             row.append()
-
-    #     table.flush()
+       
 
 
     def store_genoInfo(self,data,chr="",groupName=""):
@@ -266,32 +138,6 @@ class HDF5Engine_storage(Base_Storage):
     def to_csr_matrix(self,group):
         return csr_matrix((group.data[:],group.indices[:],group.indptr[:]),shape=group.shape[:])
 
-    # def get_sparse_noWT_variants(self,sampleID):
-    #     noWT=None
-    #     for chr in range(1,23):
-    #         try:
-    #             #haven't dealt with data==-1
-    #             group=self.file.get_node("/chr"+str(chr)+"/GT/")
-    #             matrix=self.to_csr_matrix(group)
-    #             colnames=group.colnames[:]
-    #             rownames=group.rownames[:]
-    #             samplePos=np.where(colnames==sampleID)
-    #             nonZero=matrix.nonzero()
-    #             sampleLoc=np.where(nonZero[1]==samplePos)
-    #             rowLoc=nonZero[0][sampleLoc[1]]
-    #             noWT=rownames[rowLoc]
-    #             # colPos=np.where(indices==samplePos[0][0])
-    #             # data=group.data[colPos]
-    #             # print(data)
-    #             # noNan=rownames[np.where(~np.isnan(data))]
-    #             # noNone=rownames[np.where(data!=-1)]
-    #             # noWT=np.intersect1d(noNan,noNone)
-    #         except Exception as e:
-    #             pass
-    #     return noWT
-
-   
-
 
 
     def geno_fields(self,sampleID):
@@ -350,19 +196,6 @@ class HDF5Engine_storage(Base_Storage):
                 pass
         
 
-    # def remove_genotype(self,cond):
-    #     for chr in range(1,23):
-    #         genoNode="/chr"+str(chr)+"/genoInfo"
-    #         try:
-    #             group=self.file.get_node(genoNode)
-    #             table=group.genoInfo
-    #             for x in table.where(cond):
-    #                 x["entryMask"]=True
-    #                 x.update()
-    #         except:
-    #             env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
-
-
     def remove_genotype(self,cond):
         chrs=["X","Y"]
         chrs.extend(range(1,23))
@@ -399,32 +232,7 @@ class HDF5Engine_storage(Base_Storage):
                 # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
                 print(e)
                 pass        
-        # group=self.file.get_node("/chr"+chr+"/GT")
-        # indptr=group.indptr
-        # indices=group.indices
-        # rownames=group.rownames[:]
-        # data=group.data
-        # pre_id=0
-        # pos=None
-        # sampleList=None
-        # for var_id,sample_id in result:
-        #     if var_id!=pre_id:
-        #         pre_id=var_id
-        #         pos=np.where(rownames==var_id)[0][0]
-        #         sampleList=indices[indptr[pos]:indptr[pos+1]]
-        #         # dataList=data[indptr[pos]:indptr[pos+1]]
-        #         # # if len(sampleList)>0:
-        #         # #     notNone=np.where(~np.isnan(dataList))[0]
-        #         # #     sampleList=notNone
-        #         # #     print(var_id,dataList,notNone)
-        #     try:
-        #         if len(sampleList)>0:
-        #             samplePos=np.where(sampleList==sample_id)[0][0]
-        #             res=[(x['DP'],x['GQ']) for x in table.where('(variant_id=='+str(var_id)+')&(sample_id=='+str(sample_id)+')')]
-        #             print("here",var_id,sample_id,data[indptr[pos]+samplePos],res)
-        #         # data[indptr[pos]+samplePos]=np.nan
-        #     except Exception as e:
-        #             pass
+  
 
     def removeNode(self,chr,info=""):
         # for chr in range(1,23):
@@ -457,250 +265,6 @@ class HDF5Engine_storage(Base_Storage):
                     print(e)
                     pass        
 
-
-        
-
-    def store_HDF5(self,hmatrix,chr,groupName=""):
-        """The implementation of store API
-
-            Args:
-
-               - hmatrix (HMatrix): An object contains matrix, rownames,colnames
-               - chr (string): the chromosome 
-               - groupName (string): the group name, for example gene name
-        """
-        
-        filters = tb.Filters(complevel=9, complib='blosc')       
-        group=self.getGroup(chr,groupName)
-        #check to see if 0 has been added to the start of indptr
-        if len(hmatrix.indptr)==len(hmatrix.rownames):
-            hmatrix.indptr=[0]+hmatrix.indptr
-        
-        for par in ('data', 'indices', 'indptr', 'shape',"rownames","colnames","rowMask","sampleMask"):
-            arr = None
-            atom=tb.Atom.from_dtype(np.dtype(np.int32))
-            if (par=='data'):
-                arr=np.array(hmatrix.data)
-                if groupName=="AD_geno" or groupName=="PL_geno":
-                    atom=tb.Atom.from_dtype(np.dtype('S20'))
-                else:
-                    atom=tb.Atom.from_dtype(np.dtype(np.float64))
-            elif (par=='indices'):
-                arr=np.array(hmatrix.indices)                
-            elif (par=='indptr'):
-                arr=np.array(hmatrix.indptr)
-            elif (par=='shape'):
-                arr=np.array(hmatrix.shape)
-            elif(par=="rownames"):
-                arr=np.array(hmatrix.rownames)
-            elif(par=="colnames"):
-                arr=np.array(hmatrix.colnames)
-            elif(par=="rowMask"):
-                arr=np.zeros(len(hmatrix.rownames),dtype=np.bool)
-                atom=tb.Atom.from_dtype(np.dtype(np.bool))
-            elif(par=="sampleMask"):
-                arr=np.zeros(len(hmatrix.colnames),dtype=np.bool)
-                atom=tb.Atom.from_dtype(np.dtype(np.bool))
-
-            ds = self.file.create_earray(group, par, atom, (0,),filters=filters)
-            ds.append(arr)
-
-
-    def append_HDF5(self,hmatrix,chr,groupName=""):
-        """This function accepts a HMatrix object and appends it to HDF5 file.
-            **The columns of appending matrix should have the exact same samples as exisiting matrix and in the same order.**  
-
-            Args:
-
-               - hmatrix (HMatrix): An object contains matrix, rownames,colnames
-               - chr (string): the chromosome 
-               - groupName (string): the group name, for example gene name
-
-        """
-    
-        group=self.getGroup(chr,groupName)
-        arr = None
-        currentStart=group.indptr[-1]
-
-        if hmatrix.indptr is not None:
-            hmatrix.indptr=[x+currentStart for x in hmatrix.indptr]
-        else:
-            hmatrix.indptr=[currentStart]
-
-        if hmatrix.data is not None:
-            if groupName=="AD_geno" or groupName=="PL_geno":
-                arr=np.array(hmatrix.data,dtype=np.dtype("S20"))
-            else:
-                arr=np.array(hmatrix.data,dtype=np.dtype(np.float64))
-            group.data.append(arr)
-        if hmatrix.indices is not None:
-            arr=np.array(hmatrix.indices,dtype=np.dtype(np.int32))
-            group.indices.append(arr)
-        if  hmatrix.indptr is not None:
-            arr=np.array(hmatrix.indptr,dtype=np.dtype(np.int32))
-            group.indptr.append(arr)
-        if  hmatrix.rownames is not None:
-            arr=np.array(hmatrix.rownames,dtype=np.dtype(np.int32))
-            group.rownames.append(arr)
-            arr=np.zeros(len(hmatrix.rownames),dtype=np.dtype(np.bool))
-            group.rowMask.append(arr)
-        group.shape[1]=hmatrix.shape[1]
-        group.shape[0]=len(group.rownames[:])
- 
-
-
-
-    def __store_arrays_into_HDF5(self,data,indices,indptr,shape,rownames,colnames,chr,groupName=""):
-        """This function accepts three arrays which represent the matrix (or sparse matrix,check below for example), the shape of the matrix,
-        rownames (variant_ids), colnames (sample names), chromosome and groupName (HDF5 group name)
-
-            Args:
-            
-               - data (list): the genotype value for row i are stored in data[indptr[i]:indptr[i+1]]
-               - indices (list): the column indices for row i are stored in indices[indptr[i]:indptr[i+1]]
-               - indptr (list): the position for each row in the data and indices array
-               - shape (tuple): the shape of the matrix
-               - rownames (list): variant_id for each variant
-               - colnames (list): sample name for each sample
-               - chr (string): the chromosome 
-               - groupName (string): the group name, for example gene name
-        """
-        filters = tb.Filters(complevel=9, complib='blosc')       
-        group=self.getGroup(chr,groupName)
-        #check to see if 0 has been added to the start of indptr
-        if len(indptr)==len(rownames):
-            indptr=[0]+indptr
-        
-        for par in ('data', 'indices', 'indptr', 'shape',"rownames","colnames"):
-            arr = None
-            atom=tb.Atom.from_dtype(np.dtype(np.int32))
-            if (par=='data'):
-                arr=np.array(data)
-                if groupName=="AD_geno" or groupName=="PL_geno":
-                    atom=tb.Atom.from_dtype(np.dtype('S20'))
-                else:
-                    atom=tb.Atom.from_dtype(np.dtype(np.float64))
-            elif (par=='indices'):
-                arr=np.array(indices)                
-            elif (par=='indptr'):
-                arr=np.array(indptr)
-            elif (par=='shape'):
-                arr=np.array(shape)
-            elif(par=="rownames"):
-                arr=np.array(rownames)
-            elif(par=="colnames"):
-                arr=np.array(colnames)
-
-            ds = self.file.create_earray(group, par, atom, (0,),filters=filters)
-            ds.append(arr)
-           
-            # ds = f.create_earray(group, "rownames",  tb.StringAtom(itemsize=200), (0,),filters=filters)
-            # ds.append(rownames)
- 
-
-
-
-    def __append_arrays_into_HDF5(self,data,indices,indptr,shape,rownames,chr,groupName=""):
-        """This function appends a new matrix to exisiting matrix stored in HDF5, accepts three arrays as described above,
-            shape of matrix, rownames,chromosome and groupName. **The columns of appending matrix should have the exact same samples as 
-            exisiting matrix and in the same order.**  
-
-            Args:
-
-               - data (list): the genotype value for row i are stored in data[indptr[i]:indptr[i+1]]
-               - indices (list): the column indices for row i are stored in indices[indptr[i]:indptr[i+1]]
-               - indptr (list): the position for each row in the data and indices array
-               - shape (tuple): the shape of the matrix
-               - rownames (list): variant_id for each variant
-               - chr (string): the chromosome
-               - groupName (string): the group name, for example gene name
-
-        """
-    
-        group=self.getGroup(chr,groupName)
-        arr = None
-        currentStart=group.indptr[-1]
-
-        if indptr is not None:
-            indptr=[x+currentStart for x in indptr]
-        else:
-            indptr=[currentStart]
-
-        if data is not None:
-            if groupName=="AD_geno" or groupName=="PL_geno":
-                arr=np.array(data,dtype=np.dtype("S20"))
-            else:
-                arr=np.array(data,dtype=np.dtype(np.float64))
-            group.data.append(arr)
-        if indices is not None:
-            arr=np.array(indices,dtype=np.dtype(np.int32))
-            group.indices.append(arr)
-        if  indptr is not None:
-            arr=np.array(indptr,dtype=np.dtype(np.int32))
-            group.indptr.append(arr)
-        if  rownames is not None:
-            arr=np.array(rownames,dtype=np.dtype(np.int32))
-            group.rownames.append(arr)
-        group.shape[1]=shape[1]
-        group.shape[0]=len(group.rownames[:])
-
-
-    def store_matrix_into_HDF5(self,data,rownames,colnames,chr,groupName=""):
-        """This function accepts a matrix and stores the matrix into HDF5 file. 
-
-            Args:
-
-               - data (matrix): a matrix with rows as variants and cols as samples, each cell records the geno info
-               - rownames (list): variant_id for each variant
-               - colnames (list): sample name for each sample
-               - chr (string): the chromosome 
-               - groupName (string): the group name, for example gene name
-
-        """
-
-        if (data.__class__ != csr_matrix):
-            m=csr_matrix(data.as_matrix())
-            rownames=data.index.values
-            colnames=data.columns.values
-        else:
-            m=data            
-            if rownames is None:
-                raise ValueError("The rownames of sparse matrix can't be None.")
-            elif colnames is None:
-                raise ValueError("The colnames of sparse matrix can't be None.")
-            rownames=np.array(rownames)
-            colnames=np.array(colnames)
-
-        msg = "This code only works for csr matrices"
-        assert(m.__class__ == csr_matrix), msg
-        h5matrix=HMatrix(m.data,m.indices,m.indptr,m.shape,rownames,colnames)
-        self.store_HDF5(h5matrix,chr,groupName)
-
-
-    def append_matrix_into_HDF5(self,data,rownames,chr,groupName=""):
-        """This function appends a new matrix to exisiting matrix stored in HDF5, accepts a matrix, rownames,chromosome and groupName. 
-            **The columns of appending matrix should have the exact same samples as exisiting matrix and in the same order.**  
-
-            Args:
-
-               - data (list): the genotype value for row i are stored in data[indptr[i]:indptr[i+1]]
-               - rownames (list): variant_id for each variant
-               - chr (string): the chromosome
-               - groupName (string): the group name, for example gene name
-
-        """
-        if (data.__class__ != csr_matrix):
-            m=csr_matrix(data.as_matrix())
-            rownames=data.index.values
-        else:
-            m=data            
-            if rownames is None:
-                raise ValueError("The rownames of sparse matrix can't be None.")
-            rownames=np.array(rownames)
-        h5matrix=HMatrix(m.data,m.indices,m.indptr[1:],m.shape,rownames,[])
-        self.append_HDF5(h5matrix,chr,groupName)
- 
-              
 
 
     def checkGroup(self,chr,groupName=""):
@@ -1099,6 +663,66 @@ class HDF5Engine_access(Base_Access):
 
 
 
+    def get_genotype(self,variantIDs,sampleName,chrs=""):
+        updated_rownames=[]
+        updated_geno=[]
+        updated_colnames=[]
+        if chrs=="":
+            chrs=["X","Y"]
+            chrs.extend(range(1,23))
+        for chr in chrs:
+            try:
+                node=self.file.get_node("/chr"+str(chr))
+                rownames=node.rownames[:].tolist()
+                colnames=node.colnames[:].tolist()
+                colpos=[]
+                if (len(sampleName)>0):
+                    colpos=colnames.index(sampleName)
+                else:
+                    colpos=list(map(lambda x:colnames.index(x),colnames))
+
+                if len(variantIDs)>0:
+                    for id in variantIDs:
+                        try:
+                            minPos=rownames.index(id)
+                            break
+                        except ValueError:
+                            continue
+                    for id in reversed(variantIDs):
+                        try:
+                            maxPos=rownames.index(id)
+                            maxPos=maxPos+1
+                            break
+                        except ValueError:
+                            continue
+                    try:
+                        minPos
+                        maxPos
+                        genoinfo=node.GT_geno[minPos:maxPos,colpos]           
+                        updated_rownames,updated_colnames,updated_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[])
+                        
+                    except NameError:
+                        env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
+                else:
+                    shape=node.shape[:].tolist()
+                    chunkPos=chunks_start_stop(shape[0])
+                    for minPos,maxPos in chunkPos:
+                        if "/chr"+str(chr)+"/"+type in self.file:
+                            genoinfo=node.GT_geno[minPos:maxPos,colpos]           
+                            sub_rownames,updated_colnames,sub_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[])
+                            updated_rownames.append(sub_rownames)
+                            updated_geno.append(sub_geno)
+     
+            except tb.exceptions.NoSuchNodeError:
+                pass                              
+            except Exception as e:
+                print(e)
+                pass
+        return np.array(updated_rownames),np.array(updated_colnames),np.array(updated_geno)
+
+
+
+
     def get_geno_by_variant_IDs(self,rowIDs,chr,groupName=""):
 
         #assume rowIDs are sorted by genome position
@@ -1147,7 +771,7 @@ class HDF5Engine_access(Base_Access):
             env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
 
     
-    def get_geno_by_variant_IDs_sample(self,rowIDs,sampleName,chr=""):
+    def get_geno_by_variant_IDs_sample(self,rowIDs,sampleName,chrs):
         NULL_to_0 = env.treat_missing_as_wildtype
         g=set()
         chrs=range(1,23)
@@ -1175,6 +799,65 @@ class HDF5Engine_access(Base_Access):
                 print(e)
                 pass
         return g
+
+
+
+    def get_geno_by_sample_ID(self,sampleID,type,chrs=range(1,23),groupName=""):
+        geno=[]
+        for chr in chrs:
+            try:
+                node=self.file.get_node("/chr"+str(chr))
+                colnames=node.colnames[:].tolist()
+                colpos=list(map(lambda x:colnames.index(x),colnames))
+                shape=node.shape[:].tolist()
+                chunkPos=chunks_start_stop(shape[0])
+                for startPos,endPos in chunkPos:
+                    if "/chr"+str(chr)+"/"+type in self.file:
+                        genoinfo=node.GT_geno[startPos:endPos,colpos]           
+                        rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
+                        samplePos=colnames.tolist().index(sampleID)
+                        sampleGeno=genoinfo[:,samplePos]
+                        for idx,rowname in enumerate(rownames):
+                            genotype=sampleGeno[idx]
+                            if np.isnan(genotype):
+                                genotype=-1
+                            geno.append([rowname,genotype])
+            except tb.exceptions.NoSuchNodeError:
+                pass
+        return geno
+
+
+
+
+    def get_noWT_variants(self,samples):
+        noWT=[]
+        chrs=["X","Y"]
+        chrs.extend(range(1,23))
+        if len(samples)!=0:
+            for chr in chrs:
+                try:
+                    #haven't dealt with data==-1
+                    node=self.file.get_node("/chr"+str(chr))
+                    shape=node.shape[:].tolist()
+                    samples.sort()
+                    colnames=node.colnames[:].tolist()
+                    colpos=list(map(lambda x:colnames.index(x),samples))
+                    chunkPos=chunks_start_stop(shape[0])
+                    for startPos,endPos in chunkPos:
+                        if "/chr"+str(chr)+"/GT_geno" in self.file:
+                            genoinfo=node.GT_geno[startPos:endPos]       
+                            rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
+                            genoinfo[genoinfo==-1]=0
+                            rowsum=np.nansum(genoinfo,axis=1)
+                            noWTvariants=rownames[np.where(rowsum>0)].tolist()
+                            noWT.extend(noWTvariants)
+                        startPos=endPos
+                except tb.exceptions.NoSuchNodeError:
+                    pass  
+                except Exception as e:
+                    print(e)
+        self.close()
+        return noWT
 
 
 
@@ -1354,61 +1037,9 @@ class HDF5Engine_access(Base_Access):
 
 
 
-    def get_noWT_variants(self,samples):
-        noWT=[]
-        chrs=["X","Y"]
-        chrs.extend(range(1,23))
-        if len(samples)!=0:
-            for chr in chrs:
-                try:
-                    #haven't dealt with data==-1
-                    node=self.file.get_node("/chr"+str(chr))
-                    shape=node.shape[:].tolist()
-                    samples.sort()
-                    colnames=node.colnames[:].tolist()
-                    colpos=list(map(lambda x:colnames.index(x),samples))
-                    chunkPos=chunks_start_stop(shape[0])
-                    for startPos,endPos in chunkPos:
-                        if "/chr"+str(chr)+"/GT_geno" in self.file:
-                            genoinfo=node.GT_geno[startPos:endPos]       
-                            rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
-                            genoinfo[genoinfo==-1]=0
-                            rowsum=np.nansum(genoinfo,axis=1)
-                            noWTvariants=rownames[np.where(rowsum>0)].tolist()
-                            noWT.extend(noWTvariants)
-                        startPos=endPos
-                except tb.exceptions.NoSuchNodeError:
-                    pass  
-                except Exception as e:
-                    print(e)
-        self.close()
-        return noWT
 
 
-
-    def get_geno_by_sample_ID(self,sampleID,type,chrs=range(1,23),groupName=""):
-        geno=[]
-        for chr in chrs:
-            try:
-                node=self.file.get_node("/chr"+str(chr))
-                colnames=node.colnames[:].tolist()
-                colpos=list(map(lambda x:colnames.index(x),colnames))
-                shape=node.shape[:].tolist()
-                chunkPos=chunks_start_stop(shape[0])
-                for startPos,endPos in chunkPos:
-                    if "/chr"+str(chr)+"/"+type in self.file:
-                        genoinfo=node.GT_geno[startPos:endPos,colpos]           
-                        rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
-                        samplePos=colnames.tolist().index(sampleID)
-                        sampleGeno=genoinfo[:,samplePos]
-                        for idx,rowname in enumerate(rownames):
-                            genotype=sampleGeno[idx]
-                            if np.isnan(genotype):
-                                genotype=-1
-                            geno.append([rowname,genotype])
-            except tb.exceptions.NoSuchNodeError:
-                pass
-        return geno
+    
 
 
     def get_geno_by_row_pos(self,rowpos,chr,groupName=""):
@@ -1420,256 +1051,6 @@ class HDF5Engine_access(Base_Access):
 
 
         
-        
-
-
-
-    ##used for access sparse GT matrix
-
-    # def __load_HDF5_by_group(self,chr,groupName=""):
-    #     """This function loads matrix, rownames and colnames of specified group into memory
-
-    #         Args:
-
-    #            chr (string): the chromosome 
-    #            groupName (string): the group name, for example gene name
-
-
-    #     """
-    #     self.chr=chr
-    #     group=self.getGroup(chr,groupName)
-    #     pars = []
-    #     for par in ('data', 'indices', 'indptr', 'shape','rownames',"colnames"):
-    #         if hasattr(group, par):
-    #             pars.append(getattr(group, par).read())
-    #         else:
-    #             pars.append([])
-    #     # f.close()
-    #     self.data=pars[0]
-    #     self.indices=pars[1]
-    #     self.indptr=pars[2]
-    #     self.shape=pars[3]
-    #     self.rownames=pars[4]
-    #     self.colnames=pars[5]
-
-
-
-
-    # def get_geno_info_by_group(self,groupName,chr=None):
-       
-    #     if chr is None:
-    #         #raise error
-    #         pass
-    #     if self.chr is None:
-    #         self.chr=chr
-    #     self.__load_HDF5_by_group(chr,groupName)
-
-    #     snpdict=dict.fromkeys(self.colnames,{})
-    #     for key,value in snpdict.items():
-    #         snpdict[key]=dict.fromkeys(self.rownames.tolist(),(0,))
-      
-    #     for idx,id in enumerate(self.rownames):
-    #         variant_ID,indices,data=self.get_geno_info_by_row_pos(idx,chr,groupName)
-    #         if len(indices)>0:
-    #             for colidx,samplePos in enumerate(indices):
-    #                 snpdict[self.colnames[samplePos]][id]=(data[colidx],)
-    
-    #     return snpdict
-
-    
-    # def get_geno_info_by_row_pos(self,rowpos,chr,groupName=""):
-
-
-    #     group=self.getGroup(chr,groupName)
-      
-    #     start=group.indptr[rowpos]
-    #     end=group.indptr[rowpos+1]
-    #     variant_ID=group.rownames[rowpos]
-    #     indices=None
-    #     data=None
- 
-    #     if end==start:
-    #         indices=[]
-    #         data=[]
-    #     else:
-    #         indices=group.indices[start:end]
-    #         data=group.data[start:end]
-    #     return variant_ID,indices,data
-
-    # def maskRemovedVariants(self,masked,data,indices,indptr,shape,rownames):
-    #     for i in masked:   
-    #         n = indptr[i+1] - indptr[i]
-    #         # print(n)
-    #         if n > 0:
-    #             data[indptr[i]:-n] = data[indptr[i+1]:]
-    #             data = data[:-n]
-    #             indices[indptr[i]:-n] = indices[indptr[i+1]:]
-    #             indices = indices[:-n]
-    #         indptr[i:-1] = indptr[i+1:]
-    #         indptr[i:] -= n
-    #         indptr =indptr[:-1]
-    #         shape = (shape[0]-1, shape[1])
-    #         rownames[i:-1] = rownames[i+1:]
-    #         rownames =rownames[:-1]
-    #     return data,indices,indptr,shape,rownames
-
-    # def maskRemovedSamples(self,masked,data,indices,indptr,shape,rownames,colnames):
-    #     # print(len(data),data)
-    #     # print(len(indices),indices)
-    #     # print(len(indptr),indptr)
-    #     # print(shape)
-    #     M=csr_matrix((data,indices,indptr),shape=shape)
-    #     C=M.tocoo()
-    #     keep = ~np.in1d(C.col, masked)
-    #     C.data, C.row, C.col = C.data[keep], C.row[keep], C.col[keep]
-    #     C.col -= masked.searchsorted(C.col) 
-    #     C._shape = (C.shape[0], C.shape[1] - len(masked))
-    #     M=C.tocsr()
-    #     for i in masked:
-    #         colnames[i:-1] = colnames[i+1:]
-    #         colnames =colnames[:-1]
-    #     return M.data,M.indices,M.indptr,M.shape,rownames,colnames
-
-    # def maskRemovedGenotypes(self,masked,data,indices,indptr,shape,rownames,colnames):
-    #     M=csr_matrix((data,indices,indptr),shape=shape)
-    #     C=M.tolil()
-    #     rownames=np.array(rownames)
-    #     for entry in masked:
-    #         rowPos=np.where(rownames==entry[0])
-    #         colPos=np.where(colnames==entry[1])
-    #         # print(entry,rowPos[0],colPos[0])
-    #         if len(rowPos[0]>0) and len(colPos[0])>0:
-    #             # print(rowPos[0][0],colPos[0][0])
-    #             C[rowPos[0][0],colPos[0][0]]=np.nan
-    #     # print(len(masked),count)
-    #     M=C.tocsr()
-    #     return M.data,M.indices,M.indptr,M.shape
-
-
-    # def get_geno_info_by_variant_IDs(self,rowIDs,chr,groupName=""):
-
-    #     #assume rowIDs are sorted by genome position
-    #     group=self.getGroup(chr,groupName)
-    #     rownames=group.rownames[:].tolist()
-    #     colnames=group.colnames[:]
-    #     rowMask=group.rowMask[:]
-    #     sampleMask=group.sampleMask[:]
-
-    #     for id in rowIDs:
-    #         try:
-    #             minPos=rownames.index(id)
-    #             break
-    #         except ValueError:
-    #             continue
-    #     for id in reversed(rowIDs):
-    #         try:
-    #             maxPos=rownames.index(id)
-    #             break
-    #         except ValueError:
-    #             continue
-    #     try:
-    #         minPos
-    #         maxPos
-    #         update_rownames=rownames[minPos:maxPos+1]
-    #         sub_indptr=group.indptr[minPos:maxPos+2]
-
-    #         # print(idPos[0],idPos[-1],len(sub_indptr))
-    #         sub_indices=sub_data=sub_shape=None
-    #         if len(sub_indptr)>0:
-    #             sub_indices=group.indices[sub_indptr[0]:sub_indptr[-1]]
-    #             sub_data=group.data[sub_indptr[0]:sub_indptr[-1]]
-    #             sub_indptr=[sub_indptr[i]-sub_indptr[0] for i in range(0,len(sub_indptr))]
-    #             sub_shape=(len(sub_indptr)-1,group.shape[1])
-
-    #         update_rowMask=rowMask[minPos:maxPos+1]
-    #         rowMasked=np.where(update_rowMask==True)[0]
-    #         sampleMasked=np.where(sampleMask==True)[0]+1
-    #         # check removed variants
-    #         if len(rowMasked)>0:
-    #             sub_data,sub_indices,sub_indptr,sub_shape,update_rownames=self.maskRemovedVariants(rowMasked,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames)
-    #             # print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames))
-    #         #check removed samples
-    #         if len(sampleMasked)>0:
-    #             # print("before",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
-    #             sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames=self.maskRemovedSamples(sampleMasked,sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
-    #             # print("after",len(sub_data),len(sub_indices),len(sub_indptr),sub_shape,len(update_rownames),len(colnames))
-            
-            
-
-    #         return HMatrix(sub_data,sub_indices,sub_indptr,sub_shape,update_rownames,colnames)
-    #     except NameError:
-    #         env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
-
-
-
-
-
-    # def get_geno_info_by_variant_ID(self,variantID,chr,groupName=""):
-
-    #     group=self.getGroup(chr)
-    #     rownames=group.rownames[:].tolist()
-    #     try:
-    #         pos=rownames.index(variantID)
-    #         return self.get_geno_info_by_row_pos(pos,chr,groupName)
-    #     except ValueError as e:
-    #         env.logger.error("Variant with ID {} not in the specified group.".format(variantID))
-
-
-    # def get_geno_info_by_sample_ID(self,sampleID,chr,groupName=""):
-        
-    #     self.__load_HDF5_by_group(chr,groupName)
-    #     colnames=self.colnames[:].tolist()
-    #     try:
-    #         colPos=colnames.index(sampleID)
-    #     except ValueError:
-    #         env.logger.error("Given sampleID is not in this HDF5 file.")
-    #     matrix=csr_matrix((self.data,self.indices,self.indptr),shape=self.shape)
-    #     col=matrix.getcol(colPos)
-    #     snpdict={}
-    #     for idx,value in enumerate(col.toarray()):
-    #         genotype=value[0]
-    #         if not math.isnan(genotype):
-    #             genotype=int(value[0])
-    #         snpdict[self.rownames[idx]]=genotype
-    #     return snpdict
-
-
-
-    # def get_geno_field_from_table(self,sampleID,cond,fields):
-    #     for chr in range(1,23):
-    #         try:
-    #             node=self.file.get_node("/chr"+str(chr))
-    #             colnames=node.colnames[:].tolist()
-    #             colPos=colnames.index(sampleID)
-    #             rownames=node.rownames[:].tolist()
-    #             infos=[]
-
-    #             for field in fields:
-    #                 if field=="GT":
-    #                     field="GT_geno"
-    #                 if "/chr"+str(chr)+"/"+field in self.file:
-                        
-    #                     if field=="GT_geno":
-    #                         genoinfo=node.GT_geno
-    #                         infos.append(genoinfo)
-    #                     elif field=="DP_geno":
-    #                         genoinfo=node.DP_geno
-    #                         infos.append(genoinfo)
-    #                     elif field=="GQ_geno":
-    #                         genoinfo=node.GQ_geno
-    #                         infos.append(genoinfo)
-    #             for rowPos,rowName in enumerate(rownames):
-    #                 line=[rowName]
-    #                 for info in infos:
-    #                     line.append(info[int(rowPos),int(colPos)])
-    #                 yield(tuple(line))
-        
-    #         except Exception as e:
-    #             # print(e)
-    #             pass
-
-    
-
     def compare_HDF5(self,hdf5,chr,groupName=""):
         """This function checks the similarity of two HDF5 files.
 
@@ -1740,53 +1121,7 @@ class HDF5Engine_access(Base_Access):
         group=self.getGroup(chr,groupName)
         return group.shape[:]
 
-    # def get_indptr(self,chr,groupName=""):
-    #     """This function gets indptr array of specified group.
-            
-    #         Args:
-
-    #             - chr (string): the chromosome 
-    #             - groupName (string): the group name, for example gene name
-
-    #         Return:
-    #             - indptr ndarray
-
-    #     """
-    #     group=self.getGroup(chr,groupName)
-    #     return group.indptr[:]
-
-    # def get_indices(self,chr,groupName=""):
-    #     """This function gets indptr array of specified group.
-            
-    #         Args:
-
-    #             - chr (string): the chromosome 
-    #             - groupName (string): the group name, for example gene name
-
-    #         Return:
-    #             - indptr ndarray
-
-    #     """
-    #     group=self.getGroup(chr,groupName)
-    #     return group.indices[:]
-
-
-
-    # def get_data(self,chr,groupName=""):
-    #     """This function gets data array of specified group.
-            
-    #         Args:
-
-    #             - chr (string): the chromosome 
-    #             - groupName (string): the group name, for example gene name
-
-    #         Return:
-    #             - data ndarray
-
-    #     """
-    #     group=self.getGroup(chr,groupName)
-    #     return group.data[:]
-
+   
 
     def close(self):
         """This function closes db file

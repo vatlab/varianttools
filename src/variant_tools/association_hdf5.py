@@ -31,7 +31,7 @@ import queue
 import time
 from .utils import DatabaseEngine
 
-from .accessor import Engine_Access, Engine_Storage, HMatrix
+from .accessor import Engine_Access, Engine_Storage
 
 import glob
 
@@ -88,7 +88,9 @@ class GroupHDFGenerator(Process):
                     # if subMatrix is not None and subMatrix.indices is not None:
                     #     storageEngine.store(subMatrix,chr,geneSymbol
                     if chr==chrEnd:
-                        updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
+                        # updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
+                        updated_rownames,colnames,subMatrix=accessEngine.get_genotype(ids,"",[chr])
+                        
                         if subMatrix is not None:
                             storageEngine.store(subMatrix,chr,geneSymbol+"/GT_geno")
                             storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
