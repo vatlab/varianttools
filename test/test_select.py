@@ -88,20 +88,20 @@ class TestSelect(ProcessTestCase):
         self.assertSucc('vtools show table "ns@sub"')
         
     def testSelectSample(self):
-        # self.assertOutput("vtools select variant --samples 'filename like \"%input.vcf\"' -c", '1446')
-        # self.assertOutput("vtools select variant --samples 'filename like \"%CEU.vcf.gz\" ' -c", '288\n')
-        self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "filename like \'%input.vcf\'" -t ns_input')
-        #nsfp = output2list('vtools execute "select chr, hg18pos, ref, alt from testNSFP"')
-        #variantid = [output2list('vtools execute "select variant_id from variant where chr={0} and pos={1} and ref={2} and alt={3}"'.format(x.split()[0], x.split()[1], repr(x.split()[2]), repr(x.split()[3]))) for x in nsfp]
+        self.assertOutput("vtools select variant --samples 'filename like \"%input_nogeno.vcf\"' -c", '1446')
+        self.assertOutput("vtools select variant --samples 'filename like \"%CEU.vcf.gz\" ' -c", '288\n')
+        self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "filename like \'%input_nogeno.vcf\'" -t ns_input')
+        # nsfp = output2list('vtools execute "select chr, hg18pos, ref, alt from testNSFP"')
+        # variantid = [output2list('vtools execute "select variant_id from variant where chr={0} and pos={1} and ref={2} and alt={3}"'.format(x.split()[0], x.split()[1], repr(x.split()[2]), repr(x.split()[3]))) for x in nsfp]
         #print variantid
         # self.assertOutput("vtools select ns_input -c", '521')
-        # self.assertOutput("vtools select ns_input -c", '1446')
+        self.assertOutput("vtools select ns_input -c", '1446')
         self.assertSucc('vtools select ns_input \'genename = "PLEKHN1"\'  -t plekhn1')
         # self.assertOutput("vtools select plekhn1 -c", '514')
-        # self.assertOutput("vtools select plekhn1 -c", '1427')
+        self.assertOutput("vtools select plekhn1 -c", '1427')
         self.assertSucc('vtools select plekhn1 "polyphen2_score>0.9 and sift_score>0.9" -t d_plekhn1')
         # self.assertOutput("vtools select d_plekhn1 -c", '134\n')
-        # self.assertOutput("vtools select d_plekhn1 -c", '427\n')
+        self.assertOutput("vtools select d_plekhn1 -c", '427\n')
         self.assertSucc('vtools select variant "testNSFP.chr is not null" --samples "aff=1" -t ns_aff')
         self.assertOutput("vtools select ns_aff -c", '0\n')
         #

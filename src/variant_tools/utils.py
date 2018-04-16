@@ -4155,7 +4155,7 @@ def dehtml(text):
         env.logger.warning('Failed to dehtml text: {}'.format(e))
         return text
 
-def chunks_start_stop(length,rows=200):
+def chunks_start_stop(length,rows=50):
     cycle=int(length/rows)
     startPos=0
     endPos=0

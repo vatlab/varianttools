@@ -135,10 +135,6 @@ class HDF5Engine_storage(Base_Storage):
                 pass
         return totalNum,numCount
 
-    def to_csr_matrix(self,group):
-        return csr_matrix((group.data[:],group.indices[:],group.indptr[:]),shape=group.shape[:])
-
-
 
     def geno_fields(self,sampleID):
         fields=[]
@@ -663,7 +659,7 @@ class HDF5Engine_access(Base_Access):
 
 
 
-    def get_genotype(self,variantIDs,sampleName,chrs=""):
+    def get_genotype(self,variantIDs,sampleNames,chrs=""):
         updated_rownames=[]
         updated_geno=[]
         updated_colnames=[]
@@ -676,11 +672,10 @@ class HDF5Engine_access(Base_Access):
                 rownames=node.rownames[:].tolist()
                 colnames=node.colnames[:].tolist()
                 colpos=[]
-                if (len(sampleName)>0):
-                    colpos=colnames.index(sampleName)
+                if (len(sampleNames)>0):
+                    colpos=list(map(lambda x:colnames.index(x),sampleNames))
                 else:
                     colpos=list(map(lambda x:colnames.index(x),colnames))
-
                 if len(variantIDs)>0:
                     for id in variantIDs:
                         try:
@@ -707,12 +702,11 @@ class HDF5Engine_access(Base_Access):
                     shape=node.shape[:].tolist()
                     chunkPos=chunks_start_stop(shape[0])
                     for minPos,maxPos in chunkPos:
-                        if "/chr"+str(chr)+"/"+type in self.file:
+                        if "/chr"+str(chr)+"/GT_geno" in self.file:
                             genoinfo=node.GT_geno[minPos:maxPos,colpos]           
-                            sub_rownames,updated_colnames,sub_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[])
-                            updated_rownames.append(sub_rownames)
-                            updated_geno.append(sub_geno)
-     
+                            sub_rownames,updated_colnames,sub_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[])                    
+                            updated_rownames.extend(sub_rownames)
+                            updated_geno.extend(sub_geno)
             except tb.exceptions.NoSuchNodeError:
                 pass                              
             except Exception as e:
@@ -721,84 +715,119 @@ class HDF5Engine_access(Base_Access):
         return np.array(updated_rownames),np.array(updated_colnames),np.array(updated_geno)
 
 
+    def get_genotype_by_chunk(self,sampleNames,chrs=""):
 
-
-    def get_geno_by_variant_IDs(self,rowIDs,chr,groupName=""):
-
-        #assume rowIDs are sorted by genome position
-     
-        group=self.getGroup(chr,groupName)
-        rownames=group.rownames[:].tolist()
-        colnames=group.colnames[:]
-        rowMask=group.rowmask[:]
-        sampleMask=group.samplemask[:]
-        if len(rowIDs)>0:
-            for id in rowIDs:
-                try:
-                    minPos=rownames.index(id)
-                    break
-                except ValueError:
-                    continue
-            for id in reversed(rowIDs):
-                try:
-                    maxPos=rownames.index(id)
-                    break
-                except ValueError:
-                    continue
-        try:
-            minPos
-            maxPos
-            update_rownames=rownames[minPos:maxPos+1]
-            
-            sub_geno=group.GT_geno[minPos:maxPos+1,:]    
-            sub_Mask=group.Mask_geno[minPos:maxPos+1,:]
-            sub_geno=np.multiply(sub_geno,sub_Mask)
-
-            update_rowMask=rowMask[minPos:maxPos+1]
-            rowMasked=np.where(update_rowMask==True)[0]
-            sampleMasked=np.where(sampleMask==True)[0]
-            if len(rowMasked)>0:
-                update_rownames=np.array(update_rownames)[np.where(update_rowMask==False)[0]]
-                sub_geno=np.delete(sub_geno,rowMasked,0)
-
-            if len(sampleMasked)>0:
-                colnames=colnames[np.where(sampleMask==False)[0]]
-                sub_geno=np.delete(sub_geno,sampleMasked,1)
-
-            
-            return np.array(update_rownames),colnames,np.array(sub_geno)
-        except NameError:
-            env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
-
-    
-    def get_geno_by_variant_IDs_sample(self,rowIDs,sampleName,chrs):
-        NULL_to_0 = env.treat_missing_as_wildtype
-        g=set()
-        chrs=range(1,23)
-        if len(chr)>0:
-            chrs=[chr]
+        if chrs=="":
+            chrs=["X","Y"]
+            chrs.extend(range(1,23))
         for chr in chrs:
             try:
                 node=self.file.get_node("/chr"+str(chr))
-                updated_rownames,colnames,subMatrix=self.get_geno_by_variant_IDs(rowIDs,str(chr))
-                # print(updated_rownames,colnames,subMatrix)
-                colPos=colnames.tolist().index(sampleName)
-                GT_geno=subMatrix[:,colPos]
-                # print(GT_geno)
-                for idx,id in enumerate(updated_rownames):
-                    GT=GT_geno[idx]
-                    if np.isnan(GT):
-                        if NULL_to_0:
-                            g.add((id, 0))
-                    else:
-                        g.add((id, GT))
-                # print(g)
+                colnames=node.colnames[:].tolist()
+                colpos=[]
+                if (len(sampleNames)>0):
+                    colpos=list(map(lambda x:colnames.index(x),sampleNames))
+                else:
+                    colpos=list(map(lambda x:colnames.index(x),colnames))
+                
+                shape=node.shape[:].tolist()
+                chunkPos=chunks_start_stop(shape[0])
+                for minPos,maxPos in chunkPos:
+                    
+                    if "/chr"+str(chr)+"/GT_geno" in self.file:
+                        genoinfo=node.GT_geno[minPos:maxPos,colpos]    
+                        sub_rownames,updated_colnames,sub_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[])
+                        yield np.array(sub_rownames),np.array(updated_colnames),np.array(sub_geno)
+
             except tb.exceptions.NoSuchNodeError:
                 pass                              
             except Exception as e:
                 print(e)
                 pass
-        return g
+
+    def get_all_genotype(self,sampleNames,chrs=""):
+        return(list(self.get_genotype_by_chunk(sampleNames,chrs)))
+
+
+
+
+
+    # def get_geno_by_variant_IDs(self,rowIDs,chr,groupName=""):
+
+    #     #assume rowIDs are sorted by genome position
+     
+    #     group=self.getGroup(chr,groupName)
+    #     rownames=group.rownames[:].tolist()
+    #     colnames=group.colnames[:]
+    #     rowMask=group.rowmask[:]
+    #     sampleMask=group.samplemask[:]
+    #     if len(rowIDs)>0:
+    #         for id in rowIDs:
+    #             try:
+    #                 minPos=rownames.index(id)
+    #                 break
+    #             except ValueError:
+    #                 continue
+    #         for id in reversed(rowIDs):
+    #             try:
+    #                 maxPos=rownames.index(id)
+    #                 break
+    #             except ValueError:
+    #                 continue
+    #     try:
+    #         minPos
+    #         maxPos
+    #         update_rownames=rownames[minPos:maxPos+1]
+            
+    #         sub_geno=group.GT_geno[minPos:maxPos+1,:]    
+    #         sub_Mask=group.Mask_geno[minPos:maxPos+1,:]
+    #         sub_geno=np.multiply(sub_geno,sub_Mask)
+
+    #         update_rowMask=rowMask[minPos:maxPos+1]
+    #         rowMasked=np.where(update_rowMask==True)[0]
+    #         sampleMasked=np.where(sampleMask==True)[0]
+    #         if len(rowMasked)>0:
+    #             update_rownames=np.array(update_rownames)[np.where(update_rowMask==False)[0]]
+    #             sub_geno=np.delete(sub_geno,rowMasked,0)
+
+    #         if len(sampleMasked)>0:
+    #             colnames=colnames[np.where(sampleMask==False)[0]]
+    #             sub_geno=np.delete(sub_geno,sampleMasked,1)
+
+            
+    #         return np.array(update_rownames),colnames,np.array(sub_geno)
+    #     except NameError:
+    #         env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
+
+    
+    # def get_geno_by_variant_IDs_sample(self,rowIDs,sampleName,chrs):
+    #     NULL_to_0 = env.treat_missing_as_wildtype
+    #     g=set()
+    #     chrs=range(1,23)
+    #     if len(chr)>0:
+    #         chrs=[chr]
+    #     for chr in chrs:
+    #         try:
+    #             node=self.file.get_node("/chr"+str(chr))
+    #             updated_rownames,colnames,subMatrix=self.get_geno_by_variant_IDs(rowIDs,str(chr))
+    #             # print(updated_rownames,colnames,subMatrix)
+    #             colPos=colnames.tolist().index(sampleName)
+    #             GT_geno=subMatrix[:,colPos]
+    #             # print(GT_geno)
+    #             for idx,id in enumerate(updated_rownames):
+    #                 GT=GT_geno[idx]
+    #                 if np.isnan(GT):
+    #                     if NULL_to_0:
+    #                         g.add((id, 0))
+    #                 else:
+    #                     g.add((id, GT))
+    #             # print(g)
+    #         except tb.exceptions.NoSuchNodeError:
+    #             pass                              
+    #         except Exception as e:
+    #             print(e)
+    #             pass
+    #     return g
 
 
 
@@ -829,35 +858,35 @@ class HDF5Engine_access(Base_Access):
 
 
 
-    def get_noWT_variants(self,samples):
-        noWT=[]
-        chrs=["X","Y"]
-        chrs.extend(range(1,23))
-        if len(samples)!=0:
-            for chr in chrs:
-                try:
-                    #haven't dealt with data==-1
-                    node=self.file.get_node("/chr"+str(chr))
-                    shape=node.shape[:].tolist()
-                    samples.sort()
-                    colnames=node.colnames[:].tolist()
-                    colpos=list(map(lambda x:colnames.index(x),samples))
-                    chunkPos=chunks_start_stop(shape[0])
-                    for startPos,endPos in chunkPos:
-                        if "/chr"+str(chr)+"/GT_geno" in self.file:
-                            genoinfo=node.GT_geno[startPos:endPos]       
-                            rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
-                            genoinfo[genoinfo==-1]=0
-                            rowsum=np.nansum(genoinfo,axis=1)
-                            noWTvariants=rownames[np.where(rowsum>0)].tolist()
-                            noWT.extend(noWTvariants)
-                        startPos=endPos
-                except tb.exceptions.NoSuchNodeError:
-                    pass  
-                except Exception as e:
-                    print(e)
-        self.close()
-        return noWT
+    # def get_noWT_variants(self,samples):
+    #     noWT=[]
+    #     chrs=["X","Y"]
+    #     chrs.extend(range(1,23))
+    #     if len(samples)!=0:
+    #         for chr in chrs:
+    #             try:
+    #                 #haven't dealt with data==-1
+    #                 node=self.file.get_node("/chr"+str(chr))
+    #                 shape=node.shape[:].tolist()
+    #                 samples.sort()
+    #                 colnames=node.colnames[:].tolist()
+    #                 colpos=list(map(lambda x:colnames.index(x),samples))
+    #                 chunkPos=chunks_start_stop(shape[0])
+    #                 for startPos,endPos in chunkPos:
+    #                     if "/chr"+str(chr)+"/GT_geno" in self.file:
+    #                         genoinfo=node.GT_geno[startPos:endPos]       
+    #                         rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,[])
+    #                         genoinfo[genoinfo==-1]=0
+    #                         rowsum=np.nansum(genoinfo,axis=1)
+    #                         noWTvariants=rownames[np.where(rowsum>0)].tolist()
+    #                         noWT.extend(noWTvariants)
+    #                     startPos=endPos
+    #             except tb.exceptions.NoSuchNodeError:
+    #                 pass  
+    #             except Exception as e:
+    #                 print(e)
+    #     self.close()
+    #     return noWT
 
 
 

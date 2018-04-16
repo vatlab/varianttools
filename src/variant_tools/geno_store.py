@@ -1358,7 +1358,9 @@ class HDF5_Store(Base_Store):
 
 
     def get_noWT_variants_worker(self,queue,accessEngine,samples):
-        queue.put(accessEngine.get_noWT_variants(samples))
+        # queue.put(accessEngine.get_noWT_variants(samples))
+        # queue.put(accessEngine.get_genotype([],samples))
+        queue.put(accessEngine.get_all_genotype(samples))
 
     def get_noWT_variants(self,samples,proj,where_clause,args):
         sampleFileMap=self.get_HDF5_sampleMap()
@@ -1370,12 +1372,19 @@ class HDF5_Store(Base_Store):
             if filename in sampleFileMap:
                 samplesInfile=sampleFileMap[filename]
                 accessEngine=Engine_Access.choose_access_engine(HDFfileName)
-                p=Process(target=self.get_noWT_variants_worker,args=(queue,accessEngine,list(set(samples).intersection(samplesInfile)))) 
-                procs.append(p)
-                p.start()
+                if len(list(set(samples).intersection(samplesInfile)))>0:
+                    p=Process(target=self.get_noWT_variants_worker,args=(queue,accessEngine,list(set(samples).intersection(samplesInfile)))) 
+                    procs.append(p)
+                    p.start()
         for _ in procs:
-            result=queue.get()
-            noWT=noWT.union(set(result))     
+            # result=queue.get()
+            # noWT=noWT.union(set(result))    
+            for rownames,colnames,genoinfo in queue.get():
+                genoinfo[genoinfo==-1]=0
+                rowsum=np.nansum(genoinfo,axis=1)
+                noWTvariants=rownames[np.where(rowsum>=0)].tolist()
+                noWT=noWT.union(set(noWTvariants)) 
+
         for p in procs:
             p.join()
 
@@ -1455,18 +1464,44 @@ class HDF5_Store(Base_Store):
         for chr in cur:
             chrs.append(chr[0])
         accessEngine=Engine_Access.choose_access_engine(HDFfileName)
-        return accessEngine.get_geno_by_variant_IDs_sample(ids,sample_ID,chrs)
+        g=set()
+        NULL_to_0 = env.treat_missing_as_wildtype
+        rownames,colnames,genoinfo=accessEngine.get_genotype(ids,[sample_ID],chrs)
+        for idx,id in enumerate(rownames.tolist()):
+            GT=genoinfo[idx][0]
+            if np.isnan(GT):
+                if NULL_to_0:
+                    g.add((id, 0))
+            else:
+                g.add((id, GT))
+        return g
+        # return accessEngine.get_geno_by_variant_IDs_sample(ids,sample_ID,chrs)
 
     def validate_sex(self,proj,sample_ID,sex):
         HDFfileName=self.get_sampleFileName(sample_ID)
         accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+        geno=[]
+        invalidate=[]
         if sex==1:
-            geno=accessEngine.get_geno_by_sample_ID(sample_ID,"GT_geno",["X"])
-            # updated_rownames,colnames,sub_geno=accessEngine.get_genotype("",[sample_ID],["X"])
+            # geno=accessEngine.get_geno_by_sample_ID(sample_ID,"GT_geno",["X"])
+            for rownames,colnames,genoinfo in accessEngine.get_all_genotype([sample_ID],["X"]):
+                for idx,rowname in enumerate(rownames):
+                    genotype=genoinfo[idx]
+                    if np.isnan(genotype):
+                        genotype=-1
+                    geno.append([rowname,genotype])
             geno=np.array(geno)
             invalidate=geno[geno==2]
         if sex==2:
-            invalidate=accessEngine.get_geno_by_sample_ID(sample_ID,"GT_geno",["Y"])
+            # invalidate=accessEngine.get_geno_by_sample_ID(sample_ID,"GT_geno",["Y"])
+            for rownames,colnames,genoinfo in accessEngine.get_all_genotype([sample_ID],["Y"]):
+                for idx,rowname in enumerate(rownames):
+                    genotype=genoinfo[idx]
+                    if np.isnan(genotype):
+                        genotype=-1
+                    geno.append([rowname,genotype])
+            geno=np.array(geno)
+            invalidate=geno
         accessEngine.close()
         return len(invalidate)
         
