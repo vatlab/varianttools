@@ -1406,9 +1406,9 @@ class HDF5_Store(Base_Store):
         return where_clause
 
 
-    def get_genoType_genoInfo_worker(self,queue,accessEngine,samples,variants,genotypes,fieldSelect,validGenotypeFields,operations):
-        queue.put(accessEngine.get_geno_field_from_HDF5(samples,variants,genotypes,fieldSelect,validGenotypeFields,operations))
 
+    def get_genoType_genoInfo_worker(self,queue,accessEngine,sampleNames,variants,validGenotypeFields,genotypes):
+         queue.put(accessEngine.get_all_genotype_genoinfo(sampleNames,variants,validGenotypeFields,genotypes))
 
 
     def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
@@ -1428,15 +1428,46 @@ class HDF5_Store(Base_Store):
             if filename in sampleFileMap:
                 samplesInfile=sampleFileMap[filename]
                 accessEngine=Engine_Access.choose_access_engine(HDFfileName)
-                p=Process(target=self.get_genoType_genoInfo_worker,args=(queue,accessEngine,list(set(sampleDict.keys()).intersection(samplesInfile)),variants,genotypes,fieldSelect,validGenotypeFields,operations)) 
+                p=Process(target=self.get_genoType_genoInfo_worker,args=(queue,accessEngine,list(set(sampleDict.keys()).intersection(samplesInfile)),variants,validGenotypeFields,genotypes)) 
                 procs.append(p)
                 p.start()
 
         minPos=[i+5 for i, x in enumerate(operations) if x == 2]
         maxPos=[i+5 for i, x in enumerate(operations) if x == 3]
-
+  
         for _ in procs:
-            result=queue.get()
+            vardict={}
+            try:
+                for rownames,colnames,sub_all in queue.get():
+                    
+                    numrow=len(rownames)
+                    genotype=sub_all[0]
+                    variants=np.zeros(shape=(numrow,len(validGenotypeFields)+5),dtype=np.int64)   
+                    
+                    variants[:,3]=np.nansum(~np.isnan(genotype),axis=1)
+                    variants[:,0]=np.nansum(genotype==1,axis=1)
+                    variants[:,1]=np.nansum(genotype==2,axis=1)
+                    variants[:,2]=np.nansum(genotype==-1,axis=1)
+
+                    for fieldpos,field in enumerate(validGenotypeFields):
+                        genoinfo=sub_all[fieldpos+1]
+                        operation=operations[fieldpos]
+                        if operation==0:                      
+                            variants[:,5+fieldpos]=np.nansum(genoinfo,axis=1)
+                        if operation==1:
+                            variants[:,5+fieldpos]=np.nansum(genoinfo,axis=1)
+                        if operation==2:
+                            variants[:,5+fieldpos]=np.nanmin(genoinfo,axis=1)
+                        if operation==3:
+                            variants[:,5+fieldpos]=np.nanmax(genoinfo,axis=1)
+
+                    vardict.update(dict(zip(rownames,variants)))
+            except Exception as e:
+                print(e)
+                pass
+
+            result=vardict
+           
             for key,value in result.items():
                 if key not in master:
                     master[key]=value
@@ -1452,6 +1483,57 @@ class HDF5_Store(Base_Store):
         for p in procs:
             p.join()
         return master
+
+
+
+    # def get_genoType_genoInfo_worker(self,queue,accessEngine,samples,variants,genotypes,fieldSelect,validGenotypeFields,operations):
+    #     queue.put(accessEngine.get_geno_field_from_HDF5(samples,variants,genotypes,fieldSelect,validGenotypeFields,operations))
+
+
+
+
+    # def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
+    #     # print(genotypes)
+    #     # print(validGenotypeFields)
+    #     sampleFileMap=self.get_HDF5_sampleMap()
+    #     fieldSelect=list(sampleDict.values())[0][1]
+    #     variants=[]
+    #     if variant_table != 'variant':
+    #         variants=self.get_selected_variants(variant_table)
+    
+    #     master={}
+    #     queue=Queue()
+    #     procs=[]
+    #     for HDFfileName in glob.glob("tmp*genotypes.h5"):
+    #         filename=HDFfileName.split("/")[-1]
+    #         if filename in sampleFileMap:
+    #             samplesInfile=sampleFileMap[filename]
+    #             accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+    #             p=Process(target=self.get_genoType_genoInfo_worker,args=(queue,accessEngine,list(set(sampleDict.keys()).intersection(samplesInfile)),variants,genotypes,fieldSelect,validGenotypeFields,operations)) 
+    #             procs.append(p)
+    #             p.start()
+
+    #     minPos=[i+5 for i, x in enumerate(operations) if x == 2]
+    #     maxPos=[i+5 for i, x in enumerate(operations) if x == 3]
+
+    #     for _ in procs:
+
+    #         result=queue.get()
+    #         for key,value in result.items():
+    #             if key not in master:
+    #                 master[key]=value
+    #             else:
+    #                 master[key]= [sum(x) for x in zip(master[key], value)]
+    #                 if len(minPos)>0 or len(maxPos)>0:
+    #                     for pos in minPos:
+    #                         preValue=master[key][pos]-value[pos]
+    #                         master[key][pos]=value[pos] if preValue>=value[pos] else preValue
+    #                     for pos in maxPos:
+    #                         preValue=master[key][pos]-value[pos]
+    #                         master[key][pos]=value[pos] if preValue<=value[pos] else preValue                 
+    #     for p in procs:
+    #         p.join()
+    #     return master
 
     def get_Genotype(self,cur,table,proj,sample_ID):
         HDFfileName=self.get_sampleFileName(sample_ID)

@@ -432,7 +432,25 @@ class VariantWorker_HDF5(Process):
 
     def run(self):
         accessEngine=Engine_Access.choose_access_engine(self.fileName)
-        result=accessEngine.get_genoType_forExport_from_HDF5(self.samples,self.geno_fields)  
+        vardict={}
+        genoinfo_fields=[field for field in self.geno_fields if field!="GT"]
+
+        for rownames,colnames,sub_all in accessEngine.get_all_genotype_genoinfo(self.samples,[],genoinfo_fields):
+            genoType=sub_all[0]
+            numrow,numcol=genoType.shape[0],genoType.shape[1]
+            info=np.zeros(shape=(numrow,numcol*len(self.geno_fields)),dtype=float)   
+            for col in range(numcol):
+                    info[:,col*len(self.geno_fields)]=genoType[:,col]
+
+            if len(genoinfo_fields)>0:
+                for pos,field in enumerate(genoinfo_fields):
+                    genoInfo=sub_all[pos+1]
+                    for col in range(numcol):
+                        info[:,col*len(self.geno_fields)+pos]=genoInfo[:,col]
+
+            vardict.update(dict(zip(rownames,info)))  
+        result=vardict
+        # result=accessEngine.get_genoType_forExport_from_HDF5(self.samples,self.geno_fields)  
         self.output.send(None)
         last_id = None
         for key,val in result.items():

@@ -740,7 +740,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                     # VARCHAR fields in the genotype tables.  We'll throw an error if someone wants to perform numeric operations on these fields
                     # further down in the code.
                     # raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
-    
+  
     validGenotypeIndices = []
 
 
@@ -807,9 +807,11 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             (missing, 'INT'), (wtGT, 'INT'), (mutGT, 'INT'),
             (maf, 'FLOAT')]
     fieldsDefaultZero = [alt, hom, het, other, GT, missing, wtGT, mutGT, maf]
+   
     for index in validGenotypeIndices:
         field = genotypeFields[index]
-        genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index].lower()) 
+        # genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index].lower()) 
+        genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index]) 
         
         if genotypeFieldType == 'VARCHAR':
             raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
@@ -818,6 +820,8 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             table_attributes.append((destinations[index], 'FLOAT'))
         else:                
             table_attributes.append((destinations[index], genotypeFieldType))
+    
+
     for field, fldtype in table_attributes:
         if field is None:
             continue
@@ -832,6 +836,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                 env.logger.warning('Type mismatch (existing: {}, new: {}) for column {}. Please remove this column and recalculate statistics if needed.'\
                     .format(proj.db.typeOfColumn('variant', field), fldtype, field))
             env.logger.info('Resetting values at existing field {}'.format(field))
+
             proj.db.execute('Update variant SET {} = {} {};'.format(field, proj.db.PH, where_clause), (defaultValue, ))
         else:
             env.logger.info('Adding variant info field {} with type {}'.format(field, fldtype))
@@ -853,6 +858,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         ' ,'.join(['{}={}'.format(x, proj.db.PH) for x in queryDestinations if x is not None]))
 
     count = 0
+    
     for count,id in enumerate(variants):
         value = variants[id]
         res = []
