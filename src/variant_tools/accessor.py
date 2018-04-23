@@ -106,34 +106,20 @@ class HDF5Engine_storage(Base_Storage):
                 self.getGroup(chr,groupName).append(data)
 
 
-               
-
-
-    def num_variants(self,sampleID):
-        totalNum=0
-        chrs=["X","Y"]
-        chrs.extend(range(1,23))
-        numCount={}
-        for chr in chrs:
-            try:
-                group=self.file.get_node("/chr"+str(chr))
-                # indices=group.indices[:]
-                colnames=group.colnames[:]
-                numVariants=len(group.rownames[:])
-                # samplePos=np.where(colnames==sampleID)
-                # colPos=np.where(indices==samplePos[0][0])
-                colPos=np.where(colnames==sampleID)[0]
-                # data=group.data[colPos]
-                data=group.GT_geno[:,colPos]
-                numNan=np.where(np.isnan(data))
-                numNone=np.where(data==-1) 
-                # totalNum+=numVariants-len(numNan[0])-len(numNone[0])
-                totalNum+=numVariants-len(numNan[0])
-                numCount[chr]=numVariants-len(numNan[0])
-                # totalNum+=numVariants
-            except tb.exceptions.NoSuchNodeError:
-                pass
-        return totalNum,numCount
+    # def geno_fields(self,sampleID):
+    #     fields=[]
+    #     chrs=["X","Y"]
+    #     chrs.extend(range(1,23))
+    #     for chr in chrs:
+    #         try:
+    #             for field in ["GT_geno","DP_geno","GQ_geno"]:
+    #                 group=self.file.get_node("/chr"+str(chr)+"/"+field)  
+    #                 if field=="GT_geno":
+    #                     field="GT"     
+    #                 fields.append(field)
+    #         except tb.exceptions.NoSuchNodeError:
+    #             pass
+    #     return list(set(fields))
 
 
     def geno_fields(self,sampleID):
@@ -142,15 +128,15 @@ class HDF5Engine_storage(Base_Storage):
         chrs.extend(range(1,23))
         for chr in chrs:
             try:
-                for field in ["GT_geno","DP_geno","GQ_geno"]:
-                    group=self.file.get_node("/chr"+str(chr)+"/"+field)  
+                for node in self.file.get_node("/chr"+str(chr)):
+                    field=node.name
                     if field=="GT_geno":
-                        field="GT"     
-                    fields.append(field)
+                        field="GT"
+                    if field not in ["Mask_geno","colnames","rowmask","rownames","samplemask","shape"] and field not in fields:
+                        fields.append(field)
             except tb.exceptions.NoSuchNodeError:
                 pass
         return list(set(fields))
-
 
 
     def remove_variants(self,variantIDs):
@@ -558,10 +544,55 @@ class HDF5Engine_access(Base_Access):
         return num
 
 
+     # def num_variants(self,sampleID):
+     #    totalNum=0
+     #    chrs=["X","Y"]
+     #    chrs.extend(range(1,23))
+     #    numCount={}
+     #    for chr in chrs:
+     #        try:
+     #            group=self.file.get_node("/chr"+str(chr))
+     #            # indices=group.indices[:]
+     #            colnames=group.colnames[:]
+     #            numVariants=len(group.rownames[:])
+     #            # samplePos=np.where(colnames==sampleID)
+     #            # colPos=np.where(indices==samplePos[0][0])
+     #            colPos=np.where(colnames==sampleID)[0]
+     #            # data=group.data[colPos]
+     #            data=group.GT_geno[:,colPos]
+     #            numNan=np.where(np.isnan(data))
+     #            numNone=np.where(data==-1) 
+     #            # totalNum+=numVariants-len(numNan[0])-len(numNone[0])
+     #            totalNum+=numVariants-len(numNan[0])
+     #            numCount[chr]=numVariants-len(numNan[0])
+     #            # totalNum+=numVariants
+     #        except tb.exceptions.NoSuchNodeError:
+     #            pass
+     #    return totalNum,numCount
+
+
+    def num_variants(self,sampleID):
+        totalNum=0
+        numCount={}
+        for rownames,colnames,genoinfo in self.get_all_genotype([sampleID]):
+            numVariants=len(rownames[:])
+            # samplePos=np.where(colnames==sampleID)
+            # colPos=np.where(indices==samplePos[0][0])
+            colPos=np.where(colnames==sampleID)[0]
+            # data=group.data[colPos]
+            data=genoinfo[:,colPos]
+            numNan=np.where(np.isnan(data))
+            numNone=np.where(data==-1) 
+            # totalNum+=numVariants-len(numNan[0])-len(numNone[0])
+            totalNum+=numVariants-len(numNan[0])
+            numCount[chr]=numVariants-len(numNan[0])
+        return totalNum,numCount
+
+
     def num_genotypes(self,sampleID,cond,genotypes):
         totalNum=0
 
-        for rownames,colnames,genoinfo in accessEngine.get_all_genotype([sampleID]):
+        for rownames,colnames,genoinfo in self.get_all_genotype([sampleID]):
             if cond is None:
                 numNan=np.where(np.isnan(genoinfo))
                 numNone=np.where(genoinfo==-1) 
@@ -722,7 +753,7 @@ class HDF5Engine_access(Base_Access):
 
 
 
-    def get_genotype_genoinfo_by_chunk(self,sampleNames,varIDs,validGenotypeFields,genotypes,chrs=""):
+    def get_genotype_genoinfo_by_chunk(self,sampleNames,varIDs,validGenotypeFields,cond,chrs=""):
         
         if chrs=="":
             chrs=["X","Y"]
@@ -755,12 +786,12 @@ class HDF5Engine_access(Base_Access):
                     sub_all=[]
                     if "/chr"+str(chr)+"/GT_geno" in self.file and minPos!=maxPos:
         
-                        sub_rownames,updated_colnames,sub_geno=self.filter_on_genotypes(genotypes,chr,node,"GT_geno",minPos,maxPos,colpos,rowpos)
+                        sub_rownames,updated_colnames,sub_geno=self.filter_on_genotypes(cond,chr,node,"GT_geno",minPos,maxPos,colpos,rowpos)
  
                         sub_all.append(np.array(sub_geno))
                         if len(validGenotypeFields)>0:
                             for pos,field in enumerate(validGenotypeFields):
-                                _,_,sub_info=self.filter_on_genotypes(genotypes,chr,node,field,minPos,maxPos,colpos,rowpos)
+                                _,_,sub_info=self.filter_on_genotypes(cond,chr,node,field,minPos,maxPos,colpos,rowpos)
                                 sub_all.append(np.array(sub_info))
 
                         yield np.array(sub_rownames),np.array(updated_colnames),sub_all
@@ -771,7 +802,7 @@ class HDF5Engine_access(Base_Access):
                 print(e)
                 pass
 
-    def get_all_genotype_genoinfo(self,sampleNames,varIDs,validGenotypeFields,genotypes,chrs=""):
+    def get_all_genotype_genoinfo(self,sampleNames,varIDs,validGenotypeFields,genotypes="",chrs=""):
         return(list(self.get_genotype_genoinfo_by_chunk(sampleNames,varIDs,validGenotypeFields,genotypes,chrs)))
 
 
@@ -812,7 +843,7 @@ class HDF5Engine_access(Base_Access):
 
 
 
-    def filter_on_genotypes(self,genotypes,chr,node,field,startPos,endPos,colpos,rowpos):
+    def filter_on_genotypes(self,cond,chr,node,field,startPos,endPos,colpos,rowpos):
         genoinfo=None
         if field=="GT_geno":
             genoinfo=node.GT_geno[startPos:endPos,:]
@@ -823,18 +854,18 @@ class HDF5Engine_access(Base_Access):
             genoinfo=node.GQ_geno[startPos:endPos,:]
             genoinfo=np.nan_to_num(genoinfo)
 
-        if len(genotypes)>0:
-            if type(genotypes) is str:
-                genotypes=genotypes.replace("(","").replace(")","")
+        if len(cond)>0:
+            if type(cond) is str:
+                cond=cond.replace("(","").replace(")","")
             else:
-                genotypes=genotypes[0]
-            if "DP_geno" in genotypes and "/chr"+str(chr)+"/DP_geno" in self.file:
+                cond=cond[0]
+            if "DP_geno" in cond and "/chr"+str(chr)+"/DP_geno" in self.file:
                 DP_geno=node.DP_geno[startPos:endPos,:]
                 DP_geno[DP_geno==-1]=0
-            if "GQ_geno" in genotypes and "/chr"+str(chr)+"/GQ_geno" in self.file:
+            if "GQ_geno" in cond and "/chr"+str(chr)+"/GQ_geno" in self.file:
                 GQ_geno=node.GQ_geno[startPos:endPos,:]
                 GQ_geno=np.nan_to_num(GQ_geno)
-            genoinfo=np.where(eval("~("+genotypes+")"),np.nan,genoinfo)
+            genoinfo=np.where(eval("~("+cond+")"),np.nan,genoinfo)
         rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,rowpos)
         return rownames,colnames,genoinfo
 

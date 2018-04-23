@@ -1288,9 +1288,9 @@ class HDF5_Store(Base_Store):
         HDFfileName=self.get_sampleFileName(sampleID)
         num=0
         if HDFfileName is not None:
-            storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
-            num,_=storageEngine.num_variants(sampleID)
-            storageEngine.close()
+            accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+            num,_=accessEngine.num_variants(sampleID)
+            accessEngine.close()
         return num
 
 
@@ -1591,10 +1591,7 @@ class HDF5_Store(Base_Store):
 
 
     def importGenotypes(self, importer):
-        # from .importer_hdf5 import importGenotypesInParallel
-        # return importGenotypesInParallel(importer)
-        # from .importer_vcf_to_hdf5 import importGenotypes
-        # return importGenotypes(importer)
+
         from .importer_allele_hdf5 import importGenotypesInParallel
         return importGenotypesInParallel(importer)
 
