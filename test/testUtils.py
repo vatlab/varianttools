@@ -345,7 +345,17 @@ class ProcessTestCase(unittest.TestCase):
                             stderr=fnull).decode()
                         HDF5FileName=fileResult.rstrip()
                         accessEngine=Engine_Access.choose_access_engine(HDF5FileName)
-                        proj_geno=accessEngine.get_geno_by_sample_ID(table,"GT_geno")
+                        # proj_geno=accessEngine.get_geno_by_sample_ID(table,"GT_geno")
+                        proj_geno=[]
+                        for rownames,colnames,genoinfo in accessEngine.get_all_genotype([table]):
+                            for idx,rowname in enumerate(rownames):
+                                genotype=genoinfo[idx]
+                                if np.isnan(genotype):
+                                    genotype=-1
+                                proj_geno.append([rowname,genotype])
+                        proj_geno=np.array(proj_geno)
+
+
                         self.compare([int(x[1]) for x in proj_geno], list([int(x) for x in geno]), partial=partial, negate=negate)
                         
 
@@ -361,7 +371,16 @@ class ProcessTestCase(unittest.TestCase):
                             stderr=fnull).decode()
                         HDF5FileName=fileResult.rstrip()
                         accessEngine=Engine_Access.choose_access_engine(HDF5FileName)
-                        proj_geno=accessEngine.get_geno_by_sample_ID(table[0],table[1])
+                        # proj_geno=accessEngine.get_geno_by_sample_ID(table[0],table[1])
+                        proj_geno=[]
+                        for rownames,colnames,genoinfo in accessEngine.get_all_genotype([table[0]]):
+                            for idx,rowname in enumerate(rownames):
+                                genotype=genoinfo[idx]
+                                if np.isnan(genotype):
+                                    genotype=-1
+                                proj_geno.append([rowname,genotype])
+                        proj_geno=np.array(proj_geno)
+
                         self.compare([int(x[1]) for x in proj_geno], list([int(x) for x in geno]), partial=partial, negate=negate)
 
         if hasTable is not None:

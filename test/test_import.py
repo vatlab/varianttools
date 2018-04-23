@@ -237,8 +237,16 @@ class TestImport(ProcessTestCase):
                             stderr=fnull).decode()
             HDF5FileName=fileResult.rstrip()
             accessEngine=Engine_Access.choose_access_engine(HDF5FileName)
-            geno=accessEngine.get_geno_by_sample_ID(1,"GT_geno")
-            proj_output="".join([str(val[0])+"\t"+str(int(val[1]))+"\n" for val in geno])
+            # geno=accessEngine.get_geno_by_sample_ID(1,"GT_geno")
+            geno=[]
+            for rownames,colnames,genoinfo in accessEngine.get_all_genotype([1]):
+                for idx,rowname in enumerate(rownames):
+                    genotype=genoinfo[idx]
+                    if np.isnan(genotype):
+                        genotype=-1
+                    geno.append([rowname,genotype])
+            geno=np.array(geno)
+            proj_output="".join([str(int(val[0]))+"\t"+str(int(val[1]))+"\n" for val in geno])
             output='output/import_mpi_multi_genotype_hdf5.txt'
             if os.path.isfile(output):
                 with open(output, 'r') as cf:

@@ -297,7 +297,6 @@ class MultiVariantReader(BaseVariantReader):
             export_alt_build, IDs, jobs,transformToHDF5):
         BaseVariantReader.__init__(self, proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
             export_alt_build,  IDs)
-
         self.proj = proj
         self.var_fields = var_fields
         # the first job for variants
@@ -352,7 +351,6 @@ class MultiVariantReader(BaseVariantReader):
                 sampleFileMap[res[1]].append(res[0])
             samplefiles=glob.glob("tmp*genotypes.h5")      
             samplefiles.sort(key=lambda x:x.split("_")[1])
-      
             for HDFfileName in samplefiles:
                 filename=HDFfileName.split("/")[-1]
                 if filename in sampleFileMap:
@@ -434,7 +432,6 @@ class VariantWorker_HDF5(Process):
         accessEngine=Engine_Access.choose_access_engine(self.fileName)
         vardict={}
         genoinfo_fields=[field for field in self.geno_fields if field!="GT"]
-
         for rownames,colnames,sub_all in accessEngine.get_all_genotype_genoinfo(self.samples,[],genoinfo_fields):
             genoType=sub_all[0]
             numrow,numcol=genoType.shape[0],genoType.shape[1]

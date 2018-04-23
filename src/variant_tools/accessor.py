@@ -568,10 +568,8 @@ class HDF5Engine_access(Base_Access):
                 group=self.file.get_node("/chr"+str(chr))
                 colnames=group.colnames[:]
                 numVariants=len(group.rownames[:])
-                colPos=np.where(colnames==sampleID)[0]
-                
+                colPos=np.where(colnames==sampleID)[0]         
                 shape=group.shape[:].tolist()   
-                
                 chunkPos=chunks_start_stop(shape[0])
     
                 for startPos,endPos in chunkPos:
@@ -768,17 +766,16 @@ class HDF5Engine_access(Base_Access):
                 shape=node.shape[:].tolist()
                 chunkPos=chunks_start_stop(shape[0])
                 rowpos=[]
-                # if len(varIDs)>0:
-                #       rownames=node.rownames[:].tolist()
-                # #      # rowpos=list(map(lambda x:rownames.index(x),varids))
-                #       rowpos=np.full((1,len(rownames)),0,dtype=int)
-                #       selectPos=[self.find_element_in_list(id,rownames) for id in varIDs]
-                #       print(rowpos,selectPos)
-                #       rowpos[selectPos]=1
-                #     rowpos=[x for x in rowpos if x is not None]
-                #     if len(rowpos)==0:
-                #         continue 
-                print(rowpos)
+                
+                if len(varIDs)>0:
+                    rownames=node.rownames[:].tolist()
+                    rowpos=np.array([0]*len(rownames))
+                    selectPos=[self.find_element_in_list(id,rownames) for id in varIDs]
+                    selected=[x for x in selectPos if x is not None]
+                    rowpos[selected]=1
+                    if np.sum(rowpos)==0:
+                        continue 
+  
                 for minPos,maxPos in chunkPos:
                     sub_all=[]
                     if "/chr"+str(chr)+"/GT_geno" in self.file and minPos!=maxPos:
@@ -819,7 +816,6 @@ class HDF5Engine_access(Base_Access):
             
             if len(rowpos)>0:
                 selectRows=rowpos[minPos:maxPos]
-                print(selectRows)
                 rownames=rownames[selectRows==1]
                 sub_geno=sub_geno[selectRows==1,:]
          
@@ -886,21 +882,7 @@ class HDF5Engine_access(Base_Access):
 
 
         
-    def compare_HDF5(self,hdf5,chr,groupName=""):
-        """This function checks the similarity of two HDF5 files.
-
-            Args:
-
-                - hdf5 (HDF5Engine_access object): another HDF5_access object to compare with
-                - chr (string): the chromosome
-                - groupName (string): the group name, for example gene name 
-
-        """
-        assert sum(self.get_rownames(chr)==hdf5.get_rownames(chr))==len(self.get_rownames(chr)),"rownames not the same"
-        assert sum(self.get_data(chr)==hdf5.get_data(chr))==len(self.get_data(chr)),"data not the same" 
-        assert sum(self.get_indices(chr)==hdf5.get_indices(chr))==len(self.get_indices(chr)),"indices not the same"             
-        assert sum(self.get_indptr(chr)==hdf5.get_indptr(chr))==len(self.get_indptr(chr)),"indptr not the same"       
-
+   
     
     def show_file_node(self):
         """This function prints the nodes in the file. 
@@ -966,94 +948,65 @@ class HDF5Engine_access(Base_Access):
 
 
 
-class AccessEachHDF5(Process):
+# class AccessEachHDF5(Process):
 
-    def __init__(self,fileName,variantID,result,chr,groupName=""):
-        Process.__init__(self)
-        self.hdf5=HDF5Engine_access(fileName)
-        self.variantID=variantID
-        self.chr=chr
-        self.groupName=groupName
-        self.result=result
+#     def __init__(self,fileName,variantID,result,chr,groupName=""):
+#         Process.__init__(self)
+#         self.hdf5=HDF5Engine_access(fileName)
+#         self.variantID=variantID
+#         self.chr=chr
+#         self.groupName=groupName
+#         self.result=result
 
-    def run(self):
-        variant_ID,indices,data=self.hdf5.get_geno_info_by_variant_ID(self.variantID,self.chr,self.groupName)
-        print((variant_ID,len(indices)))
-        colnames=self.hdf5.get_colnames(self.chr,self.groupName)
-        for idx,col in enumerate(indices):
-            if not math.isnan(data[idx]):
-                self.result[colnames[col]]=int(data[idx])
-            else:
-                self.result[colnames[col]]=data[idx]
-        self.hdf5.close()
+#     def run(self):
+#         variant_ID,indices,data=self.hdf5.get_geno_info_by_variant_ID(self.variantID,self.chr,self.groupName)
+#         print((variant_ID,len(indices)))
+#         colnames=self.hdf5.get_colnames(self.chr,self.groupName)
+#         for idx,col in enumerate(indices):
+#             if not math.isnan(data[idx]):
+#                 self.result[colnames[col]]=int(data[idx])
+#             else:
+#                 self.result[colnames[col]]=data[idx]
+#         self.hdf5.close()
 
-class HDF5Engine_access_multi:
-    """This is the class for access genotype info stored in multiple HDF5 (under development).
+# class HDF5Engine_access_multi:
+#     """This is the class for access genotype info stored in multiple HDF5 (under development).
 
-    """
-    def __init__(self,files,jobs):
-        self.files=files
-        self.jobs=jobs
-
-
-    def get_geno_info_by_variant_ID(self,variantID,chr,groupName=""):
-        """This function gets the genotype info of a variant specified by the variant_id stored in rownames. 
-
-            Args:
-
-                - variantID : the variant ID stored in rownames 
-                - chr (string): the chromosome  
-                - groupName (string): the group which variants are in, for example gene name
-
-            Returns:
-
-                right now, just print a dict of dict[sampleID]=genotype info
-
-        """
-        taskQueue=queue.Queue()
-        importers=[None]*self.jobs
-        result=Manager().dict()
-        for file in self.files:
-            taskQueue.put(AccessEachHDF5(file,variantID,result,chr,groupName))
-        while taskQueue.qsize()>0:
-            for i in range(self.jobs):    
-                if importers[i] is None or not importers[i].is_alive():
-                    task=taskQueue.get()
-                    importers[i]=task
-                    importers[i].start()           
-                    break 
-        for worker in importers:
-            worker.join() 
-        print(result)
+#     """
+#     def __init__(self,files,jobs):
+#         self.files=files
+#         self.jobs=jobs
 
 
-if __name__ == '__main__':
-    
-    # for i in range(1355,1369):
-    #     file=HDF5Engine_storage("/Users/jma7/Development/VAT/importTest_13t/tmp_1_2504_genotypes.h5")
-    #     file.recover_variant(i,"22","GT")
-    #     file.close()
+#     def get_geno_info_by_variant_ID(self,variantID,chr,groupName=""):
+#         """This function gets the genotype info of a variant specified by the variant_id stored in rownames. 
 
-    file=HDF5Engine_storage("/Users/jma7/Development/VAT/genoinfo_allele/tmp_1_491_genotypes.h5")
-    file.remove_genotype("(DP<10) & (GQ>10)","22")
+#             Args:
 
-    # for i in range(1,3):
-    #     file=HDF5Engine_storage("/Users/jma7/Development/VAT/importTest_13t/tmp_1_2504_genotypes.h5")
-    #     file.remove_sample(i,"22","GT")
-    #     file.close()
+#                 - variantID : the variant ID stored in rownames 
+#                 - chr (string): the chromosome  
+#                 - groupName (string): the group which variants are in, for example gene name
+
+#             Returns:
+
+#                 right now, just print a dict of dict[sampleID]=genotype info
+
+#         """
+#         taskQueue=queue.Queue()
+#         importers=[None]*self.jobs
+#         result=Manager().dict()
+#         for file in self.files:
+#             taskQueue.put(AccessEachHDF5(file,variantID,result,chr,groupName))
+#         while taskQueue.qsize()>0:
+#             for i in range(self.jobs):    
+#                 if importers[i] is None or not importers[i].is_alive():
+#                     task=taskQueue.get()
+#                     importers[i]=task
+#                     importers[i].start()           
+#                     break 
+#         for worker in importers:
+#             worker.join() 
+#         print(result)
 
 
-    # files=glob.glob("/Users/jma7/Development/VAT/importTest_12t/tmp*genotypes.h5")
-    # testHDF=HDF5Engine_access_multi(files,8)
-    # testHDF.get_geno_info_by_variant_ID(2,"22")
-    # testHDF=HDF5Engine_access("/Users/jma7/Development/VAT/importTest_11t/tmp_1_2504_genotypes.h5")
-    # variant_ID,indices,data=testHDF.get_geno_info_by_variant_ID(2,"22")
-    # colnames=testHDF.get_colnames("22")
-    # result={}
-    # for idx,col in enumerate(indices):
-    #         if not math.isnan(data[idx]):
-    #             result[colnames[col]]=int(data[idx])
-    #         else:
-    #             result[colnames[col]]=data[idx]
-    # print(result)
-    
+
