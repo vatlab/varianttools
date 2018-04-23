@@ -558,48 +558,23 @@ class HDF5Engine_access(Base_Access):
         return num
 
 
-
     def num_genotypes(self,sampleID,cond,genotypes):
         totalNum=0
-        chrs=["X","Y"]
-        chrs.extend(range(1,23))
-        for chr in chrs:
-            try:
-                group=self.file.get_node("/chr"+str(chr))
-                colnames=group.colnames[:]
-                numVariants=len(group.rownames[:])
-                colPos=np.where(colnames==sampleID)[0]         
-                shape=group.shape[:].tolist()   
-                chunkPos=chunks_start_stop(shape[0])
-    
-                for startPos,endPos in chunkPos:
-                    # rownames=node.rownames[startPos:endPos].tolist() 
-                               
-                    if "/chr"+str(chr)+"/GT_geno" in self.file:    
-                        rownames,colnames,data=self.filter_on_genotypes(genotypes,chr,group,"GT_geno",startPos,endPos,colPos,"")
-                 
-                        # data=group.GT_geno[:,colPos]
-                        if cond is None:
-                            numNan=np.where(np.isnan(data))
-                            numNone=np.where(data==-1) 
-                            totalNum+=numVariants-len(numNan[0])
-                        #     totalNum+=numVariants-len(numNan[0])
-                        else:
-                            numNan=np.where(np.isnan(data))
-                            if cond=="GT!=0":
-                                numCond=np.where(data!=0)
-                                totalNum+=len(numCond[0])-len(numNan[0])
-                            else:
-                                GTcond=cond.split("=")[1]
-                                numCond=np.where(data==int(GTcond))
-                                totalNum+=len(numCond[0])
-   
-            except tb.exceptions.NoSuchNodeError:
-                pass
-            except Exception as e:
-                # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
-                print(e)
-                pass     
+
+        for rownames,colnames,genoinfo in accessEngine.get_all_genotype([sampleID]):
+            if cond is None:
+                numNan=np.where(np.isnan(genoinfo))
+                numNone=np.where(genoinfo==-1) 
+                totalNum+=len(rownames)-len(numNan[0])
+            else:
+                numNan=np.where(np.isnan(genoinfo))
+                if cond=="GT!=0":
+                    numCond=np.where(genoinfo!=0)
+                    totalNum+=len(numCond[0])-len(numNan[0])
+                else:
+                    GTcond=cond.split("=")[1]
+                    numCond=np.where(genoinfo==int(GTcond))
+                    totalNum+=len(numCond[0])
         return totalNum
 
 
@@ -796,8 +771,8 @@ class HDF5Engine_access(Base_Access):
                 print(e)
                 pass
 
-    def get_all_genotype_genoinfo(self,sampleNames,varIDs,validGenotypeFields,chrs=""):
-        return(list(self.get_genotype_genoinfo_by_chunk(sampleNames,varIDs,validGenotypeFields,chrs)))
+    def get_all_genotype_genoinfo(self,sampleNames,varIDs,validGenotypeFields,genotypes,chrs=""):
+        return(list(self.get_genotype_genoinfo_by_chunk(sampleNames,varIDs,validGenotypeFields,genotypes,chrs)))
 
 
 
