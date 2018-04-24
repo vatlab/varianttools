@@ -1181,6 +1181,7 @@ class HDF5_Store(Base_Store):
                         continue
                     
                     end_sample = min(start_sample + workload[job], start_sample+len(IDs))
+
                     if end_sample <= start_sample:
                         continue
                     HDFfile_Merge="tmp_"+str(start_sample+1)+"_"+str(end_sample)+"_genotypes.h5"

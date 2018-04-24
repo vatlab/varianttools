@@ -369,13 +369,17 @@ class Updater:
                 self.db.commit()
                 prog.update(self.count[0])
         self.count[7] = reader.unprocessable_lines
+        hdf5Files=[]
+        for id in sample_ids:
+            cur.execute('SELECT HDF5 FROM sample WHERE sample_id = ?;', (id,))
+            res=cur.fetchone()
+            hdf5file=res[0]
+            hdf5Files.append(hdf5file)
+        hdf5Files=list(set(hdf5Files))
         self.db.commit()
         prog.done(self.count[0])
+        UpdateGenotypeInParallel(self,input_filename,sample_ids,hdf5Files)
 
-        UpdateGenotypeInParallel(self,input_filename,sample_ids)
-        # for HDFfileName in glob.glob("tmp*genotypes.h5"):
-        #     storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
-        #     print(storageEngine.file)
 
 
         
@@ -773,7 +777,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     for name in queryDestinations:
         if name is not None:
             proj.checkFieldName(name, exclude='variant')
-    # print(queryDestinations)
+ 
  
     
     prog = ProgressBar('Counting variants', len(IDs))
@@ -792,8 +796,6 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
 
     variants=store.get_genoType_genoInfo(sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step)
 
-    # for key,value in variants.items():
-    #      print(key,value)
 
 
     #

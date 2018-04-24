@@ -216,19 +216,24 @@ class HDF5Engine_storage(Base_Storage):
                 pass        
   
 
-    def removeNode(self,chr,info=""):
+    def removeNode(self,chrs=[],info=""):
         # for chr in range(1,23):
-        try:
-            if self.checkGroup(str(chr),info):
-                if len(info)>0:
-                    self.file.remove_node("/chr"+str(chr)+"/"+info)
-                else:
-                    self.file.remove_node("/chr"+str(chr),recursive=True)
-        except tb.exceptions.NoSuchNodeError:
-            pass                              
-        except Exception as e:
-            print(e)
-            pass
+        if chrs==[]:
+            chrs=["X","Y"]
+            chrs.extend(range(1,23))    
+        for chr in chrs:
+            try:
+                if self.checkGroup(str(chr),info):
+                    if len(info)>0:
+                        # print(chr,info,self.fileName)
+                        self.file.remove_node("/chr"+str(chr)+"/"+info)
+                    else:
+                        self.file.remove_node("/chr"+str(chr),recursive=True)
+            except tb.exceptions.NoSuchNodeError:
+                pass                              
+            except Exception as e:
+                print(e)
+                pass
 
 
     def remove_genofields(self,items):

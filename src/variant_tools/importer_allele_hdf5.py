@@ -1082,7 +1082,6 @@ class HDF5GenotypeImportWorker(Process):
     def writeIntoHDF(self,chr):
         storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
         shape=np.array([len(self.rownames),len(self.colnames)])
-       
         storageEngine.store(np.array(self.info["GT_geno"]),chr,"GT_geno")
         storageEngine.store(np.array(self.info["Mask_geno"]),chr,"Mask_geno")
         storageEngine.store(np.array(self.rownames),chr,"rownames")
@@ -1112,8 +1111,7 @@ class HDF5GenotypeImportWorker(Process):
     def run(self):
         
         prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
-        prev_variant_id=-1
-       
+        prev_variant_id=-1     
         for i in range(len(self.chunk["variants/ID"])):
             infoDict={}
             chr=self.chunk["variants/CHROM"][i].replace("chr","")
@@ -1493,7 +1491,7 @@ class HDF5GenotypeSortWorker(Process):
         prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
         if self.efirst.value==True:
             storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
-            storageEngine.removeNode(prev_chr)
+            storageEngine.removeNode([prev_chr])
             # command = ["ptrepack", "-o", "--chunkshape=auto", "--propindexes", self.dbLocation, self.dbLocation+"test"]
             # call(command)
             storageEngine.close()
@@ -1513,7 +1511,7 @@ class HDF5GenotypeSortWorker(Process):
                     self.writeIntoHDF(prev_chr)
                 prev_chr=chr
                 storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
-                storageEngine.removeNode(prev_chr)
+                storageEngine.removeNode([prev_chr])
                 storageEngine.close()
                 self.estart.value=0
                 self.eend.value=self.estart.value+READ_EXISTING_CHUNK_LENGTH
@@ -1845,8 +1843,7 @@ class HDF5GenotypeUpdateWorker(Process):
 
 
 
-def UpdateGenotypeInParallel(updater,input_filename,sample_ids):
-
+def UpdateGenotypeInParallel(updater,input_filename,sample_ids,hdf5Files):
         
     jobs=updater.jobs
     numTasks=jobs
@@ -1879,14 +1876,17 @@ def UpdateGenotypeInParallel(updater,input_filename,sample_ids):
             tabix=tabix, samples=samples, transformers=transformers
         )
 
-    for HDFfileName in glob.glob("tmp*genotypes.h5"):
+    for HDFfileName in hdf5Files:
         storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
         for info in updater.genotype_info:
-            storageEngine.removeNode(info.name)
+            if "_geno" not in info.name:
+                storageEngine.removeNode([],info.name+"_geno")
+            else:
+                storageEngine.removeNode([],info.name)
             storageEngine.close()
 
     for chunk, _, _, _ in it:
-        for HDFfileName in glob.glob("tmp*genotypes.h5"):
+        for HDFfileName in hdf5Files:
             # cur=updater.proj.db.cursor()
             # cur.execute('SELECT MIN(sample_id),Max(sample_id) FROM sample where HDF5="{}" '.format(HDFfileName))
             # result=cur.fetchone()

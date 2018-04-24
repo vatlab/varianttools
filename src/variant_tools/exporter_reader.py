@@ -478,7 +478,6 @@ class VariantWorker(Process):
         for anno in self.annoDB:
             db.attach(os.path.join(anno.dir, anno.filename), lock=self.lock)
         cur = db.cursor()
-       
         cur.execute(self.query)
         # reporting to the main process that SQL query is done
         self.output.send(None)
