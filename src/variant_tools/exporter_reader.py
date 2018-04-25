@@ -314,7 +314,7 @@ class MultiVariantReader(BaseVariantReader):
         self.jobs = max(jobs, len(IDs) // MAX_COLUMN + 2)
         block = len(IDs) // (self.jobs-1) + 1
         
-        
+      
         if self.proj.store=="sqlite" or transformToHDF5:
 
             if transformToHDF5:
@@ -351,6 +351,7 @@ class MultiVariantReader(BaseVariantReader):
                 sampleFileMap[res[1]].append(res[0])
             samplefiles=glob.glob("tmp*genotypes.h5")      
             samplefiles.sort(key=lambda x:x.split("_")[1])
+            self.jobs=len(samplefiles)+1
             for HDFfileName in samplefiles:
                 filename=HDFfileName.split("/")[-1]
                 if filename in sampleFileMap:
@@ -359,6 +360,7 @@ class MultiVariantReader(BaseVariantReader):
                     p=VariantWorker_HDF5(HDFfileName,list(set(IDs).intersection(samplesInfile)),self.geno_fields,w)
                     self.workers.append(p)
                     self.readers.append(r)
+
        
 
 
@@ -367,6 +369,7 @@ class MultiVariantReader(BaseVariantReader):
         status = [0] * len(self.readers)
         while True:
             for idx, (w,r) in enumerate(zip(self.workers, self.readers)):
+                # print(status)
                 if status[idx] == 2: # completed 
                     continue
                 elif status[idx] == 1: # started?
@@ -391,31 +394,62 @@ class MultiVariantReader(BaseVariantReader):
         id = None
         last = len(self.readers) - 1
         all_done = False
-        while True:
-            try:
-                for idx, reader in enumerate(self.readers):
+        if self.table=="variant":
+            while True:
+                try:
+                    for idx, reader in enumerate(self.readers):
+                        val = reader.recv()
+                        if val is None:
+                            all_done = True
+                            break
+                        sys.stdout.flush()
+                        if idx == 0:
+                            id = val[0]
+                        elif id != val[0]:
+                            raise ValueError('Read different IDs from multiple processes')
+                        rec.extend(val[1:])             
+                        if idx == last:
 
-                    val = reader.recv()
-                    if val is None:
-                        all_done = True
+                            yield rec
+                            rec = []
+                    if all_done:
                         break
-                    sys.stdout.flush()
-                    if idx == 0:
-                        id = val[0]
-                    elif id != val[0]:
-                        raise ValueError('Read different IDs from multiple processes')
+                except Exception as e:
+                    env.logger.debug('Failed to get record: {}'.format(e))
+            for p in self.workers:
+                p.terminate()
+        else:
+
+            while True:
+                try:
+                    val=self.readers[0].recv()
+                    if val is None:
+                        all_done=True
+                        break
+                    # sys.stdou.flush()
+                    id=val[0]
                     rec.extend(val[1:])
-                    
-                    if idx == last:
-                        # print(id,rec[:20])
-                        yield rec
-                        rec = []
-                if all_done:
-                    break
-            except Exception as e:
-                env.logger.debug('Failed to get record: {}'.format(e))
-        for p in self.workers:
-            p.terminate()
+                    notSameID=True
+                    while notSameID:
+                        for idx,reader in enumerate(self.readers[1:]):
+                            val=reader.recv()
+                            # print(idx+1,val[0])
+                            if id ==val[0]:
+                                rec.extend(val[1:])
+                                if idx+1==last:
+                                    notSameID=False
+                                    # print(id,rec)
+                                    yield rec
+                                    rec=[]
+                                    break
+                    if all_done:
+                        break
+                except Exception as e:
+                    env.logger.debug('Failed to get record: {}'.format(e))
+            for p in self.workers:
+                p.terminate()
+
+
 
 
 
@@ -425,7 +459,7 @@ class VariantWorker_HDF5(Process):
         self.fileName=HDFfileName
         self.samples=samples
         self.geno_fields=geno_fields
-        self.output = output    
+        self.output = output   
         Process.__init__(self)
 
     def run(self):
@@ -446,11 +480,10 @@ class VariantWorker_HDF5(Process):
                         info[:,col*len(self.geno_fields)+pos]=genoInfo[:,col]
 
             vardict.update(dict(zip(rownames,info)))  
-        result=vardict
         # result=accessEngine.get_genoType_forExport_from_HDF5(self.samples,self.geno_fields)  
         self.output.send(None)
         last_id = None
-        for key,val in result.items():
+        for key,val in vardict.items():
             if key!=last_id:
                 last_id=key
                 val=np.where(np.isnan(val), None, val)
