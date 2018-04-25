@@ -1381,11 +1381,14 @@ class HDF5_Store(Base_Store):
             # result=queue.get()
             # noWT=noWT.union(set(result))    
             for rownames,colnames,genoinfo in queue.get():
-                genoinfo[genoinfo==-1]=0
-                rowsum=np.nansum(genoinfo,axis=1)
-                noWTvariants=rownames[np.where(rowsum>=0)].tolist()
+                # deal with empty geno
+                if ((genoinfo==-1).sum())==len(rownames)*len(colnames):
+                    noWTvariants=rownames.tolist()
+                else:
+                    genoinfo[genoinfo==-1]=0
+                    rowsum=np.nansum(genoinfo,axis=1)
+                    noWTvariants=rownames[np.where(rowsum>0)].tolist()
                 noWT=noWT.union(set(noWTvariants)) 
-
         for p in procs:
             p.join()
 
