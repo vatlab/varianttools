@@ -439,8 +439,12 @@ class MutantInfo:
                         # the complete codon must be in the simulated region. We do not handle
                         # partial codon because we cannot control mutations outside of the specified
                         # region
-                        if (p not in all_loci[ch]) or (pos[idx+1] not in all_loci[ch]) or (pos[idx+2] not in all_loci[ch]):
-                            skip_codon = True
+                        try:
+                            if (p not in all_loci[ch]) or (pos[idx+1] not in all_loci[ch]) or (pos[idx+2] not in all_loci[ch]):
+                                skip_codon = True
+                                continue
+                        except:
+                            skip_condon = True
                             continue
                         # information about the codon: p0, p1, p2, aa, strand
                         codon = ((ch, p), (ch, pos[idx+1]), (ch, pos[idx+2]),
@@ -801,7 +805,12 @@ class CreatePopulation(PipelineAction):
                         infoFields=self.infoFields)
                 #
                 chr = pop.chromNames().index(fields[0])
-                pos = lociIndex[chr][int(fields[1])]
+                try:
+                    # due to a bug in tabix, loci position might be outside of the specified region
+                    # so there is no "pos" for this line of genotype, but that is ok anyway. (issue #62)
+                    pos = lociIndex[chr][int(fields[1])]
+                except:
+                    continue
                 for ind, geno in enumerate(fields[10:]):
                     if geno[0] not in ('0', '.'):
                         pop.individual(ind).setAllele(1, pos, 0, chr)
