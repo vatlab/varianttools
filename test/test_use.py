@@ -80,7 +80,7 @@ class TestUse(ProcessTestCase):
         self.assertOutput('vtools select variant -c', '145')
         self.assertOutput('vtools select variant "testThousandGenomes.chr is not NULL" -c', '145')
 
-    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
+    # @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
     def testESP(self):
         self.runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
         self.assertSucc('vtools use ESP')

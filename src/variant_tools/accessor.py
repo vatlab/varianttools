@@ -106,20 +106,6 @@ class HDF5Engine_storage(Base_Storage):
                 self.getGroup(chr,groupName).append(data)
 
 
-    # def geno_fields(self,sampleID):
-    #     fields=[]
-    #     chrs=["X","Y"]
-    #     chrs.extend(range(1,23))
-    #     for chr in chrs:
-    #         try:
-    #             for field in ["GT_geno","DP_geno","GQ_geno"]:
-    #                 group=self.file.get_node("/chr"+str(chr)+"/"+field)  
-    #                 if field=="GT_geno":
-    #                     field="GT"     
-    #                 fields.append(field)
-    #         except tb.exceptions.NoSuchNodeError:
-    #             pass
-    #     return list(set(fields))
 
 
     def geno_fields(self,sampleID):
@@ -548,32 +534,6 @@ class HDF5Engine_access(Base_Access):
                 pass     
         return num
 
-
-     # def num_variants(self,sampleID):
-     #    totalNum=0
-     #    chrs=["X","Y"]
-     #    chrs.extend(range(1,23))
-     #    numCount={}
-     #    for chr in chrs:
-     #        try:
-     #            group=self.file.get_node("/chr"+str(chr))
-     #            # indices=group.indices[:]
-     #            colnames=group.colnames[:]
-     #            numVariants=len(group.rownames[:])
-     #            # samplePos=np.where(colnames==sampleID)
-     #            # colPos=np.where(indices==samplePos[0][0])
-     #            colPos=np.where(colnames==sampleID)[0]
-     #            # data=group.data[colPos]
-     #            data=group.GT_geno[:,colPos]
-     #            numNan=np.where(np.isnan(data))
-     #            numNone=np.where(data==-1) 
-     #            # totalNum+=numVariants-len(numNan[0])-len(numNone[0])
-     #            totalNum+=numVariants-len(numNan[0])
-     #            numCount[chr]=numVariants-len(numNan[0])
-     #            # totalNum+=numVariants
-     #        except tb.exceptions.NoSuchNodeError:
-     #            pass
-     #    return totalNum,numCount
 
 
     def num_variants(self,sampleID):
