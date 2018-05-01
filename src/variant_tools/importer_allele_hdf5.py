@@ -466,10 +466,8 @@ def _normalize_field_prefix(field, headers):
 
 
 def _check_field(field, headers):
-
     # assume field is already normalized for prefix
     group, name = field.split('/')
-
     if group == 'variants':
 
         if name in FIXED_VARIANTS_FIELDS:
@@ -489,8 +487,8 @@ def _check_field(field, headers):
         elif name in headers.infos:
             pass
 
-        else:
-            warnings.warn('%r INFO header not found' % name)
+        # else:
+        #     warnings.warn('%r INFO header not found' % name)
 
     elif group == 'calldata':
 
@@ -636,6 +634,7 @@ default_types = {
     'variants/AF': 'f4',
     'variants/MQ': 'f4',
     'variants/ANN': 'object',
+    'variants/NS': 'i1',
     'calldata/GT': 'genotype/i1',
     'calldata/GQ': 'f4',
     'calldata/HQ': 'i1',
@@ -644,7 +643,8 @@ default_types = {
     'calldata/AD': 'i2',
     'calldata/MQ0': 'i2',
     'calldata/MQ': 'f2',
-    'calldata/PL': 'i2'
+    'calldata/PL': 'i2',
+    'calldata/NS': 'i1'
 }
 
 
@@ -726,6 +726,7 @@ default_numbers = {
     'calldata/PL': 4,
     'calldata/MQ0': 1,
     'calldata/MQ': 1,
+    'calldata/NS': 1,
 }
 
 
@@ -989,19 +990,18 @@ class HDF5GenotypeImportWorker(Process):
             dbLocation: the HDF5 file name 
 
     '''
-    def __init__(self, chunk,variantIndex, start_sample,end_sample,sample_ids,variant_count, 
-        proc_index,geno_info,dbLocation,build):
+    def __init__(self, chunk,variantIndex,start_sample,end_sample,sample_ids,variant_count, 
+        proc_index,dbLocation,genotype_info,build):
 
         Process.__init__(self, name='GenotypeImporter')
         # self.daemon=True
         self.chunk=chunk
-
         self.variantIndex = variantIndex
         self.variant_count = variant_count
         self.proc_index = proc_index
         self.start_sample=start_sample
         self.end_sample=end_sample
-        # self.geno_info=geno_info
+        
         self.indptr=[]
         self.indices=[]
         self.data=[]
@@ -1018,72 +1018,71 @@ class HDF5GenotypeImportWorker(Process):
         self.build=build
         self.info={}
         self.rowData=[]
-        self.info["GT_geno"]=[]
-        self.info["Mask_geno"]=[]
+        self.info["GT"]=[]
+        self.info["Mask"]=[]
         self.namedict={}
         self.geno_info=[]
-        if "GT" in geno_info:
-            geno_info.remove("GT")
+        if "GT" in genotype_info:
+            genotype_info.remove("GT")
 
-        if len(geno_info)>0:
-            for info in geno_info:
-
+        if len(genotype_info)>0:
+            for info in genotype_info:
                 #indptr,indices,data,shape,rownames
                 if not isinstance(info,str):
-                    self.geno_info.append(info.name)
+                    self.geno_info.append(info.name.replace("_geno",""))
                 else:
-                    self.geno_info.append(info)
+                    self.geno_info.append(info.replace("_geno",""))
         for info in self.geno_info:
             self.info[info]=[]
-            self.namedict[info]="calldata/"+info.replace("_geno","")
-
+            if "calldata/"+info in self.chunk and np.sum(self.chunk["calldata/"+info][:10])>0:
+                    self.namedict[info]="calldata/"+info
+            elif "variants/"+info in self.chunk and np.sum(self.chunk["variants/"+info][:10])>0:
+                    self.namedict[info]="variants/"+info
 
   
-        
-   
-
     # check io_vcf_read.pyx function vcf_genotype_parse to see the meaning of coding
     def get_geno(self,variant_id,pos,altIndex):
         self.rownames.append(variant_id)
         if "calldata/GT" in self.chunk:
-            GT_geno=self.chunk["calldata/GT"][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]
-            GT_geno=GT_geno.astype(float)
+            GT=self.chunk["calldata/GT"][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]
+            GT=GT.astype(float)
             if altIndex==0:
-                GT_geno[np.logical_or(GT_geno==3, GT_geno==4)]=np.nan          
+                GT[np.logical_or(GT==3, GT==4)]=np.nan          
             elif altIndex==1:
                 # GT_geno[GT_geno==3]=1
                 # GT_geno[GT_geno==4]=2
-                GT_geno[(GT_geno!=3)&(GT_geno!=4)&(GT_geno!=-1)]=np.nan
+                GT[(GT!=3)&(GT!=4)&(GT!=-1)]=np.nan
                 # GT_geno[np.logical_and(GT_geno!=3, GT_geno!=4)]=np.nan
-                GT_geno[GT_geno==3]=1
-                GT_geno[GT_geno==4]=2
-            GT_geno[GT_geno==-10]=np.nan
-            self.info["GT_geno"].append(GT_geno)
-            self.info["Mask_geno"].append([1.0]*len(GT_geno))
+                GT[GT==3]=1
+                GT[GT==4]=2
+            GT[GT==-10]=np.nan
+            self.info["GT"].append(GT)
+            self.info["Mask"].append([1.0]*len(GT))
         else:
             # GT_geno=[np.nan]
-            GT_geno=[-1]
-            self.info["GT_geno"].append(GT_geno)
-            self.info["Mask_geno"].append([1.0]*len(GT_geno))
+            GT=[-1]
+            self.info["GT"].append(GT)
+            self.info["Mask"].append([1.0]*len(GT))
       
         if len(self.geno_info)>0:
             # self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
             # self.getInfoTable(variant_id,infoDict,altIndex)
             for info in self.geno_info:
-                self.info[info].append(self.chunk[self.namedict[info]][pos,self.start_sample-self.firstID:self.end_sample-self.firstID])
+                if "variants" in self.namedict[info]:
+                    self.info[info].append(np.array([self.chunk[self.namedict[info]][pos]]))
+                else:
+                    self.info[info].append(self.chunk[self.namedict[info]][pos,self.start_sample-self.firstID:self.end_sample-self.firstID])
                 # print(self.namedict[info],info,self.start_sample,self.end_sample,pos,(self.chunk[self.namedict[info]][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]))
         
 
-
-   
 
 
     def writeIntoHDF(self,chr):
         storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
         shape=np.array([len(self.rownames),len(self.colnames)])
-        storageEngine.store(np.array(self.info["GT_geno"]),chr,"GT_geno")
-        storageEngine.store(np.array(self.info["Mask_geno"]),chr,"Mask_geno")
+        storageEngine.store(np.array(self.info["GT"]),chr,"GT")
+        storageEngine.store(np.array(self.info["Mask"]),chr,"Mask")
         storageEngine.store(np.array(self.rownames),chr,"rownames")
         rowmask=np.zeros(len(self.rownames),dtype=np.bool)
         storageEngine.store(np.array(rowmask),chr,"rowmask")
@@ -1095,8 +1094,8 @@ class HDF5GenotypeImportWorker(Process):
         
         storageEngine.store(shape,chr,"shape")
 
-        self.info["GT_geno"]=[]
-        self.info["Mask_geno"]=[]
+        self.info["GT"]=[]
+        self.info["Mask"]=[]
 
         if len(self.geno_info)>0:
             for info in self.geno_info:
@@ -1141,162 +1140,7 @@ class HDF5GenotypeImportWorker(Process):
         self.writeIntoHDF(chr)
 
 
-     # def getInfoTable(self,variant_id,infoDict,altIndex):
-     #    for idx in range(self.start_sample,self.end_sample):
-     #        rowData=[variant_id,idx]
-     #        samplePos=idx-self.start_sample
-     #        for name in infoDict.keys():
-     #            if name=="DP_geno" or name=="GQ_geno":
-     #                rowData.append(infoDict[name][samplePos])
-     #            elif name=="AD_geno" and altIndex==0:
-     #                rowData.append(infoDict[name][samplePos][0])
-     #                rowData.append(infoDict[name][samplePos][1])
-     #            elif name=="AD_geno" and altIndex==1:
-     #                rowData.append(infoDict[name][samplePos][0])
-     #                rowData.append(infoDict[name][samplePos][2])
-     #            elif name=="PL_geno" and altIndex==0:
-     #                rowData.append(infoDict[name][samplePos][0])
-     #                rowData.append(infoDict[name][samplePos][1])
-     #                rowData.append(infoDict[name][samplePos][2])
-     #            elif name=="PL_geno" and altIndex==1:
-     #                rowData.append(infoDict[name][samplePos][3])
-     #                rowData.append(infoDict[name][samplePos][4])
-     #                rowData.append(infoDict[name][samplePos][5])
-     #        self.rowData.append(rowData)
 
-    #   # check io_vcf_read.pyx function vcf_genotype_parse to see the meaning of coding
-    # def getGT(self,variant_id,i,altIndex):
-    #     GT=self.chunk["calldata/GT"][i].tolist()
-    #     for idx in range(self.start_sample,self.end_sample):
-    #         if GT[idx] is not None:
-    #             if altIndex==0:
-    #                 if GT[idx]!=0:
-    #                     if GT[idx]!=3 and GT[idx]!=4:
-    #                         self.genoCount=self.genoCount+1
-    #                         self.indices.append(idx-self.start_sample)
-    #                         self.data.append(GT[idx])
-    #                     else:
-    #                         self.genoCount=self.genoCount+1
-    #                         self.indices.append(idx-self.start_sample)
-    #                         self.data.append(np.nan)  
-    #             elif altIndex==1:
-    #                     self.genoCount=self.genoCount+1
-    #                     self.indices.append(idx-self.start_sample)   
-    #                     if GT[idx]==3:
-    #                         self.data.append(1)
-    #                     elif GT[idx]==4:
-    #                         self.data.append(2)
-    #                     else:
-    #                         self.data.append(np.nan)
-    #         else:
-    #             self.genoCount=self.genoCount+1
-    #             self.indices.append(idx-self.start_sample)
-    #             self.data.append(np.nan)
-    #     self.indptr.append(self.genoCount)
-    #     self.rownames.append(variant_id)
-    #     if len(self.geno_info)>0:
-    #         # self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
-    #         # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
-    #         # self.getInfoTable(variant_id,infoDict,altIndex)
-    #         for info in self.geno_info:
-    #             self.info[info.name].append(self.chunk[self.namedict[info.name]][i,self.start_sample:self.end_sample].tolist())
-
-
-    # def writeIntoFile(self,chr):
-
-    #     self.variant_count.value = self.variant_count.value + len(self.indptr)
-    #     shape=(self.variant_count.value,self.end_sample-self.start_sample)
-
-    #     storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
-    #     # make a HMatrix object which is a matrix with rownames and colnames
-    #     hmatrix=HMatrix(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames)
-    #     # write GT into file
-    #     storageEngine.store(hmatrix,chr)
-    #     # write geno info into HDF5 if exists
-    #     if len(self.geno_info)>0:
-    #             for key,value in list(self.info.items()):
-    #                 hmatrix=HMatrix(value[2],value[1],value[0],shape,value[3],self.colnames)
-    #                 storageEngine.store(hmatrix,chr,key) 
-        
-    #     # clean up
-    #     self.indptr=[]
-    #     self.indices=[]
-    #     self.data=[]
-    #     self.rownames=[]
-
-    #     if len(self.geno_info)>0:
-    #         for info in self.geno_info:
-    #             #indptr,indices,data,shape,rownames
-    #             self.info[info.name]=[[],[],[],[],[]]
-
-
-
-    # def writeSparseGT_IntoHDF(self,chr):
-    #     storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
-    #     # if self.proc_index==1:
-    #     #     print(self.proc_index,tolistTime,getGTtime,getInfotime)
-    #     shape=(len(self.indptr),len(self.colnames))
-    #     # make a HMatrix object which is a matrix with rownames and colnames
-    #     hmatrix=HMatrix(self.data,self.indices,self.indptr,shape,self.rownames,self.colnames)
-    #     # write GT into file
-    #     storageEngine.store(hmatrix,chr,"GT")
-    #     # if len(self.geno_info)>0:
-    #     #     for key,value in list(self.info.items()):
-    #     #         hmatrix=HMatrix(value[2],value[1],value[0],shape,value[3],self.colnames)
-    #     #         storageEngine.store(hmatrix,chr,key) 
-    #     #     for info in self.geno_info:
-    #     #         #indptr,indices,data,shape,rownames
-    #     #         self.info[info.name]=[[],[],[],[],[]]
-    #     tableName="genoInfo"
-    #     if len(self.geno_info)>0:
-    #         storageEngine.store_table(self.rowData,tableName,chr)
-    #     storageEngine.close()
-    #     self.indptr=[]
-    #     self.indices=[]
-    #     self.data=[]
-    #     self.rownames=[]
-    #     self.rowData=[]
-    #     self.genoCount=0
-
-    #save into sparse
-    # def run(self):
-    #     prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
-
-    #     for i in range(len(self.chunk["variants/ID"])):
-    #         infoDict={}
-    #         chr=self.chunk["variants/CHROM"][i].replace("chr","")
-    #         if chr!=prev_chr:
-    #             self.writeIntoHDF(prev_chr)
-    #             prev_chr=chr
-        
-    #         ref=self.chunk["variants/REF"][i]
-    #         pos=self.chunk["variants/POS"][i]
-    #         GT=self.chunk["calldata/GT"][i].tolist()
-          
-    #         for altIndex in range(len(self.chunk["variants/ALT"][i])):
-    #             alt=self.chunk["variants/ALT"][i][altIndex]
-    #             if alt!="":
-    #                 if tuple((chr, ref, alt)) in self.variantIndex:
-    #                     variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
-    #                     self.getGT(variant_id,GT,altIndex)
-    #                     if len(self.geno_info)>0:
-    #                         self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
-    #                         # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
-    #                         # self.getInfoTable(variant_id,infoDict,altIndex)   
-    #                 else:
-    #                     rec=[str(chr),str(pos),ref,alt]  
-    #                     msg=normalize_variant(RefGenome(self.build).crr, rec, 0, 1, 2, 3)
-    #                     if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
-    #                         variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
-    #                         starttime=time.time()
-    #                         self.getGT(variant_id,GT,altIndex)
-    #                         getGTtime+=time.time()-starttime
-    #                         if len(self.geno_info)>0:
-    #                             # starttime=time.time()
-    #                             self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
-    #                             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
-    #                             # self.getInfoTable(variant_id,infoDict,altIndex)
-    #     self.writeIntoHDF(chr)
 
 class HDF5GenotypeSortWorker(Process):
     
@@ -1331,14 +1175,13 @@ class HDF5GenotypeSortWorker(Process):
         self.build=importer.build
         self.info={}
         self.rowData=[]
-        self.info["GT_geno"]=[]
-        self.info["Mask_geno"]=[]
+        self.info["GT"]=[]
+        self.info["Mask"]=[]
         self.namedict={}
         self.geno_info=[]
         self.estart=estart
         self.eend=eend
         self.efirst=efirst
-        self.checkfileName="tmp_1501_1750_sort_genotypes.h5"
         self.countcheck=0
         self.readcheck=0
         # if self.dbLocation==self.checkfileName:
@@ -1352,7 +1195,7 @@ class HDF5GenotypeSortWorker(Process):
                     self.geno_info.append(info)
         for info in self.geno_info:    
             self.info[info]=[]
-            self.namedict[info]="calldata/"+info.replace("_geno","")
+            self.namedict[info]="calldata/"+info
         
    
 
@@ -1361,17 +1204,17 @@ class HDF5GenotypeSortWorker(Process):
         self.readcheck+=1
         self.rownames.append(variant_id)
         
-        GT_geno=self.chunk["calldata/GT"][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]
-        GT_geno=GT_geno.astype(float)
+        GT=self.chunk["calldata/GT"][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]
+        GT=GT.astype(float)
         if altIndex==0:
-            GT_geno[np.logical_or(GT_geno==3, GT_geno==4)]=np.nan          
+            GT[np.logical_or(GT==3, GT==4)]=np.nan          
         elif altIndex==1:
-            GT_geno[np.logical_and(GT_geno!=3, GT_geno!=4)]=np.nan
-            GT_geno[GT_geno==3]=1
-            GT_geno[GT_geno==4]=2
+            GT[np.logical_and(GT!=3, GT!=4)]=np.nan
+            GT[GT==3]=1
+            GT[GT==4]=2
         # GT_geno[GT_geno==-10]=np.nan
-        self.info["GT_geno"].append(GT_geno)
-        self.info["Mask_geno"].append([1.0]*len(GT_geno))
+        self.info["GT"].append(GT)
+        self.info["Mask"].append([1.0]*len(GT))
         if len(self.geno_info)>0:
             # self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
@@ -1386,13 +1229,11 @@ class HDF5GenotypeSortWorker(Process):
     def writeIntoHDF(self,chr):
         # if self.dbLocation==self.checkfileName:
         print("writing ",self.dbLocation, self.countcheck,self.readcheck,chr,len(self.rownames))
-        # if self.countcheck<2000:
-        #     print(self.rownames)
-        #     sys.exit()
+  
         storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
         shape=np.array([len(self.rownames),len(self.colnames)])
-        storageEngine.store(np.array(self.info["GT_geno"]),chr,"GT_geno")
-        storageEngine.store(np.array(self.info["Mask_geno"]),chr,"Mask_geno")
+        storageEngine.store(np.array(self.info["GT"]),chr,"GT")
+        storageEngine.store(np.array(self.info["Mask"]),chr,"Mask")
         storageEngine.store(np.array(self.rownames),chr,"rownames")
         rowmask=np.zeros(len(self.rownames),dtype=np.bool)
         storageEngine.store(np.array(rowmask),chr,"rowmask")
@@ -1404,12 +1245,11 @@ class HDF5GenotypeSortWorker(Process):
         
         storageEngine.store(shape,chr,"shape")
 
-        self.info["GT_geno"]=[]
-        self.info["Mask_geno"]=[]
+        self.info["GT"]=[]
+        self.info["Mask"]=[]
 
         if len(self.geno_info)>0:
             for info in self.geno_info:
-                # print(info)
                 storageEngine.store_genoInfo(np.array(self.info[info]),chr,info)
                 self.info[info]=[]
  
@@ -1426,8 +1266,8 @@ class HDF5GenotypeSortWorker(Process):
         # if endPos>shape[0]:
         #     print(endPos,shape[0])
         #     endPos=shape[0]
-        rownames,colnames,genotype=accessEngine.filter_on_genotypes("",chr,node,"GT_geno",startPos,endPos,colpos,[])
-        allgenoinfo["GT_geno"]=genotype
+        rownames,colnames,genotype=accessEngine.filter_on_genotypes("",chr,node,"GT",startPos,endPos,colpos,[])
+        allgenoinfo["GT"]=genotype
         if len(self.geno_info)>0:
             for info in self.geno_info:
                 _,_,genoinfo=accessEngine.filter_on_genotypes("",chr,node,info,startPos,endPos,colpos,[])
@@ -1468,12 +1308,12 @@ class HDF5GenotypeSortWorker(Process):
             endPos=startPos+READ_EXISTING_CHUNK_LENGTH
             if endPos>=len(rownames):
                 endPos=len(rownames)
-            chunk_rownames,colnames,genotype=accessEngine.filter_on_genotypes("",chr,node,"GT_geno",startPos,endPos,colpos,[])
+            chunk_rownames,colnames,genotype=accessEngine.filter_on_genotypes("",chr,node,"GT",startPos,endPos,colpos,[])
             for rowname in chunk_rownames:
                 self.rownames.append(rowname)
             for rec in genotype:
-                self.info["GT_geno"].append(rec)
-                self.info["Mask_geno"].append([1.0]*len(rec))
+                self.info["GT"].append(rec)
+                self.info["Mask"].append([1.0]*len(rec))
             if len(self.geno_info)>0:
                 for info in self.geno_info:
                     _,_,genoinfo=accessEngine.filter_on_genotypes("",chr,node,info,startPos,endPos,colpos,[])
@@ -1519,8 +1359,7 @@ class HDF5GenotypeSortWorker(Process):
                 last=0
             ref=self.chunk["variants/REF"][i]
             pos=self.chunk["variants/POS"][i]
-            # if self.dbLocation==self.checkfileName:
-            #     print("new file",pos)
+
             while last<len(erowpos) and pos>erowpos[last]:
                 self.countcheck+=1
                 # if self.dbLocation==self.checkfileName:
@@ -1528,7 +1367,7 @@ class HDF5GenotypeSortWorker(Process):
                 self.rownames.append(erownames[last])
                 for info in egenoinfo.keys():
                     self.info[info].append(egenoinfo[info][last,:])
-                self.info["Mask_geno"].append([1.0]*len(egenoinfo["GT_geno"][last,:]))
+                self.info["Mask"].append([1.0]*len(egenoinfo["GT"][last,:]))
                 last+=1
             # if self.dbLocation==self.checkfileName:
             #         print("before",last,len(erowpos))
@@ -1696,7 +1535,7 @@ def importGenotypesInParallel(importer,num_sample=0):
         if (len(importer.genotype_info)>0):
             for genoinfo in importer.genotype_info:
                 fields.append("calldata/"+genoinfo.name.replace("_geno",""))
-
+                fields.append("variants/"+genoinfo.name.replace("_geno",""))
         alt_number=DEFAULT_ALT_NUMBER
         fills=None
         region=None
@@ -1721,11 +1560,8 @@ def importGenotypesInParallel(importer,num_sample=0):
             if workload[job] == 0:
                 continue
             # readQueue.append(mpQueue())
-
         prog = ProgressBar('Importing genotypes', importer.total_count[2],initCount=0)
         lines=0
-        # print(fields[6:])
-
 
         estart=[Value('L', 0) for x in range(numTasks)]
         eend=[Value('L', READ_EXISTING_CHUNK_LENGTH) for x in range(numTasks)]
@@ -1745,7 +1581,7 @@ def importGenotypesInParallel(importer,num_sample=0):
                     HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
                     updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge)
                     taskQueue.put(HDF5GenotypeImportWorker(chunk, importer.variantIndex, start_sample, end_sample, 
-                        sample_ids,variant_import_count[job], job, importer.genotype_info,HDFfile_Merge,importer.build))
+                        sample_ids,variant_import_count[job], job,HDFfile_Merge,importer.genotype_info,importer.build))
                 else:
                     originalFile="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
                     HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_sort_genotypes.h5"
@@ -1797,23 +1633,30 @@ class HDF5GenotypeUpdateWorker(Process):
 
         if len(self.geno_info)>0:
             for info in self.geno_info:
-                self.info[info.name]=[]
-                if "_geno" in info.name:
-                    self.namedict[info.name]="calldata/"+info.name.replace("_geno","")
-                else:
-                    self.namedict[info.name]="variants/"+info.name.replace("_geno","")
+                name=info.name.replace("_geno","")
+                self.info[name]=[]
+                # if "_geno" in info.name:
+                #     self.namedict[info.name]="calldata/"+info.name.replace("_geno","")
+                # else:
+                #     self.namedict[info.name]="variants/"+info.name.replace("_geno","")
+                if "calldata/"+name in self.chunk and np.sum(self.chunk["calldata/"+name][:10])>0:
+                    self.namedict[name]="calldata/"+name
+                elif "variants/"+name in self.chunk and np.sum(self.chunk["variants/"+name][:10])>0:
+                    self.namedict[name]="variants/"+name
+       
                 
 
     def writeIntoHDF(self,chr):
         storageEngine=Engine_Storage.choose_storage_engine(self.HDFfile)
         if len(self.geno_info)>0:
             for info in self.geno_info:
-                if "_geno" in info.name:
-                    storageEngine.store_genoInfo(np.array(self.info[info.name]),chr,info.name)
-                else:
-                    ar=np.array(self.info[info.name])
-                    storageEngine.store_genoInfo(np.reshape(ar,(len(ar),-1)),chr,info.name+"_geno")
-                self.info[info.name]=[]
+                # if "_geno" in info.name:
+                name=info.name.replace("_geno","")
+                storageEngine.store_genoInfo(np.array(self.info[name]),chr,name)
+                # else:
+                #     ar=np.array(self.info[info.name])
+                #     storageEngine.store_genoInfo(np.reshape(ar,(len(ar),-1)),chr,info.name)
+                self.info[name]=[]
         storageEngine.close()
 
     
@@ -1833,10 +1676,11 @@ class HDF5GenotypeUpdateWorker(Process):
                 alt=self.chunk["variants/ALT"][i][altIndex]
                 if alt!="":
                     for info in self.geno_info:
-                        if "_geno" in info.name:
-                            self.info[info.name].append(self.chunk[self.namedict[info.name]][i,self.start_sample:self.end_sample]) 
+                        name=info.name.replace("_geno","")
+                        if "variants" in self.namedict[name]:
+                            self.info[name].append(np.array([self.chunk[self.namedict[name]][i]]))
                         else:
-                            self.info[info.name].append(self.chunk[self.namedict[info.name]][i]) 
+                            self.info[name].append(self.chunk[self.namedict[name]][i,self.start_sample:self.end_sample])  
 
         self.writeIntoHDF(chr)
 
@@ -1844,7 +1688,7 @@ class HDF5GenotypeUpdateWorker(Process):
 
 
 def UpdateGenotypeInParallel(updater,input_filename,sample_ids,hdf5Files):
-        
+
     jobs=updater.jobs
     numTasks=jobs
     updaters=[None]*jobs
@@ -1852,11 +1696,11 @@ def UpdateGenotypeInParallel(updater,input_filename,sample_ids,hdf5Files):
     task=None
     variantIndex = updater.proj.createVariantMap('variant', False)
 
-    fields=['variants/ID','variants/REF','variants/ALT','variants/POS','variants/CHROM','variants/DP']
+    fields=['variants/ID','variants/REF','variants/ALT','variants/POS','variants/CHROM']
     if (len(updater.genotype_info)>0):
         for field in updater.genotype_info:          
             fields.append("calldata/"+field.name.replace("_geno",""))
- 
+            fields.append("variants/"+field.name.replace("_geno",""))
     types=None
     numbers=None
     alt_number=DEFAULT_ALT_NUMBER
@@ -1879,10 +1723,7 @@ def UpdateGenotypeInParallel(updater,input_filename,sample_ids,hdf5Files):
     for HDFfileName in hdf5Files:
         storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
         for info in updater.genotype_info:
-            if "_geno" not in info.name:
-                storageEngine.removeNode([],info.name+"_geno")
-            else:
-                storageEngine.removeNode([],info.name)
+            storageEngine.removeNode([],info.name)
             storageEngine.close()
 
     for chunk, _, _, _ in it:

@@ -156,7 +156,7 @@ class TestImport(ProcessTestCase):
         # import additional information on variants and on genotypes.
         # DP and DP_geno are fields provided in the default vcf.fmt
         self.runCmd('vtools init test -f --store '+self.storeMode)
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --var_info DP --geno_info DP_geno --build hg18')
+        self.assertSucc('vtools import vcf/CEU.vcf.gz --var_info DP --geno_info DP --build hg18')
         self.assertSucc('vtools output variant DP')
         if self.storeMode=="sqlite":
             self.assertProj(numOfColumns={'genotype_1': 3})

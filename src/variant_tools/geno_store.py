@@ -726,8 +726,6 @@ class Sqlite_Store(Base_Store):
             myIDs.sort()
             merged_table = '__variants_from_samples'
             query = 'CREATE TEMPORARY TABLE {} (variant_id INT);'.format(merged_table)
-            # env.logger.debug(query)
-            # print(query)
             cur.execute(query)
             prog = ProgressBar('Collecting sample variants', len(IDs)) if NUM_BLOCKS > 1 else None
             count = 0
@@ -739,8 +737,6 @@ class Sqlite_Store(Base_Store):
                 query = 'INSERT INTO {} {};'.format(merged_table,
                     '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{} {}'
                         .format(proj.name, id, noWT_clause[id]) for id in block_IDs]))
-                #env.logger.debug(query)
-                # print(query)
                 cur.execute(query)
                 count += len(block_IDs)
                 if prog:
@@ -1106,7 +1102,7 @@ class HDF5_Store(Base_Store):
                 if len(importer.genotype_field)==0:
                     validGenotypeFields=[]
                 for info in importer.genotype_info:
-                    validGenotypeFields.append(info.name)
+                    validGenotypeFields.append(info.name.replace("_geno",""))
             # self.proj.db = DatabaseEngine()
             # self.proj.db.connect(self.proj.proj_file)
 
@@ -1129,7 +1125,7 @@ class HDF5_Store(Base_Store):
 
                 chunk={'variants/CHROM':[],"variants/POS":[],"variants/REF":[],"variants/ALT":[],"variants/ID":[]}
                 for geno_field in validGenotypeFields:
-                    geno_field=geno_field.replace("_geno","")
+                    # geno_field=geno_field.replace("_geno","")
                     chunk["calldata/"+geno_field]=[]
               
                 for idx, raw_rec in enumerate(reader.records()):
@@ -1141,7 +1137,7 @@ class HDF5_Store(Base_Store):
                     chunk["variants/ID"].append(raw_rec[5])
                     for genoID,geno_field in enumerate(validGenotypeFields):
                         colpos=[6+genoID+pos*len(validGenotypeFields) for pos in range(len(IDs))]
-                        geno_field=geno_field.replace("_geno","")
+                        # geno_field=geno_field.replace("_geno","")
                         chunk["calldata/"+geno_field].append([raw_rec[pos] if raw_rec[pos] is not None else -10 for pos in colpos])
                 
                 for key,value in chunk.items():
@@ -1169,7 +1165,8 @@ class HDF5_Store(Base_Store):
                     workload[i % jobs] += 1
                 numTasks=len(workload)
                 variantIndex = self.proj.createVariantMap('variant', False)
-                # print(variantIndex)
+
+
                 if IDs[0]==1:
                     start_sample =0
                 else:
@@ -1187,9 +1184,9 @@ class HDF5_Store(Base_Store):
                     HDFfile_Merge="tmp_"+str(start_sample+1)+"_"+str(end_sample)+"_genotypes.h5"
                     names=[key for key in allNames.keys()]
                     updateSample(cur,start_sample,end_sample,IDs,names,allNames,HDFfile_Merge)
-                   
+                    
                     taskQueue.put(HDF5GenotypeImportWorker(chunk, variantIndex, start_sample, end_sample, 
-                        IDs,0, job, validGenotypeFields ,HDFfile_Merge,self.proj.build))
+                        IDs,0, job, HDFfile_Merge,validGenotypeFields, self.proj.build))
                     start_sample = end_sample 
                 while taskQueue.qsize()>0:
                     for i in range(jobs):    
@@ -1313,7 +1310,7 @@ class HDF5_Store(Base_Store):
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
             genoFields=storageEngine.geno_fields(sampleID)
             genoFields.sort()
-            # genoFields=[x.lower() for x in genoFields]
+            genoFields=[x.upper() for x in genoFields]
             storageEngine.close()
         return genoFields
 
@@ -1399,7 +1396,6 @@ class HDF5_Store(Base_Store):
         divData=chunks(list(noWT))
         for chunk in divData:
             cur.execute('BEGIN TRANSACTION')
-            # print(len(chunk))
             for id in chunk:
                 # query = 'INSERT INTO {}({}) VALUES {};'.format(merged_table,
                 #         'variant_id', ",".join([ "("+str(id)+")" for id in variantIDs[:1]])) 
@@ -1417,7 +1413,6 @@ class HDF5_Store(Base_Store):
 
     def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
         # print(genotypes)
-        # print(validGenotypeFields)
         sampleFileMap=self.get_HDF5_sampleMap()
         fieldSelect=list(sampleDict.values())[0][1]
         variants=[]
@@ -1438,12 +1433,12 @@ class HDF5_Store(Base_Store):
 
         minPos=[i+5 for i, x in enumerate(operations) if x == 2]
         maxPos=[i+5 for i, x in enumerate(operations) if x == 3]
-  
+
+
         for _ in procs:
             vardict={}
             try:
                 for rownames,colnames,sub_all in queue.get():
-                    
                     numrow=len(rownames)
                     genotype=sub_all[0]
                     variants=np.zeros(shape=(numrow,len(validGenotypeFields)+5),dtype=np.int64)   
@@ -1471,12 +1466,12 @@ class HDF5_Store(Base_Store):
                 pass
 
             result=vardict
-           
             for key,value in result.items():
                 if key not in master:
                     master[key]=value
                 else:
                     master[key]= [sum(x) for x in zip(master[key], value)]
+                
                     if len(minPos)>0 or len(maxPos)>0:
                         for pos in minPos:
                             preValue=master[key][pos]-value[pos]

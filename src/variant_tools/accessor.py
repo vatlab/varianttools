@@ -90,7 +90,6 @@ class HDF5Engine_storage(Base_Storage):
             if len(groups)>1:
                 group=self.getGroup(chr,groups[0])
                 # group=self.file.create_group("/chr"+chr+"/"+groups[0],groups[-1])
-            
             if len(data.shape)==2:
                 ds = self.file.create_earray(group, groupName, tb.Atom.from_dtype(data.dtype), (0,data.shape[1]),filters=filters,expectedrows=len(data))
             elif len(data.shape)>2:
@@ -116,10 +115,8 @@ class HDF5Engine_storage(Base_Storage):
             try:
                 for node in self.file.get_node("/chr"+str(chr)):
                     field=node.name
-                    if field=="GT_geno":
-                        field="GT"
-                    if field not in ["Mask_geno","colnames","rowmask","rownames","samplemask","shape"] and field not in fields:
-                        fields.append(field)
+                    if field not in ["Mask","colnames","rowmask","rownames","samplemask","shape"] and field not in fields:
+                        fields.append(field.lower())
             except tb.exceptions.NoSuchNodeError:
                 pass
         return list(set(fields))
@@ -175,25 +172,22 @@ class HDF5Engine_storage(Base_Storage):
                 chunkPos=chunks_start_stop(shape[0])
                 for startPos,endPos in chunkPos:
 
-                    if "GT_geno" in cond and "/chr"+str(chr)+"/GT_geno" in self.file: 
-                        GT_geno=node.GT_geno[startPos:endPos,:]
+                    if "GT" in cond and "/chr"+str(chr)+"/GT" in self.file: 
+                        GT=node.GT[startPos:endPos,:]
                         if "nan" in cond:
-                            GT_geno=np.nan_to_num(GT_geno)
-                            cond="GT_geno==0"
-                    if "DP_geno" in cond and "/chr"+str(chr)+"/DP_geno" in self.file:    
-                        DP_geno=node.DP_geno[startPos:endPos,:]
-                        DP_geno[DP_geno==-1]=0
-                    if "GQ_geno" in cond and "/chr"+str(chr)+"/GQ_geno" in self.file:    
-                        GQ_geno=node.GQ_geno[startPos:endPos,:]
-                        GQ_geno=np.nan_to_num(GQ_geno)
+                            GT=np.nan_to_num(GT)
+                            cond="GT==0"
+                    if "DP" in cond and "/chr"+str(chr)+"/DP" in self.file:    
+                        DP=node.DP[startPos:endPos,:]
+                        DP[DP==-1]=0
+                    if "GQ" in cond and "/chr"+str(chr)+"/GQ" in self.file:    
+                        GQ=node.GQ[startPos:endPos,:]
+                        GQ=np.nan_to_num(GQ)
                     # Mask_geno=group.Mask_geno[:]
-                    Mask_geno=np.ones(shape=(endPos-startPos,shape[1]),dtype=np.int8)
-                    node.Mask_geno[startPos:endPos,:]=np.where(eval(cond),np.nan,Mask_geno)
+                    Mask=np.ones(shape=(endPos-startPos,shape[1]),dtype=np.int8)
+                    node.Mask[startPos:endPos,:]=np.where(eval(cond),np.nan,Mask)
                     startPos=endPos
-                # print("mask",group.Mask_geno[:])
-                # print(group.Mask_geno[:])
-                # print(group.DP_geno[:])
-                # print(group.GQ_geno[:])
+
             except tb.exceptions.NoSuchNodeError:
                 pass 
             except Exception as e:
@@ -581,7 +575,7 @@ class HDF5Engine_access(Base_Access):
         self.colnames=group.colnames[:].tolist()
         group=self.getGroup(chr,groupName)
         self.rownames=group.rownames[:].tolist()
-        self.GT=group.GT_geno[:]
+        self.GT=group.GT[:]
         snpdict=dict.fromkeys(self.colnames,{})
         for key,value in snpdict.items():
             snpdict[key]=dict.fromkeys(self.rownames,(0,))
@@ -607,8 +601,8 @@ class HDF5Engine_access(Base_Access):
        
         try:
             update_rownames=rownames[rowPos]
-            sub_geno=group.GT_geno[rowPos,:]    
-            sub_Mask=group.Mask_geno[rowPos,:]
+            sub_geno=group.GT[rowPos,:]    
+            sub_Mask=group.Mask[rowPos,:]
             sub_geno=np.multiply(sub_geno,sub_Mask)
 
             update_rowMask=rowMask[rowPos]
@@ -662,7 +656,7 @@ class HDF5Engine_access(Base_Access):
                     try:
                         minPos
                         maxPos
-                        genoinfo=node.GT_geno[minPos:maxPos,colpos]           
+                        genoinfo=node.GT[minPos:maxPos,colpos]           
                         updated_rownames,updated_colnames,updated_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[])
                         
                     except NameError:
@@ -671,8 +665,8 @@ class HDF5Engine_access(Base_Access):
                     shape=node.shape[:].tolist()
                     chunkPos=chunks_start_stop(shape[0])
                     for minPos,maxPos in chunkPos:
-                        if "/chr"+str(chr)+"/GT_geno" in self.file:
-                            genoinfo=node.GT_geno[minPos:maxPos,colpos]           
+                        if "/chr"+str(chr)+"/GT" in self.file:
+                            genoinfo=node.GT[minPos:maxPos,colpos]           
                             sub_rownames,updated_colnames,sub_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[])                    
                             updated_rownames.extend(sub_rownames)
                             updated_geno.extend(sub_geno)
@@ -701,9 +695,8 @@ class HDF5Engine_access(Base_Access):
                 shape=node.shape[:].tolist()
                 chunkPos=chunks_start_stop(shape[0])
                 for minPos,maxPos in chunkPos:
-                    
-                    if "/chr"+str(chr)+"/GT_geno" in self.file and minPos!=maxPos:
-                        genoinfo=node.GT_geno[minPos:maxPos,colpos]    
+                    if "/chr"+str(chr)+"/GT" in self.file and minPos!=maxPos:
+                        genoinfo=node.GT[minPos:maxPos,colpos]
                         sub_rownames,updated_colnames,sub_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[])
                         yield np.array(sub_rownames),np.array(updated_colnames),np.array(sub_geno)
 
@@ -729,7 +722,6 @@ class HDF5Engine_access(Base_Access):
                 colnames=node.colnames[:].tolist()
                 colpos=[]
                 sampleNames.sort()
-
                 if (len(sampleNames)>0):
                     colpos=list(map(lambda x:colnames.index(x),sampleNames))
                 # else:
@@ -749,16 +741,15 @@ class HDF5Engine_access(Base_Access):
   
                 for minPos,maxPos in chunkPos:
                     sub_all=[]
-                    if "/chr"+str(chr)+"/GT_geno" in self.file and minPos!=maxPos:
+                    if "/chr"+str(chr)+"/GT" in self.file and minPos!=maxPos:
         
-                        sub_rownames,updated_colnames,sub_geno=self.filter_on_genotypes(cond,chr,node,"GT_geno",minPos,maxPos,colpos,rowpos)
+                        sub_rownames,updated_colnames,sub_geno=self.filter_on_genotypes(cond,chr,node,"GT",minPos,maxPos,colpos,rowpos)
  
                         sub_all.append(np.array(sub_geno))
                         if len(validGenotypeFields)>0:
                             for pos,field in enumerate(validGenotypeFields):
                                 _,_,sub_info=self.filter_on_genotypes(cond,chr,node,field,minPos,maxPos,colpos,rowpos)
                                 sub_all.append(np.array(sub_info))
-
                         yield np.array(sub_rownames),np.array(updated_colnames),sub_all
 
             except tb.exceptions.NoSuchNodeError:
@@ -780,7 +771,7 @@ class HDF5Engine_access(Base_Access):
         # sampleMask=node.samplemask[:]
 
         try:
-            sub_Mask=node.Mask_geno[minPos:maxPos,:]
+            sub_Mask=node.Mask[minPos:maxPos,:]
             sub_geno=np.multiply(genoinfo,sub_Mask)
             rowMasked=np.where(rowMask==True)[0]
             # sampleMasked=np.where(sampleMask==True)[0]
@@ -801,7 +792,6 @@ class HDF5Engine_access(Base_Access):
             #     # sub_geno=np.delete(sub_geno,sampleMasked,1)
             #     colnames=colnames[colpos]
             #     sub_geno=sub_geno[:,colpos]
-            
             return np.array(rownames),colnames,np.array(sub_geno)
         except Exception as e:
             print(e)
@@ -810,26 +800,32 @@ class HDF5Engine_access(Base_Access):
 
     def filter_on_genotypes(self,cond,chr,node,field,startPos,endPos,colpos,rowpos):
         genoinfo=None
-        if field=="GT_geno":
-            genoinfo=node.GT_geno[startPos:endPos,:]
-        if field=="DP_geno" and "/chr"+str(chr)+"/DP_geno" in self.file:
-            genoinfo=node.DP_geno[startPos:endPos,:]
+       
+        if field in self.file.get_node("/chr"+str(chr)):
+            genoinfo=self.file.get_node("/chr"+str(chr)+"/"+field)[startPos:endPos,:]
             genoinfo[genoinfo==-1]=0
-        if field=="GQ_geno" and "/chr"+str(chr)+"/GQ_geno" in self.file:
-            genoinfo=node.GQ_geno[startPos:endPos,:]
             genoinfo=np.nan_to_num(genoinfo)
+
+        # if field=="GT":
+        #     genoinfo=node.GT[startPos:endPos,:]
+        # if field=="DP" and "/chr"+str(chr)+"/DP" in self.file:
+        #     genoinfo=node.DP[startPos:endPos,:]
+        #     genoinfo[genoinfo==-1]=0
+        # if field=="GQ" and "/chr"+str(chr)+"/GQ" in self.file:
+        #     genoinfo=node.GQ[startPos:endPos,:]
+        #     genoinfo=np.nan_to_num(genoinfo)
 
         if len(cond)>0:
             if type(cond) is str:
                 cond=cond.replace("(","").replace(")","")
             else:
                 cond=cond[0]
-            if "DP_geno" in cond and "/chr"+str(chr)+"/DP_geno" in self.file:
-                DP_geno=node.DP_geno[startPos:endPos,:]
-                DP_geno[DP_geno==-1]=0
-            if "GQ_geno" in cond and "/chr"+str(chr)+"/GQ_geno" in self.file:
-                GQ_geno=node.GQ_geno[startPos:endPos,:]
-                GQ_geno=np.nan_to_num(GQ_geno)
+            if "DP" in cond and "/chr"+str(chr)+"/DP" in self.file:
+                DP=node.DP[startPos:endPos,:]
+                DP[DP==-1]=0
+            if "GQ" in cond and "/chr"+str(chr)+"/GQ" in self.file:
+                GQ=node.GQ[startPos:endPos,:]
+                GQ=np.nan_to_num(GQ)
             genoinfo=np.where(eval("~("+cond+")"),np.nan,genoinfo)
         rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,rowpos)
         return rownames,colnames,genoinfo

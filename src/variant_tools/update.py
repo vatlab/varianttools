@@ -392,18 +392,19 @@ class Updater:
             
             if self.proj.store=="sqlite" or (self.proj.store=="hdf5" and "vcf" not in f):
                 self.updateFromFile(f)
+                env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.count[8],
+                    '' if self.count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.count[1])))
                 
             elif self.proj.store=="hdf5":
                 self.updateHDF5FromFile(f)
-            env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.count[8],
-                    '' if self.count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.count[1])))
+            
             for i in range(len(self.count)):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0
         
-        if len(self.files) > 1:
-            env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.total_count[8],
-                    '' if self.total_count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.total_count[1])))
+        # if len(self.files) > 1:
+        #     env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.total_count[8],
+        #             '' if self.total_count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.total_count[1])))
 
 
 def setFieldValue(proj, table, items, build):
@@ -652,6 +653,52 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     destinations = []
     fieldCalcs = []
     desc_of_field = {}
+
+
+    
+    cur = proj.db.cursor()
+    if IDs is None:
+        cur.execute('SELECT sample_id from sample;')
+        IDs = [x[0] for x in cur.fetchall()]
+    #
+    numSample = len(IDs)
+    if numSample == 0:
+        env.logger.warning('No sample is selected.')
+        return
+    
+    
+    
+
+    #
+    # Error checking with the user specified genotype fields
+    # 1) if a field does not exist within one of the sample genotype tables a warning is issued
+    # 2) if a field does not exist in any sample, it is not included in validGenotypeFields
+    # 3) if no fields are valid and no core stats were requested (i.e., alt, het, hom, other), then sample_stat is exited
+    genotypeFieldTypes = {}
+    fieldInTable = defaultdict(list)
+    for id in IDs:
+        store=GenoStore(proj)
+        fields=["variant_id"]
+        fields.extend(store.geno_fields(id))
+        for field in fields:
+            fieldInTable[field].append(id)
+            if field not in genotypeFieldTypes:
+                genotypeFieldTypes[field] = 'INT'
+                # fieldType = proj.db.typeOfColumn('{}_genotype.genotype_{}'.format(proj.name, id), field) 
+                fieldType=store.get_typeOfColumn(id,field)
+                if fieldType.upper().startswith('FLOAT'):
+                    genotypeFieldTypes[field] = 'FLOAT'
+                elif fieldType.upper().startswith('VARCHAR'):
+                    genotypeFieldTypes[field] = 'VARCHAR'
+                    # We had been throwing an error here if a genotype field is a VARCHAR, but I think we should allow
+                    # VARCHAR fields in the genotype tables.  We'll throw an error if someone wants to perform numeric operations on these fields
+                    # further down in the code.
+                    # raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
+    validGenotypeIndices = []
+
+
+
+
     for stat in from_stat:
         f, e = [x.strip() for x in stat.split('=', 1)]
         desc_of_field[f.lower()] = e
@@ -684,24 +731,16 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             if m is None:
                 raise ValueError('Unrecognized parameter {}, which should have the form of FIELD=FUNC(GENO_INFO) where FUNC is one of #, avg, sum, max and min'.format(stat))
             dest, operation, field = m.groups()
+            field=field.replace("_geno","")
             if operation not in possibleOperations:
                 raise ValueError('Unsupported operation {}. Supported operations include {}.'.format(operation, ', '.join(possibleOperations)))
-            operations.append(operationKeys[operation])
-            genotypeFields.append(field)
-            fieldCalcs.append(None)
-            destinations.append(dest)
-    #
-    coreDestinations = [alt, hom, het, other, GT, missing, wtGT, mutGT, maf]
-    cur = proj.db.cursor()
-    if IDs is None:
-        cur.execute('SELECT sample_id from sample;')
-        IDs = [x[0] for x in cur.fetchall()]
-    #
-    numSample = len(IDs)
-    if numSample == 0:
-        env.logger.warning('No sample is selected.')
-        return
-    
+            
+            if field.lower() in [x.lower() for x in list(genotypeFieldTypes.keys())] :
+                operations.append(operationKeys[operation])
+                genotypeFields.append(field)
+                fieldCalcs.append(None)
+                destinations.append(dest)
+
     # for maf calculation, we need to know sex and chromosome name information
     if maf is not None:
         # find variants on sex chromosomes (exlcuding pseudi-autosomal regions)
@@ -718,36 +757,9 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             env.logger.info('{} males and {} females are identified'
                 .format(numMales, numFemales))
     
-
-    #
-    # Error checking with the user specified genotype fields
-    # 1) if a field does not exist within one of the sample genotype tables a warning is issued
-    # 2) if a field does not exist in any sample, it is not included in validGenotypeFields
-    # 3) if no fields are valid and no core stats were requested (i.e., alt, het, hom, other), then sample_stat is exited
-    genotypeFieldTypes = {}
-    fieldInTable = defaultdict(list)
-    for id in IDs:
-        store=GenoStore(proj)
-        fields=["variant_id"]
-        fields.extend(store.geno_fields(id))
-        for field in fields:
-            fieldInTable[field].append(id)
-            if field not in genotypeFieldTypes:
-                genotypeFieldTypes[field] = 'INT'
-                # fieldType = proj.db.typeOfColumn('{}_genotype.genotype_{}'.format(proj.name, id), field) 
-                fieldType=store.get_typeOfColumn(id,field)
-                if fieldType.upper().startswith('FLOAT'):
-                    genotypeFieldTypes[field] = 'FLOAT'
-                elif fieldType.upper().startswith('VARCHAR'):
-                    genotypeFieldTypes[field] = 'VARCHAR'
-                    # We had been throwing an error here if a genotype field is a VARCHAR, but I think we should allow
-                    # VARCHAR fields in the genotype tables.  We'll throw an error if someone wants to perform numeric operations on these fields
-                    # further down in the code.
-                    # raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
   
-    validGenotypeIndices = []
 
-
+    coreDestinations = [alt, hom, het, other, GT, missing, wtGT, mutGT, maf]
     for index, field in enumerate(genotypeFields):
         if field.lower() not in [x.lower() for x in list(genotypeFieldTypes.keys())]:
             env.logger.warning("Field {} does not exist in any of the samples.".format(field))
@@ -786,17 +798,13 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     sampleDict=dict()
     for id_idx, id in enumerate(IDs):
             record_male_gt = ID_sex is not None and ID_sex[id] == 1
-            fieldSelect = ['GT' if ('gt' in fieldInTable and id in fieldInTable['gt']) else 'NULL']
+            fieldSelect = ['GT' if ('gt' in fieldInTable and id in fieldInTable['gt']) or ('GT' in fieldInTable and id in fieldInTable['GT']) else 'NULL']
             if validGenotypeFields is not None and len(validGenotypeFields) != 0:
                  fieldSelect.extend([x if id in fieldInTable[x.lower()] else 'NULL' for x in validGenotypeFields])
             sampleDict[id]=[record_male_gt,fieldSelect]
             if not fieldSelect or all([x == 'NULL' for x in fieldSelect]):
                 continue
-   
-
     variants=store.get_genoType_genoInfo(sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step)
-
-
 
     #
     # even if no variant is updated, we need set count 0 to fields.
@@ -809,12 +817,10 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             (missing, 'INT'), (wtGT, 'INT'), (mutGT, 'INT'),
             (maf, 'FLOAT')]
     fieldsDefaultZero = [alt, hom, het, other, GT, missing, wtGT, mutGT, maf]
-   
     for index in validGenotypeIndices:
         field = genotypeFields[index]
-        # genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index].lower()) 
-        genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index]) 
-        
+        genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index].lower()) 
+        # genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index]) 
         if genotypeFieldType == 'VARCHAR':
             raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
         
@@ -822,7 +828,6 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             table_attributes.append((destinations[index], 'FLOAT'))
         else:                
             table_attributes.append((destinations[index], genotypeFieldType))
-    
 
     for field, fldtype in table_attributes:
         if field is None:
@@ -833,6 +838,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             where_clause = 'WHERE variant_id in (SELECT variant_id FROM {})'.format(variant_table)
         else:
             where_clause = ''
+        
         if field.lower() in headers:
             if proj.db.typeOfColumn('variant', field) != (fldtype + ' NULL'):
                 env.logger.warning('Type mismatch (existing: {}, new: {}) for column {}. Please remove this column and recalculate statistics if needed.'\
@@ -846,6 +852,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             if defaultValue == 0:
                 proj.db.execute('UPDATE variant SET {} = 0 {}'.format(field, where_clause))
         # add an description
+
         try:
             proj.describeField(field, 'Created from stat "{}" {} with type {} on {}'
                 .format(desc_of_field[field.lower()], 
@@ -860,7 +867,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         ' ,'.join(['{}={}'.format(x, proj.db.PH) for x in queryDestinations if x is not None]))
 
     count = 0
-    
+
     for count,id in enumerate(variants):
         value = variants[id]
         res = []

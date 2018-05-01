@@ -181,8 +181,8 @@ class TestUpdate(ProcessTestCase):
     def testGenoAnnoSet(self):
         'Testing command vtools update --set'
         self.runCmd('vtools init test -f --store '+self.storeMode)
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18 --geno_info DP_geno,GQ_geno')    
-        self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' 'minDP=min(DP_geno)' 'maxDP=max(DP_geno)' 'meanDP=avg(DP_geno)' 'minGQv=min(GQ_geno)' 'maxGQv=max(GQ_geno)' 'meanGQv=avg(GQ_geno)'")
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')    
+        self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' 'minDP=min(DP)' 'maxDP=max(DP)' 'meanDP=avg(DP)' 'minGQv=min(GQ)' 'maxGQv=max(GQ)' 'meanGQv=avg(GQ)'")
         self.assertSucc('vtools update variant --set "maf=num/(total*2.0)"')
         self.assertSucc('vtools output variant chr pos total num maf -l 10')
         #we can set the fields from the annotation file

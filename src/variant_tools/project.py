@@ -2261,6 +2261,7 @@ class Project:
 
     def removeGenofields(self,IDs,items):
         store = GenoStore(self)
+        items=[item.replace("_geno","") for item in items]
         store.remove_genofields(IDs,items)
         
 

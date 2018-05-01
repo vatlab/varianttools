@@ -164,7 +164,7 @@ class BaseVariantReader:
 
 
     def getVariantQuery(self):
-        # print(self.proj.build)
+        
         select_clause, select_fields = consolidateFieldName(self.proj, self.table,
             ','.join(['variant_id', 'variant.ref', 'variant.alt'] + self.var_fields), self.export_alt_build)
         # FROM clause
@@ -232,7 +232,7 @@ class BaseVariantReader:
             order_clause = ' ORDER BY {}'.format(order_fields)
         else:
             order_clause = ' ORDER BY {}.variant_id'.format(self.table)
-        #print 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
+
         return 'SELECT {} {} {} {};'.format(select_clause, from_clause, where_clause, order_clause)
 
 
@@ -369,7 +369,7 @@ class MultiVariantReader(BaseVariantReader):
         status = [0] * len(self.readers)
         while True:
             for idx, (w,r) in enumerate(zip(self.workers, self.readers)):
-                # print(status)
+              
                 if status[idx] == 2: # completed 
                     continue
                 elif status[idx] == 1: # started?
@@ -409,7 +409,6 @@ class MultiVariantReader(BaseVariantReader):
                             raise ValueError('Read different IDs from multiple processes')
                         rec.extend(val[1:])             
                         if idx == last:
-
                             yield rec
                             rec = []
                     if all_done:
@@ -433,12 +432,11 @@ class MultiVariantReader(BaseVariantReader):
                     while notSameID:
                         for idx,reader in enumerate(self.readers[1:]):
                             val=reader.recv()
-                            # print(idx+1,val[0])
+                           
                             if id ==val[0]:
                                 rec.extend(val[1:])
                                 if idx+1==last:
                                     notSameID=False
-                                    # print(id,rec)
                                     yield rec
                                     rec=[]
                                     break
@@ -465,11 +463,11 @@ class VariantWorker_HDF5(Process):
     def run(self):
         accessEngine=Engine_Access.choose_access_engine(self.fileName)
         vardict={}
-        genoinfo_fields=[field for field in self.geno_fields if field!="GT"]
+        genoinfo_fields=[field.replace("_geno","") for field in self.geno_fields]
         for rownames,colnames,sub_all in accessEngine.get_all_genotype_genoinfo(self.samples,[],genoinfo_fields):
             genoType=sub_all[0]
             numrow,numcol=genoType.shape[0],genoType.shape[1]
-            info=np.zeros(shape=(numrow,numcol*len(self.geno_fields)),dtype=float)   
+            info=np.zeros(shape=(numrow,numcol*len(self.geno_fields)))   
             for col in range(numcol):
                     info[:,col*len(self.geno_fields)]=genoType[:,col]
 

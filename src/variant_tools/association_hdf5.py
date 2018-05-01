@@ -92,7 +92,7 @@ class GroupHDFGenerator(Process):
                         updated_rownames,colnames,subMatrix=accessEngine.get_genotype(ids,"",[chr])
                         
                         if subMatrix is not None:
-                            storageEngine.store(subMatrix,chr,geneSymbol+"/GT_geno")
+                            storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
                             storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
                             if not storageEngine.checkGroup(chr,"colnames"):
                                 storageEngine.store(colnames,chr,"colnames")
@@ -101,7 +101,7 @@ class GroupHDFGenerator(Process):
                         for chr,vids in varDict.items():
                             updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_sep_variant_ids(vids,chr)
                             if subMatrix is not None:
-                                storageEngine.store(subMatrix,chr,geneSymbol+"/GT_geno")
+                                storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
                                 storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
                                 if not storageEngine.checkGroup(chr,"colnames"):
                                     storageEngine.store(colnames,chr,"colnames")
