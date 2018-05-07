@@ -1139,7 +1139,6 @@ class HDF5_Store(Base_Store):
                         colpos=[6+genoID+pos*len(validGenotypeFields) for pos in range(len(IDs))]
                         # geno_field=geno_field.replace("_geno","")
                         chunk["calldata/"+geno_field].append([raw_rec[pos] if raw_rec[pos] is not None else -10 for pos in colpos])
-                
                 for key,value in chunk.items():
                     dtype=np.dtype(object)
                     if key=="variants/POS":
@@ -1165,7 +1164,7 @@ class HDF5_Store(Base_Store):
                     workload[i % jobs] += 1
                 numTasks=len(workload)
                 variantIndex = self.proj.createVariantMap('variant', False)
-
+              
 
                 if IDs[0]==1:
                     start_sample =0

@@ -4135,7 +4135,6 @@ def init(args):
                     result=parent_cur.execute("select value from project where name='name'")
                     parent_name=result.fetchone()[0]
                     parentdb.close()
-                    
                     if parent_store=="hdf5":
                         for file_name in src_files:
                             full_file_name = os.path.join(args.parent, file_name)

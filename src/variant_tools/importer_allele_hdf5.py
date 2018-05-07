@@ -1024,7 +1024,6 @@ class HDF5GenotypeImportWorker(Process):
         self.geno_info=[]
         if "GT" in genotype_info:
             genotype_info.remove("GT")
-
         if len(genotype_info)>0:
             for info in genotype_info:
                 #indptr,indices,data,shape,rownames
@@ -1043,6 +1042,7 @@ class HDF5GenotypeImportWorker(Process):
     # check io_vcf_read.pyx function vcf_genotype_parse to see the meaning of coding
     def get_geno(self,variant_id,pos,altIndex):
         self.rownames.append(variant_id)
+        # print(self.dbLocation,self.start_sample,self.end_sample,self.firstID)
         if "calldata/GT" in self.chunk:
             GT=self.chunk["calldata/GT"][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]
             GT=GT.astype(float)
@@ -1427,11 +1427,10 @@ def updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDF5fileN
         end_sample=end_sample+1
         adjust=1
     for id in range(start_sample,end_sample):
-        sql="UPDATE sample SET HDF5=? WHERE sample_id=? and sample_name=?"
-        # task=(HDF5fileName,allNames[names[id]],sample_ids[id],names[id])
-        # print(id,HDF5fileName,sample_ids[id-firstID],names[id-adjust])
-        task=(HDF5fileName,sample_ids[id-firstID],names[id-adjust])
         try:
+            sql="UPDATE sample SET HDF5=? WHERE sample_id=? and sample_name=?"
+            # task=(HDF5fileName,allNames[names[id]],sample_ids[id],names[id])
+            task=(HDF5fileName,sample_ids[id-firstID],names[id-firstID])
             cur.execute(sql,task)
         except Exception as e:
             print(e)
