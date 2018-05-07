@@ -498,34 +498,36 @@ class HDF5Engine_access(Base_Access):
         return exist
 
 
+
+
     def num_genoinfo(self,sampleID,expr,cond):
         num=0
-        chrs=["X","Y"]
-        chrs.extend(range(1,23))
-        for chr in chrs:
-            try:
-                group=self.file.get_node("/chr"+str(chr))
-                colnames=group.colnames[:]
-                colPos=np.where(colnames==sampleID)[0]
-                exprCols=expr.split("(")
-                method=exprCols[0]
-                info=exprCols[1].replace(")","")
-                # data=group.get_node(info)[:,colPos]
-                
-                data=self.file.get_node("/chr"+str(chr)+"/"+info)[:,colPos]
-                data[data==-1]=0
-                if method=="avg":
-                    num=np.average(data).item()
-                elif method=="min":
-                    num=np.nanmin(data).item()
-                elif method=="max":
-                    num=np.nanmax(data).item()
-            except tb.exceptions.NoSuchNodeError:
-                pass
-            except Exception as e:
-                # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
-                print(e)
-                pass     
+        exprCols=expr.split("(")
+        method=exprCols[0]
+        info=exprCols[1].replace(")","")
+        info=info.replace("_geno","")
+        numVariants=0
+        if method=="min":
+            num=1000000
+        for rownames,colnames,sub_all in self.get_all_genotype_genoinfo([sampleID],[],[info]):
+            genotype=sub_all[0]
+            genoinfo=sub_all[1]
+            if method=="avg":
+                localsum=np.nansum(genoinfo).item()
+                num+=localsum
+                numVariants+=len(rownames)
+            elif method=="min":
+                genoinfo[genoinfo==-1]=0
+                localmin=np.nanmin(genoinfo).item()
+                if localmin<num:
+                    num=localmin
+            elif method=="max":
+                genoinfo[genoinfo==-1]=0
+                localmax=np.nanmax(genoinfo).item()
+                if localmax>num:
+                    num=localmax
+        if method=="avg":
+            num=num/numVariants
         return num
 
 
@@ -567,6 +569,13 @@ class HDF5Engine_access(Base_Access):
                     totalNum+=len(numCond[0])
         return totalNum
 
+
+    def sum_genotypes(self,sampleID,cond,genotypes):
+        totalGeno=0
+        for rownames,colnames,genoinfo in self.get_all_genotype([sampleID]):
+            numGeno=np.nansum(genoinfo)
+            totalGeno+=numGeno
+        return int(totalGeno)
 
 
 

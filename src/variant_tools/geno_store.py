@@ -1164,7 +1164,6 @@ class HDF5_Store(Base_Store):
                     workload[i % jobs] += 1
                 numTasks=len(workload)
                 variantIndex = self.proj.createVariantMap('variant', False)
-              
 
                 if IDs[0]==1:
                     start_sample =0
@@ -1277,6 +1276,15 @@ class HDF5_Store(Base_Store):
         if HDFfileName is not None:
             accessEngine=Engine_Access.choose_access_engine(HDFfileName)
             num=accessEngine.num_genotypes(sampleID,cond,genotypes)
+            accessEngine.close()
+        return num
+
+    def sum_genotypes(self,sampleID,cond,genotypes):
+        HDFfileName=self.get_sampleFileName(sampleID)
+        num=0
+        if HDFfileName is not None:
+            accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+            num=accessEngine.sum_genotypes(sampleID,cond,genotypes)
             accessEngine.close()
         return num
 
