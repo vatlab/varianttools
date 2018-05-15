@@ -1033,9 +1033,9 @@ class HDF5GenotypeImportWorker(Process):
                     self.geno_info.append(info.replace("_geno",""))
         for info in self.geno_info:
             self.info[info]=[]
-            if "calldata/"+info in self.chunk and np.sum(self.chunk["calldata/"+info][:10])>0:
+            if "calldata/"+info in self.chunk and np.nansum(self.chunk["calldata/"+info][:10])>0:
                     self.namedict[info]="calldata/"+info
-            elif "variants/"+info in self.chunk and np.sum(self.chunk["variants/"+info][:10])>0:
+            elif "variants/"+info in self.chunk and np.nansum(self.chunk["variants/"+info][:10])>0:
                     self.namedict[info]="variants/"+info
 
   
@@ -1638,9 +1638,9 @@ class HDF5GenotypeUpdateWorker(Process):
                 #     self.namedict[info.name]="calldata/"+info.name.replace("_geno","")
                 # else:
                 #     self.namedict[info.name]="variants/"+info.name.replace("_geno","")
-                if "calldata/"+name in self.chunk and np.sum(self.chunk["calldata/"+name][:10])>0:
+                if "calldata/"+name in self.chunk and np.nansum(self.chunk["calldata/"+name][:10])>0:
                     self.namedict[name]="calldata/"+name
-                elif "variants/"+name in self.chunk and np.sum(self.chunk["variants/"+name][:10])>0:
+                elif "variants/"+name in self.chunk and np.nansum(self.chunk["variants/"+name][:10])>0:
                     self.namedict[name]="variants/"+name
        
                 

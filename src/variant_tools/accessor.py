@@ -170,6 +170,12 @@ class HDF5Engine_storage(Base_Storage):
                 node=self.file.get_node(genoNode)
                 shape=node.shape[:].tolist()
                 chunkPos=chunks_start_stop(shape[0])
+                if type(cond) is str:
+                    # cond=cond.replace("(","").replace(")","")
+                    pass
+                else:
+                    cond=cond[0]
+                cond=cond.replace("_geno","")
                 for startPos,endPos in chunkPos:
 
                     if "GT" in cond and "/chr"+str(chr)+"/GT" in self.file: 
@@ -183,6 +189,24 @@ class HDF5Engine_storage(Base_Storage):
                     if "GQ" in cond and "/chr"+str(chr)+"/GQ" in self.file:    
                         GQ=node.GQ[startPos:endPos,:]
                         GQ=np.nan_to_num(GQ)
+                    if "GD" in cond and "/chr"+str(chr)+"/GD" in self.file:
+                        GD=node.GD[startPos:endPos,:]
+                        GD[GD==-1]=0
+                    if "HQ" in cond and "/chr"+str(chr)+"/HQ" in self.file:
+                        HG=node.HQ[startPos:endPos,:]
+                        HQ[HQ==-1]=0
+                    if "AD" in cond and "/chr"+str(chr)+"/AD" in self.file:
+                        AD=node.AD[startPos:endPos,:]
+                        AD[AD==-1]=0
+                    if "PL" in cond and "/chr"+str(chr)+"/PL" in self.file:
+                        PL=node.PL[startPos:endPos,:]
+                        PL[PL==-1]=0
+                    if "MQ" in cond and "/chr"+str(chr)+"/MQ" in self.file:
+                        MQ=node.MQ[startPos:endPos,:]
+                        MQ[MQ==-1]=0
+                    if "NS" in cond and "/chr"+str(chr)+"/NS" in self.file:
+                        NS=node.NS[startPos:endPos,:]
+                        NS[NS==-1]=0
                     # Mask_geno=group.Mask_geno[:]
                     Mask=np.ones(shape=(endPos-startPos,shape[1]),dtype=np.int8)
                     node.Mask[startPos:endPos,:]=np.where(eval(cond),np.nan,Mask)
@@ -825,16 +849,36 @@ class HDF5Engine_access(Base_Access):
         #     genoinfo=np.nan_to_num(genoinfo)
 
         if len(cond)>0:
+
             if type(cond) is str:
                 cond=cond.replace("(","").replace(")","")
             else:
                 cond=cond[0]
+                cond=cond.replace("_geno","")
             if "DP" in cond and "/chr"+str(chr)+"/DP" in self.file:
                 DP=node.DP[startPos:endPos,:]
                 DP[DP==-1]=0
             if "GQ" in cond and "/chr"+str(chr)+"/GQ" in self.file:
                 GQ=node.GQ[startPos:endPos,:]
                 GQ=np.nan_to_num(GQ)
+            if "GD" in cond and "/chr"+str(chr)+"/GD" in self.file:
+                GD=node.GD[startPos:endPos,:]
+                GD[GD==-1]=0
+            if "HQ" in cond and "/chr"+str(chr)+"/HQ" in self.file:
+                HG=node.HQ[startPos:endPos,:]
+                HQ[HQ==-1]=0
+            if "AD" in cond and "/chr"+str(chr)+"/AD" in self.file:
+                AD=node.AD[startPos:endPos,:]
+                AD[AD==-1]=0
+            if "PL" in cond and "/chr"+str(chr)+"/PL" in self.file:
+                PL=node.PL[startPos:endPos,:]
+                PL[PL==-1]=0
+            if "MQ" in cond and "/chr"+str(chr)+"/MQ" in self.file:
+                MQ=node.MQ[startPos:endPos,:]
+                MQ[MQ==-1]=0
+            if "NS" in cond and "/chr"+str(chr)+"/NS" in self.file:
+                NS=node.NS[startPos:endPos,:]
+                NS[NS==-1]=0
             genoinfo=np.where(eval("~("+cond+")"),np.nan,genoinfo)
         rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,rowpos)
         return rownames,colnames,genoinfo
