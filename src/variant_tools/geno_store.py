@@ -1372,11 +1372,13 @@ class HDF5_Store(Base_Store):
         queue=Queue()
         procs=[]
         noWT=set()
+        accessEngines=[]
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
             filename=HDFfileName.split("/")[-1]
             if filename in sampleFileMap:
                 samplesInfile=sampleFileMap[filename]
                 accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+                accessEngines.append(accessEngine)
                 if len(list(set(samples).intersection(samplesInfile)))>0:
                     p=Process(target=self.get_noWT_variants_worker,args=(queue,accessEngine,list(set(samples).intersection(samplesInfile)))) 
                     procs.append(p)
@@ -1395,7 +1397,8 @@ class HDF5_Store(Base_Store):
                 noWT=noWT.union(set(noWTvariants)) 
         for p in procs:
             p.join()
-
+        for accessEngine in accessEngines:
+            accessEngine.close()
         cur = proj.db.cursor()
         merged_table = '__variants_from_samples'
         query = 'CREATE TEMPORARY TABLE {} (variant_id INT);'.format(merged_table)
@@ -1428,12 +1431,14 @@ class HDF5_Store(Base_Store):
     
         master={}
         queue=Queue()
+        accessEngines=[]
         procs=[]
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
             filename=HDFfileName.split("/")[-1]
             if filename in sampleFileMap:
                 samplesInfile=sampleFileMap[filename]
                 accessEngine=Engine_Access.choose_access_engine(HDFfileName)
+                accessEngines.append(accessEngine)
                 p=Process(target=self.get_genoType_genoInfo_worker,args=(queue,accessEngine,list(set(sampleDict.keys()).intersection(samplesInfile)),variants,validGenotypeFields,genotypes)) 
                 procs.append(p)
                 p.start()
@@ -1488,6 +1493,8 @@ class HDF5_Store(Base_Store):
                             master[key][pos]=value[pos] if preValue<=value[pos] else preValue                 
         for p in procs:
             p.join()
+        for accessEngine in accessEngines:
+            accessEngine.close()
         return master
 
 

@@ -2605,7 +2605,6 @@ class Project:
             tarinfo = snapshot.gettarinfo('{}.proj'.format(self.name), arcname='snapshot.proj')
             snapshot.addfile(tarinfo, ProgressFileObj(prog, '{}.proj'.format(self.name), 'rb'))
 
-            
             store.addGenotypeToTar(snapshot,prog)
 
             os.remove(readme_file)
@@ -2670,7 +2669,7 @@ class Project:
                 self.db = DatabaseEngine()
                 self.db.connect(self.proj_file)
                 self.saveProperty('store', self.store)
-                all_files=store.load_Genotype_From_SQLite(all_files,self)     
+                all_files=store.load_Genotype_From_SQLite(all_files,self)  
                 # other files
                 for f in all_files:
                     if os.path.isfile(f):
@@ -4029,7 +4028,7 @@ def init(args):
                 else:
                     args.store = os.environ['STOREMODE']
             if args.store is None:
-                args.store = 'sqlite'
+                args.store = 'hdf5'
 
         temp_dirs = []
         if args.parent and not os.path.isdir(args.parent):
@@ -4119,13 +4118,15 @@ def init(args):
                 # if args.store != 'sqlite':
                 #     raise NotImplemented('Option --parent is not supported yet with non-sqlite storage model')
                 # if args.store=="sqlite":
+                if args.store=="hdf5" and args.variants!="variants":
+                    raise NotImplementedError('Option --variants is not supported yet with HDF5 storage model')
                 copier = ProjCopier(proj, args.parent, args.variants,
                     ' AND '.join(['({})'.format(x) for x in args.samples]),
                     ' AND '.join(['({})'.format(x) for x in args.genotypes]))
                 copier.copy()
                 if args.store=="hdf5":
                     # all_files=[proj.name+".proj",proj.name+"_genotype.DB"]
-                   
+                    
                     src_files = os.listdir(args.parent)
                     parent_proj_file=glob.glob(args.parent+"/*.proj")
                     parentdb = DatabaseEngine()
@@ -5175,11 +5176,11 @@ x, "'{}'".format(y) if isinstance(y, str) else str(y)) for x,y in list(_user_opt
                 proj.removeProperty('__option_{}'.format(args.reset_runtime_option))
                 env.logger.info('Option {} is set to its default value'.format(args.reset_runtime_option))
             elif args.save_snapshot is not None:
-                if proj.store=="hdf5":
-                    if args.extra_files is not None:
-                        args.extra_files.extend(glob.glob("tmp*h5"))
-                    else:
-                        args.extra_files=glob.glob("tmp*h5")
+                # if proj.store=="hdf5":
+                #     if args.extra_files is not None:
+                #         args.extra_files.extend(glob.glob("tmp*h5"))
+                #     else:
+                #         args.extra_files=glob.glob("tmp*h5")
                 if args.extra_files is not None:
                     cur_dir = os.path.realpath(os.getcwd())
                     for f in args.extra_files:
