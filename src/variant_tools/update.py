@@ -397,7 +397,7 @@ class Updater:
                 
             elif self.proj.store=="hdf5":
                 self.updateHDF5FromFile(f)
-            
+            self.sample_name=''
             for i in range(len(self.count)):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0

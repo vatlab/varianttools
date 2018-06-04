@@ -1495,6 +1495,7 @@ class HDF5_Store(Base_Store):
             p.join()
         for accessEngine in accessEngines:
             accessEngine.close()
+        prog.done()
         return master
 
 

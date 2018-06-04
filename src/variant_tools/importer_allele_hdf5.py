@@ -1043,7 +1043,9 @@ class HDF5GenotypeImportWorker(Process):
     def get_geno(self,variant_id,pos,altIndex):
         self.rownames.append(variant_id)
         # print(self.dbLocation,self.start_sample,self.end_sample,self.firstID)
+
         if "calldata/GT" in self.chunk:
+
             GT=self.chunk["calldata/GT"][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]
             GT=GT.astype(float)
             if altIndex==0:

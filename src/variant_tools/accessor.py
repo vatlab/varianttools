@@ -755,6 +755,7 @@ class HDF5Engine_access(Base_Access):
                 colnames=node.colnames[:].tolist()
                 colpos=[]
                 sampleNames.sort()
+
                 if (len(sampleNames)>0):
                     colpos=list(map(lambda x:colnames.index(x),sampleNames))
                 # else:
@@ -777,7 +778,7 @@ class HDF5Engine_access(Base_Access):
                     if "/chr"+str(chr)+"/GT" in self.file and minPos!=maxPos:
         
                         sub_rownames,updated_colnames,sub_geno=self.filter_on_genotypes(cond,chr,node,"GT",minPos,maxPos,colpos,rowpos)
- 
+                       
                         sub_all.append(np.array(sub_geno))
                         if len(validGenotypeFields)>0:
                             for pos,field in enumerate(validGenotypeFields):
@@ -813,9 +814,10 @@ class HDF5Engine_access(Base_Access):
                 selectRows=rowpos[minPos:maxPos]
                 rownames=rownames[selectRows==1]
                 sub_geno=sub_geno[selectRows==1,:]
-         
+            
             colnames=colnames[colpos]
             sub_geno=sub_geno[:,colpos]
+
             if len(rowpos)==0 and len(rowMasked)>0:
                 rownames=rownames[np.where(rowMask==False)]
                 sub_geno=np.delete(sub_geno,rowMasked,0)
@@ -838,6 +840,7 @@ class HDF5Engine_access(Base_Access):
             genoinfo=self.file.get_node("/chr"+str(chr)+"/"+field)[startPos:endPos,:]
             genoinfo[genoinfo==-1]=0
             genoinfo=np.nan_to_num(genoinfo)
+
 
         # if field=="GT":
         #     genoinfo=node.GT[startPos:endPos,:]

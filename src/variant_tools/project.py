@@ -4437,11 +4437,13 @@ def show(args):
                 cur = proj.db.cursor()
                 fields = proj.db.getHeaders('sample')
                 # if -v0, do not show phenotypes
+                fields.remove("HDF5")
                 if args.verbosity == '0':
                     fields = fields[:3]
                 # headers are ID, file, sample, FIELDS
                 prt = PrettyPrinter(max_width={} if args.verbosity == '2' else {1: 25})
                 prt.write(['sample_name', 'filename'] + fields[3:])
+
                 cur.execute('SELECT sample_name, filename {} FROM sample, filename '
                     'WHERE sample.file_id = filename.file_id {} ORDER BY sample_name {};'
                     .format(' '.join([','+x for x in fields[3:]]),
@@ -4462,6 +4464,7 @@ def show(args):
                     return
                 cur = proj.db.cursor()
                 fields = proj.db.getHeaders('sample')[3:]
+                fields.remove("HDF5")
                 if args.items:
                     found = []
                     unfound = []
