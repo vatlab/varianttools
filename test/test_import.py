@@ -31,7 +31,6 @@ import subprocess
 from testUtils import ProcessTestCase 
 from variant_tools.accessor import *
 
-# @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
 class TestImport(ProcessTestCase):
     def testInvalidVariant(self):
         'Test importing invalid variants (<DEL>)'
@@ -82,7 +81,7 @@ class TestImport(ProcessTestCase):
         self.assertProj(numOfVariants=288)
 
 
-    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","sqlite version is not implemented for this test")
+    @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite3","HDF5 version is not implemented for this test")
     def testANNOVAR(self):
         'Testing the annovar input format'
         self.assertSucc('vtools import --build hg18 --format ../resources/format/ANNOVAR txt/ANNOVAR.txt')
@@ -169,7 +168,7 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno_info')
         self.assertProj(numOfSamples= 0, numOfVariants=11877)
     
-    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")   
+    @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")   
     def testMPImport(self):
         'Test multi-processing import'
         self.runCmd('vtools init test -f --store '+self.storeMode)
@@ -204,7 +203,7 @@ class TestImport(ProcessTestCase):
         self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
                 'output/import_mpi_genotype.txt')
     
-    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
+    @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
     def testMPImportMultiFiles_sqlite(self):
         self.runCmd('vtools init test -f --store '+self.storeMode)
         self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j1')
@@ -225,7 +224,7 @@ class TestImport(ProcessTestCase):
         self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(3)],
                 'output/import_mpi_multi_genotype.txt')
 
-    @unittest.skipIf(os.getenv("STOREMODE")=="sqlite","sqlite version is not implemented for this test")
+    @unittest.skipUnless(os.getenv("STOREMODE")=="hdf5","sqlite version is not implemented for this test")
     def testMPImportMultiFiles_hdf5(self):
         self.runCmd('vtools init test -f --store '+self.storeMode)
         self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j1')
@@ -327,7 +326,7 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19 --sample_name vcf_test3')
         self.assertProj(numOfSamples= 1, numOfVariants=134, sampleNames=['vcf_test3'])
     
-    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","sqlite version is not implemented for this test")    
+    @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","hdf5 version is not implemented for this test")    
     def testSampleName_single_assign(self):
         #Testing one sample per file with the --sample_name option
         self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18 --sample_name samp_vcf1')

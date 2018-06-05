@@ -28,7 +28,7 @@ import os
 import unittest
 import shlex, subprocess
 import sys
-sys.path.append("/Users/jma7/anaconda/envs/VariantTools/lib/python3.6/site-packages/variant_tools-3.0.0.dev0-py3.6-macosx-10.7-x86_64.egg")
+# sys.path.append("/Users/jma7/anaconda/envs/VariantTools/lib/python3.6/site-packages/variant_tools-3.0.0.dev0-py3.6-macosx-10.7-x86_64.egg")
 from variant_tools.geno_store import *
 from variant_tools.accessor import *
 # from "variant_tools-3.0.0.dev0-py3.6-macosx-10.7-x86_64.egg".variant_tools.geno_store import *
@@ -52,7 +52,9 @@ class ProcessTestCase(unittest.TestCase):
             self.storeMode=os.getenv("STOREMODE")
             self.runCmd('vtools init test -f --store '+self.storeMode)
         else:
-            self.runCmd('vtools init test -f')
+            self.storeMode="hdf5"
+            os.environ["STOREMODE"]="hdf5"
+            self.runCmd('vtools init test -f --store hdf5')
         if os.environ.get("LOCALRESOURCE") is not None:
             self.local_resource=os.getenv("LOCALRESOURCE")
             self.runCmd('vtools admin --set_runtime_option local_resource='+self.local_resource)

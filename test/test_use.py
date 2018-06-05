@@ -43,7 +43,6 @@ class TestUse(ProcessTestCase):
         self.assertFail('vtools use ann/testNSFP.ann --files ann/non_existing_file.zip')
         self.assertSucc('vtools use ann/testNSFP.DB.gz')
 
-    # @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
     def testThousandGenomes(self):
         'Test variants in thousand genomes'
         if os.path.isfile('TestUse.tar.gz'):
@@ -80,7 +79,6 @@ class TestUse(ProcessTestCase):
         self.assertOutput('vtools select variant -c', '145')
         self.assertOutput('vtools select variant "testThousandGenomes.chr is not NULL" -c', '145')
 
-    # @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
     def testESP(self):
         self.runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
         self.assertSucc('vtools use ESP')
@@ -88,7 +86,6 @@ class TestUse(ProcessTestCase):
         self.assertOutput('vtools execute "select sample_name from sample"', 'WHISP:D967-33\nWHISP:D226958-47\nWHISP:D264508-52\nWHISP:D7476-42\n')
         self.assertOutput('vtools output variant variant_id ref alt DP MQ ANNO SVM --header id ref alt DP MQ ANNO SVM -d"\t"', 'output/evsVariantTest.txt')
 
-    # @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
     def testNSFP(self):
         'Test variants in dbNSFP'
         if os.path.isfile('TestUse.tar.gz'):

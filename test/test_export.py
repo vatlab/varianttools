@@ -31,7 +31,6 @@ import subprocess
 from testUtils import ProcessTestCase
 
 
-# @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
 class TestExport(ProcessTestCase):
     
     # def testExportVcfSnv_single(self):

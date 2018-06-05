@@ -47,7 +47,6 @@ class TestUpdate(ProcessTestCase):
         self.assertSucc('vtools update variant --format ../resources/format/ANNOVAR_exonic_variant_function --from_file txt/annovar.txt.exonic_variant_function --build hg19')
         self.assertOutput('vtools select variant "mut_type is not null" -c', '24')
 
-    # @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
     def testUpdate(self):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools import vcf/SAMP1.vcf --build hg18')
@@ -64,7 +63,6 @@ class TestUpdate(ProcessTestCase):
             "1\t743268\tuntranslated-5\tby-cluster,by-1000genomes\n")
      
     
-    # @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")   
     def testSampleStat(self):
         'Test command vtools update'
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
@@ -113,8 +111,9 @@ class TestUpdate(ProcessTestCase):
         #     self.assertAlmostEqual(float(m), value)
         
     
-    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
+    @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
     def testGenotypeSumStats(self):
+        print(os.getenv("STOREMODE"))
         'Test command vtools update min/max/sum/mean_FIELD'
         self.runCmd('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
         # non-existing field, should fail
@@ -140,7 +139,6 @@ class TestUpdate(ProcessTestCase):
         self.assertProj(info={'res': ['0']*6})
 
 
-    # @unittest.skipIf(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
     # def testGenotypeSumStats(self):
     #     'Test command vtools update min/max/sum/mean_FIELD'
     #     self.runCmd('vtools import  vcf/missing_gen_hdf5.vcf --build hg19 --geno_info PL_geno,DP_geno,GQ_geno')

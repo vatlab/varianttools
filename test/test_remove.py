@@ -31,7 +31,6 @@ import subprocess
 from testUtils import ProcessTestCase
 
 
-# @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
 class TestRemove(ProcessTestCase):
     def setUp(self):
         'Create a project'
@@ -124,7 +123,6 @@ class TestRemove(ProcessTestCase):
         # removing non-existing phenotype should yield just a warning
         self.assertSucc('vtools remove phenotypes non_existing')
         if self.storeMode=="hdf5":
-            self.assertSucc('vtools remove phenotypes HDF5')
             self.assertOutput('vtools show samples', 'output/remove_phenotype_output.txt')
         elif self.storeMode=="sqlite":
             self.assertOutput('vtools show samples', 'output/remove_phenotype_sqlite.txt')

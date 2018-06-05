@@ -45,7 +45,7 @@ class TestAdmin(ProcessTestCase):
             self.runCmd('vtools admin --merge_samples')         
             self.assertProj(numOfVariants=577, numOfSamples= 60)
 
-    @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
+    @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
     def testMergeWithOverlappingSamples(self):
         # Test merge samples with overlapping variants
         self.assertSucc('vtools import vcf/SAMP2.vcf --build hg19')

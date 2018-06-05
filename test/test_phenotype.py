@@ -31,7 +31,6 @@ import subprocess
 from testUtils import ProcessTestCase
 
 
-# @unittest.skipIf(os.getenv("STOREMODE")=="hdf5","HDF5 version is not implemented for this test")
 class TestPhenotype(ProcessTestCase):
     def setUp(self):
         'Create a project'
@@ -47,8 +46,6 @@ class TestPhenotype(ProcessTestCase):
         self.assertSucc('vtools phenotype --from_file -h')
         # opening project project_name. Importing phenotypes into table sample.
         self.assertSucc('vtools phenotype --from_file phenotype/phenotype.txt')
-        if self.storeMode=="hdf5":
-            self.assertSucc('vtools remove phenotypes HDF5')
         self.assertOutput('vtools show samples -l -1', 'output/phenotype_import.txt')
         #the output format was changed, so we reorganize the output and compare
         self.assertSucc('vtools phenotype --from_file phenotype/badphenotype1.txt')
@@ -59,8 +56,6 @@ class TestPhenotype(ProcessTestCase):
         'Test command phenotype --from_file FIELD'
         # importing only a few fields, not all fields
         self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt aff')
-        if self.storeMode=="hdf5":
-            self.assertSucc('vtools remove phenotypes HDF5')
         self.assertOutput('vtools show samples', 'output/phenotype_fields.txt')
         
     def testImportPhenotypeWithFilename(self):
@@ -68,16 +63,12 @@ class TestPhenotype(ProcessTestCase):
         # too few arguments
         # opening project project_name. Importing phenotypes into table sample.
         self.assertSucc('vtools phenotype --from_file phenotype/pheno_filename.txt')
-        if self.storeMode=="hdf5":
-            self.assertSucc('vtools remove phenotypes HDF5')
         self.assertOutput('vtools show samples -l -1', 'output/phenotype_phenotype_with_filename.txt')
         
     def testImportFieldsWithFilename(self):
         'Test command phenotype --from_file FIELD'
         # importing only a few fields, not all fields
         self.runCmd('vtools phenotype --from_file phenotype/pheno_filename.txt aff')
-        if self.storeMode=="hdf5":
-            self.assertSucc('vtools remove phenotypes HDF5')
         self.assertOutput('vtools show samples -l -1', 'output/phenotype_phenotype_with_filename_field.txt')
         
     def testSetPhenotype(self):
