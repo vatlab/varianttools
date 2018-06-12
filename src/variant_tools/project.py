@@ -4437,7 +4437,8 @@ def show(args):
                 cur = proj.db.cursor()
                 fields = proj.db.getHeaders('sample')
                 # if -v0, do not show phenotypes
-                fields.remove("HDF5")
+                if "HDF5" in fields:
+                    fields.remove("HDF5")
                 if args.verbosity == '0':
                     fields = fields[:3]
                 # headers are ID, file, sample, FIELDS
@@ -4464,7 +4465,8 @@ def show(args):
                     return
                 cur = proj.db.cursor()
                 fields = proj.db.getHeaders('sample')[3:]
-                fields.remove("HDF5")
+                if "HDF5" in fields:
+                    fields.remove("HDF5")
                 if args.items:
                     found = []
                     unfound = []
