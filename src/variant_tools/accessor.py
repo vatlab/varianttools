@@ -116,7 +116,11 @@ class HDF5Engine_storage(Base_Storage):
                 for node in self.file.get_node("/chr"+str(chr)):
                     field=node.name
                     if field not in ["Mask","colnames","rowmask","rownames","samplemask","shape"] and field not in fields:
-                        fields.append(field.lower())
+                        if field=="GT":
+                            if node[0][0]!=-1:
+                                fields.append(field.lower())
+                        else:
+                            fields.append(field.lower())
             except tb.exceptions.NoSuchNodeError:
                 pass
         return list(set(fields))
