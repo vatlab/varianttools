@@ -1341,16 +1341,16 @@ def getSnapshotInfo(name):
     try:
         with tarfile.open(snapshot_file, mode) as snapshot:
             while True:
-                tarinfo = next(snapshot)
+                tarinfo = snapshot.next()
                 if tarinfo.name in ['.snapshot.info', 'README']:
                     readme = snapshot.extractfile(tarinfo)
                     break
                 if tarinfo is None:
                     raise ValueError('{}: cannot find snapshot information'.format(snapshot_file))
-            readme.readline()   # header line
-            name = readme.readline()[6:].rstrip()  # snapshot name
-            date = readme.readline()[6:].rstrip()  # date
-            message = ' '.join(readme.read()[6:].split('\n'))  # message
+            readme.readline().decode()   # header line
+            name = readme.readline().decode()[6:].rstrip()  # snapshot name
+            date = readme.readline().decode()[6:].rstrip()  # date
+            message = ' '.join(readme.read().decode()[6:].split('\n'))  # message
             readme.close()
             return (name, date, message)
     except Exception as e:
