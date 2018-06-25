@@ -1059,12 +1059,12 @@ class HDF5GenotypeImportWorker(Process):
                 GT[GT==4]=2
             GT[GT==-10]=np.nan
             self.info["GT"].append(GT)
-            self.info["Mask"].append([1.0]*len(GT))
+            self.info["Mask"].append([1]*len(GT))
         else:
             # GT_geno=[np.nan]
             GT=[-1]
             self.info["GT"].append(GT)
-            self.info["Mask"].append([1.0]*len(GT))
+            self.info["Mask"].append([1]*len(GT))
       
         if len(self.geno_info)>0:
             # self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
@@ -1216,7 +1216,7 @@ class HDF5GenotypeSortWorker(Process):
             GT[GT==4]=2
         # GT_geno[GT_geno==-10]=np.nan
         self.info["GT"].append(GT)
-        self.info["Mask"].append([1.0]*len(GT))
+        self.info["Mask"].append([1]*len(GT))
         if len(self.geno_info)>0:
             # self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
@@ -1369,7 +1369,7 @@ class HDF5GenotypeSortWorker(Process):
                 self.rownames.append(erownames[last])
                 for info in egenoinfo.keys():
                     self.info[info].append(egenoinfo[info][last,:])
-                self.info["Mask"].append([1.0]*len(egenoinfo["GT"][last,:]))
+                self.info["Mask"].append([1]*len(egenoinfo["GT"][last,:]))
                 last+=1
             # if self.dbLocation==self.checkfileName:
             #         print("before",last,len(erowpos))
