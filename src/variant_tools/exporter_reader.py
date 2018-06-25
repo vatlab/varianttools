@@ -468,17 +468,20 @@ class VariantWorker_HDF5(Process):
         for rownames,colnames,sub_all in accessEngine.get_all_genotype_genoinfo(self.samples,[],genoinfo_fields):
             genoType=sub_all[0]
             numrow,numcol=genoType.shape[0],genoType.shape[1]
-            info=np.zeros(shape=(numrow,numcol*len(self.geno_fields)))   
+            info=np.zeros(shape=(numrow,numcol*len(self.geno_fields)),dtype=int)
+       
             for col in range(numcol):
                     info[:,col*len(self.geno_fields)]=genoType[:,col]
 
             if len(genoinfo_fields)>0:
-                for pos,field in enumerate(genoinfo_fields):
+                for pos,field in enumerate(genoinfo_fields):    
                     genoInfo=sub_all[pos+1]
+
                     for col in range(numcol):
                         info[:,col*len(self.geno_fields)+pos]=genoInfo[:,col]
 
             vardict.update(dict(zip(rownames,info)))  
+
         # result=accessEngine.get_genoType_forExport_from_HDF5(self.samples,self.geno_fields)  
         self.output.send(None)
         last_id = None
@@ -487,6 +490,7 @@ class VariantWorker_HDF5(Process):
             if key!=last_id:
                 last_id=key
                 val=np.where(np.isnan(val), None, val)
+
                 self.output.send([key]+val.tolist())
         self.output.send(None)
     

@@ -116,7 +116,11 @@ class HDF5Engine_storage(Base_Storage):
                 for node in self.file.get_node("/chr"+str(chr)):
                     field=node.name
                     if field not in ["Mask","colnames","rowmask","rownames","samplemask","shape"] and field not in fields:
-                        fields.append(field.lower())
+                        if field=="GT":
+                            if node[0][0]!=-1:
+                                fields.append(field.lower())
+                        else:
+                            fields.append(field.lower())
             except tb.exceptions.NoSuchNodeError:
                 pass
         return list(set(fields))
@@ -841,7 +845,6 @@ class HDF5Engine_access(Base_Access):
             genoinfo[genoinfo==-1]=0
             genoinfo=np.nan_to_num(genoinfo)
 
-
         # if field=="GT":
         #     genoinfo=node.GT[startPos:endPos,:]
         # if field=="DP" and "/chr"+str(chr)+"/DP" in self.file:
@@ -883,7 +886,9 @@ class HDF5Engine_access(Base_Access):
                 NS=node.NS[startPos:endPos,:]
                 NS[NS==-1]=0
             genoinfo=np.where(eval("~("+cond+")"),np.nan,genoinfo)
+
         rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,rowpos)
+  
         return rownames,colnames,genoinfo
 
     def find_element_in_list(self,element, list_element):
