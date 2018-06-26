@@ -77,7 +77,6 @@ except (ImportError, ValueError) as e:
     hasPySam = False
 
 
-
 class NamedList:
     '''This class implements a named list to assist users in inputting a large
     number of items to a pipeline. Because these lists are often stored in a text 
@@ -747,6 +746,12 @@ class PipelineAction:
 
 # for backward compatibility
 SkiptableAction=PipelineAction
+
+try:
+    from simulation import *
+    hasSimuPOP = True
+except ImportError as e:
+    hasSimuPOP = False
 
 class SequentialActions(PipelineAction):
     '''Define an action that calls a list of actions, specified by Action1,
