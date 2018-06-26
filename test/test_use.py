@@ -50,7 +50,8 @@ class TestUse(ProcessTestCase):
         else:
             self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
             self.runCmd('vtools import vcf/SAMP1.vcf')
-            self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+            self.runCmd('vtools import vcf/input_nogeno.vcf --build hg18 --sample_name input.tsv')
+            # self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
             self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
             self.runCmd('vtools admin --save_snapshot TestUse.tar.gz "Snapshot of project to test command use"')
         # no hg19
@@ -92,7 +93,8 @@ class TestUse(ProcessTestCase):
         else:
             self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
             self.runCmd('vtools import vcf/SAMP1.vcf')
-            self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+            self.runCmd('vtools import vcf/input_nogeno.vcf --build hg18 --sample_name input.tsv')
+            # self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
             self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
             self.runCmd('vtools admin --save_snapshot TestUse.tar.gz "Snapshot of project to test command use"')
         self.assertSucc('vtools use ann/testNSFP.ann --files ann/testNSFP.zip')

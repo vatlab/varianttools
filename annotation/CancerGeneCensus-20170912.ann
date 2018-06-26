@@ -25,7 +25,7 @@ version=20170912
 encoding=ISO-8859-1
 anno_type=field
 header=1
-#direct_url=annoDB/CancerGeneCensus-20170912.DB.gz	
+direct_url=annoDB/CancerGeneCensus-20170912.DB.gz	ade36e0dc8a65629fea8f58274431c52
 source_url=http://cancer.sanger.ac.uk/cancergenome/assets/cancer_gene_census.tsv
 #the input file is ^M delimited and will be read as one single line
 preprocessor=Dos2Unix()
@@ -111,4 +111,3 @@ type=VARCHAR(255)
 [Synonyms]
 index=19
 type=VARCHAR(255)
-

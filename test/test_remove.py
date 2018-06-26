@@ -30,23 +30,31 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase
 
+
 class TestRemove(ProcessTestCase):
     def setUp(self):
         'Create a project'
         ProcessTestCase.setUp(self)
-        if os.path.isfile('TestRemove.tar.gz'):
-            self.runCmd('vtools admin --load_snapshot TestRemove.tar.gz')
+        if self.storeMode=="sqlite" and os.path.isfile('TestRemove_sqlite.tar.gz'):
+            self.runCmd('vtools admin --load_snapshot TestRemove_sqlite.tar.gz')
+        elif self.storeMode=="hdf5" and os.path.isfile("TestRemove_hdf5.tar.gz"):
+            self.runCmd('vtools admin --load_snapshot TestRemove_hdf5.tar.gz')
         else:
             self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
             self.runCmd('vtools import vcf/SAMP1.vcf')
-            self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+            # self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+            self.runCmd('vtools import vcf/input_nogeno.vcf --build hg18 --sample_name input.tsv')
             self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
             self.runCmd('vtools use ann/testNSFP.ann') 
             self.runCmd('vtools select variant --samples "filename like \'%CEU%\'" -t CEU')
             self.runCmd('vtools select variant --samples "aff=\'1\'" -t unaffected')
             self.runCmd('vtools update CEU --samples "filename like \'%CEU%\' and aff=\'2\'" --from_stat "CEU_cases_num=#(alt)"')
             self.runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP --build hg18')
-            self.runCmd('vtools admin --save_snapshot TestRemove.tar.gz "Snapshot for testing command remove"')
+            if self.storeMode=="sqlite":
+                self.runCmd('vtools admin --save_snapshot TestRemove_sqlite.tar.gz "Snapshot for testing command remove"')
+            elif self.storeMode=="hdf5":
+                self.runCmd('vtools admin --save_snapshot TestRemove_hdf5.tar.gz "Snapshot for testing command remove"')
+
 
     def testRemove(self):
         'Test command vtools remove'
@@ -114,17 +122,28 @@ class TestRemove(ProcessTestCase):
         self.assertSucc('vtools remove phenotypes sex')
         # removing non-existing phenotype should yield just a warning
         self.assertSucc('vtools remove phenotypes non_existing')
-        self.assertOutput('vtools show samples', 'output/remove_phenotype.txt')
+        if self.storeMode=="hdf5":
+            self.assertOutput('vtools show samples', 'output/remove_phenotype_output.txt')
+        elif self.storeMode=="sqlite":
+            self.assertOutput('vtools show samples', 'output/remove_phenotype_sqlite.txt')
     
     def testRemoveGenoField(self):
         #runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno --var_info DP--build hg18')
         self.maxDiff=None
-        self.assertOutput('vtools show genotypes', 'output/remove_genofield_before.txt')
+        if self.storeMode=="sqlite":
+            self.assertOutput('vtools show genotypes', 'output/remove_genofield_before_sqlite.txt')
+        elif self.storeMode=="hdf5":
+            self.assertOutput('vtools show genotypes', 'output/remove_genofield_before_hdf5.txt')
         self.assertFail('vtools remove geno_fields')
         self.assertFail('vtools remove geno_fields variant_id')
         self.assertFail('vtools remove geno_fields gt')
         self.assertSucc('vtools remove geno_fields DP_geno')
-        self.assertOutput('vtools show genotypes', 'output/remove_genofield_after.txt')
+
+        if self.storeMode=="sqlite":
+            self.assertOutput('vtools show genotypes', 'output/remove_genofield_after_sqlite.txt')
+        elif self.storeMode=="hdf5":
+            self.assertOutput('vtools show genotypes', 'output/remove_genofield_after_hdf5.txt')
+                
         self.assertFail('vtools remove projects')
         self.assertSucc('vtools remove project')
 

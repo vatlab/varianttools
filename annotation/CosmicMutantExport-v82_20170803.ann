@@ -1,4 +1,4 @@
-# Copyright (C) 2017 Man Chong Leong (ml69@rice.edu) 
+# Copyright (C) 2017 Man Chong Leong (ml69@rice.edu)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
 #
 # Please refer to http://varianttools.sourceforge.net/Format/New for
@@ -13,7 +13,7 @@ version=v82_20170803
 anno_type=field
 #delimiter='\t'
 source_url: Please follow the instruction on the website of COSMIC to see how to download the dataset.
-#direct_url=annoDB/CosmicMutantExport-v67_241013.DB.gz	598ad94ef4c9dde0015878adc316848b
+direct_url=annoDB/CosmicMutantExport-v82_20170803.DB.gz	07be87093705e2c208bc6b6a8c0472db
 source_type=txt
 source_pattern=
 
@@ -161,7 +161,3 @@ type=VARCHAR(256)
 [Age]
 index=35
 type=INTEGER
-[Sample_source]
-index=24
-type=VARCHAR(256)
-

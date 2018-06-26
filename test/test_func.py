@@ -30,6 +30,7 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase
 
+@unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
 class TestFunc(ProcessTestCase):
     def testRefSequence(self):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
@@ -37,15 +38,16 @@ class TestFunc(ProcessTestCase):
         self.assertSucc('vtools output variant chr pos ref alt "ref_sequence(chr, pos-10, pos+10)"')
         self.assertSucc('''vtools output variant chr pos ref alt "ref_sequence('1', pos-10, pos+10)" ''')
 
-    def testVcfTrack(self):
-        'Testing vcf track'
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.assertSucc('vtools show track vcf/CEU.vcf.gz')
-        self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'info')" ''')
-        self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'NA12751.GT')" ''')
-        self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'info.AN')" ''')
-        self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'qual')" ''')
+    # def testVcfTrack(self):
+    #     'Testing vcf track'
+    #     self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
+    #     self.assertSucc('vtools show track vcf/CEU.vcf.gz')
+    #     self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'info')" ''')
+    #     self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'NA12751.GT')" ''')
+    #     self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'info.AN')" ''')
+    #     self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'qual')" ''')
 
+    
     def testGenotype(self):
         'Testing function genotype'
         self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')
@@ -58,6 +60,7 @@ class TestFunc(ProcessTestCase):
         self.runCmd('vtools import vcf/SAMP3_complex_variants.vcf --sample_name SAMP3')
         self.assertSucc("vtools output variant chr pos 'genotype()'")
 
+ 
     def testSamples(self):
         'Testing function samples'
         self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')

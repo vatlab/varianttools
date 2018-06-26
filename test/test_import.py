@@ -29,6 +29,7 @@ import glob
 import unittest
 import subprocess
 from testUtils import ProcessTestCase 
+from variant_tools.accessor import *
 
 class TestImport(ProcessTestCase):
     def testInvalidVariant(self):
@@ -75,55 +76,57 @@ class TestImport(ProcessTestCase):
     def testDupGenotype1(self):
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18')
         self.assertProj(numOfVariants=288)
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         self.assertSucc('vtools import vcf/CEU_dup.vcf.gz --build hg18')
         self.assertProj(numOfVariants=288)
 
 
+    @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite3","HDF5 version is not implemented for this test")
     def testANNOVAR(self):
         'Testing the annovar input format'
-        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR txt/ANNOVAR.txt')
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/ANNOVAR txt/ANNOVAR.txt')
         # one of the variant cannot be imported.
         self.assertProj(numOfSamples= 0, numOfVariants=11)
-        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR txt/ANNOVAR.txt --force --sample_name kaiw' )
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/ANNOVAR txt/ANNOVAR.txt --force --sample_name kaiw' )
         self.assertProj(numOfSamples= 1, numOfVariants=11)
         self.assertOutput('vtools execute "select sample_name from sample"', 'kaiw\n')
-        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function' )
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function' )
         self.assertSucc('vtools output variant mut_type')
         # test for importing user specified var_info
-        self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function --var_info function --force' )
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function --var_info function --force' )
         self.assertSucc('vtools select variant "function is not NULL" -t function')
         self.assertProj(numOfVariants={'function': 78})
         
     def testCASAVA18_SNP(self):
         'Testing the CASAVA SNP input format'
-        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt')
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/CASAVA18_snps txt/CASAVA18_SNP.txt')
         # 20 new, SNVs, 5 invalid
         self.assertProj(numOfSamples= 1, numOfVariants=21)
         # sample name should have been scanned from the last line starting with "#"
         self.assertProj(sampleNames=['max_gt'])
         # test for re-naming the sample
-        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --force --sample_name casavasnp')
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/CASAVA18_snps txt/CASAVA18_SNP.txt --force --sample_name casavasnp')
         # both samples exist
         self.assertProj(numOfSamples= 2, numOfVariants=21, sampleNames=['max_gt', 'casavasnp'])
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         # test for using user specified genotype information. Have to init a test because of efficiency problem using --force
-        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt --geno max_gt --geno_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/CASAVA18_snps txt/CASAVA18_SNP.txt --geno max_gt --geno_info Q_max_gt max_gt_poly_site Q_max_gt_poly_site')
         # now we have 1 genotype field and 3 info field, plus the variant ID: 5 fields in the genotype_x table
-        self.assertProj(numOfColumns={'genotype_1': 5})
+        if self.storeMode=="sqlite":
+            self.assertProj(numOfColumns={'genotype_1': 5})
         # only 1 sample here. Set num=1
         self.assertProj(genotype={1: ['1']*10 + ['2'] + ['1']*10})
         
     def testCASAVA18_INDEL(self):
         'Testing the CASAVA INDEL input format'
-        self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_indels txt/CASAVA18_INDEL.txt')
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/CASAVA18_indels txt/CASAVA18_INDEL.txt')
         # (25 new, 7 insertions, 18 deletions)
         self.assertProj(numOfSamples= 1, numOfVariants=25, sampleNames=['max_gtype'],
             genotype={1: '1111111111111111121111211'})
         
     def testPileup_INDEL(self):
         # this file has one genotype but we do not provide a sample name. Named as "None" when no sample name is specified anywhere
-        self.assertSucc('vtools import --build hg18 --format ../format/pileup_indel txt/pileup.indel')
+        self.assertSucc('vtools import --build hg18 --format ../resources/format/pileup_indel txt/pileup.indel')
         self.assertProj(numOfSamples= 1, numOfVariants=30, sampleNames=[''],
             genotype={1: '212111111111121111121121111111'})
     
@@ -151,10 +154,12 @@ class TestImport(ProcessTestCase):
         self.assertProj(numOfSamples= 62, numOfVariants=698)
         # import additional information on variants and on genotypes.
         # DP and DP_geno are fields provided in the default vcf.fmt
-        self.runCmd('vtools init test -f')
-        self.assertSucc('vtools import vcf/CEU.vcf.gz --var_info DP --geno_info DP_geno --build hg18')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
+        self.assertSucc('vtools import vcf/CEU.vcf.gz --var_info DP --geno_info DP --build hg18')
         self.assertSucc('vtools output variant DP')
-        self.assertProj(numOfSamples= 60, numOfVariants=288, numOfColumns={'genotype_1': 3})
+        if self.storeMode=="sqlite":
+            self.assertProj(numOfColumns={'genotype_1': 3})
+        self.assertProj(numOfSamples= 60, numOfVariants=288)
 
     def testImportVCFIndel(self):
         'Test importing Indel from VCF files'
@@ -162,10 +167,11 @@ class TestImport(ProcessTestCase):
         self.assertProj(numOfSamples= 0, numOfVariants=134)
         self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno_info')
         self.assertProj(numOfSamples= 0, numOfVariants=11877)
-        
+    
+    @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")   
     def testMPImport(self):
         'Test multi-processing import'
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j1')
         self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
         self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_genotypes.txt')
@@ -175,7 +181,7 @@ class TestImport(ProcessTestCase):
         #
         # compare results with -j3
         #
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         # if more than one reader is used, the order of mutants in some cases will be changed, leading
         # to different variant ids.
         self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
@@ -188,7 +194,7 @@ class TestImport(ProcessTestCase):
         #
         # compare results with -j10
         #
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
         self.assertSucc('vtools import vcf/CEU.vcf.gz --build hg18 -j10')
         self.assertOutput('vtools show samples -l -1', 'output/import_mpi_samples.txt')
@@ -197,8 +203,9 @@ class TestImport(ProcessTestCase):
         self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
                 'output/import_mpi_genotype.txt')
     
-    def testMPImportMultiFiles(self):
-        self.runCmd('vtools init test -f')
+    @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
+    def testMPImportMultiFiles_sqlite(self):
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j1')
         self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
         self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_multi_genotypes.txt')
@@ -208,7 +215,7 @@ class TestImport(ProcessTestCase):
         #
         # compare results with -j3
         #
-        self.runCmd('vtools init test -f')
+        self.runCmd('vtools init test -f --store '+self.storeMode)
         self.runCmd('vtools admin --set_runtime_option "import_num_of_readers=0"')
         self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j4')
         self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
@@ -216,7 +223,36 @@ class TestImport(ProcessTestCase):
         self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
         self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(3)],
                 'output/import_mpi_multi_genotype.txt')
- 
+
+    @unittest.skipUnless(os.getenv("STOREMODE")=="hdf5","sqlite version is not implemented for this test")
+    def testMPImportMultiFiles_hdf5(self):
+        self.runCmd('vtools init test -f --store '+self.storeMode)
+        self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j1')
+        # self.assertOutput('vtools show samples -l -1', 'output/import_mpi_multi_samples.txt')
+        # self.assertOutput('vtools show genotypes -l -1', 'output/import_mpi_multi_genotypes.txt')
+        # self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
+        with open(os.devnull, 'w') as fnull:
+            fileResult = subprocess.check_output('vtools execute "SELECT HDF5 FROM sample WHERE sample_id =1"', shell=True,
+                            stderr=fnull).decode()
+            HDF5FileName=fileResult.rstrip()
+            accessEngine=Engine_Access.choose_access_engine(HDF5FileName)
+            # geno=accessEngine.get_geno_by_sample_ID(1,"GT_geno")
+            geno=[]
+            for rownames,colnames,genoinfo in accessEngine.get_all_genotype([1]):
+                for idx,rowname in enumerate(rownames):
+                    genotype=genoinfo[idx]
+                    if np.isnan(genotype):
+                        genotype=-1
+                    geno.append([rowname,genotype])
+            geno=np.array(geno)
+            proj_output="".join([str(int(val[0]))+"\t"+str(int(val[1]))+"\n" for val in geno])
+            output='output/import_mpi_multi_genotype_hdf5.txt'
+            if os.path.isfile(output):
+                with open(output, 'r') as cf:
+                    output = cf.read()
+            self.compare(proj_output, output)
+
+
     def testMixedBuild(self):
         'Test importing vcf files with different reference genomes'
         self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18')
@@ -255,9 +291,10 @@ class TestImport(ProcessTestCase):
             FIC LQR MQ0 MQ10 MQ20 MQ30 ANNO SVM', 'output/import_customized.txt')
         # test importing self-defined genotypes with VcfGenotype(default=('0',))
         # code missing genotypes as None and wild-type as '0'
-        self.assertProj(genotype={1: ['-1', '-1'], 2: ['0', '2'], 3: ['0', '-1', '-1'], 4: ['0', '-1', '-1']},
-            genoInfo={(1, 'GT'): ['-1', '-1'], (1, 'GQ'): ['3', '3'], (1, 'GD'): ['1', '1'], 
-                (1, 'PL_1'): ['None', 'None'], (1, 'PL_2'): ['None', 'None'], (1, 'PL3_1'): ['0', '3']})
+        if self.storeMode=="sqlite":
+            self.assertProj(genotype={1: ['-1', '-1'], 2: ['0', '2'], 3: ['0', '-1', '-1'], 4: ['0', '-1', '-1']},
+                genoInfo={(1, 'GT'): ['-1', '-1'], (1, 'GQ'): ['3', '3'], (1, 'GD'): ['1', '1'], 
+                    (1, 'PL_1'): ['None', 'None'], (1, 'PL_2'): ['None', 'None'], (1, 'PL3_1'): ['0', '3']})
 
     def testInsertDelete(self):
         'Testing the number of insertions and deletions'
@@ -267,6 +304,7 @@ class TestImport(ProcessTestCase):
         self.assertOutput('''vtools select variant 'ref="-"' --count''', '73\n') 
         self.assertOutput('''vtools select variant 'alt="-"' --output chr pos ref alt''', 'output/import_vcf_alt.txt')
         self.assertOutput('''vtools select variant 'alt="-"' --count''', '53\n') 
+
 
     def testSampleName_single(self):
         'Testing the import of sample names'
@@ -287,7 +325,8 @@ class TestImport(ProcessTestCase):
         #Assign a sample name if the sample name is not in file
         self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19 --sample_name vcf_test3')
         self.assertProj(numOfSamples= 1, numOfVariants=134, sampleNames=['vcf_test3'])
-        
+    
+    @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","hdf5 version is not implemented for this test")    
     def testSampleName_single_assign(self):
         #Testing one sample per file with the --sample_name option
         self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18 --sample_name samp_vcf1')
@@ -314,29 +353,36 @@ class TestImport(ProcessTestCase):
         self.assertSucc("vtools import vcf/500SAMP.vcf --build hg19 --sample_name {}".format(' '.join(input[1:])))
 
     def testCsvImport1(self):
-        self.assertSucc('vtools import txt/test.csv --format ../format/csv.fmt --build hg19 --sample_name samp_csv')
+        self.assertSucc('vtools import txt/test.csv --format ../resources/format/csv.fmt --build hg19 --sample_name samp_csv')
         self.assertProj(numOfSamples=1, numOfVariants=687)
         self.assertOutput('vtools output variant chr pos ref alt', 'output/import_csv.txt')
 
     def testCGAImport(self):
-        self.assertSucc('vtools import txt/CGA.tsv.bz2 --format ../format/CGA.fmt --build hg19 --sample_name samp_csv')
+        self.assertSucc('vtools import txt/CGA.tsv.bz2 --format ../resources/format/CGA.fmt --build hg19 --sample_name samp_csv')
         self.assertProj(numOfSamples=1, numOfVariants=95)
         self.assertOutput('vtools output variant chr pos ref alt', 'output/import_cga.txt') 
-        self.assertOutput('vtools show genotypes', 'output/import_cga_phenotype.txt')
+        if self.storeMode=="sqlite":
+            self.assertOutput('vtools show genotypes', 'output/import_cga_phenotype.txt')
 
     def testMultiSamples_1(self):
         #the files are coming from one custmer
         self.assertSucc('vtools import --format fmt/multi_index.fmt txt/sample_chr22.txt  --build hg19')
         self.assertProj(numOfSamples=3)
         self.assertOutput('vtools show table variant', 'output/import_multi_sample_variant.txt', -4)
-        self.assertOutput('vtools show samples', 'output/import_multi_sample_samples.txt')
+        if self.storeMode=="sqlite":
+            self.assertOutput('vtools show samples', 'output/import_multi_sample_samples.txt')
+        elif self.storeMode=="hdf5":
+            self.assertOutput('vtools show samples', 'output/import_multi_sample_samples_hdf5.txt')
 
     def testMultiSamples_2(self):
         #the files are coming from one custmer
         self.assertSucc('vtools import --format fmt/multi_index.fmt txt/sample_1_chr22.txt  --build hg19')
         self.assertProj(numOfSamples=3)
         self.assertOutput('vtools show table variant', 'output/import_multi_sample2_variant.txt', -4)
-        self.assertOutput('vtools show samples', 'output/import_multi_sample2_samples.txt')
+        if self.storeMode=="sqlite":
+            self.assertOutput('vtools show samples', 'output/import_multi_sample2_samples.txt')
+        elif self.storeMode=="hdf5":
+            self.assertOutput('vtools show samples', 'output/import_multi_sample2_samples_hdf5.txt')
      
 
 if __name__ == '__main__':

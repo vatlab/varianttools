@@ -12,7 +12,7 @@ anno_type=variant
 description=dbSNP version 143, created using vcf file downloaded from NCBI
 version=hg38_143
 source_url=ftp://ftp.ncbi.nih.gov/snp/organisms/human_9606/VCF/00-All.vcf.gz
-direct_url=annoDB/dbSNP-hg38_143.DB.gz
+direct_url=annoDB/dbSNP-hg38_143.DB.gz	dcfc1a50e3c2770621846fc3bf9a3f66
 source_type=txt
 
 
@@ -352,4 +352,3 @@ index=8
 adj=ExtractValue('COMMON=', ';')
 type=INTEGER
 comment=RS is a common SNP.  A common SNP is one that has at least one 1000Genomes population with a minor allele of frequency >= 1% and for which 2 or more founders contribute to that minor allele frequency.
-

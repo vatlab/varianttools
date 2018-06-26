@@ -30,6 +30,7 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase
 
+
 class TestExclude(ProcessTestCase):
     def setUp(self):
         'Create a project'

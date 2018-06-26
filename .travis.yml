@@ -16,7 +16,6 @@ script:
 notifications:
     email:
         recipients:
-            - ben.bob@gmail.com
             - junmahouston@gmail.com
         on_success: never
         on_failure: always

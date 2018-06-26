@@ -41,9 +41,11 @@ class TestAdmin(ProcessTestCase):
         self.assertProj(numOfVariants=577, numOfSamples= 61)
         self.runCmd('vtools admin --rename_samples \'filename like "%SAMP1%"\' NA06985')
         self.assertProj(numOfSamples= 61)
-        self.runCmd('vtools admin --merge_samples')         
-        self.assertProj(numOfVariants=577, numOfSamples= 60)
+        if self.storeMode=="sqlite":
+            self.runCmd('vtools admin --merge_samples')         
+            self.assertProj(numOfVariants=577, numOfSamples= 60)
 
+    @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
     def testMergeWithOverlappingSamples(self):
         # Test merge samples with overlapping variants
         self.assertSucc('vtools import vcf/SAMP2.vcf --build hg19')

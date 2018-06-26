@@ -1,0 +1,87 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+# 
+# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+# for a description of the format of this file.
+#
+# To rebuild this database using a new version of data
+# 1. download an excel file from Cancer Genome Project: http://www.sanger.ac.uk/genetics/CGP/Census/
+# 2. save the data in a tab-delimited text file in filename CancerGeneCensus.txt. Remove the header.
+# 3. run vtools use CancerGeneCensus.ann --files CancerGeneCensus.txt
+
+[linked fields]
+*=GeneSymbol
+
+[data sources]
+description=Cancer Genome Project
+version=20111215
+encoding=ISO-8859-1
+anno_type=field
+direct_url=annoDB/CancerGeneCensus-20111215.DB.gz
+source_url=
+source_type=txt
+
+[GeneSymbol]
+index=1
+type=VARCHAR(255)
+
+[Name]
+index=2
+type=VARCHAR(255)
+
+[GeneID]
+index=3
+type=VARCHAR(255)
+
+[Chr]
+index=4
+type=VARCHAR(255)
+
+[ChrBand]
+index=5
+type=VARCHAR(255)
+
+[CancerSomaticMut]
+index=6
+type=VARCHAR(255)
+
+[CancerGermlineMut]
+index=7
+type=VARCHAR(255)
+
+[TumourTypesSomatic]
+index=8
+type=VARCHAR(255)
+
+[TumourTypesGermline]
+index=9
+type=VARCHAR(255)
+
+[CancerSyndrome]
+index=10
+type=VARCHAR(255)
+
+[TissueType]
+index=11
+type=VARCHAR(255)
+
+[CancerMolecularGenetics]
+index=12
+type=VARCHAR(255)
+
+[MutationType]
+index=13
+type=VARCHAR(255)
+
+[TranslocationPartner]
+index=14
+type=VARCHAR(255)
+
+[OtherGermlineMut]
+index=15
+type=VARCHAR(255)
+
+[OtherSyndromeOrDisease]
+index=16
+type=VARCHAR(255)
+

@@ -30,12 +30,13 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase
 
+
 class TestPhenotype(ProcessTestCase):
     def setUp(self):
         'Create a project'
         ProcessTestCase.setUp(self)
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.runCmd('vtools import vcf/SAMP1.vcf')
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18 --geno_info DP_geno')
+        self.runCmd('vtools import vcf/SAMP1.vcf --geno_info DP_geno')
         self.runCmd('vtools import vcf/SAMP2.vcf --geno_info DP_geno')
 
     def testImportPhenotype(self):
@@ -78,6 +79,7 @@ class TestPhenotype(ProcessTestCase):
         # have to use quote to pass the test
         self.assertSucc('vtools phenotype --set \'race="white"\' --samples \'filename like "%CEU%"\'')
 
+    
     def testPhenotypeFromStat(self):
         'Test command phenotype --from_stat'
         self.assertFail('vtools phenotype --from_stat')

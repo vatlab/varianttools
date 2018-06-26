@@ -28,6 +28,11 @@ import os
 import unittest
 import shlex, subprocess
 import sys
+# sys.path.append("/Users/jma7/anaconda/envs/VariantTools/lib/python3.6/site-packages/variant_tools-3.0.0.dev0-py3.6-macosx-10.7-x86_64.egg")
+from variant_tools.geno_store import *
+from variant_tools.accessor import *
+# from "variant_tools-3.0.0.dev0-py3.6-macosx-10.7-x86_64.egg".variant_tools.geno_store import *
+# from "variant_tools-3.0.0.dev0-py3.6-macosx-10.7-x86_64.egg".variant_tools.accessor import *
 
 test_env = None
 # Sometimes a modified environment for testing is needed.
@@ -43,7 +48,16 @@ class ProcessTestCase(unittest.TestCase):
         with open(self.test_command + '.log', 'a') as fcmd:
             fcmd.write('\n# {}\n# {} \n'.format(self.id().split('.', 1)[-1], 
                 '' if self.shortDescription() is None else '\n# '.join(self.shortDescription().split('\n'))))
-        self.runCmd('vtools init test -f')
+        if os.environ.get("STOREMODE") is not None:
+            self.storeMode=os.getenv("STOREMODE")
+            self.runCmd('vtools init test -f --store '+self.storeMode)
+        else:
+            self.storeMode="hdf5"
+            os.environ["STOREMODE"]="hdf5"
+            self.runCmd('vtools init test -f --store hdf5')
+        if os.environ.get("LOCALRESOURCE") is not None:
+            self.local_resource=os.getenv("LOCALRESOURCE")
+            self.runCmd('vtools admin --set_runtime_option local_resource='+self.local_resource)
 
     def compare(self, itemA, itemB, partial=None, negate=None):
         if not isinstance(itemA, list):
@@ -305,8 +319,18 @@ class ProcessTestCase(unittest.TestCase):
         if numOfGenotype is not None:
             with open(os.devnull, 'w') as fnull:
                 for table, numGeno in numOfGenotype.items():
-                    proj_num_geno = subprocess.check_output('vtools execute "SELECT count(*) FROM genotype_{}"'.format(table), shell=True,
-                        stderr=fnull).decode()
+                    print(table,numGeno)
+                    if self.storeMode=="sqlite":
+                        proj_num_geno = subprocess.check_output('vtools execute "SELECT count(*) FROM genotype_{}"'.format(table), shell=True,
+                            stderr=fnull).decode()
+                    elif self.storeMode=="hdf5":
+                        fileResult = subprocess.check_output('vtools execute "SELECT HDF5 FROM sample WHERE sample_id ={}"'.format(table), shell=True,
+                            stderr=fnull).decode()
+                        HDF5FileName=fileResult.rstrip()
+                        storageEngine=Engine_Storage.choose_storage_engine(HDF5FileName)
+                        proj_geno,numCount=storageEngine.num_variants(table)
+                        proj_num_geno=proj_geno
+                    
                     if negate:
                         self.assertNotEqual(int(proj_num_geno), numGeno)
                     else:
@@ -314,15 +338,53 @@ class ProcessTestCase(unittest.TestCase):
         if genotype is not None:
             with open(os.devnull, 'w') as fnull:
                 for table, geno in genotype.items():
-                    proj_geno = subprocess.check_output('vtools execute "SELECT GT FROM genotype_{}"'.format(table), shell=True,
-                        stderr=fnull).decode()
-                    self.compare([int(x.strip()) for x in proj_geno.strip().split('\n')], list([int(x) for x in geno]), partial=partial, negate=negate)
+                    if self.storeMode=="sqlite":
+                        proj_geno = subprocess.check_output('vtools execute "SELECT GT FROM genotype_{}"'.format(table), shell=True,
+                            stderr=fnull).decode()
+                        self.compare([int(x.strip()) for x in proj_geno.strip().split('\n')], list([int(x) for x in geno]), partial=partial, negate=negate)
+                    elif self.storeMode=="hdf5":
+                        fileResult = subprocess.check_output('vtools execute "SELECT HDF5 FROM sample WHERE sample_id ={}"'.format(table), shell=True,
+                            stderr=fnull).decode()
+                        HDF5FileName=fileResult.rstrip()
+                        accessEngine=Engine_Access.choose_access_engine(HDF5FileName)
+                        # proj_geno=accessEngine.get_geno_by_sample_ID(table,"GT_geno")
+                        proj_geno=[]
+                        for rownames,colnames,genoinfo in accessEngine.get_all_genotype([table]):
+                            for idx,rowname in enumerate(rownames):
+                                genotype=genoinfo[idx]
+                                if np.isnan(genotype):
+                                    genotype=-1
+                                proj_geno.append([rowname,genotype])
+                        proj_geno=np.array(proj_geno)
+
+
+                        self.compare([int(x[1]) for x in proj_geno], list([int(x) for x in geno]), partial=partial, negate=negate)
+                        
+
         if genoInfo is not None:
             with open(os.devnull, 'w') as fnull:
                 for table, geno in genoInfo.items():
-                    proj_geno = subprocess.check_output('vtools execute "SELECT {} FROM genotype_{}"'.format(table[1], table[0]), shell=True,
-                        stderr=fnull).decode()
-                    self.compare([x.strip() for x in proj_geno.strip().split('\n')], list(geno), partial=partial, negate=negate)
+                    if self.storeMode=="sqlite":
+                        proj_geno = subprocess.check_output('vtools execute "SELECT {} FROM genotype_{}"'.format(table[1], table[0]), shell=True,
+                            stderr=fnull).decode()
+                        self.compare([x.strip() for x in proj_geno.strip().split('\n')], list(geno), partial=partial, negate=negate)
+                    elif self.storeMode=="hdf5":
+                        fileResult = subprocess.check_output('vtools execute "SELECT HDF5 FROM sample WHERE sample_id ={}"'.format(table[0]), shell=True,
+                            stderr=fnull).decode()
+                        HDF5FileName=fileResult.rstrip()
+                        accessEngine=Engine_Access.choose_access_engine(HDF5FileName)
+                        # proj_geno=accessEngine.get_geno_by_sample_ID(table[0],table[1])
+                        proj_geno=[]
+                        for rownames,colnames,genoinfo in accessEngine.get_all_genotype([table[0]]):
+                            for idx,rowname in enumerate(rownames):
+                                genotype=genoinfo[idx]
+                                if np.isnan(genotype):
+                                    genotype=-1
+                                proj_geno.append([rowname,genotype])
+                        proj_geno=np.array(proj_geno)
+
+                        self.compare([int(x[1]) for x in proj_geno], list([int(x) for x in geno]), partial=partial, negate=negate)
+
         if hasTable is not None:
             with open(os.devnull, 'w') as fnull:
                 proj_tables = subprocess.check_output('vtools show tables -v0', shell=True).decode().strip().split('\n')

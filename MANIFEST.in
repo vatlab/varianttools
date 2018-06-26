@@ -23,150 +23,58 @@
 #
 
 include setup.py
-include vtools
-include vtools_report
-include variant_tools/__init__.py
-include variant_tools/annotation.py
-include variant_tools/pipeline.py
-include variant_tools/importer.py
-include variant_tools/update.py
-include variant_tools/exporter.py
-include variant_tools/liftOver.py
-include variant_tools/project.py
-include variant_tools/phenotype.py
-include variant_tools/utils.py
-include variant_tools/variant.py
-include variant_tools/association.py
-include variant_tools/tester.py
-include variant_tools/rtester.py
-include variant_tools/compare.py
-include variant_tools/plinkfile.py
-include variant_tools/preprocessor.py
-include variant_tools/simulation.py
-include variant_tools/meta.py
-include variant_tools/plot.py
-include variant_tools/site_options.py
-include variant_tools/assoTests.i
-include variant_tools/cgatools.i
-include variant_tools/ucsctools.i
-include variant_tools/swigpyrun.h
-include variant_tools/assoTests.h
-include variant_tools/assoData.h
-include variant_tools/action.h
-include variant_tools/action.cpp
-include variant_tools/assoData.cpp
-include variant_tools/utils.h
-include variant_tools/utils.cpp
-include variant_tools/lm.h
-include variant_tools/lm.cpp
-include variant_tools/fisher2.h
-include variant_tools/fisher2.c
-include variant_tools/assoTests_py2.py
-include variant_tools/assoTests_py3.py
-include variant_tools/assoTests_wrap_py2.cpp
-include variant_tools/assoTests_wrap_py3.cpp
-include variant_tools/cgatools_py2.py
-include variant_tools/cgatools_py3.py
-include variant_tools/cgatools_wrap_py2.cpp
-include variant_tools/cgatools_wrap_py3.cpp
-include variant_tools/ucsctools_py2.py
-include variant_tools/ucsctools_py3.py
-include variant_tools/ucsctools_wrap_py2.cpp
-include variant_tools/ucsctools_wrap_py3.cpp
-include variant_tools/vt_sqlite3_py2.py
-include variant_tools/vt_sqlite3_py3.py
-#
-# sqlite
-include sqlite/sqlite3.c
-include sqlite/sqlite3.h
-include sqlite/sqlite3ext.h
-include sqlite/vt_sqlite3_ext.cpp
-recursive-include sqlite/py2 *.h *.c
-recursive-include sqlite/py3 *.h *.c
-#
-# gsr
-recursive-include gsl *.h *.c
-#
-# boost
-recursive-include boost_1_49_0/boost *.hpp *.ipp
-recursive-include boost_1_49_0/libs/detail *.cpp
-recursive-include boost_1_49_0/libs/iostreams/src *.cpp
-recursive-include boost_1_49_0/libs/regex/src *.cpp *.hpp
-recursive-include boost_1_49_0/libs/filesystem/v2/src *.cpp 
-recursive-include boost_1_49_0/libs/filesystem/v3/src *.cpp *.hpp
-recursive-include boost_1_49_0/libs/system/src *.cpp *.hpp
-#
-prune boost_1_49_0/boost/accumulators
-prune boost_1_49_0/boost/asio
-prune boost_1_49_0/boost/assign
-prune boost_1_49_0/boost/bimap
-prune boost_1_49_0/boost/chrono
-prune boost_1_49_0/boost/circular_buffer
-prune boost_1_49_0/boost/flyweight
-prune boost_1_49_0/boost/function_types
-prune boost_1_49_0/boost/fusion
-prune boost_1_49_0/boost/geometry
-prune boost_1_49_0/boost/gil
-prune boost_1_49_0/boost/graph
-prune boost_1_49_0/boost/icl
-prune boost_1_49_0/boost/interprocess
-prune boost_1_49_0/boost/intrusive
-prune boost_1_49_0/boost/mpi
-prune boost_1_49_0/boost/msm
-prune boost_1_49_0/boost/phoenix
-prune boost_1_49_0/boost/polygon
-prune boost_1_49_0/boost/property_tree
-prune boost_1_49_0/boost/proto
-prune boost_1_49_0/boost/ptr_container
-prune boost_1_49_0/boost/python
-prune boost_1_49_0/boost/random
-prune boost_1_49_0/boost/signals2
-prune boost_1_49_0/boost/spirit
-prune boost_1_49_0/boost/test
-prune boost_1_49_0/boost/thread
-prune boost_1_49_0/boost/typeof
-prune boost_1_49_0/boost/units
-prune boost_1_49_0/boost/variant
-prune boost_1_49_0/boost/wave
-prune boost_1_49_0/boost/xpressive
-prune boost_1_49_0/boost/math/bindings
-prune boost_1_49_0/boost/math/concepts	
-prune boost_1_49_0/boost/math/complex			
-prune boost_1_49_0/boost/math/constants
-prune boost_1_49_0/boost/math/distributions
-prune boost_1_49_0/boost/mpl/map
-prune boost_1_49_0/boost/mpl/math
-prune boost_1_49_0/boost/mpl/multiset
-prune boost_1_49_0/boost/mpl/set
-prune boost_1_49_0/boost/unordered
-prune boost_1_49_0/boost/parameter
-prune boost_1_49_0/boost/serialization
-prune boost_1_49_0/boost/numeric/internal
-prune boost_1_49_0/boost/numeric/ublas
-prune boost_1_49_0/boost/multi_array
-prune boost_1_49_0/boost/multi_index
-prune boost_1_49_0/boost/archive
-
-
-#
-# ucsc tools
-recursive-include ucsc/tabix *.h *.c
-recursive-include ucsc/samtools *.h *.c
-recursive-include ucsc/lib *.h *.c
-recursive-include ucsc/inc *.h
-#
-# cgatools
-include cgatools/core.hpp
-recursive-include cgatools/util *.hpp *.cpp
-recursive-include cgatools/reference *.hpp *.cpp
-#
+include README
 # libplinkio
-include libplinkio/LICENSE
-recursive-include libplinkio *.h *.c
-
-# test
-include test/*.py
-include test/vcf/*
-include test/txt/*
-include test/phenotype/*
-include test/ann/*
+recursive-include src *.py *.c *.cpp *.h *.hpp *.i
+recursive-include test *.py
+#
+prune src/boost_1_49_0/boost/accumulators
+prune src/boost_1_49_0/boost/asio
+prune src/boost_1_49_0/boost/assign
+prune src/boost_1_49_0/boost/bimap
+prune src/boost_1_49_0/boost/chrono
+prune src/boost_1_49_0/boost/circular_buffer
+prune src/boost_1_49_0/boost/flyweight
+prune src/boost_1_49_0/boost/function_types
+prune src/boost_1_49_0/boost/fusion
+prune src/boost_1_49_0/boost/geometry
+prune src/boost_1_49_0/boost/gil
+prune src/boost_1_49_0/boost/graph
+prune src/boost_1_49_0/boost/icl
+prune src/boost_1_49_0/boost/interprocess
+prune src/boost_1_49_0/boost/intrusive
+prune src/boost_1_49_0/boost/mpi
+prune src/boost_1_49_0/boost/msm
+prune src/boost_1_49_0/boost/phoenix
+prune src/boost_1_49_0/boost/polygon
+prune src/boost_1_49_0/boost/property_tree
+prune src/boost_1_49_0/boost/proto
+prune src/boost_1_49_0/boost/ptr_container
+prune src/boost_1_49_0/boost/python
+prune src/boost_1_49_0/boost/random
+prune src/boost_1_49_0/boost/signals2
+prune src/boost_1_49_0/boost/spirit
+prune src/boost_1_49_0/boost/test
+prune src/boost_1_49_0/boost/thread
+prune src/boost_1_49_0/boost/typeof
+prune src/boost_1_49_0/boost/units
+prune src/boost_1_49_0/boost/variant
+prune src/boost_1_49_0/boost/wave
+prune src/boost_1_49_0/boost/xpressive
+prune src/boost_1_49_0/boost/math/bindings
+prune src/boost_1_49_0/boost/math/concepts	
+prune src/boost_1_49_0/boost/math/complex			
+prune src/boost_1_49_0/boost/math/constants
+prune src/boost_1_49_0/boost/math/distributions
+prune src/boost_1_49_0/boost/mpl/map
+prune src/boost_1_49_0/boost/mpl/math
+prune src/boost_1_49_0/boost/mpl/multiset
+prune src/boost_1_49_0/boost/mpl/set
+prune src/boost_1_49_0/boost/unordered
+prune src/boost_1_49_0/boost/parameter
+prune src/boost_1_49_0/boost/serialization
+prune src/boost_1_49_0/boost/numeric/internal
+prune src/boost_1_49_0/boost/numeric/ublas
+prune src/boost_1_49_0/boost/multi_array
+prune src/boost_1_49_0/boost/multi_index
+prune src/boost_1_49_0/boost/archive

@@ -26,6 +26,7 @@
 
 import unittest
 from testUtils import ProcessTestCase
+import os
 
 class TestAvgDepth(ProcessTestCase):
     def setUp(self):

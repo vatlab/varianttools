@@ -1,3 +1,6 @@
+src/variant_tools/io_vcf_read.c
+src/variant_tools/celery_main/*.pbs
+src/variant_tools.egg-info/
 test/*.log
 test/*.DB
 test/*.proj
@@ -8,6 +11,9 @@ test/.vtools_cache/
 test/10
 test/ann/testNSFP.DB
 test/parent/
+test/tmp_*_genotypes.h5
+test/ceu/
+test/sam1/
 build
 dist
 boost_*
@@ -28,3 +34,4 @@ variant_tools/cgatools_wrap.cpp
 variant_tools/swigpyrun.h
 variant_tools/ucsctools.py
 variant_tools/ucsctools_wrap.cpp
+.DS_Store
