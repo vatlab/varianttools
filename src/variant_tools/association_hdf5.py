@@ -358,7 +358,6 @@ def getGenotype_HDF5(worker, group):
     cur = worker.db.cursor()
     # variant info
     var_info, variant_ids = worker.getVarInfo(group, where_clause)
-    
     chr=getChr(variant_ids[0],cur)
     chrEnd=getChr(variant_ids[-1],cur)
 
@@ -377,7 +376,6 @@ def getGenotype_HDF5(worker, group):
     geneSymbol=transformGeneName(group[0])
     files=glob.glob("tmp*_genotypes_multi_genes.h5")
     files=sorted(files, key=lambda name: int(name.split("_")[1]))
-
     for fileName in files:
          
         accessEngine=Engine_Access.choose_access_engine(fileName)

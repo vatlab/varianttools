@@ -32,7 +32,7 @@ import glob
 from shutil import copyfile
 from .accessor import *
 from subprocess import call
-from variant_tools.celery_main.task_receiver import do_work
+# from variant_tools.celery_main.task_receiver import do_work
 import json
 import pickle
 
@@ -1586,14 +1586,13 @@ def importGenotypesInParallel(importer,num_sample=0):
                 if not importer.sort:
                     HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
                     updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge)
-                    # taskQueue.put(HDF5GenotypeImportWorker(chunk, importer.variantIndex, start_sample, end_sample, 
-                    #     sample_ids,variant_import_count[job], job,HDFfile_Merge,importer.genotype_info,importer.build))
+                    taskQueue.put(HDF5GenotypeImportWorker(chunk, importer.variantIndex, start_sample, end_sample, 
+                        sample_ids,variant_import_count[job], job,HDFfile_Merge,importer.genotype_info,importer.build))
 
              
-                    do_work.delay(chunk,importer.variantIndex,start_sample, end_sample, 
-                         sample_ids, job,HDFfile_Merge,importer.genotype_info,importer.build)
-                    # do_work.delay(result, importer.variantIndex, start_sample, end_sample, 
-                    #     sample_ids, job,HDFfile_Merge,importer.genotype_info,importer.build)
+                    # do_work.delay(chunk,importer.variantIndex,start_sample, end_sample, 
+                    #      sample_ids, job,HDFfile_Merge,importer.genotype_info,importer.build)
+           
                 else:
                     originalFile="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
                     HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_sort_genotypes.h5"
@@ -1604,19 +1603,19 @@ def importGenotypesInParallel(importer,num_sample=0):
                     taskQueue.put(HDF5GenotypeSortWorker(chunk, importer, start_sample, end_sample, 
                         sample_ids,variant_import_count[job], job, HDFfile_Merge,estart[job],eend[job],efirst[job]))
                 start_sample = end_sample 
-            # while taskQueue.qsize()>0:
-            #     for i in range(importer.jobs):    
-            #         if importers[i] is None or not importers[i].is_alive():     
-            #             task=taskQueue.get()
-            #             importers[i]=task
-            #             importers[i].start()         
-            #             break 
-            # starttime=time.time()   
-            # for worker in importers:
-            #     if worker is not None:
-            #         worker.join()
-            # # print("jointime "+str(time.time()-starttime))
-            # starttime=time.time()  
+            while taskQueue.qsize()>0:
+                for i in range(importer.jobs):    
+                    if importers[i] is None or not importers[i].is_alive():     
+                        task=taskQueue.get()
+                        importers[i]=task
+                        importers[i].start()         
+                        break 
+            starttime=time.time()   
+            for worker in importers:
+                if worker is not None:
+                    worker.join()
+            # print("jointime "+str(time.time()-starttime))
+            starttime=time.time()  
             lines+=chunk_length
             prog.update(lines)
             start=time.time()

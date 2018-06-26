@@ -41,6 +41,9 @@ from variant_tools.vt_sqlite3 import OperationalError
 import argparse
 import numpy as np
 from .association_hdf5 import generateHDFbyGroup,getGenotype_HDF5,generateHDFbyGroup_update
+from variant_tools.celery_main.task_receiver import run_grp_association
+
+import pickle
 
 
 def associateArguments(parser):
@@ -1080,14 +1083,7 @@ def runAssociation(args,asso,proj,results):
         maintenance_flag = Value('L', 1)
         maintenance = MaintenanceProcess(proj, {'genotype_index': asso.sample_IDs}, maintenance_flag)
         maintenance.start()
-        # step 2: workers work on genotypes
-        # the group queue is used to send groups
-        grpQueue = Queue()
-        # the result queue is used by workers to return results
-        resQueue = Queue()
-        # see if all workers are ready
-        ready_flags = Array('L', [0]*nJobs)
-        shelf_lock = Lock()
+        
         for j in range(nJobs):
             # the dictionary has the number of temporary database for each sample
             AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j, 
@@ -1146,6 +1142,114 @@ def runAssociation(args,asso,proj,results):
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
+
+
+
+def cluster_runAssociation(args,asso,proj,results):
+    try:
+        sampleQueue = Queue()
+        nJobs = max(min(args.jobs, len(asso.groups)), 1)
+        # loading from disk cannot really benefit from more than 8 simultaneous read
+        # due to disk access limits
+        # if env.associate_num_of_readers is set we'll use it directly
+        nLoaders = env.associate_num_of_readers
+        # if no env.associate_num_of_readers is set we limit it to a max of 8.
+        if not nLoaders > 0:
+            nLoaders = min(8, nJobs)
+        # step 1: getting all genotypes
+        # the loaders can start working only after all of them are ready. Otherwise one
+        # worker might block the database when others are trying to retrieve data
+        # which is a non-blocking procedure.
+        ready_flags = Array('L', [0]*nLoaders)
+        # Tells the master process which samples are loaded, used by the progress bar.
+        cached_samples = Array('L', max(asso.sample_IDs) + 1)
+        #
+        for id in asso.sample_IDs:
+            sampleQueue.put(id)
+        loaders = []
+        
+       
+
+        # step 1.5, start a maintenance process to create indexes, if needed.
+        # maintenance_flag = Value('L', 1)
+        # maintenance = MaintenanceProcess(proj, {'genotype_index': asso.sample_IDs}, maintenance_flag)
+        # maintenance.start()
+        # step 2: workers work on genotypes
+        # the group queue is used to send groups
+        # grpQueue = Queue()
+        # # the result queue is used by workers to return results
+        # resQueue = Queue()
+        # # see if all workers are ready
+        # ready_flags = Array('L', [0]*nJobs)
+        # shelf_lock = Lock()
+        # for j in range(nJobs):
+        #     # the dictionary has the number of temporary database for each sample
+        #     AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j, 
+        #         {x:y-1 for x,y in enumerate(cached_samples) if y > 0},
+        #         results.fields, shelf_lock, args).start()
+        # send jobs ...
+        # get initial completed and failed
+        # put all jobs to queue, the workers will work on them
+        for grp in asso.groups:
+            asso.db=""
+            asso.proj.db=""
+            asso.proj.annoDB=""
+            asso.tests=""
+            sampleMap={x:y-1 for x,y in enumerate(cached_samples) if y > 0},
+          
+
+            run_grp_association.delay(asso, grp,
+                results.fields,args.methods,os.getcwd())
+
+        # the worker will stop once all jobs are finished
+        # for j in range(nJobs):
+        #     grpQueue.put(None)
+        # #
+        # count = 0
+        # with delayedAction(env.logger.info, "Starting {} association test workers".format(nJobs)):
+        #     while True:
+        #         if all(ready_flags):
+        #             break
+        #         else:
+        #             time.sleep(random.random()*2)
+        # prog = ProgressBar('Testing for association', len(asso.groups))
+        # try:
+        #     while True:
+        #         # if everything is done
+        #         if count >= len(asso.groups):
+        #             break
+        #         # not done? wait from the queue and write to the result recorder
+        #         res = resQueue.get()
+        #         results.record(res)
+        #         # update progress bar
+        #         count = results.completed()
+        #         prog.update(count, results.failed())
+        #         # env.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
+        # except KeyboardInterrupt as e:
+        #     env.logger.error('\nAssociation tests stopped by keyboard interruption ({}/{} completed).'.\
+        #                       format(count, len(asso.groups)))
+        #     # results.done()
+        #     proj.close()
+        #     sys.exit(1)
+        # finished
+        prog.done()
+        # results.done()
+        # summary
+        # env.logger.info('Association tests on {} groups have completed. {} failed.'.\
+        #                  format(results.completed(), results.failed()))
+        # use the result database in the project
+        if args.to_db:
+            proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
+        # tells the maintenance process to stop
+        # maintenance_flag.value = 0
+        # wait for the maitenance process to stop
+        # with delayedAction(env.logger.info,
+        #         "Maintaining database. This might take a few minutes.", delay=10):
+        #     maintenance.join()
+    except Exception as e:
+        env.logger.error(e)
+        sys.exit(1)
+
 
 
 
@@ -1228,7 +1332,8 @@ def associate(args):
                 # print(len(asso.covariates[0]))
              
 
-            runAssociation(args,asso,proj,results)
+            # runAssociation(args,asso,proj,results)
+            cluster_runAssociation(args,asso,proj,results)
 
     except Exception as e:
         env.logger.error(e)
