@@ -731,7 +731,8 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             if m is None:
                 raise ValueError('Unrecognized parameter {}, which should have the form of FIELD=FUNC(GENO_INFO) where FUNC is one of #, avg, sum, max and min'.format(stat))
             dest, operation, field = m.groups()
-            field=field.replace("_geno","")
+            if proj.store=="hdf5":
+                field=field.replace("_geno","")
             if operation not in possibleOperations:
                 raise ValueError('Unsupported operation {}. Supported operations include {}.'.format(operation, ', '.join(possibleOperations)))
             
