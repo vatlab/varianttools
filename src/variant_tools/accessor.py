@@ -138,8 +138,11 @@ class HDF5Engine_storage(Base_Storage):
                 group=self.file.get_node("/chr"+str(chr))
                 rownames=group.rownames[:]
             # i=self.rownames.index(variant_id)
-            i=np.where(rownames==res[0])[0][0]
-            group.rowmask[i]=True
+            # i=np.where(rownames==res[0])[0][0]
+            check=np.where(rownames==res[0])
+            if check[0].size!=0:
+                i=check[0][0]
+                group.rowmask[check]=True
 
     # def recover_variant(self,variant_id,chr,groupName=""):
     #     group=self.file.get_node("/chr"+chr+"/"+groupName)

@@ -1008,11 +1008,12 @@ class HDF5GenotypeImportWorker(Process):
         self.rownames=[]
         self.sample_ids=sample_ids
         self.firstID=0
-        if sample_ids[0]!=1 and start_sample!=0:
-            self.firstID=sample_ids[0]
-            self.start_sample=self.start_sample+1
-            self.end_sample=self.end_sample+1
-        self.colnames=[self.sample_ids[i-self.firstID] for i in range(self.start_sample,self.end_sample)]
+        # if sample_ids[0]!=1 and start_sample!=0:
+        #     self.firstID=sample_ids[0]
+        #     self.start_sample=self.start_sample+1
+        #     self.end_sample=self.end_sample+1
+        # self.colnames=[self.sample_ids[i-self.firstID] for i in range(self.start_sample,self.end_sample)]
+        self.colnames=[self.sample_ids[i] for i in range(self.start_sample,self.end_sample)]
         self.genoCount=0
         self.dbLocation=dbLocation
         self.build=build
@@ -1165,11 +1166,12 @@ class HDF5GenotypeSortWorker(Process):
         self.rownames=[]
         self.sample_ids=sample_ids
         self.firstID=0
-        if sample_ids[0]!=1 and start_sample!=0:
-            self.firstID=sample_ids[0]
-            self.start_sample=self.start_sample+1
-            self.end_sample=self.end_sample+1
-        self.colnames=[self.sample_ids[i-self.firstID] for i in range(self.start_sample,self.end_sample)]
+        # if sample_ids[0]!=1 and start_sample!=0:
+        #     self.firstID=sample_ids[0]
+        #     self.start_sample=self.start_sample+1
+        #     self.end_sample=self.end_sample+1
+        # self.colnames=[self.sample_ids[i-self.firstID] for i in range(self.start_sample,self.end_sample)]
+        self.colnames=[self.sample_ids[i] for i in range(self.start_sample,self.end_sample)]
         self.genoCount=0
         self.dbLocation=dbLocation
         
@@ -1423,11 +1425,11 @@ class HDF5GenotypeSortWorker(Process):
 def updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDF5fileName):
     firstID=0
     adjust=0
-    if sample_ids[0]!=1 and start_sample!=0:
-        firstID=sample_ids[0]
-        start_sample=start_sample+1
-        end_sample=end_sample+1
-        adjust=1
+    # if sample_ids[0]!=1 and start_sample!=0:
+    #     firstID=sample_ids[0]
+    #     start_sample=start_sample+1
+    #     end_sample=end_sample+1
+    #     adjust=1
     for id in range(start_sample,end_sample):
         try:
             sql="UPDATE sample SET HDF5=? WHERE sample_id=? and sample_name=?"
@@ -1567,7 +1569,7 @@ def importGenotypesInParallel(importer,num_sample=0):
         estart=[Value('L', 0) for x in range(numTasks)]
         eend=[Value('L', READ_EXISTING_CHUNK_LENGTH) for x in range(numTasks)]
         efirst=[Value('b',True) for x in range(numTasks)]
-        
+      
         start=time.time()
         for chunk, _, _, _ in it:
             start_sample =0
