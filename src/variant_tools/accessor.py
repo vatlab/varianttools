@@ -785,7 +785,7 @@ class HDF5Engine_access(Base_Access):
                     if "/chr"+str(chr)+"/GT" in self.file and minPos!=maxPos:
         
                         sub_rownames,updated_colnames,sub_geno=self.filter_on_genotypes(cond,chr,node,"GT",minPos,maxPos,colpos,rowpos)
-                       
+
                         sub_all.append(np.array(sub_geno))
                         if len(validGenotypeFields)>0:
                             for pos,field in enumerate(validGenotypeFields):
@@ -845,8 +845,13 @@ class HDF5Engine_access(Base_Access):
        
         if field in self.file.get_node("/chr"+str(chr)):
             genoinfo=self.file.get_node("/chr"+str(chr)+"/"+field)[startPos:endPos,:]
-            genoinfo[genoinfo==-1]=0
-            genoinfo=np.nan_to_num(genoinfo)
+            if field != "GT": 
+                genoinfo[genoinfo==-1]=0
+                genoinfo=np.nan_to_num(genoinfo)
+            else:
+                if env.treat_missing_as_wildtype:
+                    genoinfo=np.nan_to_num(genoinfo)
+
 
         # if field=="GT":
         #     genoinfo=node.GT[startPos:endPos,:]

@@ -1456,6 +1456,7 @@ class HDF5_Store(Base_Store):
                     variants=np.zeros(shape=(numrow,len(validGenotypeFields)+5),dtype=np.int64)   
                     
                     variants[:,3]=np.nansum(~np.isnan(genotype),axis=1)
+                    
                     variants[:,0]=np.nansum(genotype==1,axis=1)
                     variants[:,1]=np.nansum(genotype==2,axis=1)
                     variants[:,2]=np.nansum(genotype==-1,axis=1)
