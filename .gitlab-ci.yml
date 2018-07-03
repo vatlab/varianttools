@@ -8,7 +8,7 @@ stages:
 #          LOCALRESOURCE: "/home/jma7/.variant_tools"
 
 before_script:
-                - git checkout v3_clean_geno
+                - git checkout master
                 - git pull
                 - cp -r /home/bpeng/VariantTools/src/boost_1_49_0 ./src
                 - cp -r /home/bpeng/VariantTools/src/cgatools ./src
@@ -88,6 +88,7 @@ HDF5_test_admin-associate-avg_depth-compare:
                 - python test_avg_depth.py
                 - python test_compare.py
 
+
 HDF5_test_show-trans_ratio-update-use:
         stage: test
         variables:
@@ -136,7 +137,6 @@ HDF5_test_init-listover-func:
 
 
 
-
 # test_associate:
 #         stage: test
 #         script:
@@ -153,7 +153,6 @@ HDF5_test_init-listover-func:
 #                 - python test_compare.py
 
 
-
 # test_execute:
 #         stage: test
 #         script:
@@ -168,13 +167,6 @@ HDF5_test_init-listover-func:
 #         stage: test
 #         script:
 #                 - python test_func.py
-
-
-
-# test_liftover:
-#         stage: test
-#         script:
-#                 - python test_liftover.py
 
 
 
@@ -209,7 +201,3 @@ HDF5_test_init-listover-func:
 #         stage: test
 #         script:
 #                 - python test_use.py
-
-
-
-

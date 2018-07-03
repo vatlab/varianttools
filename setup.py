@@ -672,9 +672,10 @@ ext_modules=[
             sources = [UCSCTOOLS_WRAPPER_CPP_FILE],
             include_dirs = ['.', 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools']  + ENV_INCLUDE_DIRS,
             library_dirs = ["build"]  + ENV_LIBRARY_DIRS,
+
             define_macros =  [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
                 ('_USE_KNETFILE', None), ('BGZF_CACHE', None)],
-            libraries = ['ucsc', 'z', 'bz2'],
+            libraries = libs + ['ucsc', 'z', 'bz2'],
         ),
         Extension('variant_tools.cplinkio',
             # stop warning message ucsctools because it is written by us.
@@ -703,13 +704,15 @@ ext_modules=[
             sources = [CGATOOLS_WRAPPER_CPP_FILE],
             libraries = ['cgatools'] + \
                 (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']) + \
-                ['z', 'bz2'],
+                ['z', 'bz2'] + ENV_INCLUDE_DIRS,
             define_macros = [('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
             extra_compile_args = gccargs,
             swig_opts = ['-O', '-shadow', '-c++', '-keyword'],
+
             include_dirs = ["src", "src/cgatools", "src/boost_1_49_0"] + ENV_INCLUDE_DIRS,
             library_dirs = ["build"] + ENV_LIBRARY_DIRS,
+
         ),
         Extension('variant_tools._assoTests',
             sources = [ASSO_WRAPPER_CPP_FILE] + ASSOC_FILES,
@@ -717,6 +720,7 @@ ext_modules=[
             libraries = libs + ['gsl', 'stat'], #, 'blas'],
             library_dirs = ["build"] + ENV_LIBRARY_DIRS,
             include_dirs = ["src", "src/variant_tools", "src/gsl"] + ENV_INCLUDE_DIRS,
+
         )
       ]
 ext_modules+=cythonize([Extension('variant_tools.io_vcf_read',

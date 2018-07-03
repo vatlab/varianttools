@@ -29,8 +29,8 @@ try:
     import argparse
 except ImportError:
     sys.exit('variant tools requires Python 2.7.2 or higher, or Python 3.2 '
-        'or higher. Please upgrade your version ({}) of Python and try again.'
-        .format(sys.version.split()[0]))
+             'or higher. Please upgrade your version ({}) of Python and try again.'
+             .format(sys.version.split()[0]))
 
 from variant_tools.utils import env
 import subprocess
@@ -46,34 +46,37 @@ import variant_tools.annotation as annotation
 import variant_tools.variant as variant
 import variant_tools.compare as compare
 import variant_tools.exporter as exporter
+import variant_tools.pipeline as pipeline
 
 if sys.platform != 'win32':
     import variant_tools.liftOver as liftOver
     import variant_tools.association as association
 
+
 def addCommonArgs(parser):
     parser.add_argument('-v', '--verbosity', choices=['0', '1', '2', '3'],
-        help='''Output error and warning (0), info (1), debug (2) and trace (3) 
+                        help='''Output error and warning (0), info (1), debug (2) and trace (3)
             information to standard output (default to 1).'''),
+
 
 def main():
     #
-    master_parser = argparse.ArgumentParser(description='''A variant calling, 
+    master_parser = argparse.ArgumentParser(description='''A variant calling,
         processing, annotation and analysis tool for next-generation sequencing
         studies.''', prog='vtools',
-        #formatter_class=argparse.RawDescriptionHelpFormatter,
-        fromfile_prefix_chars='@',
-        epilog='''Use 'vtools cmd -h' for details about each command.
+                                            # formatter_class=argparse.RawDescriptionHelpFormatter,
+                                            fromfile_prefix_chars='@',
+                                            epilog='''Use 'vtools cmd -h' for details about each command.
         Please contact Bo Peng (bpeng at mdanderson.org) if you have any question.''')
     master_parser.add_argument('--version', action='version',
-        version='%(prog)s {}'.format(VTOOLS_FULL_VERSION))
+                               version='%(prog)s {}'.format(VTOOLS_FULL_VERSION))
     subparsers = master_parser.add_subparsers(title='subcommands')
     #
     # command init
     parser = subparsers.add_parser('init', help='''Create a new project, or a
         subproject from an existing parent project, or merge several existing
         projects into one''',
-        description='''Create a new project in the current directory. This
+                                   description='''Create a new project in the current directory. This
         command will fail if another project already exists in this directory,
         unless option '--force' is used to remove the existing project.''')
     project.initArguments(parser)
@@ -82,16 +85,16 @@ def main():
     #
     # command import
     parser = subparsers.add_parser('import',
-        help='Import variants and related sample genotype from files in specified formats',
-        description='''Import variants and related sample genotype from one or more
+                                   help='Import variants and related sample genotype from files in specified formats',
+                                   description='''Import variants and related sample genotype from one or more
             delimiter separated files (e.g. VCF and a number of indel formats).''')
     importer.importVariantsArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=importer.importVariants)
-    # 
+    #
     # command phenotype
     parser = subparsers.add_parser('phenotype', help='Manage sample phenotypes',
-        description='''Import phenotypes from a file, or set phenotypes to constants, 
+                                   description='''Import phenotypes from a file, or set phenotypes to constants,
             or to summary statistics of sample genotype fields.''')
     phenotype.phenotypeArguments(parser)
     addCommonArgs(parser)
@@ -99,8 +102,8 @@ def main():
     #
     # command show
     parser = subparsers.add_parser('show', help='Display content of a project',
-        description='''Output information of all system and project related items
-            such as variant tables, samples, phenotypes, annotation databases 
+                                   description='''Output information of all system and project related items
+            such as variant tables, samples, phenotypes, annotation databases
             and fields.''')
     project.showArguments(parser)
     addCommonArgs(parser)
@@ -109,9 +112,9 @@ def main():
     # command liftover
     if sys.platform != 'win32':
         parser = subparsers.add_parser('liftover',
-            help='''Set alternative reference genome and update alternative
+                                       help='''Set alternative reference genome and update alternative
                 coordinates of all variant tables''',
-            description='''Convert coordinates of existing variants to alternative 
+                                       description='''Convert coordinates of existing variants to alternative
                 coordinates in an alternative reference genome. The UCSC liftover
                 tool will be automatically downloaded if it is not available.''')
         liftOver.liftOverArguments(parser)
@@ -120,8 +123,8 @@ def main():
     #
     # command use
     parser = subparsers.add_parser('use',
-        help='Prepare (download or import if necessary) and use an annotation database',
-        description='''Link an annotation database to the project, download it
+                                   help='Prepare (download or import if necessary) and use an annotation database',
+                                   description='''Link an annotation database to the project, download it
             from the variant tools website or build it from source if needed.''')
     annotation.useArguments(parser)
     addCommonArgs(parser)
@@ -129,12 +132,12 @@ def main():
     #
     # command update
     parser = subparsers.add_parser('update',
-        help='''Add or update fields of existing variants and genotype using
-            information from specified existing fields, sample genotype, 
+                                   help='''Add or update fields of existing variants and genotype using
+            information from specified existing fields, sample genotype,
             or external files''',
-        description='''Add or update fields of existing variants and genotype
+                                   description='''Add or update fields of existing variants and genotype
             from other fields, statistics of genotypes and genotype info, or
-            files that annotate variants or their locations (e.g. Read 
+            files that annotate variants or their locations (e.g. Read
             annotation from ANNOVAR output files, import additional variant
             or genotype fields from .vcf files).''')
     update.updateArguments(parser)
@@ -143,8 +146,8 @@ def main():
     #
     # command select
     parser = subparsers.add_parser('select',
-        help='''Output or save select variants that match specified conditions''',
-        description='''Select variants according to properties (variant and
+                                   help='''Output or save select variants that match specified conditions''',
+                                   description='''Select variants according to properties (variant and
             annotation fields) and membership (samples) of variant. The result
             can be counted, outputted, or saved to a variant table.''')
     variant.selectArguments(parser)
@@ -154,9 +157,9 @@ def main():
     #
     # command exclude
     parser = subparsers.add_parser('exclude',
-        help='''Output or save variants after excluding variants that match
+                                   help='''Output or save variants after excluding variants that match
             specified conditions''',
-        description='''Exclude variants according to properties (variant and
+                                   description='''Exclude variants according to properties (variant and
             annotation fields) and membership (samples) of variant. The result
             can be counted, outputted, or saved to a variant table.''')
     variant.excludeArguments(parser)
@@ -166,10 +169,10 @@ def main():
     #
     # command compare
     parser = subparsers.add_parser('compare',
-        help='''Compare sites, variants, or genotypes of variants in two or more
+                                   help='''Compare sites, variants, or genotypes of variants in two or more
             variant tables''',
-        description='''Get the difference, intersection and union of two or more
-            variant tables, according to sites, variants, or genotypes of 
+                                   description='''Get the difference, intersection and union of two or more
+            variant tables, according to sites, variants, or genotypes of
             associated samples of these variants. Resulting variants can be
             counted or write to other variant tables.''')
     compare.compareArguments(parser)
@@ -178,8 +181,8 @@ def main():
     #
     # command output
     parser = subparsers.add_parser('output',
-        help='Output variants in tab or comma separated format',
-        description='''Output variants, variant info fields, annotation fields
+                                   help='Output variants in tab or comma separated format',
+                                   description='''Output variants, variant info fields, annotation fields
             and expressions that involve these fields in a tab or comma separated
             format.''')
     variant.outputArguments(parser)
@@ -189,8 +192,8 @@ def main():
     #
     # command export
     parser = subparsers.add_parser('export',
-        help='Export samples (variants and genotypes) in specified format',
-        description='''Export variants and genotypes in text, vcf and other
+                                   help='Export samples (variants and genotypes) in specified format',
+                                   description='''Export variants and genotypes in text, vcf and other
             formats.''')
     exporter.exportArguments(parser)
     addCommonArgs(parser)
@@ -199,7 +202,7 @@ def main():
     # command remove
     parser = subparsers.add_parser('remove', help='''Remove project or its
         contents such as variant tables, fields, and annotation databases.''',
-        description='''Remove from the current project various items such as
+                                   description='''Remove from the current project various items such as
             variants genotypes, and annotation fields.''')
     project.removeArguments(parser)
     addCommonArgs(parser)
@@ -209,8 +212,8 @@ def main():
     #
     if sys.platform != 'win32':
         parser = subparsers.add_parser('associate',
-            help='''Test association between variants and phenotypes''',
-            description='''Call one or more statistical association tests and
+                                       help='''Test association between variants and phenotypes''',
+                                       description='''Call one or more statistical association tests and
                 return test results as fields to variants tested.''')
         association.associateArguments(parser)
         addCommonArgs(parser)
@@ -219,9 +222,9 @@ def main():
     # command admin
     #
     parser = subparsers.add_parser('admin',
-        help='''Perform various administrative tasks including merge and
+                                   help='''Perform various administrative tasks including merge and
             rename samples.''',
-        description='''Optimize or modify projects. Currently supports merging
+                                   description='''Optimize or modify projects. Currently supports merging
             and rename of samples''')
     project.adminArguments(parser)
     addCommonArgs(parser)
@@ -229,11 +232,11 @@ def main():
     #
     # command execute
     parser = subparsers.add_parser('execute',
-        help='Execute a SQL query',
-        description='''Execute arbitrary SQL query against the project database.''')
-    project.executeArguments(parser)
+                                   help='Execute a SQL query',
+                                   description='''Execute a pipeline.''')
+    pipeline.executeArguments(parser)
     addCommonArgs(parser)
-    parser.set_defaults(func=project.execute)
+    parser.set_defaults(func=pipeline.execute)
     #
     # getting args, some commands accept arbitrary arguments so we need to
     # separate them into argv
@@ -257,7 +260,7 @@ def main():
     # commands that accepts format and other subparsers can pass arbitrary
     # parameter to subparsers
     if args.func in [association.associate, importer.importVariants,
-        update.update, exporter.export]:
+                     update.update, exporter.export, pipeline.execute]:
         args.unknown_args = argv
     elif len(argv) > 0:
         master_parser.print_usage(sys.stderr)
