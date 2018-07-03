@@ -57,7 +57,7 @@ import random
 import traceback
 from multiprocessing import Process
 from collections import namedtuple, MutableMapping
-from itertools import tee, izip, combinations
+from itertools import tee, combinations
 
 from .utils import env, ProgressBar, downloadFile, downloadURL, calculateMD5, delayedAction, \
     existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName, \
@@ -66,10 +66,8 @@ from .utils import env, ProgressBar, downloadFile, downloadURL, calculateMD5, de
 
 from .project import PipelineDescription, Project
 
-from ucsctools import showTrack
+from .ucsctools import showTrack
 # for parallel execution of steps
-import Queue
-
 try:
     import pysam
     hasPySam = True
@@ -553,7 +551,7 @@ class EmitInput:
         elif self.group_by == 'pairwise':
             f1, f2 = tee(selected)
             next(f2, None)
-            return [list(x) for x in izip(f1, f2)], unselected
+            return [list(x) for x in zip(f1, f2)], unselected
         elif self.group_by == 'combinations':
             return [list(x) for x in combinations(selected, 2)], unselected
 
