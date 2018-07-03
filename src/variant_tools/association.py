@@ -1151,6 +1151,7 @@ def runAssociation(args,asso,proj,results):
 
 
 def associate(args):
+
     try:
         with Project(verbosity=args.verbosity) as proj:
             # step 0: create an association testing object with all group information
@@ -1165,6 +1166,7 @@ def associate(args):
                 sys.exit(0)
             # define results here but it might fail if args.to_db is not writable
             results = ResultRecorder(asso, args.to_db, args.delimiter, args.force)
+           
             # determine if some results are already exist
             #
             # if write to a db and
@@ -1189,7 +1191,6 @@ def associate(args):
                         for grp in existing_groups:
                             cur.execute(query, grp)
                         proj.db.commit()
-            
             if proj.store=="hdf5":
                 HDFfileNames=glob.glob("tmp*_genotypes.h5")
                 if len(HDFfileNames)==0:
@@ -1197,7 +1198,6 @@ def associate(args):
                     sys.exit()
             
                 HDFfileGroupNames=glob.glob("tmp*multi_genes.h5")
-            
                 if len(HDFfileGroupNames)==0 or args.force:
                  
                     nJobs = max(args.jobs, 1)

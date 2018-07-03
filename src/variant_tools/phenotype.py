@@ -183,6 +183,7 @@ class GenotypeStatCalculator_HDF5(Process):
         self.queue = idQueue
         self.status = status
         self.genotypes = genotypes
+       
         # threading.Thread.__init__(self, name='Calculate genotype statistics')
         Process.__init__(self, name='Calculate genotype statistics')
 

@@ -178,8 +178,8 @@ class HDF5Engine_storage(Base_Storage):
                 shape=node.shape[:].tolist()
                 chunkPos=chunks_start_stop(shape[0])
                 if type(cond) is str:
-                    # cond=cond.replace("(","").replace(")","")
-                    pass
+                    cond=cond.replace("(","").replace(")","")
+                    # pass
                 else:
                     cond=cond[0]
                 cond=cond.replace("_geno","")
@@ -216,7 +216,8 @@ class HDF5Engine_storage(Base_Storage):
                         NS[NS==-1]=0
                     # Mask_geno=group.Mask_geno[:]
                     Mask=np.ones(shape=(endPos-startPos,shape[1]),dtype=np.int8)
-                    node.Mask[startPos:endPos,:]=np.where(eval(cond),np.nan,Mask)
+                    # node.Mask[startPos:endPos,:]=np.where(eval(cond),np.nan,Mask)
+                    node.Mask[startPos:endPos,:]=np.where(eval(cond),-1.0,Mask)
                     startPos=endPos
 
             except tb.exceptions.NoSuchNodeError:
@@ -497,10 +498,9 @@ class HDF5Engine_access(Base_Access):
         if node not in self.file:
             self.file.create_group("/","chr"+chr,"chromosome")
         group=self.file.get_node(node)
-
+        groupName=str(groupName)
         if len(groupName)>0:
             node="/chr"+chr+"/"+groupName
-
             if node not in self.file:
                 self.file.create_group("/chr"+chr,groupName)
             group=self.file.get_node(node)
@@ -584,7 +584,7 @@ class HDF5Engine_access(Base_Access):
     def num_genotypes(self,sampleID,cond,genotypes):
         totalNum=0
 
-        for rownames,colnames,genoinfo in self.get_all_genotype([sampleID]):
+        for rownames,colnames,genoinfo in self.get_all_genotype_filter([sampleID],genotypes):
             if cond is None:
                 numNan=np.where(np.isnan(genoinfo))
                 numNone=np.where(genoinfo==-1) 
@@ -603,7 +603,7 @@ class HDF5Engine_access(Base_Access):
 
     def sum_genotypes(self,sampleID,cond,genotypes):
         totalGeno=0
-        for rownames,colnames,genoinfo in self.get_all_genotype([sampleID]):
+        for rownames,colnames,genoinfo in self.get_all_genotype_filter([sampleID],genotypes):
             numGeno=np.nansum(genoinfo)
             totalGeno+=numGeno
         return int(totalGeno)
@@ -616,6 +616,7 @@ class HDF5Engine_access(Base_Access):
         group=self.getGroup(chr,groupName)
         self.rownames=group.rownames[:].tolist()
         self.GT=group.GT[:]
+
         snpdict=dict.fromkeys(self.colnames,{})
         for key,value in snpdict.items():
             snpdict[key]=dict.fromkeys(self.rownames,(0,))
@@ -673,6 +674,7 @@ class HDF5Engine_access(Base_Access):
             try:
                 node=self.file.get_node("/chr"+str(chr))
                 rownames=node.rownames[:].tolist()
+                # print(self.fileName,variantIDs,chr,rownames)
                 colnames=node.colnames[:].tolist()
                 colpos=[]
                 if (len(sampleNames)>0):
@@ -697,7 +699,7 @@ class HDF5Engine_access(Base_Access):
                         minPos
                         maxPos
                         genoinfo=node.GT[minPos:maxPos,colpos]           
-                        updated_rownames,updated_colnames,updated_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[])
+                        updated_rownames,updated_colnames,updated_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[],"GT")
                         
                     except NameError:
                         env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
@@ -707,7 +709,7 @@ class HDF5Engine_access(Base_Access):
                     for minPos,maxPos in chunkPos:
                         if "/chr"+str(chr)+"/GT" in self.file:
                             genoinfo=node.GT[minPos:maxPos,colpos]           
-                            sub_rownames,updated_colnames,sub_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[])                    
+                            sub_rownames,updated_colnames,sub_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[],"GT")                    
                             updated_rownames.extend(sub_rownames)
                             updated_geno.extend(sub_geno)
             except tb.exceptions.NoSuchNodeError:
@@ -748,6 +750,39 @@ class HDF5Engine_access(Base_Access):
 
     def get_all_genotype(self,sampleNames,chrs=""):
         return(list(self.get_genotype_by_chunk(sampleNames,chrs)))
+
+
+    def get_genotype_by_chunk_filter(self,sampleNames,geno_cond,chrs=""):
+
+        if chrs=="":
+            chrs=["X","Y"]
+            chrs.extend(range(1,23))
+        for chr in chrs:
+            try:
+                node=self.file.get_node("/chr"+str(chr))
+                colnames=node.colnames[:].tolist()
+                colpos=[]
+                if (len(sampleNames)>0):
+                    colpos=list(map(lambda x:colnames.index(x),sampleNames))
+                else:
+                    colpos=list(map(lambda x:colnames.index(x),colnames))
+                shape=node.shape[:].tolist()
+                chunkPos=chunks_start_stop(shape[0])
+                for minPos,maxPos in chunkPos:
+                    if "/chr"+str(chr)+"/GT" in self.file and minPos!=maxPos:
+                        genoinfo=node.GT[minPos:maxPos,colpos]
+                        sub_rownames,updated_colnames,sub_geno=self.filter_on_genotypes(geno_cond,chr,node,"GT",minPos,maxPos,colpos,[])
+                        # sub_rownames,updated_colnames,sub_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[])
+                        yield np.array(sub_rownames),np.array(updated_colnames),np.array(sub_geno)
+
+            except tb.exceptions.NoSuchNodeError:
+                pass                              
+            except Exception as e:
+                print(e)
+                pass
+
+    def get_all_genotype_filter(self,sampleNames,geno_cond,chrs=""):
+        return(list(self.get_genotype_by_chunk_filter(sampleNames,geno_cond,chrs)))
 
 
 
@@ -804,17 +839,25 @@ class HDF5Engine_access(Base_Access):
 
 
 
-    def filter_removed_genotypes(self,minPos,maxPos,genoinfo,node,colpos,rowpos):
+    def filter_removed_genotypes(self,minPos,maxPos,genoinfo,node,colpos,rowpos,field=""):
         #assume rowIDs are sorted by genome position
         rownames=node.rownames[minPos:maxPos]
         colnames=node.colnames[:]
         rowMask=node.rowmask[minPos:maxPos]
+
         # sampleMask=node.samplemask[:]
+        # if field=="GT":
+        #     genoinfo[genoinfo==-1]=0
+        #     genoinfo=np.nan_to_num(genoinfo)
 
         try:
             sub_Mask=node.Mask[minPos:maxPos,:]
+            sub_Mask=sub_Mask.astype(float)
+            sub_Mask[sub_Mask==-1.0]=np.nan
             sub_geno=np.multiply(genoinfo,sub_Mask)
+    
             rowMasked=np.where(rowMask==True)[0]
+
             # sampleMasked=np.where(sampleMask==True)[0]
             
             if len(rowpos)>0:
@@ -824,7 +867,6 @@ class HDF5Engine_access(Base_Access):
             
             colnames=colnames[colpos]
             sub_geno=sub_geno[:,colpos]
-
             if len(rowpos)==0 and len(rowMasked)>0:
                 rownames=rownames[np.where(rowMask==False)]
                 sub_geno=np.delete(sub_geno,rowMasked,0)
@@ -863,9 +905,9 @@ class HDF5Engine_access(Base_Access):
         #     genoinfo=np.nan_to_num(genoinfo)
 
         if len(cond)>0:
-
             if type(cond) is str:
                 cond=cond.replace("(","").replace(")","")
+                cond=cond.replace("_geno","")
             else:
                 cond=cond[0]
                 cond=cond.replace("_geno","")
@@ -894,7 +936,6 @@ class HDF5Engine_access(Base_Access):
                 NS=node.NS[startPos:endPos,:]
                 NS[NS==-1]=0
             genoinfo=np.where(eval("~("+cond+")"),np.nan,genoinfo)
-
         rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,rowpos)
   
         return rownames,colnames,genoinfo

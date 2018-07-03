@@ -70,41 +70,58 @@ class GroupHDFGenerator(Process):
                 db.connect('{0}.proj'.format(self.proj.name), '__asso_tmp')
                 time.sleep(self.proc_index)
                 cur = db.cursor()
-        
+                
                 # select_group="SELECT {0}, group_concat(variant_id) from __asso_tmp group by {0}".\
                 #    format(self.group_names[0])
-         
-                select_group="SELECT {0}, group_concat(variant_id) from (select {0},t.variant_id from __asso_tmp as t join variant as v on t.variant_id=v.variant_id  order by v.pos) group by {0}".\
-                   format(self.group_names[0])
-                for row in cur.execute(select_group):
-                    geneSymbol=transformGeneName(row[0])
-                    ids=row[1].split(",")
-                    ids=[int(x) for x in ids]
-                    # ids.sort()
-                    chr= getChr(ids[0],db.cursor())
-                    chrEnd=getChr(ids[-1],db.cursor())
-                    
-                    # subMatrix=accessEngine.get_geno_info_by_variant_IDs(ids,chr,"GT")
-                    # if subMatrix is not None and subMatrix.indices is not None:
-                    #     storageEngine.store(subMatrix,chr,geneSymbol
-                    if chr==chrEnd:
-                        # updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
-                        updated_rownames,colnames,subMatrix=accessEngine.get_genotype(ids,"",[chr])
-                        
+
+                if self.group_names[0]=="variant_chr" and self.group_names[1]=="variant_pos":
+                    select_group="select t.variant_chr,t.variant_pos,t.variant_id from __asso_tmp as t join variant as v on t.variant_id=v.variant_id  order by v.pos"
+                    for row in cur.execute(select_group):
+                        chr=row[0]
+                        pos=row[1]
+                        id=row[2]
+                        updated_rownames,colnames,subMatrix=accessEngine.get_genotype([id],"",[chr])
                         if subMatrix is not None:
-                            storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
-                            storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
+                            storageEngine.store(subMatrix,chr,"pos"+str(pos)+"/GT")
+                            storageEngine.store(updated_rownames,chr,"pos"+str(pos)+"/rownames")
                             if not storageEngine.checkGroup(chr,"colnames"):
                                 storageEngine.store(colnames,chr,"colnames")
-                    else:
-                        varDict=getChrs(ids,db.cursor())
-                        for chr,vids in varDict.items():
-                            updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_sep_variant_ids(vids,chr)
+
+
+                else:
+                    select_group="SELECT {0}, group_concat(variant_id) from (select {0},t.variant_id from __asso_tmp as t join variant as v on t.variant_id=v.variant_id  order by v.pos) group by {0}".\
+                       format(self.group_names[0])
+                    
+
+                    for row in cur.execute(select_group):
+                        geneSymbol=transformGeneName(row[0])
+                        ids=row[1].split(",")
+                        ids=[int(x) for x in ids]
+                        # ids.sort()
+                        chr= getChr(ids[0],db.cursor())
+                        chrEnd=getChr(ids[-1],db.cursor())
+                        
+                        # subMatrix=accessEngine.get_geno_info_by_variant_IDs(ids,chr,"GT")
+                        # if subMatrix is not None and subMatrix.indices is not None:
+                        #     storageEngine.store(subMatrix,chr,geneSymbol
+                        if chr==chrEnd:
+                            # updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
+                            updated_rownames,colnames,subMatrix=accessEngine.get_genotype(ids,"",[chr])
+                            
                             if subMatrix is not None:
                                 storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
                                 storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
                                 if not storageEngine.checkGroup(chr,"colnames"):
                                     storageEngine.store(colnames,chr,"colnames")
+                        else:
+                            varDict=getChrs(ids,db.cursor())
+                            for chr,vids in varDict.items():
+                                updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_sep_variant_ids(vids,chr)
+                                if subMatrix is not None:
+                                    storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
+                                    storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
+                                    if not storageEngine.checkGroup(chr,"colnames"):
+                                        storageEngine.store(colnames,chr,"colnames")
 
                     # storageEngine.close() 
                 accessEngine.close()
@@ -129,6 +146,15 @@ def generateHDFbyGroup(testManager,njobs):
     taskQueue=queue.Queue()
     start=time.time()
     groupGenerators=[None]*min(njobs,len(HDFfileNames))
+    if len(testManager.sample_IDs)>0:
+        HDFfileNames=[]
+        cur = testManager.db.cursor()
+        sampleIDstring=",".join([str(ID) for ID in testManager.sample_IDs])
+        sql="select distinct HDF5 from sample where sample_id in ({0});".format(sampleIDstring)
+        cur.execute(sql)
+        res=cur.fetchall()
+        for filename in res:
+            HDFfileNames.append(filename[0])
     for HDFfileName in HDFfileNames:
         fileQueue.put(HDFfileName)
     for i in range(len(HDFfileNames)):
@@ -325,6 +351,7 @@ def generateHDFbyGroup_update(testManager,njobs):
 
 
 def transformGeneName(geneSymbol):
+    geneSymbol=str(geneSymbol)
     if ("-" in geneSymbol):
         geneSymbol=geneSymbol.replace("-","_")
     pattern=re.compile(r'\.')
@@ -373,8 +400,9 @@ def getGenotype_HDF5(worker, group):
     genotype = []
     geno_info = {x:[] for x in worker.geno_info}
     # getting samples locally from my own connection
-
     geneSymbol=transformGeneName(group[0])
+    if len(group)==2:
+        geneSymbol="pos"+str(group[1])
     files=glob.glob("tmp*_genotypes_multi_genes.h5")
     files=sorted(files, key=lambda name: int(name.split("_")[1]))
 
