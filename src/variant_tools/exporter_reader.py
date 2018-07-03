@@ -356,10 +356,12 @@ class MultiVariantReader(BaseVariantReader):
                 filename=HDFfileName.split("/")[-1]
                 if filename in sampleFileMap:
                     samplesInfile=sampleFileMap[filename]
-                    r, w = Pipe(False)
-                    p=VariantWorker_HDF5(HDFfileName,list(set(IDs).intersection(samplesInfile)),self.geno_fields,w)
-                    self.workers.append(p)
-                    self.readers.append(r)
+                    overlapSamples=list(set(IDs).intersection(samplesInfile))
+                    if len(overlapSamples)>0:
+                        r, w = Pipe(False)
+                        p=VariantWorker_HDF5(HDFfileName,overlapSamples,self.geno_fields,w)
+                        self.workers.append(p)
+                        self.readers.append(r)
 
        
 
@@ -465,21 +467,25 @@ class VariantWorker_HDF5(Process):
         accessEngine=Engine_Access.choose_access_engine(self.fileName)
         vardict={}
         genoinfo_fields=[field.replace("_geno","") for field in self.geno_fields]
+        if "GT" in genoinfo_fields:
+            genoinfo_fields.remove("GT")
         for rownames,colnames,sub_all in accessEngine.get_all_genotype_genoinfo(self.samples,[],genoinfo_fields):
+            
             genoType=sub_all[0]
             numrow,numcol=genoType.shape[0],genoType.shape[1]
-            info=np.zeros(shape=(numrow,numcol*len(self.geno_fields)),dtype=int)
-       
-            for col in range(numcol):
-                    info[:,col*len(self.geno_fields)]=genoType[:,col]
-
-            if len(genoinfo_fields)>0:
-                for pos,field in enumerate(genoinfo_fields):    
-                    genoInfo=sub_all[pos+1]
-
-                    for col in range(numcol):
-                        info[:,col*len(self.geno_fields)+pos]=genoInfo[:,col]
-
+            if len(self.geno_fields)==0:
+                info=np.zeros(shape=(numrow,numcol),dtype=int)
+                for col in range(numcol):
+                    info[:,col]=genoType[:,col]
+            else:
+                info=np.zeros(shape=(numrow,numcol*(len(self.geno_fields)+1)),dtype=float)
+                for col in range(numcol):
+                    info[:,col]=genoType[:,col]
+                if len(genoinfo_fields)>0:
+                    for pos,field in enumerate(genoinfo_fields):  
+                        genoInfo=sub_all[pos+1]
+                        for col in range(numcol):
+                            info[:,col*len(self.geno_fields)+pos+1]=genoInfo[:,col]
             vardict.update(dict(zip(rownames,info)))  
 
         # result=accessEngine.get_genoType_forExport_from_HDF5(self.samples,self.geno_fields)  
@@ -490,7 +496,6 @@ class VariantWorker_HDF5(Process):
             if key!=last_id:
                 last_id=key
                 val=np.where(np.isnan(val), None, val)
-
                 self.output.send([key]+val.tolist())
         self.output.send(None)
     

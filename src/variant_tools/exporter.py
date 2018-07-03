@@ -281,7 +281,6 @@ class Exporter:
         # if export_by_fields is empty
         nFieldBy = len([x for x in self.format.export_by_fields.split(',') if x])
         #
- 
         reader = VariantReader(self.proj, self.table, self.format.export_by_fields, self.format.order_by_fields,
             var_fields, geno_fields, self.export_alt_build, self.IDs, max(self.jobs - 1, 0))
         reader.start()

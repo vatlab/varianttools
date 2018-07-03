@@ -826,6 +826,7 @@ class HDF5Engine_access(Base_Access):
                             for pos,field in enumerate(validGenotypeFields):
                                 _,_,sub_info=self.filter_on_genotypes(cond,chr,node,field,minPos,maxPos,colpos,rowpos)
                                 sub_all.append(np.array(sub_info))
+
                         yield np.array(sub_rownames),np.array(updated_colnames),sub_all
 
             except tb.exceptions.NoSuchNodeError:
