@@ -81,7 +81,7 @@ class TestImport(ProcessTestCase):
         self.assertProj(numOfVariants=288)
 
 
-    @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite3","HDF5 version is not implemented for this test")
+    # @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite3","HDF5 version is not implemented for this test")
     def testANNOVAR(self):
         'Testing the annovar input format'
         self.assertSucc('vtools import --build hg18 --format ../resources/format/ANNOVAR txt/ANNOVAR.txt')
@@ -97,6 +97,7 @@ class TestImport(ProcessTestCase):
         self.assertSucc('vtools select variant "function is not NULL" -t function')
         self.assertProj(numOfVariants={'function': 78})
         
+    @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite3","HDF5 version is not implemented for this test")
     def testCASAVA18_SNP(self):
         'Testing the CASAVA SNP input format'
         self.assertSucc('vtools import --build hg18 --format ../resources/format/CASAVA18_snps txt/CASAVA18_SNP.txt')
