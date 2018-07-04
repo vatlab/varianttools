@@ -3091,7 +3091,7 @@ class Pipeline:
                 pname, allowed_steps = pname.split(':', 1)
         if not pname:
             if len(self.pipeline.pipelines) == 1:
-                pname = self.pipeline.pipelines.keys()[0]
+                pname = list(self.pipeline.pipelines.keys())[0]
             elif 'default' in self.pipeline.pipelines:
                 pname = 'default'
             else:
@@ -3100,9 +3100,11 @@ class Pipeline:
                                  'Available pipelines are: {}.'.format(self.pipeline.name,
                                                                        ', '.join(self.pipeline.pipelines.keys())))
         elif pname not in self.pipeline.pipelines.keys():
+
             raise ValueError('Pipeline {} is undefined in configuraiton file '
                              '{}. Available pipelines are: {}'.format(pname,
                                                                       self.pipeline.name, ', '.join(self.pipeline.pipelines.keys())))
+        
         #
         psteps = self.pipeline.pipelines[pname]
         if allowed_steps is not None:

@@ -351,7 +351,8 @@ class MultiVariantReader(BaseVariantReader):
                 sampleFileMap[res[1]].append(res[0])
             samplefiles=glob.glob("tmp*genotypes.h5")      
             samplefiles.sort(key=lambda x:x.split("_")[1])
-            self.jobs=len(samplefiles)+1
+            # self.jobs=len(samplefiles)+1
+            self.jobs=1
             for HDFfileName in samplefiles:
                 filename=HDFfileName.split("/")[-1]
                 if filename in sampleFileMap:
@@ -359,6 +360,7 @@ class MultiVariantReader(BaseVariantReader):
                     overlapSamples=list(set(IDs).intersection(samplesInfile))
                     if len(overlapSamples)>0:
                         r, w = Pipe(False)
+                        self.jobs+=1
                         p=VariantWorker_HDF5(HDFfileName,overlapSamples,self.geno_fields,w)
                         self.workers.append(p)
                         self.readers.append(r)

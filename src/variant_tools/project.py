@@ -1058,6 +1058,7 @@ class PipelineDescription:
             env.logger.error(self._translateConfigText(filename))
             raise
         # sections?
+
         sections = parser.sections()
         if 'pipeline description' not in sections:
             raise ValueError("Missing section 'pipeline description' in "
@@ -1174,6 +1175,7 @@ class PipelineDescription:
                 except Exception as e:
                     raise ValueError(
                         'Invalid section {}: {}'.format(section, e))
+
         # for pipelines with all * sections, look for a description or use default name
         not_wildname = [y for y in list(
             self.pipelines.keys()) if '*' not in y and '?' not in y]

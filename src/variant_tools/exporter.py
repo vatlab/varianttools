@@ -64,6 +64,7 @@ class Exporter:
         #
         # samples
         self.IDs = self.proj.selectSampleByPhenotype(samples) if samples else []
+
         self.samples = []
         if samples:
             env.logger.info('Genotypes of {} samples are exported.'.format(len(self.IDs)))
@@ -280,12 +281,24 @@ class Exporter:
         rec_stack = []
         # if export_by_fields is empty
         nFieldBy = len([x for x in self.format.export_by_fields.split(',') if x])
-        #
+        # 
+        # cur=self.db.cursor()
+        # cur.execute("select group_concat(sample_id) from sample group by HDF5;")
+        # res=cur.fetchall()
+        # for ids in res:
+        #     # IDlist=[]
+        #     # groupIDs=[int(id) for id in ids[0].split(",")]
+        #     # if len(self.IDs)>0:
+                
+        #     #     IDlist=list(set(self.IDs).intersection(set(groupIDs)))
+        #     # else:
+        #     #     IDlist=groupIDs
+        #     self.IDs=ids[0]
+        #     if len(self.IDs)>0:
+        
         reader = VariantReader(self.proj, self.table, self.format.export_by_fields, self.format.order_by_fields,
             var_fields, geno_fields, self.export_alt_build, self.IDs, max(self.jobs - 1, 0))
         reader.start()
-
-
 
 
         prog = ProgressBar(self.filename if self.filename else 'Writing', nr)
