@@ -403,13 +403,21 @@ def getGenotype_HDF5(worker, group):
     geneSymbol=transformGeneName(group[0])
     if len(group)==2:
         geneSymbol="pos"+str(group[1])
-    files=glob.glob("tmp*_genotypes_multi_genes.h5")
-    files=sorted(files, key=lambda name: int(name.split("_")[1]))
+    HDFfileNames=glob.glob("tmp*_genotypes_multi_genes.h5")
+    if len(worker.sample_names)>0:
+        HDFfileNames=[]
+        cur = worker.db.cursor()
+        sampleNamestring=",".join(['"'+str(ID)+'"' for ID in worker.sample_names])
+        sql="select distinct HDF5 from sample where sample_name in ({0});".format(sampleNamestring)
+        cur.execute(sql)
+        res=cur.fetchall()
+        for filename in res:
+            HDFfileNames.append(filename[0].replace(".h5","_multi_genes.h5"))
 
-    for fileName in files:
+    HDFfileNames=sorted(HDFfileNames, key=lambda name: int(name.split("_")[1]))
+    for fileName in HDFfileNames:
          
         accessEngine=Engine_Access.choose_access_engine(fileName)
-
         if len(chrs)==1:
             # colnames=accessEngine.get_colnames(chr,geneSymbol)
             # snpdict=accessEngine.get_geno_info_by_group(geneSymbol,chr)
