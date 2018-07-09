@@ -1157,7 +1157,7 @@ def cluster_runAssociation(args,asso,proj,results):
             asso.tests=""
  
             run_grp_association.delay(asso, grp,
-                results.fields,args.methods,os.getcwd())
+                args,os.getcwd())
             count+=1
             prog.update(count)
 
@@ -1187,8 +1187,8 @@ def cluster_runAssociation(args,asso,proj,results):
         # env.logger.info('Association tests on {} groups have completed. {} failed.'.\
         #                  format(results.completed(), results.failed()))
         # use the result database in the project
-        if args.to_db:
-            proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
+        # if args.to_db:
+        #     proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
 
        
     except Exception as e:
@@ -1279,6 +1279,7 @@ def associate(args):
 
             # runAssociation(args,asso,proj,results)
             cluster_runAssociation(args,asso,proj,results)
+
 
     except Exception as e:
         env.logger.error(e)

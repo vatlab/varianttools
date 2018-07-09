@@ -9,7 +9,8 @@ from variant_tools.tester import *
 from celery import Celery
 # from variant_tools.association_hdf5 import generateHDFbyGroup,getGenotype_HDF5,generateHDFbyGroup_update
 from variant_tools.assoTests import AssoData
-from variant_tools.utils import DatabaseEngine,executeUntilSucceed
+from variant_tools.utils import DatabaseEngine,executeUntilSucceed,PrettyPrinter
+
 
 
 
@@ -177,7 +178,7 @@ def do_work(self, chunk,variantIndex,start_sample,end_sample,sample_ids,
 
 class AssoTestsWorker:
     '''Association test calculator'''
-    def __init__(self, param, grp, result_fields,methods,path):
+    def __init__(self, param, grp, args,path):
 
         self.param = param
         self.proj = param.proj
@@ -189,7 +190,7 @@ class AssoTestsWorker:
         self.covariate_names = param.covariate_names
         self.var_info = param.var_info
         self.geno_info = param.geno_info
-        self.tests = self.getAssoTests(methods,len(self.covariates),[])
+        self.tests = self.getAssoTests(args.methods,len(self.covariates),[])
         self.group_names = param.group_names
         self.missing_ind_ge = param.missing_ind_ge
         self.missing_var_ge = param.missing_var_ge
@@ -197,8 +198,10 @@ class AssoTestsWorker:
         
         self.num_extern_tests = param.num_extern_tests
         self.grp = grp
-        self.result_fields = result_fields
+        
         self.path=path
+        self.param.tests=self.tests
+        self.result_fields = ResultRecorder(self.param, args.to_db, args.delimiter, args.force)
    
         # self.shelves = {}
         #
@@ -582,6 +585,7 @@ class AssoTestsWorker:
             # return no result for any of the tests if an error message is captured.
             values.extend([float('NaN') for x in range(len(self.result_fields) - len(list(grp)))])
         print(values)
+        self.result_fields.record(values)
 
 class ResultRecorder:
     def __init__(self, params, db_name=None, delimiter=None, update_existing=False):
@@ -651,6 +655,7 @@ class ResultRecorder:
 
     def record(self, res):
         self.succ_count += 1
+        self.printer.write(['{0:G}'.format(x, precision=5) if isinstance(x, float) else str(x) for x in res])
         if len([x for x in res if x!=x]) == len(self.fields) - len(self.group_fields):
             # all fields are NaN: count this as a failure
             self.failed_count += 1
@@ -683,7 +688,7 @@ class ResultRecorder:
             self.writer.finalize()
 
 @app.task(bind=True,default_retry_delay=10,serializer="pickle")
-def run_grp_association(self, param, grp,  result_fields,methods,path):
-        worker=AssoTestsWorker(param, grp,  result_fields,methods,path)
+def run_grp_association(self, param, grp, args,path):
+        worker=AssoTestsWorker(param, grp, args,path)
         worker.run()
 
