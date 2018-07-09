@@ -676,6 +676,7 @@ class ResultRecorder:
                 self.cur.execute(self.insert_query, res)
             # commit the records from time to time to write data to disk
             self.writer.db.commit()
+            
            
             # print(time.time(),self.last_commit)
             # if time.time() - self.last_commit > 5:
