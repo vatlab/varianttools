@@ -10,6 +10,7 @@ from celery import Celery
 # from variant_tools.association_hdf5 import generateHDFbyGroup,getGenotype_HDF5,generateHDFbyGroup_update
 from variant_tools.assoTests import AssoData
 from variant_tools.utils import DatabaseEngine,executeUntilSucceed,PrettyPrinter
+from variant_tools.project import AnnoDBWriter
 
 
 
@@ -190,7 +191,7 @@ class AssoTestsWorker:
         self.covariate_names = param.covariate_names
         self.var_info = param.var_info
         self.geno_info = param.geno_info
-        self.tests = self.getAssoTests(args.methods,len(self.covariates),[])
+        self.tests = self.getAssoTests(args.methods,len(args.covariates),[])
         self.group_names = param.group_names
         self.missing_ind_ge = param.missing_ind_ge
         self.missing_var_ge = param.missing_var_ge
@@ -587,6 +588,8 @@ class AssoTestsWorker:
         print(values)
         self.result_fields.record(values)
 
+
+
 class ResultRecorder:
     def __init__(self, params, db_name=None, delimiter=None, update_existing=False):
         self.succ_count = 0
@@ -598,6 +601,7 @@ class ResultRecorder:
         for n,t in zip(params.group_names, params.group_types):
             self.group_fields.append(Field(name=n, index=None, type=t, adj=None, fmt=None, comment=n))
         self.fields.extend(self.group_fields)
+
         for test in params.tests:
             if test.name:
                 self.fields.extend([
@@ -655,7 +659,6 @@ class ResultRecorder:
 
     def record(self, res):
         self.succ_count += 1
-        self.printer.write(['{0:G}'.format(x, precision=5) if isinstance(x, float) else str(x) for x in res])
         if len([x for x in res if x!=x]) == len(self.fields) - len(self.group_fields):
             # all fields are NaN: count this as a failure
             self.failed_count += 1
@@ -672,9 +675,13 @@ class ResultRecorder:
                 # insert a new record
                 self.cur.execute(self.insert_query, res)
             # commit the records from time to time to write data to disk
-            if time.time() - self.last_commit > 5:
-                self.writer.db.commit()
-                self.last_commit = time.time()
+            self.writer.db.commit()
+           
+            # print(time.time(),self.last_commit)
+            # if time.time() - self.last_commit > 5:
+            #     print("commit")
+                
+            #     self.last_commit = time.time()
 
     def completed(self):
         return self.succ_count

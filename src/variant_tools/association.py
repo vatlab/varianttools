@@ -1083,6 +1083,18 @@ def runAssociation(args,asso,proj,results):
         maintenance_flag = Value('L', 1)
         maintenance = MaintenanceProcess(proj, {'genotype_index': asso.sample_IDs}, maintenance_flag)
         maintenance.start()
+
+
+
+        # step 2: workers work on genotypes
+        # the group queue is used to send groups
+        grpQueue = Queue()
+        # the result queue is used by workers to return results
+        resQueue = Queue()
+        # see if all workers are ready
+        ready_flags = Array('L', [0]*nJobs)
+        shelf_lock = Lock()
+
         
         for j in range(nJobs):
             # the dictionary has the number of temporary database for each sample
@@ -1271,10 +1283,7 @@ def associate(args):
                 # asso.phenotypes[0]=np.array(asso.phenotypes[0])[allkeep].tolist()
                 # asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
 
-                # print(len(asso.sample_names))
-                # print(len(asso.sample_IDs))
-                # print(len(asso.phenotypes[0]))
-                # print(len(asso.covariates[0]))
+ 
              
 
             # runAssociation(args,asso,proj,results)
