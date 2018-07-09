@@ -11,6 +11,7 @@ app = Celery(
     accept_content="pickle",
     task_serializer="pickle",
     result_serializer="pickle"
+    
 )
 
 app.conf.update(
