@@ -1172,6 +1172,7 @@ def cluster_runAssociation(args,asso,proj,results):
             if count%10==0:
                 run_grp_association.delay(asso, grps,
                     args,os.getcwd())
+                grps=[]
             count+=1
             prog.update(count)
         run_grp_association.delay(asso, grps,
