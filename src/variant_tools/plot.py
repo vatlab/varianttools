@@ -282,8 +282,10 @@ def plotAssociation(args):
             data_size += len(x)
         data.append(x.rstrip().split())
     env.logger.info("Processing {} of input data ...".format(size(len(data) + data_size)))
-    PlotAssociation(args, data)
+    p=PlotAssociation(args, data)
+    
     pinput = eval(args.method.upper() + '_FOO') + eval('p.{}'.format(args.method if args.method == 'qq' else 'manhattan'))() + eval(args.method.upper() + '_MAIN')
+
     pinput = loadGgplot(pinput)
     env.logger.info("Generating graph(s) ...")
     cmd = "R --slave --no-save --no-restore"
@@ -321,6 +323,10 @@ class PlotAssociation:
             if len(chrom) == 0:
                 raise ValueError("Invalid --chrom input")
             self.a.chrom = chrom
+        else:
+            self.a.chrom=''
+        if not hasattr(self.a,'chrom_prefix'):
+            self.a.chrom_prefix = "None"
         # processing gene map
         if hasattr(self.a, 'gene_map'):
             self.gene_map = self.a.gene_map
@@ -427,6 +433,7 @@ class PlotAssociation:
                 env.logger.warning('There are {1} genes not found in local gene name database. You may want to provide your own list of genomic coordinates of genes: {0}'.format(', '.join(failed), len(failed)))
         #
         rdat = OrderedDict()
+
         for x, y in zip(self.fields, list(zip(*dat))):
             if x == 'BP':
                 rdat[x] = [i if i == i else None for i in list(map(int, list(y)))]
@@ -479,7 +486,7 @@ class PlotAssociation:
                 self.a.width_height[1] if self.a.width_height else 8,
                 )
         return astr
-
+    
     def manhattan(self):
         self.m_manhattandata()
         astr = '''

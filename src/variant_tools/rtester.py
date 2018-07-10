@@ -36,6 +36,7 @@ from collections import OrderedDict
 
 import io
 
+StringType = str
 _mybytes = lambda s:bytes(s, 'utf8') #'ascii')
 _mystr = lambda s:str(s, 'utf8')
 
@@ -75,7 +76,8 @@ def SeqStr(obj, method='c(', tail=')'):
     if tp0 not in simple_types and method == 'c(':
         method = 'list('
     else:
-        tps = isinstance(obj0, str) or num_types
+        # tps = isinstance(obj0, str) or num_types
+        tps = isinstance(obj0, str) and [StringType] or num_types
         for i in obj_not_none[1:]:
             tp = type(i)
             if tp not in tps:
@@ -86,6 +88,7 @@ def SeqStr(obj, method='c(', tail=')'):
             elif is_int and tp not in (int, int):
                 is_int = False
     # convert
+
     return (is_int and 'as.integer(' or '') + \
       method + ','.join(list(map(Str4R, obj))) + tail + \
       (is_int and ')' or '')
