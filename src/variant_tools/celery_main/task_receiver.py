@@ -179,7 +179,7 @@ def do_work(self, chunk,variantIndex,start_sample,end_sample,sample_ids,
 
 class AssoTestsWorker:
     '''Association test calculator'''
-    def __init__(self, param, grp, args,path):
+    def __init__(self, param, grps, args,path):
 
         self.param = param
         self.proj = param.proj
@@ -198,7 +198,7 @@ class AssoTestsWorker:
         self.sample_names = param.sample_names
         
         self.num_extern_tests = param.num_extern_tests
-        self.grp = grp
+        self.grps = grps
         
         self.path=path
         self.param.tests=self.tests
@@ -536,57 +536,60 @@ class AssoTestsWorker:
 
     def run(self):
         
-        grp = self.grp
+        grps = self.grps
         #
-        try:
-            grpname = ":".join(list(map(str, grp)))
-        except TypeError:
-            grpname = "None"
-        # if grp is None:
-        #     break
-        # env.logger.debug('Retrieved association unit {}'.format(repr(grpname)))
-        #
-        #
-        self.data = AssoData()
-        self.pydata = {}
-        values = list(grp)
-
-        try:
-            
-            genotype, which, var_info, geno_info = self.getGenotype_HDF5(grp)
-      
-
-            # if I throw an exception here, the program completes in 5 minutes, indicating
-            # the data collection part takes an insignificant part of the process.
-            # 
-            # set C++ data object
-            if (len(self.tests) - self.num_extern_tests) > 0:
-                self.setGenotype(which, genotype, geno_info, grpname)
-                self.setPhenotype(which)
-                self.setVarInfo(var_info)
-            # set Python data object, for external tests
-            if self.num_extern_tests:
-                self.setPyData(which, genotype, var_info, geno_info, None, grpname)
-            # association tests
-            for test in self.tests:
-                test.setData(self.data, self.pydata)
-                result = test.calculate(env.association_timeout)
-                # env.logger.debug('Finished association test on {}'.format(repr(grpname)))
-                values.extend(result)
-        # except KeyboardInterrupt as e:
-        #     # die silently if stopped by Ctrl-C
-        #     break
-        except Exception as e:
-            # env.logger.debug('An ERROR has occurred in process {} while processing {}: {}'.\
-            #                   format(self.index, repr(grpname), e),exc_info=True)
-            # self.data might have been messed up, create a new one
-            print(e)
+        valuePack=[]
+        for grp in grps:
+            try:
+                grpname = ":".join(list(map(str, grp)))
+            except TypeError:
+                grpname = "None"
+            # if grp is None:
+            #     break
+            # env.logger.debug('Retrieved association unit {}'.format(repr(grpname)))
+            #
+            #
             self.data = AssoData()
             self.pydata = {}
-            # return no result for any of the tests if an error message is captured.
-            values.extend([float('NaN') for x in range(len(self.result_fields) - len(list(grp)))])
-        print(values)
-        self.result_fields.record(values)
+            values = list(grp)
+
+            try:
+                
+                genotype, which, var_info, geno_info = self.getGenotype_HDF5(grp)
+          
+
+                # if I throw an exception here, the program completes in 5 minutes, indicating
+                # the data collection part takes an insignificant part of the process.
+                # 
+                # set C++ data object
+                if (len(self.tests) - self.num_extern_tests) > 0:
+                    self.setGenotype(which, genotype, geno_info, grpname)
+                    self.setPhenotype(which)
+                    self.setVarInfo(var_info)
+                # set Python data object, for external tests
+                if self.num_extern_tests:
+                    self.setPyData(which, genotype, var_info, geno_info, None, grpname)
+                # association tests
+                for test in self.tests:
+                    test.setData(self.data, self.pydata)
+                    result = test.calculate(env.association_timeout)
+                    # env.logger.debug('Finished association test on {}'.format(repr(grpname)))
+                    values.extend(result)
+            # except KeyboardInterrupt as e:
+            #     # die silently if stopped by Ctrl-C
+            #     break
+            except Exception as e:
+                # env.logger.debug('An ERROR has occurred in process {} while processing {}: {}'.\
+                #                   format(self.index, repr(grpname), e),exc_info=True)
+                # self.data might have been messed up, create a new one
+                print(e)
+                self.data = AssoData()
+                self.pydata = {}
+                # return no result for any of the tests if an error message is captured.
+                values.extend([float('NaN') for x in range(len(self.result_fields) - len(list(grp)))])
+            print(values)
+            valuePack.append(values)
+        self.result_fields.record(valuePack)
 
 
 
@@ -657,26 +660,27 @@ class ResultRecorder:
         self.cur.execute(self.select_query)
         return self.cur.fetchall()
 
-    def record(self, res):
-        self.succ_count += 1
-        if len([x for x in res if x!=x]) == len(self.fields) - len(self.group_fields):
-            # all fields are NaN: count this as a failure
-            self.failed_count += 1
-        else:
-            self.printer.write(['{0:G}'.format(x, precision=5) if isinstance(x, float) else str(x) for x in res])
-        # also write to an annotation database?
-        if self.writer:
-            if self.writer.update_existing:
-                self.cur.execute(self.update_query, res[len(self.group_names):] + res[:len(self.group_names)])
-                # if no record to update, insert a new one
-                if self.cur.rowcount == 0:
-                    self.cur.execute(self.insert_query, res)
+    def record(self, valuePack):
+        for res in valuePack:
+            self.succ_count += 1
+            if len([x for x in res if x!=x]) == len(self.fields) - len(self.group_fields):
+                # all fields are NaN: count this as a failure
+                self.failed_count += 1
             else:
-                # insert a new record
-                self.cur.execute(self.insert_query, res)
-            # commit the records from time to time to write data to disk
-            self.writer.db.commit()
-            
+                self.printer.write(['{0:G}'.format(x, precision=5) if isinstance(x, float) else str(x) for x in res])
+            # also write to an annotation database?
+            if self.writer:
+                if self.writer.update_existing:
+                    self.cur.execute(self.update_query, res[len(self.group_names):] + res[:len(self.group_names)])
+                    # if no record to update, insert a new one
+                    if self.cur.rowcount == 0:
+                        self.cur.execute(self.insert_query, res)
+                else:
+                    # insert a new record
+                    self.cur.execute(self.insert_query, res)
+                # commit the records from time to time to write data to disk
+        self.writer.db.commit()
+
            
             # print(time.time(),self.last_commit)
             # if time.time() - self.last_commit > 5:
@@ -696,7 +700,7 @@ class ResultRecorder:
             self.writer.finalize()
 
 @app.task(bind=True,default_retry_delay=10,serializer="pickle")
-def run_grp_association(self, param, grp, args,path):
-        worker=AssoTestsWorker(param, grp, args,path)
+def run_grp_association(self, param, grps, args,path):
+        worker=AssoTestsWorker(param, grps, args,path)
         worker.run()
 

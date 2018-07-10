@@ -1162,16 +1162,20 @@ def cluster_runAssociation(args,asso,proj,results):
        
         prog = ProgressBar('Testing for association', len(asso.groups))
         count=0
+        grps=[]
+        asso.db=""
+        asso.proj.db=""
+        asso.proj.annoDB=""
+        asso.tests=""
         for grp in asso.groups:
-            asso.db=""
-            asso.proj.db=""
-            asso.proj.annoDB=""
-            asso.tests=""
- 
-            run_grp_association.delay(asso, grp,
-                args,os.getcwd())
+            grps.append(grp)
+            if count%10==0:
+                run_grp_association.delay(asso, grps,
+                    args,os.getcwd())
             count+=1
             prog.update(count)
+        run_grp_association.delay(asso, grps,
+                    args,os.getcwd())
 
        
         # try:
