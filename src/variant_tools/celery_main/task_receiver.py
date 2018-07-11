@@ -589,7 +589,8 @@ class AssoTestsWorker:
                 values.extend([float('NaN') for x in range(len(self.result_fields) - len(list(grp)))])
             print(values)
             valuePack.append(values)
-        self.result_fields.record(valuePack)
+        return valuePack
+        # self.result_fields.record(valuePack)
 
 
 
@@ -702,5 +703,5 @@ class ResultRecorder:
 @app.task(bind=True,default_retry_delay=10,serializer="pickle")
 def run_grp_association(self, param, grps, args,path):
         worker=AssoTestsWorker(param, grps, args,path)
-        worker.run()
+        return worker.run()
 
