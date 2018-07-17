@@ -1169,16 +1169,16 @@ def cluster_runAssociation(args,asso,proj,results):
         asso.tests=""
         for grp in asso.groups:
             grps.append(grp)
-            if count%10==0:
+            if len(grps)==1:
                 result=run_grp_association.delay(asso, grps,
                     args,os.getcwd())
-                print(result.get())
+                results.record(result.get()[0])
                 grps=[]
             count+=1
             prog.update(count)
-        result=run_grp_association.delay(asso, grps,
-                    args,os.getcwd())
-        print(result.get())
+        # result=run_grp_association.delay(asso, grps,
+        #             args,os.getcwd())
+        # print(result.get())
 
        
         # try:

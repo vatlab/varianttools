@@ -202,7 +202,7 @@ class AssoTestsWorker:
         
         self.path=path
         self.param.tests=self.tests
-        self.result_fields = ResultRecorder(self.param, args.to_db, args.delimiter, args.force)
+        self.results = ResultRecorder(self.param, args.to_db, args.delimiter, args.force)
    
         # self.shelves = {}
         #
@@ -586,11 +586,10 @@ class AssoTestsWorker:
                 self.data = AssoData()
                 self.pydata = {}
                 # return no result for any of the tests if an error message is captured.
-                values.extend([float('NaN') for x in range(len(self.result_fields) - len(list(grp)))])
-            print(values)
+                values.extend([float('NaN') for x in range(len(self.results.fields) - len(list(grp)))])
+            # print(values)
             valuePack.append(values)
         return valuePack
-        # self.result_fields.record(valuePack)
 
 
 
