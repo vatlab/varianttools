@@ -44,6 +44,7 @@ from .association_hdf5 import generateHDFbyGroup,getGenotype_HDF5,generateHDFbyG
 from variant_tools.celery_main.task_receiver import run_grp_association
 
 import pickle
+from celery.result import AsyncResult
 
 
 def associateArguments(parser):
@@ -1167,15 +1168,52 @@ def cluster_runAssociation(args,asso,proj,results):
         asso.proj.db=""
         asso.proj.annoDB=""
         asso.tests=""
-        for grp in asso.groups:
-            grps.append(grp)
-            if len(grps)==1:
-                result=run_grp_association.delay(asso, grps,
-                    args,os.getcwd())
-                results.record(result.get()[0])
-                grps=[]
+        outputs=[]
+        # for grp in asso.groups:
+        #     grps.append(grp)
+        #     if count%10==0:
+        #         output=run_grp_association.delay(asso, grps,
+        #             args,os.getcwd())
+        #         # results.record(result.get()[0])
+        #         outputs.append(output)
+                
+        #         grps=[]
+        #     count+=1
+        #     prog.update(count)
+        # if len(grps)!=0:
+        #     output=run_grp_association.delay(asso, grps,
+        #             args,os.getcwd())
+        #     # results.record(result.get()[0])
+        #     outputs.append(output)
+
+        # while outputs:
+        #     output=outputs.pop(0)
+        #     if output.ready():
+        #         for rec in output.get():
+        #             results.record(rec)
+        #     else:
+        #         outputs.append(output)
+
+        for grp in asso.groups:    
+            output=run_grp_association.delay(asso, [grp],
+                args,os.getcwd())
+            # results.record(result.get()[0])
+            outputs.append(output.task_id)
             count+=1
             prog.update(count)
+
+        while outputs:
+            output=outputs.pop(0)
+            res=AsyncResult(output)
+            print(output,res.state)
+            if res.ready():
+                rec=res.get()[0]
+                results.record(rec)
+            else:
+               outputs.append(output)
+          
+     
+        
         # result=run_grp_association.delay(asso, grps,
         #             args,os.getcwd())
         # print(result.get())
