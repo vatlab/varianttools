@@ -1175,48 +1175,42 @@ def cluster_runAssociation(args,asso,proj,results):
                 output=run_grp_association.delay(asso, grps,
                     args,os.getcwd())
                 # results.record(result.get()[0])
-                outputs.append(output)
+                outputs.append(output.id)
+                # outputs.append(output)
                 
                 grps=[]
             count+=1
-            prog.update(count)
         if len(grps)!=0:
             output=run_grp_association.delay(asso, grps,
                     args,os.getcwd())
-            # results.record(result.get()[0])
-            outputs.append(output)
+            outputs.append(output.id)
+            # outputs.append(output)
+           
 
-        while outputs:
-            output=outputs.pop(0)
-            if output.ready():
-                for rec in output.get():
-                    results.record(rec)
-            else:
-                outputs.append(output)
-
-        # for grp in asso.groups:    
-        #     output=run_grp_association.delay(asso, [grp],
-        #         args,os.getcwd())
-        #     # results.record(result.get()[0])
-        #     outputs.append(output.task_id)
-        #     count+=1
-        #     prog.update(count)
-
+        # count=0
         # while outputs:
         #     output=outputs.pop(0)
-        #     res=AsyncResult(output)
-        #     print(output,res.state)
-        #     if res.ready():
-        #         rec=res.get()[0]
-        #         results.record(rec)
+        #     if output.ready():
+        #         for rec in output.get():
+        #             results.record(rec)
+        #             count+=1
+        #             prog.update(count)
         #     else:
-        #        outputs.append(output)
-          
-     
+        #         outputs.append(output)
+
+
+        count=0
+        for output in outputs:
+            print(output)
+            result=AsyncResult(output)
+            print(result.status)
+            for rec in result.get():
+                results.record(rec)
+                count+=1
+                prog.update(count)
+
+
         
-        # result=run_grp_association.delay(asso, grps,
-        #             args,os.getcwd())
-        # print(result.get())
 
        
         # try:
