@@ -1171,43 +1171,28 @@ def cluster_runAssociation(args,asso,proj,results):
         outputs=[]
         for grp in asso.groups:
             grps.append(grp)
-            if count%10==0:
+            if count%50==0:
                 output=run_grp_association.delay(asso, grps,
                     args,os.getcwd())
-                # results.record(result.get()[0])
                 outputs.append(output.id)
-                # outputs.append(output)
-                
                 grps=[]
             count+=1
         if len(grps)!=0:
             output=run_grp_association.delay(asso, grps,
                     args,os.getcwd())
             outputs.append(output.id)
-            # outputs.append(output)
-           
 
-        # count=0
-        # while outputs:
-        #     output=outputs.pop(0)
-        #     if output.ready():
-        #         for rec in output.get():
-        #             results.record(rec)
-        #             count+=1
-        #             prog.update(count)
-        #     else:
-        #         outputs.append(output)
+
 
 
         count=0
         for output in outputs:
-            print(output)
             result=AsyncResult(output)
-            print(result.status)
             for rec in result.get():
                 results.record(rec)
-                count+=1
-                prog.update(count)
+                count = results.completed()
+                prog.update(count, results.failed())
+        results.done()
 
 
         

@@ -553,11 +553,8 @@ class AssoTestsWorker:
             self.pydata = {}
             values = list(grp)
 
-            try:
-                
+            try:     
                 genotype, which, var_info, geno_info = self.getGenotype_HDF5(grp)
-          
-
                 # if I throw an exception here, the program completes in 5 minutes, indicating
                 # the data collection part takes an insignificant part of the process.
                 # 
@@ -575,9 +572,7 @@ class AssoTestsWorker:
                     result = test.calculate(env.association_timeout)
                     # env.logger.debug('Finished association test on {}'.format(repr(grpname)))
                     values.extend(result)
-            # except KeyboardInterrupt as e:
-            #     # die silently if stopped by Ctrl-C
-            #     break
+                valuePack.append(values)
             except Exception as e:
                 # env.logger.debug('An ERROR has occurred in process {} while processing {}: {}'.\
                 #                   format(self.index, repr(grpname), e),exc_info=True)
@@ -587,117 +582,13 @@ class AssoTestsWorker:
                 self.pydata = {}
                 # return no result for any of the tests if an error message is captured.
                 values.extend([float('NaN') for x in range(len(self.results.fields) - len(list(grp)))])
-            # print(values)
-            valuePack.append(values)
+
+                valuePack.append(values)
         return valuePack
 
 
 
-class ResultRecorder:
-    def __init__(self, params, db_name=None, delimiter=None, update_existing=False):
-        self.succ_count = 0
-        self.failed_count = 0
-        #
-        self.group_names = params.group_names
-        self.fields = []
-        self.group_fields = []
-        for n,t in zip(params.group_names, params.group_types):
-            self.group_fields.append(Field(name=n, index=None, type=t, adj=None, fmt=None, comment=n))
-        self.fields.extend(self.group_fields)
 
-        for test in params.tests:
-            if test.name:
-                self.fields.extend([
-                    Field(name='{}_{}'.format(x.name, test.name), index=None,
-                        type=x.type, adj=None, fmt=None, comment=x.comment) for x in test.fields])
-            else:
-                self.fields.extend(test.fields)
-        for field in self.fields:
-            if '-' in field.name:
-                raise ValueError('"-" is not allowed in field name {}'.format(field.name))
-        if len(self.fields) != len(set([x.name for x in self.fields])):
-            raise ValueError('Duplicate field names. Please rename one of the tests using parameter --name')
-        #
-        self.printer = PrettyPrinter(delimiter=delimiter)
-        self.printer.write([x.name for x in self.fields])
-        self.writer = None
-        if db_name:
-            db_name = db_name if not db_name.lower().endswith('.db') else db_name[:-3]
-            old_pragma = env.sqlite_pragma
-            # make sure each commit will write data to disk, the performance can be bad though.
-            env.sqlite_pragma = 'synchronous=FULL,journal_mode=DELETE'
-            self.writer = AnnoDBWriter(db_name, self.fields,
-                'field',                       # field annotation databases
-                'Annotation database used to record results of association tests. Created on {}'.format(
-                    time.strftime('%a, %d %b %Y %H:%M:%S', time.gmtime())),
-                '1.0',                         # version 1.0
-                {'*': self.group_names},       # link by group fields
-                2,                             # database format
-                True,                          # allow updating an existing database
-                update_existing                # allow updating an existing field
-            )
-            # restore system sqlite_pragma
-            env.sqlite_pragma = ','.join(old_pragma)
-            #
-            self.cur = self.writer.db.cursor()
-            if self.writer.update_existing:
-                #
-                self.update_query = 'UPDATE {0} SET {1} WHERE {2};'.format(db_name,
-                    ', '.join(['{}={}'.format(x.name, self.writer.db.PH) for x in self.fields[len(self.group_names):]]),
-                    ' AND '.join(['{}={}'.format(x, self.writer.db.PH) for x in self.group_names]))
-                self.insert_query = 'INSERT INTO {0} ({1}) VALUES ({2});'.format(db_name,
-                    ','.join([x.name for x in self.fields]),
-                    ','.join([self.writer.db.PH] * len(self.fields)))
-                self.select_query = 'SELECT {1} FROM {0};'.format(db_name, ', '.join(self.group_names))
-            else:
-                self.insert_query = 'INSERT INTO {0} VALUES ({1});'.format(db_name,
-                    ','.join([self.writer.db.PH] * len(self.fields)))
-        #
-        self.last_commit = time.time()
-
-    def get_groups(self):
-        '''Get groups that have been calculated'''
-        self.cur.execute(self.select_query)
-        return self.cur.fetchall()
-
-    def record(self, valuePack):
-        for res in valuePack:
-            self.succ_count += 1
-            if len([x for x in res if x!=x]) == len(self.fields) - len(self.group_fields):
-                # all fields are NaN: count this as a failure
-                self.failed_count += 1
-            else:
-                self.printer.write(['{0:G}'.format(x, precision=5) if isinstance(x, float) else str(x) for x in res])
-            # also write to an annotation database?
-            if self.writer:
-                if self.writer.update_existing:
-                    self.cur.execute(self.update_query, res[len(self.group_names):] + res[:len(self.group_names)])
-                    # if no record to update, insert a new one
-                    if self.cur.rowcount == 0:
-                        self.cur.execute(self.insert_query, res)
-                else:
-                    # insert a new record
-                    self.cur.execute(self.insert_query, res)
-                # commit the records from time to time to write data to disk
-        self.writer.db.commit()
-
-           
-            # print(time.time(),self.last_commit)
-            # if time.time() - self.last_commit > 5:
-            #     print("commit")
-                
-            #     self.last_commit = time.time()
-
-    def completed(self):
-        return self.succ_count
-
-    def failed(self):
-        return self.failed_count
-
-    def done(self):
-        self.printer.write_rest()
-        if self.writer:
-            self.writer.finalize()
 
 @app.task(bind=True,default_retry_delay=10,serializer="pickle")
 def run_grp_association(self, param, grps, args,path):
