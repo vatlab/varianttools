@@ -45,6 +45,7 @@ from variant_tools.celery_main.task_receiver import run_grp_association
 
 import pickle
 from celery.result import AsyncResult
+from collections import deque
 
 
 def associateArguments(parser):
@@ -1171,7 +1172,7 @@ def cluster_runAssociation(args,asso,proj,results):
         outputs=[]
         for grp in asso.groups:
             grps.append(grp)
-            if count%50==0:
+            if count%10==0:
                 output=run_grp_association.delay(asso, grps,
                     args,os.getcwd())
                 outputs.append(output.id)
@@ -1182,50 +1183,29 @@ def cluster_runAssociation(args,asso,proj,results):
                     args,os.getcwd())
             outputs.append(output.id)
 
-
-
-
-        count=0
-        for output in outputs:
+       
+        outputs=deque(outputs)
+        while outputs:
+            output=outputs.popleft()
             result=AsyncResult(output)
-            for rec in result.get():
-                results.record(rec)
-                count = results.completed()
-                prog.update(count, results.failed())
+            if result.state=="SUCCESS":
+                for rec in result.get():
+                    results.record(rec)
+                    count = results.completed()
+                    prog.update(count, results.failed())
+            else :
+                if result.state!="FAILURE":
+                    outputs.append(output)
         results.done()
 
-
-        
-
-       
-        # try:
-        #     while True:
-        #         # if everything is done
-        #         if count >= len(asso.groups):
-        #             break
-        #         # not done? wait from the queue and write to the result recorder
-        #         res = resQueue.get()
-        #         results.record(res)
-        #         # update progress bar
-        #         count = results.completed()
-        #         prog.update(count, results.failed())
-        #         # env.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
-        # except KeyboardInterrupt as e:
-        #     env.logger.error('\nAssociation tests stopped by keyboard interruption ({}/{} completed).'.\
-        #                       format(count, len(asso.groups)))
-        #     # results.done()
-        #     proj.close()
-        #     sys.exit(1)
-        # finished
         prog.done()
-        # results.done()
+        
         # summary
-        # env.logger.info('Association tests on {} groups have completed. {} failed.'.\
-        #                  format(results.completed(), results.failed()))
+        env.logger.info('Association tests on {} groups have completed. {} failed.'.\
+                         format(results.completed(), results.failed()))
         # use the result database in the project
-        # if args.to_db:
-        #     proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
-
+        if args.to_db:
+            proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
        
     except Exception as e:
         env.logger.error(e)
@@ -1307,12 +1287,8 @@ def associate(args):
                 # asso.phenotypes[0]=np.array(asso.phenotypes[0])[allkeep].tolist()
                 # asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
 
- 
-             
-
             # runAssociation(args,asso,proj,results)
             cluster_runAssociation(args,asso,proj,results)
-
 
     except Exception as e:
         env.logger.error(e)
