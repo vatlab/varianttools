@@ -1165,6 +1165,10 @@ def cluster_runAssociation(args,asso,proj,results):
         prog = ProgressBar('Testing for association', len(asso.groups))
         count=0
         grps=[]
+        old_db=asso.db
+        old_proj_db=asso.proj.db
+        old_proj_annoDB=asso.proj.annoDB
+        old_test=asso.tests
         asso.db=""
         asso.proj.db=""
         asso.proj.annoDB=""
@@ -1199,6 +1203,11 @@ def cluster_runAssociation(args,asso,proj,results):
         results.done()
 
         prog.done()
+
+        asso.db=old_db
+        asso.proj.db=old_proj_db
+        asso.proj.annoDB=old_proj_annoDB
+        asso.tests=old_test
         
         # summary
         env.logger.info('Association tests on {} groups have completed. {} failed.'.\
@@ -1216,83 +1225,83 @@ def cluster_runAssociation(args,asso,proj,results):
 
 
 def associate(args):
-    try:
-        with Project(verbosity=args.verbosity) as proj:
-            # step 0: create an association testing object with all group information
-            try:
-                asso = AssociationTestManager(proj, args.variants, args.phenotypes, args.covariates,
-                    args.var_info, args.geno_info, args.geno_name, args.methods, args.unknown_args,
-                    args.samples, args.genotypes, args.group_by, args.discard_samples, args.discard_variants)
-            except ValueError as e:
-                sys.exit(e)
-            if len(asso.groups) == 0:
-                env.logger.info('No data to analyze.')
-                sys.exit(0)
-            # define results here but it might fail if args.to_db is not writable
-            results = ResultRecorder(asso, args.to_db, args.delimiter, args.force)
-            # determine if some results are already exist
-            #
-            # if write to a db and
-            # if not forcefully recalculate everything and
-            # the file exists
-            # if the new fields is a subset of fields in the database
-            if args.to_db and (not args.force) and results.writer.update_existing and \
-                set([x.name for x in results.fields]).issubset(set([x.name for x in results.writer.cur_fields])):
-                    existing_groups = results.get_groups()
-                    num_groups = len(asso.groups)
-                    asso.groups = list(set(asso.groups).difference(set(existing_groups)))
-                    if len(asso.groups) != num_groups:
-                        env.logger.info('{} out of {} groups with existing results are ignored. '
-                                         'You can use option --force to re-analyze all groups.'.\
-                                         format(num_groups - len(asso.groups), num_groups))
-                        if len(asso.groups) == 0:
-                            sys.exit(0)
-                        # mark existing groups as ignored
-                        cur = proj.db.cursor()
-                        query = 'UPDATE __asso_tmp SET _ignored = 1 WHERE {}'.\
-                          format(' AND '.join(['{}={}'.format(x, proj.db.PH) for x in asso.group_names]))
-                        for grp in existing_groups:
-                            cur.execute(query, grp)
-                        proj.db.commit()
-            
-            if proj.store=="hdf5":
-                HDFfileNames=glob.glob("tmp*_genotypes.h5")
-                if len(HDFfileNames)==0:
-                    env.logger.error("No HDF5 file found. Please run vtools import with --HDF5 tag first.")
-                    sys.exit()
-            
-                HDFfileGroupNames=glob.glob("tmp*multi_genes.h5")
-            
-                if len(HDFfileGroupNames)==0 or args.force:
-                 
-                    nJobs = max(args.jobs, 1)
-                    
-                    # generateHDFbyGroup_update(asso,nJobs)
-                    # generate HDF5 with variants grouped by gene name.
-                    generateHDFbyGroup(asso,nJobs)
-                else:
-                    env.logger.warning("Temp files are not regenerated!")
-
-                # remove phenotype, not necessary if sample is deleted from sample table
-                # allkeep=[]
-                # for HDFfileName in HDFfileNames:
-                #     file=tb.open_file(HDFfileName)
-                #     node=file.get_node("/chr22/GT")
-                #     sampleMasked=np.where(node.sampleMask[:]==True)[0]+1
-                #     keep = ~np.in1d(node.colnames[:], sampleMasked)
-                #     allkeep.extend(keep)
+    # try:
+    with Project(verbosity=args.verbosity) as proj:
+        # step 0: create an association testing object with all group information
+        try:
+            asso = AssociationTestManager(proj, args.variants, args.phenotypes, args.covariates,
+                args.var_info, args.geno_info, args.geno_name, args.methods, args.unknown_args,
+                args.samples, args.genotypes, args.group_by, args.discard_samples, args.discard_variants)
+        except ValueError as e:
+            sys.exit(e)
+        if len(asso.groups) == 0:
+            env.logger.info('No data to analyze.')
+            sys.exit(0)
+        # define results here but it might fail if args.to_db is not writable
+        results = ResultRecorder(asso, args.to_db, args.delimiter, args.force)
+        # determine if some results are already exist
+        #
+        # if write to a db and
+        # if not forcefully recalculate everything and
+        # the file exists
+        # if the new fields is a subset of fields in the database
+        if args.to_db and (not args.force) and results.writer.update_existing and \
+            set([x.name for x in results.fields]).issubset(set([x.name for x in results.writer.cur_fields])):
+                existing_groups = results.get_groups()
+                num_groups = len(asso.groups)
+                asso.groups = list(set(asso.groups).difference(set(existing_groups)))
+                if len(asso.groups) != num_groups:
+                    env.logger.info('{} out of {} groups with existing results are ignored. '
+                                     'You can use option --force to re-analyze all groups.'.\
+                                     format(num_groups - len(asso.groups), num_groups))
+                    if len(asso.groups) == 0:
+                        sys.exit(0)
+                    # mark existing groups as ignored
+                    cur = proj.db.cursor()
+                    query = 'UPDATE __asso_tmp SET _ignored = 1 WHERE {}'.\
+                      format(' AND '.join(['{}={}'.format(x, proj.db.PH) for x in asso.group_names]))
+                    for grp in existing_groups:
+                        cur.execute(query, grp)
+                    proj.db.commit()
         
-                # asso.sample_names=np.array(asso.sample_names)[allkeep].tolist()
-                # asso.sample_IDs=np.array(asso.sample_IDs)[allkeep].tolist()
-                # asso.phenotypes[0]=np.array(asso.phenotypes[0])[allkeep].tolist()
-                # asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
+        if proj.store=="hdf5":
+            HDFfileNames=glob.glob("tmp*_genotypes.h5")
+            if len(HDFfileNames)==0:
+                env.logger.error("No HDF5 file found. Please run vtools import with --HDF5 tag first.")
+                sys.exit()
+        
+            HDFfileGroupNames=glob.glob("tmp*multi_genes.h5")
+        
+            if len(HDFfileGroupNames)==0 or args.force:
+             
+                nJobs = max(args.jobs, 1)
+                
+                # generateHDFbyGroup_update(asso,nJobs)
+                # generate HDF5 with variants grouped by gene name.
+                generateHDFbyGroup(asso,nJobs)
+            else:
+                env.logger.warning("Temp files are not regenerated!")
 
-            # runAssociation(args,asso,proj,results)
-            cluster_runAssociation(args,asso,proj,results)
+            # remove phenotype, not necessary if sample is deleted from sample table
+            # allkeep=[]
+            # for HDFfileName in HDFfileNames:
+            #     file=tb.open_file(HDFfileName)
+            #     node=file.get_node("/chr22/GT")
+            #     sampleMasked=np.where(node.sampleMask[:]==True)[0]+1
+            #     keep = ~np.in1d(node.colnames[:], sampleMasked)
+            #     allkeep.extend(keep)
 
-    except Exception as e:
-        env.logger.error(e)
-        sys.exit(1)
+            # asso.sample_names=np.array(asso.sample_names)[allkeep].tolist()
+            # asso.sample_IDs=np.array(asso.sample_IDs)[allkeep].tolist()
+            # asso.phenotypes[0]=np.array(asso.phenotypes[0])[allkeep].tolist()
+            # asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
+
+        # runAssociation(args,asso,proj,results)
+        cluster_runAssociation(args,asso,proj,results)
+
+    # except Exception as e:
+    #     env.logger.error(e)
+    #     sys.exit(1)
 
 def getAllTests():
     '''List all tests (all classes that subclasses of NullTest/GLMBurdenTest) in this module'''
