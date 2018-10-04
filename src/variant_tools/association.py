@@ -46,6 +46,8 @@ from variant_tools.celery_main.task_receiver import run_grp_association
 import pickle
 from celery.result import AsyncResult
 from collections import deque
+import zmq
+import json
 
 
 def associateArguments(parser):
@@ -1158,12 +1160,108 @@ def runAssociation(args,asso,proj,results):
         sys.exit(1)
 
 
+def generate_works(asso,args):
+    count=1
+    grps=[]
+    projName=asso.proj.name
+    asso.proj=None
+
+    for grp in asso.groups:
+        grps.append(grp)
+        if count%10==0:
+            work={"projName":projName,"param":json.dumps(asso.__dict__), "grps":grps,
+            "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,},"path": os.getcwd()}
+            yield work
+            grps=[]
+        count+=1
+
+def send_next_work(sock, works):
+    try:
+        work = next(works)
+        sock.send_json(work)
+    except StopIteration:
+        # If no more work is available, we still have to reply something.
+        sock.send_json({})
+
+def send_thanks(sock):
+    sock.send_string("") # Nothing more to say actually
+
+
+
+def zmq_cluster_runAssociation(args,asso,proj,results):
+    try:
+       
+        prog = ProgressBar('Testing for association', len(asso.groups))
+        grps=[]
+        old_db=asso.db
+        old_proj=asso.proj
+        old_proj_annoDB=asso.proj.annoDB
+        old_test=asso.tests
+        asso.db=""
+        asso.proj.db=""
+        asso.proj.annoDB=""
+        asso.tests=""
+        outputs=[]
+
+        context = zmq.Context()
+        sock = context.socket(zmq.REP)
+        sock.bind("tcp://0.0.0.0:5557")
+
+        # Generate the json messages for all computations.
+     
+        works = generate_works(asso,args)
+
+        print(len(outputs),len(asso.groups))
+
+        while len(outputs) < len(asso.groups)/10:
+            # Receive;
+            j = sock.recv_json()
+            # First case: worker says "I'm available". Send him some work.
+            if j['msg'] == "available":
+                send_next_work(sock, works)
+
+            # Second case: worker says "Here's your result". Store it, say thanks.
+            elif j['msg'] == "result":
+                r = j['result']
+                outputs.append(r)
+                send_thanks(sock)
+
+        # Results are all in.
+        print("=== Results ===")
+        for rec in outputs:
+            result=json.loads(rec)
+            for rec in result:
+                results.record(rec)
+            count = results.completed()
+            prog.update(count, results.failed())
+        results.done()
+        prog.done()
+
+        asso.db=old_db
+        asso.proj=old_proj
+        asso.tests=old_test
+        
+        # summary
+        env.logger.info('Association tests on {} groups have completed. {} failed.'.\
+                         format(results.completed(), results.failed()))
+        # use the result database in the project
+        if args.to_db:
+            proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
+       
+    except Exception as e:
+        env.logger.error(e)
+        sys.exit(1)
+
+
+
+
+
 
 def cluster_runAssociation(args,asso,proj,results):
     try:
        
         prog = ProgressBar('Testing for association', len(asso.groups))
-        count=0
+        count=1
         grps=[]
         old_db=asso.db
         old_proj_db=asso.proj.db
@@ -1297,7 +1395,8 @@ def associate(args):
             # asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
 
         # runAssociation(args,asso,proj,results)
-        cluster_runAssociation(args,asso,proj,results)
+        zmq_cluster_runAssociation(args,asso,proj,results)
+        # cluster_runAssociation(args,asso,proj,results)
 
     # except Exception as e:
     #     env.logger.error(e)
