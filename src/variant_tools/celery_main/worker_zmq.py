@@ -540,7 +540,7 @@ def slave():
     # Setup ZMQ.
     context = zmq.Context()
     sock = context.socket(zmq.REQ)
-    sock.connect("tcp://0.0.0.0:5557") # IP of master
+    sock.connect("tcp://"+os.environ["ZEROMQIP"]+":5557") # IP of master
 
     while True:
         # Say we're available.

@@ -1205,7 +1205,7 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
 
         context = zmq.Context()
         sock = context.socket(zmq.REP)
-        sock.bind("tcp://0.0.0.0:5557")
+        sock.bind("tcp://"+os.environ["ZEROMQIP"]+":5557")
 
         # Generate the json messages for all computations.
      
