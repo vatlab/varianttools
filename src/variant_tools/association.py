@@ -1195,6 +1195,7 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
         grps=[]
         old_db=asso.db
         old_proj=asso.proj
+        old_proj_db=asso.proj.db
         old_proj_annoDB=asso.proj.annoDB
         old_test=asso.tests
         asso.db=""
@@ -1240,6 +1241,8 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
         asso.db=old_db
         asso.proj=old_proj
         asso.tests=old_test
+        asso.proj.db=old_proj_db
+        asso.proj.annoDB=old_proj_annoDB
         
         # summary
         env.logger.info('Association tests on {} groups have completed. {} failed.'.\
