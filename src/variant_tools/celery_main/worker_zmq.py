@@ -550,6 +550,8 @@ def slave():
         work = sock.recv_json()
         if work == {}:
             continue
+        if "noMoreWork" in work:
+            break
         param = work['param']
         grps = work['grps']
         args=work['args']

@@ -1174,6 +1174,9 @@ def generate_works(asso,args):
             yield work
             grps=[]
         count+=1
+    work={"projName":projName,"param":json.dumps(asso.__dict__), "grps":grps,
+    "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,},"path": os.getcwd()}
+    yield work
 
 def send_next_work(sock, works):
     try:
@@ -1181,7 +1184,7 @@ def send_next_work(sock, works):
         sock.send_json(work)
     except StopIteration:
         # If no more work is available, we still have to reply something.
-        sock.send_json({})
+        sock.send_json({"noMoreWork":"noMoreWork"})
 
 def send_thanks(sock):
     sock.send_string("") # Nothing more to say actually
@@ -1202,7 +1205,7 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
         asso.proj.db=""
         asso.proj.annoDB=""
         asso.tests=""
-        outputs=[]
+        groupCount=0
 
         context = zmq.Context()
         sock = context.socket(zmq.REP)
@@ -1212,9 +1215,8 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
      
         works = generate_works(asso,args)
 
-        print(len(outputs),len(asso.groups))
 
-        while len(outputs) < len(asso.groups)/10:
+        while groupCount < len(asso.groups):
             # Receive;
             j = sock.recv_json()
             # First case: worker says "I'm available". Send him some work.
@@ -1224,17 +1226,30 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
             # Second case: worker says "Here's your result". Store it, say thanks.
             elif j['msg'] == "result":
                 r = j['result']
-                outputs.append(r)
+                groupCount+=10
+                # outputs.append(r)
+                result=json.loads(r)
+                for rec in result:
+                    results.record(rec)
+                count = results.completed()
+                prog.update(count, results.failed())
                 send_thanks(sock)
-
+        
+        stopCount=0
+        while stopCount<10:
+            j = sock.recv_json()
+            # First case: worker says "I'm available". Send him some work.
+            if j['msg'] == "available":   
+                sock.send_json({"noMoreWork":"noMoreWork"})
+            stopCount+=1
         # Results are all in.
-        print("=== Results ===")
-        for rec in outputs:
-            result=json.loads(rec)
-            for rec in result:
-                results.record(rec)
-            count = results.completed()
-            prog.update(count, results.failed())
+        # print("=== Results ===")
+        # for rec in outputs:
+        #     result=json.loads(rec)
+        #     for rec in result:
+        #         results.record(rec)
+        #     count = results.completed()
+        #     prog.update(count, results.failed())
         results.done()
         prog.done()
 
