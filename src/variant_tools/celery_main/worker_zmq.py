@@ -541,10 +541,10 @@ def slave():
     context = zmq.Context()
     sock = context.socket(zmq.REQ)
     sock.connect("tcp://"+os.environ["ZEROMQIP"]+":5557") # IP of master
-
+    count=0
     while True:
         # Say we're available.
-        sock.send_json({ "msg": "available" })
+        sock.send_json({ "msg": "available","count":count })
 
         # Retrieve work and run the computation.
         work = sock.recv_json()
@@ -566,10 +566,39 @@ def slave():
         # We have a result, let's inform the master about that, and receive the
         # "thanks".
 
-        sock.send_json({ "msg": "result", "result": result})
+        sock.send_json({ "msg": "result", "result": result,"count":count})
         sock.recv()
+        count+=1
+
+def slave_pub_sub():
+    # Setup ZMQ.
+    context = zmq.Context()
+    sock_in = context.socket(zmq.PULL)
+    sock_in.connect("tcp://"+os.environ["ZEROMQIP"]+":5557") # IP of master
+    sock_out= context.socket(zmq.PUSH)
+    sock_out.connect("tcp://"+os.environ["ZEROMQIP"]+":5558") 
+
+    while True:
+       
+        work = sock_in.recv_json()
+        if work == {}:
+            continue
+        if "noMoreWork" in work:
+            break
+        param = work['param']
+        grps = work['grps']
+        args=work['args']
+        path=work["path"]
+        projName=work["projName"]
+        print("running computation")
+        worker = AssoTestsWorker(param, grps, args,path,projName)
+        result=worker.run()    
+        result =json.dumps(result)
+        sock_out.send_json(result)
+       
 
 
 
 if __name__ == "__main__":
-    slave()
+    # slave()
+    slave_pub_sub()

@@ -1221,10 +1221,12 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
             j = sock.recv_json()
             # First case: worker says "I'm available". Send him some work.
             if j['msg'] == "available":
+                print("send",j["count"])
                 send_next_work(sock, works)
 
             # Second case: worker says "Here's your result". Store it, say thanks.
             elif j['msg'] == "result":
+                print("get",j["count"])
                 r = j['result']
                 groupCount+=10
                 # outputs.append(r)
@@ -1235,13 +1237,12 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
                 prog.update(count, results.failed())
                 send_thanks(sock)
         
-        stopCount=0
-        while stopCount<10:
-            j = sock.recv_json()
-            # First case: worker says "I'm available". Send him some work.
-            if j['msg'] == "available":   
-                sock.send_json({"noMoreWork":"noMoreWork"})
-            stopCount+=1
+
+        j = sock.recv_json()
+        # First case: worker says "I'm available". Send him some work.
+        if j['msg'] == "available":   
+            sock.send_json({"noMoreWork":"noMoreWork"})
+           
         # Results are all in.
         # print("=== Results ===")
         # for rec in outputs:
@@ -1271,6 +1272,86 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
         sys.exit(1)
 
 
+def zmq_pub_sub_cluster_runAssociation(args,asso,proj,results):
+    try:
+       
+        prog = ProgressBar('Testing for association', len(asso.groups))
+        grps=[]
+        old_db=asso.db
+        old_proj=asso.proj
+        old_proj_db=asso.proj.db
+        old_proj_annoDB=asso.proj.annoDB
+        old_test=asso.tests
+        asso.db=""
+        asso.proj.db=""
+        asso.proj.annoDB=""
+        asso.tests=""
+        groupCount=0
+
+        context = zmq.Context()
+        sock = context.socket(zmq.PUSH)
+        sock.bind("tcp://"+os.environ["ZEROMQIP"]+":5557")
+        time.sleep(0.5)
+
+        # Generate the json messages for all computations.
+     
+        count=1
+        grps=[]
+        projName=asso.proj.name
+        asso.proj=None
+
+        for grp in asso.groups:
+            grps.append(grp)
+            if count%10==0:
+                work={"projName":projName,"param":json.dumps(asso.__dict__), "grps":grps,
+                "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,},"path": os.getcwd()}
+                sock.send_json(work)
+                grps=[]
+            count+=1
+        if (len(grps)>0):
+            work={"projName":projName,"param":json.dumps(asso.__dict__), "grps":grps,
+                "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,},"path": os.getcwd()}
+            sock.send_json(work)
+        sock.send_json({"noMoreWork":"noMoreWork"})
+        
+        context = zmq.Context()
+        sock = context.socket(zmq.PULL)
+        sock.bind("tcp://"+os.environ["ZEROMQIP"]+":5558")
+
+
+
+        while groupCount < len(asso.groups):
+            # Receive;
+            r = sock.recv_json()
+            # First case: worker says "I'm available". Send him some work.
+            groupCount+=10
+            # outputs.append(r)
+            result=json.loads(r)
+            for rec in result:
+                results.record(rec)
+            count = results.completed()
+            prog.update(count, results.failed())
+        
+
+        results.done()
+        prog.done()
+
+        asso.db=old_db
+        asso.proj=old_proj
+        asso.tests=old_test
+        asso.proj.db=old_proj_db
+        asso.proj.annoDB=old_proj_annoDB
+        
+        # summary
+        env.logger.info('Association tests on {} groups have completed. {} failed.'.\
+                         format(results.completed(), results.failed()))
+        # use the result database in the project
+        if args.to_db:
+            proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
+       
+    except Exception as e:
+        env.logger.error(e)
+        sys.exit(1)
 
 
 
@@ -1413,8 +1494,9 @@ def associate(args):
             # asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
 
         # runAssociation(args,asso,proj,results)
-        zmq_cluster_runAssociation(args,asso,proj,results)
-        # cluster_runAssociation(args,asso,proj,results)
+        zmq_pub_sub_cluster_runAssociation(args,asso,proj,results)
+        #zmq_cluster_runAssociation(args,asso,proj,results)
+        #cluster_runAssociation(args,asso,proj,results)
 
     # except Exception as e:
     #     env.logger.error(e)
