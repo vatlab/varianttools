@@ -1221,20 +1221,18 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
             j = sock.recv_json()
             # First case: worker says "I'm available". Send him some work.
             if j['msg'] == "available":
-                print("send",j["count"])
                 send_next_work(sock, works)
 
             # Second case: worker says "Here's your result". Store it, say thanks.
             elif j['msg'] == "result":
-                print("get",j["count"])
                 r = j['result']
                 groupCount+=10
                 # outputs.append(r)
                 result=json.loads(r)
                 for rec in result:
                     results.record(rec)
-                count = results.completed()
-                prog.update(count, results.failed())
+                    count = results.completed()
+                    prog.update(count, results.failed())
                 send_thanks(sock)
         
 
@@ -1319,20 +1317,23 @@ def zmq_pub_sub_cluster_runAssociation(args,asso,proj,results):
         sock.bind("tcp://"+os.environ["ZEROMQIP"]+":5558")
 
 
-
+        endtime=time.time()
         while groupCount < len(asso.groups):
             # Receive;
             r = sock.recv_json()
+            print("wait", time.time()-endtime)
+            starttime=time.time()
             # First case: worker says "I'm available". Send him some work.
             groupCount+=10
             # outputs.append(r)
+            
             result=json.loads(r)
             for rec in result:
                 results.record(rec)
-            count = results.completed()
-            prog.update(count, results.failed())
-        
-
+                count = results.completed()
+                prog.update(count, results.failed())
+            print("process ",time.time()-starttime)
+            endtime=time.time()
         results.done()
         prog.done()
 
@@ -1386,17 +1387,26 @@ def cluster_runAssociation(args,asso,proj,results):
 
        
         outputs=deque(outputs)
+        begintime=time.time()
+        endtime=time.time()
         while outputs:
             output=outputs.popleft()
+            
             result=AsyncResult(output)
             if result.state=="SUCCESS":
+                print("wait ",time.time()-endtime)
+                starttime=time.time()
                 for rec in result.get():
                     results.record(rec)
                     count = results.completed()
                     prog.update(count, results.failed())
+                print("process ",time.time()-starttime)
+                endtime=time.time()
             else :
                 if result.state!="FAILURE":
                     outputs.append(output)
+    
+        print("total ",time.time()-begintime)
         results.done()
 
         prog.done()
@@ -1493,7 +1503,7 @@ def associate(args):
             # asso.phenotypes[0]=np.array(asso.phenotypes[0])[allkeep].tolist()
             # asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
 
-        # runAssociation(args,asso,proj,results)
+        #runAssociation(args,asso,proj,results)
         zmq_pub_sub_cluster_runAssociation(args,asso,proj,results)
         #zmq_cluster_runAssociation(args,asso,proj,results)
         #cluster_runAssociation(args,asso,proj,results)
