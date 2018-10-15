@@ -1320,20 +1320,23 @@ def zmq_pub_sub_cluster_runAssociation(args,asso,proj,results):
         endtime=time.time()
         while groupCount < len(asso.groups):
             # Receive;
-            r = sock.recv_json()
-            print("wait", time.time()-endtime)
-            starttime=time.time()
-            # First case: worker says "I'm available". Send him some work.
-            groupCount+=10
-            # outputs.append(r)
-            
-            result=json.loads(r)
-            for rec in result:
-                results.record(rec)
-                count = results.completed()
-                prog.update(count, results.failed())
-            print("process ",time.time()-starttime)
-            endtime=time.time()
+            try:
+                r = sock.recv_json(flags=zmq.NOBLOCK)
+                print("wait", time.time()-endtime)
+                starttime=time.time()
+                # First case: worker says "I'm available". Send him some work.
+                groupCount+=10
+                # outputs.append(r)
+                
+                result=json.loads(r)
+                for rec in result:
+                    results.record(rec)
+                    count = results.completed()
+                    prog.update(count, results.failed())
+                print("process ",time.time()-starttime)
+                endtime=time.time()
+            except zmq.error.Again as e:
+                continue
         results.done()
         prog.done()
 
