@@ -577,27 +577,39 @@ def slave_pub_sub():
     sock_in.connect("tcp://"+os.environ["ZEROMQIP"]+":5557") # IP of master
     sock_out= context.socket(zmq.PUSH)
     sock_out.connect("tcp://"+os.environ["ZEROMQIP"]+":5558") 
-
+    param=None
+    grps=None 
+    args=None 
+    path=None
+    projName=None
+    result=""
+    work={}
     while True:
-       
-        work = sock_in.recv_json()
-        if work == {}:
-            continue
-        if "noMoreWork" in work:
-            break
-        param = work['param']
-        grps = work['grps']
-        args=work['args']
-        path=work["path"]
-        projName=work["projName"]
-        print("running computation")
-        worker = AssoTestsWorker(param, grps, args,path,projName)
-        result=worker.run()    
-        result =json.dumps(result)
-        sock_out.send_json(result)
-       
+        try:
+            work = sock_in.recv_json(flags=zmq.NOBLOCK)
+            if work == {}:
+                continue
+            if "noMoreWork" in work:
+                break
+            param = work['param']
+            grps = work['grps']
+            args=work['args']
+            path=work["path"]
+            projName=work["projName"]
+        except zmq.error.Again as e:
+            pass
+        if work!={}:
+            print("running computation")
+            worker = AssoTestsWorker(param, grps, args,path,projName)
+            result=worker.run()    
+            result =json.dumps(result)
+        try:
+            if result!="":
+                sock_out.send_json(result,flags=zmq.NOBLOCK)
+        except zmq.error.Again as e:
+            pass
 
-
+       
 
 if __name__ == "__main__":
     # slave()
