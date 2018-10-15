@@ -48,6 +48,8 @@ from celery.result import AsyncResult
 from collections import deque
 import zmq
 import json
+from zmq.log.handlers import PUBHandler
+import logging
 
 
 def associateArguments(parser):
@@ -1291,6 +1293,32 @@ def zmq_pub_sub_cluster_runAssociation(args,asso,proj,results):
         sock.bind("tcp://"+os.environ["ZEROMQIP"]+":5557")
         time.sleep(0.5)
 
+
+        LOG_LEVELS = (logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR, logging.CRITICAL)
+
+        port = "6001"
+        level = logging.DEBUG
+        ctx = zmq.Context()
+        pub = ctx.socket(zmq.PUB)
+        pub.connect("tcp://"+os.environ["ZEROMQIP"]+":"+port)
+        formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s',
+                                  datefmt='%Y-%m-%d %H:%M:%S')
+
+        logger = logging.getLogger(str(os.getpid()))
+        logger.setLevel(level)
+        handler = PUBHandler(pub)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        print("starting logger at %i with level=%s" % (os.getpid(), level))
+        logger.log(level, "Hello from %i!" % os.getpid())
+
+        # while True:
+        #     level = random.choice(LOG_LEVELS)
+        #     logger.log(level, "Hello from %i!" % os.getpid())
+        #     time.sleep(1)
+
+
+
         # Generate the json messages for all computations.
      
         count=1
@@ -1324,6 +1352,7 @@ def zmq_pub_sub_cluster_runAssociation(args,asso,proj,results):
             try:
                 r = sock.recv_json(flags=zmq.NOBLOCK)
                 print("wait", time.time()-endtime)
+                logger.log(level, time.asctime( time.localtime(time.time()) ))
                 starttime=time.time()
                 # First case: worker says "I'm available". Send him some work.
                 groupCount+=10

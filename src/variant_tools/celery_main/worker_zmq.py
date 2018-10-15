@@ -12,6 +12,8 @@ from variant_tools.assoTests import AssoData
 from variant_tools.utils import DatabaseEngine,executeUntilSucceed,PrettyPrinter
 from variant_tools.project import AnnoDBWriter
 import json
+import logging
+from zmq.log.handlers import PUBHandler
 
 
 
@@ -584,6 +586,24 @@ def slave_pub_sub():
     projName=None
     result=""
     work={}
+
+
+ 
+    LOG_LEVELS = (logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR, logging.CRITICAL)
+
+    port = "6001"
+    level = logging.DEBUG
+    ctx = zmq.Context()
+    pub = ctx.socket(zmq.PUB)
+    pub.connect("tcp://"+os.environ["ZEROMQIP"]+":"+port)
+
+    logger = logging.getLogger(str(os.getpid()))
+    logger.setLevel(level)
+    handler = PUBHandler(pub)
+    logger.addHandler(handler)
+    print("starting logger at %i with level=%s" % (os.getpid(), level))
+    logger.log(level, "Hello from %i!" % os.getpid())
+    
     while True:
         try:
             work = sock_in.recv_json(flags=zmq.NOBLOCK)
@@ -600,6 +620,7 @@ def slave_pub_sub():
             pass
         if work!={}:
             print("running computation")
+            logger.log(level, str(os.getpid())+" "+time.asctime(time.localtime(time.time()) ))
             worker = AssoTestsWorker(param, grps, args,path,projName)
             result=worker.run()    
             result =json.dumps(result)
