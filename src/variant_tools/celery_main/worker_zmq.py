@@ -542,35 +542,76 @@ def slave():
     # Setup ZMQ.
     context = zmq.Context()
     sock = context.socket(zmq.REQ)
+    if os.environ.get("NODENAME") is None:
+        os.environ["NODENAME"]="127.0.0.1"
     sock.connect("tcp://"+os.environ["ZEROMQIP"]+":5557") # IP of master
     count=0
+    param=None
+    grps=None 
+    args=None 
+    path=None
+    projName=None
+    result=""
+    work={}
+
+    LOG_LEVELS = (logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR, logging.CRITICAL)
+
+    port = "6001"
+    level = logging.DEBUG
+    ctx = zmq.Context()
+    pub = ctx.socket(zmq.PUB)
+    pub.connect("tcp://"+os.environ["ZEROMQIP"]+":"+port)
+
+    logger = logging.getLogger(str(os.getpid()))
+    logger.setLevel(level)
+    handler = PUBHandler(pub)
+    logger.addHandler(handler)
+    print("starting logger at %i with level=%s" % (os.getpid(), level))
+    logger.log(level, "Hello from %i!" % os.getpid())
+    endtime=time.time()
+
+
+
     while True:
         # Say we're available.
-        sock.send_json({ "msg": "available","count":count })
+        try:
+            sock.send_json({ "msg": "available","count":count },flags=zmq.NOBLOCK)
+        except zmq.error.ZMQError as e:
+            pass
 
         # Retrieve work and run the computation.
-        work = sock.recv_json()
-        if work == {}:
-            continue
-        if "noMoreWork" in work:
-            break
-        param = work['param']
-        grps = work['grps']
-        args=work['args']
-        path=work["path"]
-        projName=work["projName"]
-        print("running computation")
-        worker = AssoTestsWorker(param, grps, args,path,projName)
-        result=worker.run()
+        try:
+            work = sock.recv_json(flags=zmq.NOBLOCK)
+            if work == {}:
+                continue
+            if "noMoreWork" in work:
+                break
+            param = work['param']
+            grps = work['grps']
+            args=work['args']
+            path=work["path"]
+            projName=work["projName"]
+            print("running computation")
+            logger.log(level, str(os.environ["NODENAME"])+" "+time.asctime(time.localtime(time.time()) )+" "+str(time.time()-endtime))
+            starttime=time.time()
+            worker = AssoTestsWorker(param, grps, args,path,projName)
+            result=worker.run()
+            result =json.dumps(result)
+            logger.log(level, str(os.environ["NODENAME"])+" "+str(time.time()-starttime))
+            endtime=time.time()
+        except zmq.error.Again as e:
+            pass
         
-        result =json.dumps(result)
 
         # We have a result, let's inform the master about that, and receive the
         # "thanks".
-
-        sock.send_json({ "msg": "result", "result": result,"count":count})
-        sock.recv()
-        count+=1
+        try:
+            if result!="":
+                sock.send_json({ "msg": "result", "result": result,"count":count},flags=zmq.NOBLOCK)
+                sock.recv()
+                count+=1
+        except zmq.error.ZMQError as e:
+            pass
 
 def slave_pub_sub():
     # Setup ZMQ.
@@ -603,6 +644,7 @@ def slave_pub_sub():
     logger.addHandler(handler)
     print("starting logger at %i with level=%s" % (os.getpid(), level))
     logger.log(level, "Hello from %i!" % os.getpid())
+    endtime=time.time()
     
     while True:
         try:
@@ -616,14 +658,18 @@ def slave_pub_sub():
             args=work['args']
             path=work["path"]
             projName=work["projName"]
-        except zmq.error.Again as e:
-            pass
-        if work!={}:
             print("running computation")
-            logger.log(level, str(os.getpid())+" "+time.asctime(time.localtime(time.time()) ))
+            logger.log(level, str(os.environ["NODENAME"])+" "+time.asctime(time.localtime(time.time()) )+" "+str(time.time()-endtime))
+            # logger.log(level, str(os.getpid())+" "+time.asctime(time.localtime(time.time()) ))
+            starttime=time.time()
             worker = AssoTestsWorker(param, grps, args,path,projName)
             result=worker.run()    
             result =json.dumps(result)
+            logger.log(level, str(os.environ["NODENAME"])+" "+str(time.time()-starttime))
+            endtime=time.time()
+        except zmq.error.Again as e:
+            pass
+        
         try:
             if result!="":
                 sock_out.send_json(result,flags=zmq.NOBLOCK)
@@ -633,5 +679,5 @@ def slave_pub_sub():
        
 
 if __name__ == "__main__":
-    # slave()
-    slave_pub_sub()
+    slave()
+    #slave_pub_sub()

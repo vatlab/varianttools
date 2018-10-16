@@ -1183,13 +1183,22 @@ def generate_works(asso,args):
 def send_next_work(sock, works):
     try:
         work = next(works)
-        sock.send_json(work)
+        sock.send_json(work,flags=zmq.NOBLOCK)
+    except zmq.error.ZMQError as e:
+        pass
     except StopIteration:
         # If no more work is available, we still have to reply something.
-        sock.send_json({"noMoreWork":"noMoreWork"})
+        try:
+            sock.send_json({"noMoreWork":"noMoreWork"},flags=zmq.NOBLOCK)
+        except zmq.error.ZMQError as e:
+            pass
 
 def send_thanks(sock):
-    sock.send_string("") # Nothing more to say actually
+    try:
+        sock.send_string("") # Nothing more to say actually
+    except zmq.error.ZMQError as e:
+        pass
+
 
 
 
@@ -1213,31 +1222,58 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
         sock = context.socket(zmq.REP)
         sock.bind("tcp://"+os.environ["ZEROMQIP"]+":5557")
 
+
+
+        LOG_LEVELS = (logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR, logging.CRITICAL)
+
+        port = "6001"
+        level = logging.DEBUG
+        ctx = zmq.Context()
+        pub = ctx.socket(zmq.PUB)
+        pub.connect("tcp://"+os.environ["ZEROMQIP"]+":"+port)
+        formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s',
+                                  datefmt='%Y-%m-%d %H:%M:%S')
+
+        logger = logging.getLogger(str(os.getpid()))
+        logger.setLevel(level)
+        handler = PUBHandler(pub)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        print("starting logger at %i with level=%s" % (os.getpid(), level))
+        logger.log(level, "Hello from %i!" % os.getpid())
+
+
+
         # Generate the json messages for all computations.
-     
+        j={}
         works = generate_works(asso,args)
+        endtime=time.time()
 
 
         while groupCount < len(asso.groups):
             # Receive;
-            j = sock.recv_json()
-            # First case: worker says "I'm available". Send him some work.
-            if j['msg'] == "available":
-                send_next_work(sock, works)
+            try:
+                j = sock.recv_json(flags=zmq.NOBLOCK)
+                if j['msg'] == "available":
+                    send_next_work(sock, works)
 
-            # Second case: worker says "Here's your result". Store it, say thanks.
-            elif j['msg'] == "result":
-                r = j['result']
-                groupCount+=10
-                # outputs.append(r)
-                result=json.loads(r)
-                for rec in result:
-                    results.record(rec)
-                    count = results.completed()
-                    prog.update(count, results.failed())
-                send_thanks(sock)
+                # Second case: worker says "Here's your result". Store it, say thanks.
+                elif j['msg'] == "result":
+                    r = j['result']
+                    groupCount+=10
+                    # outputs.append(r)
+                    logger.log(level, time.asctime( time.localtime(time.time()) )+" "+str(time.time()-endtime))
+                    result=json.loads(r)
+                    for rec in result:
+                        results.record(rec)
+                        count = results.completed()
+                        prog.update(count, results.failed())
+                    send_thanks(sock)
+                    endtime=time.time()
+            except zmq.error.Again as e:
+                pass
+                
         
-
         j = sock.recv_json()
         # First case: worker says "I'm available". Send him some work.
         if j['msg'] == "available":   
@@ -1538,8 +1574,8 @@ def associate(args):
             # asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
 
         #runAssociation(args,asso,proj,results)
-        zmq_pub_sub_cluster_runAssociation(args,asso,proj,results)
-        #zmq_cluster_runAssociation(args,asso,proj,results)
+        #zmq_pub_sub_cluster_runAssociation(args,asso,proj,results)
+        zmq_cluster_runAssociation(args,asso,proj,results)
         #cluster_runAssociation(args,asso,proj,results)
 
     # except Exception as e:
