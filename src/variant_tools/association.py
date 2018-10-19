@@ -50,6 +50,7 @@ import zmq
 import json
 from zmq.log.handlers import PUBHandler
 import logging
+import uuid
 
 
 def associateArguments(parser):
@@ -1193,11 +1194,122 @@ def send_next_work(sock, works):
         except zmq.error.ZMQError as e:
             pass
 
+
+
 def send_thanks(sock):
     try:
         sock.send_string("") # Nothing more to say actually
     except zmq.error.ZMQError as e:
         pass
+
+
+def zmq_router_dealer(args,asso,proj,results):
+    try:
+       
+        prog = ProgressBar('Testing for association', len(asso.groups))
+        grps=[]
+        old_db=asso.db
+        old_proj=asso.proj
+        old_proj_db=asso.proj.db
+        old_proj_annoDB=asso.proj.annoDB
+        old_test=asso.tests
+        asso.db=""
+        asso.proj.db=""
+        asso.proj.annoDB=""
+        asso.tests=""
+        groupCount=0
+
+        context = zmq.Context()
+        sock = context.socket(zmq.DEALER)
+        sock.bind("tcp://"+os.environ["ZEROMQIP"]+":5557")
+
+
+
+        LOG_LEVELS = (logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR, logging.CRITICAL)
+
+        port = "6001"
+        level = logging.DEBUG
+        ctx = zmq.Context()
+        pub = ctx.socket(zmq.PUB)
+        pub.connect("tcp://"+os.environ["ZEROMQIP"]+":"+port)
+        formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s',
+                                  datefmt='%Y-%m-%d %H:%M:%S')
+
+        logger = logging.getLogger(str(os.getpid()))
+        logger.setLevel(level)
+        handler = PUBHandler(pub)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        print("starting logger at %i with level=%s" % (os.getpid(), level))
+        logger.log(level, "Hello from %i!" % os.getpid())
+
+
+
+        # Generate the json messages for all computations.
+        j={}
+        works = generate_works(asso,args)
+        endtime=time.time()
+        uid = bytes(uuid.uuid1().hex,'utf8')
+        while True:
+            try:
+                work = next(works)
+
+                sock.send_multipart([uid,bytes(json.dumps(work),'utf8')])
+           
+            except StopIteration:
+                break
+        sock.send_multipart([uid,bytes(json.dumps({"noMoreWork":"noMoreWork"}),'utf8')])
+        print("all job send")
+        while groupCount < len(asso.groups):
+            # Receive;
+            try:
+                r = sock.recv_multipart(zmq.NOBLOCK)
+                if r is not None:
+
+                    groupCount+=10
+                    # outputs.append(r)
+                    logger.log(level, time.asctime( time.localtime(time.time()) )+" "+str(time.time()-endtime))
+                    result=json.loads(r[1])
+                    for rec in result["result"]:
+                        results.record(rec)
+                        count = results.completed()
+                        prog.update(count, results.failed())
+                    endtime=time.time()
+            except:
+                pass
+            # Second case: worker says "Here's your result". Store it, say thanks.
+            
+      
+                
+           
+        # Results are all in.
+        # print("=== Results ===")
+        # for rec in outputs:
+        #     result=json.loads(rec)
+        #     for rec in result:
+        #         results.record(rec)
+        #     count = results.completed()
+        #     prog.update(count, results.failed())
+        results.done()
+        prog.done()
+
+        asso.db=old_db
+        asso.proj=old_proj
+        asso.tests=old_test
+        asso.proj.db=old_proj_db
+        asso.proj.annoDB=old_proj_annoDB
+        
+        # summary
+        env.logger.info('Association tests on {} groups have completed. {} failed.'.\
+                         format(results.completed(), results.failed()))
+        # use the result database in the project
+        if args.to_db:
+            proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
+       
+    except Exception as e:
+        env.logger.error(e)
+        sys.exit(1)
+
 
 
 
@@ -1575,7 +1687,8 @@ def associate(args):
 
         #runAssociation(args,asso,proj,results)
         #zmq_pub_sub_cluster_runAssociation(args,asso,proj,results)
-        zmq_cluster_runAssociation(args,asso,proj,results)
+        zmq_router_dealer(args,asso,proj,results)
+        # zmq_cluster_runAssociation(args,asso,proj,results)
         #cluster_runAssociation(args,asso,proj,results)
 
     # except Exception as e:

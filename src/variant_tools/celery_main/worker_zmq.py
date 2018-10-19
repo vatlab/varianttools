@@ -538,10 +538,77 @@ class ResultRecorder:
         if self.writer:
             self.writer.finalize()
 
+def slave_dealer():
+    # Setup ZMQ.
+    context = zmq.Context()
+    sock = context.socket(zmq.ROUTER)
+    sock.setsockopt(zmq.IDENTITY,b'A')
+
+    if os.environ.get("NODENAME") is None:
+        os.environ["NODENAME"]="127.0.0.1"
+    sock.connect("tcp://"+os.environ["ZEROMQIP"]+":5557") # IP of master
+
+    count=0
+    param=None
+    grps=None 
+    args=None 
+    path=None
+    projName=None
+    result=""
+    work={}
+
+    LOG_LEVELS = (logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR, logging.CRITICAL)
+
+    port = "6001"
+    level = logging.DEBUG
+    ctx = zmq.Context()
+    pub = ctx.socket(zmq.PUB)
+    pub.connect("tcp://"+os.environ["ZEROMQIP"]+":"+port)
+
+    logger = logging.getLogger(str(os.getpid()))
+    logger.setLevel(level)
+    handler = PUBHandler(pub)
+    logger.addHandler(handler)
+    print("starting logger at %i with level=%s" % (os.getpid(), level))
+    logger.log(level, "Hello from %i!" % os.getpid())
+    endtime=time.time()
+
+
+
+    while True:
+
+        message = sock.recv_multipart()
+        client_id,msg_id,work=message
+        work=json.loads(work)
+        if work == {}:
+            continue
+        if "noMoreWork" in work:
+            break
+        param = work['param']
+        grps = work['grps']
+        args=work['args']
+        path=work["path"]
+        projName=work["projName"]
+        print("running computation")
+        logger.log(level, str(os.environ["NODENAME"])+" "+time.asctime(time.localtime(time.time()) )+" "+str(time.time()-endtime))
+        starttime=time.time()
+        worker = AssoTestsWorker(param, grps, args,path,projName)
+        result=worker.run()
+        # result =json.dumps(result)
+        logger.log(level, str(os.environ["NODENAME"])+" "+str(time.time()-starttime))
+        endtime=time.time()
+  
+        if result!="":
+            # sock.send_json({ "msg": "result", "result": result,"count":count},flags=zmq.NOBLOCK)
+            sock.send_multipart([client_id,msg_id,bytes(json.dumps({ "msg": "result", "result": result,"count":count}),'utf8')])
+            count+=1
+        
+
 def slave():
     # Setup ZMQ.
     context = zmq.Context()
     sock = context.socket(zmq.REQ)
+
     if os.environ.get("NODENAME") is None:
         os.environ["NODENAME"]="127.0.0.1"
     sock.connect("tcp://"+os.environ["ZEROMQIP"]+":5557") # IP of master
@@ -679,5 +746,6 @@ def slave_pub_sub():
        
 
 if __name__ == "__main__":
-    slave()
+    #slave()
+    slave_dealer()
     #slave_pub_sub()
