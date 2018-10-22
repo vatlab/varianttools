@@ -1268,7 +1268,7 @@ def zmq_router_dealer(args,asso,proj,results):
 
                     groupCount+=10
                     # outputs.append(r)
-                    logger.log(level, time.asctime( time.localtime(time.time()) )+" "+str(time.time()-endtime))
+                    logger.log(level, time.asctime( time.localtime(time.time()) )+" "+str(result[0][0])+" "+str(time.time()-endtime))
                     result=json.loads(r[1])
                     for rec in result["result"]:
                         results.record(rec)
@@ -1687,8 +1687,8 @@ def associate(args):
 
         #runAssociation(args,asso,proj,results)
         #zmq_pub_sub_cluster_runAssociation(args,asso,proj,results)
-        zmq_router_dealer(args,asso,proj,results)
-        # zmq_cluster_runAssociation(args,asso,proj,results)
+        #zmq_router_dealer(args,asso,proj,results)
+        zmq_cluster_runAssociation(args,asso,proj,results)
         #cluster_runAssociation(args,asso,proj,results)
 
     # except Exception as e:

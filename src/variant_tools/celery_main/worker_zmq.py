@@ -590,12 +590,12 @@ def slave_dealer():
         path=work["path"]
         projName=work["projName"]
         print("running computation")
-        logger.log(level, str(os.environ["NODENAME"])+" "+time.asctime(time.localtime(time.time()) )+" "+str(time.time()-endtime))
+        logger.log(level, str(os.environ["NODENAME"])+" "+time.asctime(time.localtime(time.time()) )+" "+str(grps[0])+" "+str(time.time()-endtime))
         starttime=time.time()
         worker = AssoTestsWorker(param, grps, args,path,projName)
         result=worker.run()
         # result =json.dumps(result)
-        logger.log(level, str(os.environ["NODENAME"])+" "+str(time.time()-starttime))
+        logger.log(level, str(os.environ["NODENAME"])+" "+str(grps[0])+" "+str(time.time()-starttime))
         endtime=time.time()
   
         if result!="":
