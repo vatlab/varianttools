@@ -746,6 +746,6 @@ def slave_pub_sub():
        
 
 if __name__ == "__main__":
-    #slave()
-    slave_dealer()
+    slave()
+    #slave_dealer()
     #slave_pub_sub()
