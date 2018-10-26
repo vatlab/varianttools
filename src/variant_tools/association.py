@@ -131,6 +131,8 @@ def associateArguments(parser):
             the result database.''')
     parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
         help='''Number of processes to carry out association tests.'''),
+    parser.add_argument('-mpi',action="store_true",
+        help='''Submit vtools association job to cluster, please check bash script.''')
     # parser.add_argument('--HDF5', action='store_true',
     #     help='''Store genotypes into HDF5 files'''),
 
@@ -1177,9 +1179,10 @@ def generate_works(asso,args):
             yield work
             grps=[]
         count+=1
-    work={"projName":projName,"param":json.dumps(asso.__dict__), "grps":grps,
-    "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,},"path": os.getcwd()}
-    yield work
+    if(len(grps)>0):
+        work={"projName":projName,"param":json.dumps(asso.__dict__), "grps":grps,
+        "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,},"path": os.getcwd()}
+        yield work
 
 def send_next_work(sock, works):
     try:
@@ -1203,117 +1206,6 @@ def send_thanks(sock):
         pass
 
 
-def zmq_router_dealer(args,asso,proj,results):
-    try:
-       
-        prog = ProgressBar('Testing for association', len(asso.groups))
-        grps=[]
-        old_db=asso.db
-        old_proj=asso.proj
-        old_proj_db=asso.proj.db
-        old_proj_annoDB=asso.proj.annoDB
-        old_test=asso.tests
-        asso.db=""
-        asso.proj.db=""
-        asso.proj.annoDB=""
-        asso.tests=""
-        groupCount=0
-
-        context = zmq.Context()
-        sock = context.socket(zmq.DEALER)
-        sock.bind("tcp://"+os.environ["ZEROMQIP"]+":5557")
-
-
-
-        LOG_LEVELS = (logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR, logging.CRITICAL)
-
-        port = "6001"
-        level = logging.DEBUG
-        ctx = zmq.Context()
-        pub = ctx.socket(zmq.PUB)
-        pub.connect("tcp://"+os.environ["ZEROMQIP"]+":"+port)
-        formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s',
-                                  datefmt='%Y-%m-%d %H:%M:%S')
-
-        logger = logging.getLogger(str(os.getpid()))
-        logger.setLevel(level)
-        handler = PUBHandler(pub)
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        print("starting logger at %i with level=%s" % (os.getpid(), level))
-        logger.log(level, "Hello from %i!" % os.getpid())
-
-
-
-        # Generate the json messages for all computations.
-        j={}
-        works = generate_works(asso,args)
-        endtime=time.time()
-        uid = bytes(uuid.uuid1().hex,'utf8')
-        while True:
-            try:
-                work = next(works)
-
-                sock.send_multipart([uid,bytes(json.dumps(work),'utf8')])
-           
-            except StopIteration:
-                break
-        sock.send_multipart([uid,bytes(json.dumps({"noMoreWork":"noMoreWork"}),'utf8')])
-        print("all job send")
-        while groupCount < len(asso.groups):
-            # Receive;
-            try:
-                r = sock.recv_multipart(zmq.NOBLOCK)
-                if r is not None:
-
-                    groupCount+=10
-                    # outputs.append(r)
-                    logger.log(level, time.asctime( time.localtime(time.time()) )+" "+str(result[0][0])+" "+str(time.time()-endtime))
-                    result=json.loads(r[1])
-                    for rec in result["result"]:
-                        results.record(rec)
-                        count = results.completed()
-                        prog.update(count, results.failed())
-                    endtime=time.time()
-            except:
-                pass
-            # Second case: worker says "Here's your result". Store it, say thanks.
-            
-      
-                
-           
-        # Results are all in.
-        # print("=== Results ===")
-        # for rec in outputs:
-        #     result=json.loads(rec)
-        #     for rec in result:
-        #         results.record(rec)
-        #     count = results.completed()
-        #     prog.update(count, results.failed())
-        results.done()
-        prog.done()
-
-        asso.db=old_db
-        asso.proj=old_proj
-        asso.tests=old_test
-        asso.proj.db=old_proj_db
-        asso.proj.annoDB=old_proj_annoDB
-        
-        # summary
-        env.logger.info('Association tests on {} groups have completed. {} failed.'.\
-                         format(results.completed(), results.failed()))
-        # use the result database in the project
-        if args.to_db:
-            proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
-       
-    except Exception as e:
-        env.logger.error(e)
-        sys.exit(1)
-
-
-
-
-
 def zmq_cluster_runAssociation(args,asso,proj,results):
     try:
        
@@ -1330,37 +1222,41 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
         asso.tests=""
         groupCount=0
 
+
+        if os.environ.get("ZEROMQIP") is None:
+            os.environ["ZEROMQIP"]="127.0.0.1"
+
         context = zmq.Context()
         sock = context.socket(zmq.REP)
-        sock.bind("tcp://"+os.environ["ZEROMQIP"]+":5557")
+
+        port_selected=sock.bind_to_random_port("tcp://"+os.environ["ZEROMQIP"])     
+        with open(os.getcwd()+"/randomPort.txt","w") as outputFile:
+            outputFile.write(str(port_selected))
+        # sock.bind("tcp://"+os.environ["ZEROMQIP"]+":5557")
 
 
+        # LOG_LEVELS = (logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR, logging.CRITICAL)
+        # port = "6001"
+        # level = logging.DEBUG
+        # ctx = zmq.Context()
+        # pub = ctx.socket(zmq.PUB)
+        # pub.connect("tcp://"+os.environ["ZEROMQIP"]+":"+port)
+        # formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s',
+        #                           datefmt='%Y-%m-%d %H:%M:%S')
 
-        LOG_LEVELS = (logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR, logging.CRITICAL)
-
-        port = "6001"
-        level = logging.DEBUG
-        ctx = zmq.Context()
-        pub = ctx.socket(zmq.PUB)
-        pub.connect("tcp://"+os.environ["ZEROMQIP"]+":"+port)
-        formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s',
-                                  datefmt='%Y-%m-%d %H:%M:%S')
-
-        logger = logging.getLogger(str(os.getpid()))
-        logger.setLevel(level)
-        handler = PUBHandler(pub)
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        print("starting logger at %i with level=%s" % (os.getpid(), level))
-        logger.log(level, "Hello from %i!" % os.getpid())
-
+        # logger = logging.getLogger(str(os.getpid()))
+        # logger.setLevel(level)
+        # handler = PUBHandler(pub)
+        # handler.setFormatter(formatter)
+        # logger.addHandler(handler)
+        # print("starting logger at %i with level=%s" % (os.getpid(), level))
+        # logger.log(level, "Hello from %i!" % os.getpid())
 
 
         # Generate the json messages for all computations.
         j={}
         works = generate_works(asso,args)
-        endtime=time.time()
-
+        # endtime=time.time()
 
         while groupCount < len(asso.groups):
             # Receive;
@@ -1368,37 +1264,25 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
                 j = sock.recv_json(flags=zmq.NOBLOCK)
                 if j['msg'] == "available":
                     send_next_work(sock, works)
-
-                # Second case: worker says "Here's your result". Store it, say thanks.
                 elif j['msg'] == "result":
-                    r = j['result']
-                    groupCount+=10
+                    r = j['result']       
                     # outputs.append(r)
-                    logger.log(level, time.asctime( time.localtime(time.time()) )+" "+str(time.time()-endtime))
+                    # logger.log(level, time.asctime( time.localtime(time.time()) )+" "+str(time.time()-endtime))
                     result=json.loads(r)
                     for rec in result:
                         results.record(rec)
                         count = results.completed()
                         prog.update(count, results.failed())
+                        groupCount+=1
                     send_thanks(sock)
-                    endtime=time.time()
+                    # endtime=time.time()
             except zmq.error.Again as e:
                 pass
                 
-        
         j = sock.recv_json()
-        # First case: worker says "I'm available". Send him some work.
         if j['msg'] == "available":   
             sock.send_json({"noMoreWork":"noMoreWork"})
            
-        # Results are all in.
-        # print("=== Results ===")
-        # for rec in outputs:
-        #     result=json.loads(rec)
-        #     for rec in result:
-        #         results.record(rec)
-        #     count = results.completed()
-        #     prog.update(count, results.failed())
         results.done()
         prog.done()
 
@@ -1418,124 +1302,8 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
-
-
-def zmq_pub_sub_cluster_runAssociation(args,asso,proj,results):
-    try:
-       
-        prog = ProgressBar('Testing for association', len(asso.groups))
-        grps=[]
-        old_db=asso.db
-        old_proj=asso.proj
-        old_proj_db=asso.proj.db
-        old_proj_annoDB=asso.proj.annoDB
-        old_test=asso.tests
-        asso.db=""
-        asso.proj.db=""
-        asso.proj.annoDB=""
-        asso.tests=""
-        groupCount=0
-
-        context = zmq.Context()
-        sock = context.socket(zmq.PUSH)
-        sock.bind("tcp://"+os.environ["ZEROMQIP"]+":5557")
-        time.sleep(0.5)
-
-
-        LOG_LEVELS = (logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR, logging.CRITICAL)
-
-        port = "6001"
-        level = logging.DEBUG
-        ctx = zmq.Context()
-        pub = ctx.socket(zmq.PUB)
-        pub.connect("tcp://"+os.environ["ZEROMQIP"]+":"+port)
-        formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s',
-                                  datefmt='%Y-%m-%d %H:%M:%S')
-
-        logger = logging.getLogger(str(os.getpid()))
-        logger.setLevel(level)
-        handler = PUBHandler(pub)
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        print("starting logger at %i with level=%s" % (os.getpid(), level))
-        logger.log(level, "Hello from %i!" % os.getpid())
-
-        # while True:
-        #     level = random.choice(LOG_LEVELS)
-        #     logger.log(level, "Hello from %i!" % os.getpid())
-        #     time.sleep(1)
-
-
-
-        # Generate the json messages for all computations.
-     
-        count=1
-        grps=[]
-        projName=asso.proj.name
-        asso.proj=None
-
-        for grp in asso.groups:
-            grps.append(grp)
-            if count%10==0:
-                work={"projName":projName,"param":json.dumps(asso.__dict__), "grps":grps,
-                "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,},"path": os.getcwd()}
-                sock.send_json(work)
-                grps=[]
-            count+=1
-        if (len(grps)>0):
-            work={"projName":projName,"param":json.dumps(asso.__dict__), "grps":grps,
-                "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,},"path": os.getcwd()}
-            sock.send_json(work)
-        sock.send_json({"noMoreWork":"noMoreWork"})
-        
-        context = zmq.Context()
-        sock = context.socket(zmq.PULL)
-        sock.bind("tcp://"+os.environ["ZEROMQIP"]+":5558")
-
-
-        endtime=time.time()
-        while groupCount < len(asso.groups):
-            # Receive;
-            result=[]
-            try:
-                r = sock.recv_json(flags=zmq.NOBLOCK)
-                print("wait", time.time()-endtime)
-                logger.log(level, time.asctime( time.localtime(time.time()) ))
-                starttime=time.time()
-                # First case: worker says "I'm available". Send him some work.
-                groupCount+=10
-                # outputs.append(r)
-                
-                result=json.loads(r)             
-            except zmq.error.Again as e:
-                pass
-            if len(result)!=0:
-                for rec in result:
-                    results.record(rec)
-                    count = results.completed()
-                    prog.update(count, results.failed())
-                print("process ",time.time()-starttime)
-                endtime=time.time()
-        results.done()
-        prog.done()
-
-        asso.db=old_db
-        asso.proj=old_proj
-        asso.tests=old_test
-        asso.proj.db=old_proj_db
-        asso.proj.annoDB=old_proj_annoDB
-        
-        # summary
-        env.logger.info('Association tests on {} groups have completed. {} failed.'.\
-                         format(results.completed(), results.failed()))
-        # use the result database in the project
-        if args.to_db:
-            proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
-       
-    except Exception as e:
-        env.logger.error(e)
-        sys.exit(1)
-
+    finally:
+        sock.close()
 
 
 
@@ -1614,86 +1382,85 @@ def cluster_runAssociation(args,asso,proj,results):
 
 
 def associate(args):
-    # try:
-    with Project(verbosity=args.verbosity) as proj:
-        # step 0: create an association testing object with all group information
-        try:
-            asso = AssociationTestManager(proj, args.variants, args.phenotypes, args.covariates,
-                args.var_info, args.geno_info, args.geno_name, args.methods, args.unknown_args,
-                args.samples, args.genotypes, args.group_by, args.discard_samples, args.discard_variants)
-        except ValueError as e:
-            sys.exit(e)
-        if len(asso.groups) == 0:
-            env.logger.info('No data to analyze.')
-            sys.exit(0)
-        # define results here but it might fail if args.to_db is not writable
-        results = ResultRecorder(asso, args.to_db, args.delimiter, args.force)
-        # determine if some results are already exist
-        #
-        # if write to a db and
-        # if not forcefully recalculate everything and
-        # the file exists
-        # if the new fields is a subset of fields in the database
-        if args.to_db and (not args.force) and results.writer.update_existing and \
-            set([x.name for x in results.fields]).issubset(set([x.name for x in results.writer.cur_fields])):
-                existing_groups = results.get_groups()
-                num_groups = len(asso.groups)
-                asso.groups = list(set(asso.groups).difference(set(existing_groups)))
-                if len(asso.groups) != num_groups:
-                    env.logger.info('{} out of {} groups with existing results are ignored. '
-                                     'You can use option --force to re-analyze all groups.'.\
-                                     format(num_groups - len(asso.groups), num_groups))
-                    if len(asso.groups) == 0:
-                        sys.exit(0)
-                    # mark existing groups as ignored
-                    cur = proj.db.cursor()
-                    query = 'UPDATE __asso_tmp SET _ignored = 1 WHERE {}'.\
-                      format(' AND '.join(['{}={}'.format(x, proj.db.PH) for x in asso.group_names]))
-                    for grp in existing_groups:
-                        cur.execute(query, grp)
-                    proj.db.commit()
-        
-        if proj.store=="hdf5":
-            HDFfileNames=glob.glob("tmp*_genotypes.h5")
-            if len(HDFfileNames)==0:
-                env.logger.error("No HDF5 file found. Please run vtools import with --HDF5 tag first.")
-                sys.exit()
-        
-            HDFfileGroupNames=glob.glob("tmp*multi_genes.h5")
-        
-            if len(HDFfileGroupNames)==0 or args.force:
-             
-                nJobs = max(args.jobs, 1)
-                
-                # generateHDFbyGroup_update(asso,nJobs)
-                # generate HDF5 with variants grouped by gene name.
-                generateHDFbyGroup(asso,nJobs)
-            else:
-                env.logger.warning("Temp files are not regenerated!")
+    try:
+        with Project(verbosity=args.verbosity) as proj:
+            # step 0: create an association testing object with all group information
+            try:
+                asso = AssociationTestManager(proj, args.variants, args.phenotypes, args.covariates,
+                    args.var_info, args.geno_info, args.geno_name, args.methods, args.unknown_args,
+                    args.samples, args.genotypes, args.group_by, args.discard_samples, args.discard_variants)
+            except ValueError as e:
+                sys.exit(e)
+            if len(asso.groups) == 0:
+                env.logger.info('No data to analyze.')
+                sys.exit(0)
+            # define results here but it might fail if args.to_db is not writable
+            results = ResultRecorder(asso, args.to_db, args.delimiter, args.force)
+            # determine if some results are already exist
+            #
+            # if write to a db and
+            # if not forcefully recalculate everything and
+            # the file exists
+            # if the new fields is a subset of fields in the database
+            if args.to_db and (not args.force) and results.writer.update_existing and \
+                set([x.name for x in results.fields]).issubset(set([x.name for x in results.writer.cur_fields])):
+                    existing_groups = results.get_groups()
+                    num_groups = len(asso.groups)
+                    asso.groups = list(set(asso.groups).difference(set(existing_groups)))
+                    if len(asso.groups) != num_groups:
+                        env.logger.info('{} out of {} groups with existing results are ignored. '
+                                         'You can use option --force to re-analyze all groups.'.\
+                                         format(num_groups - len(asso.groups), num_groups))
+                        if len(asso.groups) == 0:
+                            sys.exit(0)
+                        # mark existing groups as ignored
+                        cur = proj.db.cursor()
+                        query = 'UPDATE __asso_tmp SET _ignored = 1 WHERE {}'.\
+                          format(' AND '.join(['{}={}'.format(x, proj.db.PH) for x in asso.group_names]))
+                        for grp in existing_groups:
+                            cur.execute(query, grp)
+                        proj.db.commit()
+            
+            if proj.store=="hdf5":
+                HDFfileNames=glob.glob("tmp*_genotypes.h5")
+                if len(HDFfileNames)==0:
+                    env.logger.error("No HDF5 file found. Please run vtools import with --HDF5 tag first.")
+                    sys.exit()
+            
+                HDFfileGroupNames=glob.glob("tmp*multi_genes.h5")
+            
+                if len(HDFfileGroupNames)==0 or args.force:
+                 
+                    nJobs = max(args.jobs, 1)
+                    
+                    # generateHDFbyGroup_update(asso,nJobs)
+                    # generate HDF5 with variants grouped by gene name.
+                    generateHDFbyGroup(asso,nJobs)
+                else:
+                    env.logger.warning("Temp files are not regenerated!")
 
-            # remove phenotype, not necessary if sample is deleted from sample table
-            # allkeep=[]
-            # for HDFfileName in HDFfileNames:
-            #     file=tb.open_file(HDFfileName)
-            #     node=file.get_node("/chr22/GT")
-            #     sampleMasked=np.where(node.sampleMask[:]==True)[0]+1
-            #     keep = ~np.in1d(node.colnames[:], sampleMasked)
-            #     allkeep.extend(keep)
+                # remove phenotype, not necessary if sample is deleted from sample table
+                # allkeep=[]
+                # for HDFfileName in HDFfileNames:
+                #     file=tb.open_file(HDFfileName)
+                #     node=file.get_node("/chr22/GT")
+                #     sampleMasked=np.where(node.sampleMask[:]==True)[0]+1
+                #     keep = ~np.in1d(node.colnames[:], sampleMasked)
+                #     allkeep.extend(keep)
 
-            # asso.sample_names=np.array(asso.sample_names)[allkeep].tolist()
-            # asso.sample_IDs=np.array(asso.sample_IDs)[allkeep].tolist()
-            # asso.phenotypes[0]=np.array(asso.phenotypes[0])[allkeep].tolist()
-            # asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
+                # asso.sample_names=np.array(asso.sample_names)[allkeep].tolist()
+                # asso.sample_IDs=np.array(asso.sample_IDs)[allkeep].tolist()
+                # asso.phenotypes[0]=np.array(asso.phenotypes[0])[allkeep].tolist()
+                # asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
 
-        #runAssociation(args,asso,proj,results)
-        #zmq_pub_sub_cluster_runAssociation(args,asso,proj,results)
-        #zmq_router_dealer(args,asso,proj,results)
-        zmq_cluster_runAssociation(args,asso,proj,results)
-        #cluster_runAssociation(args,asso,proj,results)
-
-    # except Exception as e:
-    #     env.logger.error(e)
-    #     sys.exit(1)
+            if args.mpi :
+                zmq_cluster_runAssociation(args,asso,proj,results)
+                #cluster_runAssociation(args,asso,proj,results)
+            else :
+                runAssociation(args,asso,proj,results)
+    except Exception as e:
+        env.logger.error(e)
+        sys.exit(1)
 
 def getAllTests():
     '''List all tests (all classes that subclasses of NullTest/GLMBurdenTest) in this module'''

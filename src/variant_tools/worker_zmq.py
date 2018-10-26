@@ -1,4 +1,5 @@
-from variant_tools.celery_main.start_celery import app
+import zmq
+import subprocess
 import time
 import random
 import re
@@ -6,209 +7,49 @@ import glob
 import numpy as np
 from variant_tools.accessor import *
 from variant_tools.tester import *
-from celery import Celery
 # from variant_tools.association_hdf5 import generateHDFbyGroup,getGenotype_HDF5,generateHDFbyGroup_update
 from variant_tools.assoTests import AssoData
 from variant_tools.utils import DatabaseEngine,executeUntilSucceed,PrettyPrinter
 from variant_tools.project import AnnoDBWriter
+import json
+import logging
+from zmq.log.handlers import PUBHandler
 
 
-
-
-
-
-class HDF5GenotypeImportWorker:
-    def __init__(self, chunk,variantIndex,start_sample,end_sample,sample_ids, 
-        proc_index,dbLocation,genotype_info,build):
-
-
-        self.chunk=chunk
-        self.variantIndex = variantIndex
-        # self.variant_count = variant_count
-        self.proc_index = proc_index
-        self.start_sample=start_sample
-        self.end_sample=end_sample
-        self
-        self.indptr=[]
-        self.indices=[]
-        self.data=[]
-        self.rownames=[]
-        self.sample_ids=sample_ids
-        self.firstID=0
-        if sample_ids[0]!=1 and start_sample!=0:
-            self.firstID=sample_ids[0]
-            self.start_sample=self.start_sample+1
-            self.end_sample=self.end_sample+1
-        self.colnames=[self.sample_ids[i-self.firstID] for i in range(self.start_sample,self.end_sample)]
-        self.genoCount=0
-        self.dbLocation=dbLocation
-        self.build=build
-        self.info={}
-        self.rowData=[]
-        self.info["GT"]=[]
-        self.info["Mask"]=[]
-        self.namedict={}
-        self.geno_info=[]
-        if "GT" in genotype_info:
-            genotype_info.remove("GT")
-        if len(genotype_info)>0:
-            for info in genotype_info:
-                #indptr,indices,data,shape,rownames
-                if not isinstance(info,str):
-                    self.geno_info.append(info.name.replace("_geno",""))
-                else:
-                    self.geno_info.append(info.replace("_geno",""))
-        for info in self.geno_info:
-            self.info[info]=[]
-            if "calldata/"+info in self.chunk and np.nansum(self.chunk["calldata/"+info][:10])>0:
-                    self.namedict[info]="calldata/"+info
-            elif "variants/"+info in self.chunk and np.nansum(self.chunk["variants/"+info][:10])>0:
-                    self.namedict[info]="variants/"+info
-
-  
-    # check io_vcf_read.pyx function vcf_genotype_parse to see the meaning of coding
-    def get_geno(self,variant_id,pos,altIndex):
-        self.rownames.append(variant_id)
-        # print(self.dbLocation,self.start_sample,self.end_sample,self.firstID)
-
-        if "calldata/GT" in self.chunk:
-
-            GT=self.chunk["calldata/GT"][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]
-            GT=GT.astype(float)
-            if altIndex==0:
-                GT[np.logical_or(GT==3, GT==4)]=np.nan          
-            elif altIndex==1:
-                # GT_geno[GT_geno==3]=1
-                # GT_geno[GT_geno==4]=2
-                GT[(GT!=3)&(GT!=4)&(GT!=-1)]=np.nan
-                # GT_geno[np.logical_and(GT_geno!=3, GT_geno!=4)]=np.nan
-                GT[GT==3]=1
-                GT[GT==4]=2
-            GT[GT==-10]=np.nan
-            self.info["GT"].append(GT)
-            self.info["Mask"].append([1.0]*len(GT))
-        else:
-            # GT_geno=[np.nan]
-            GT=[-1]
-            self.info["GT"].append(GT)
-            self.info["Mask"].append([1.0]*len(GT))
-      
-        if len(self.geno_info)>0:
-            # self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
-            # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
-            # self.getInfoTable(variant_id,infoDict,altIndex)
-            for info in self.geno_info:
-                if "variants" in self.namedict[info]:
-                    self.info[info].append(np.array([self.chunk[self.namedict[info]][pos]]))
-                else:
-                    self.info[info].append(self.chunk[self.namedict[info]][pos,self.start_sample-self.firstID:self.end_sample-self.firstID])
-                # print(self.namedict[info],info,self.start_sample,self.end_sample,pos,(self.chunk[self.namedict[info]][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]))
-        
-
-
-
-    def writeIntoHDF(self,chr):
-        storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
-        shape=np.array([len(self.rownames),len(self.colnames)])
-        storageEngine.store(np.array(self.info["GT"]),chr,"GT")
-        storageEngine.store(np.array(self.info["Mask"]),chr,"Mask")
-        storageEngine.store(np.array(self.rownames),chr,"rownames")
-        rowmask=np.zeros(len(self.rownames),dtype=np.bool)
-        storageEngine.store(np.array(rowmask),chr,"rowmask")
-        
-        if not storageEngine.checkGroup(chr,"colnames"):
-            storageEngine.store(np.array(self.colnames),chr,"colnames")
-            colmask=np.zeros(len(self.colnames),dtype=np.bool)
-            storageEngine.store(np.array(colmask),chr,"samplemask")
-        
-        storageEngine.store(shape,chr,"shape")
-
-        self.info["GT"]=[]
-        self.info["Mask"]=[]
-
-        if len(self.geno_info)>0:
-            for info in self.geno_info:
-                storageEngine.store_genoInfo(np.array(self.info[info]),chr,info)
-                self.info[info]=[]
- 
-        storageEngine.close()       
-        self.rownames=[]
- 
-
-   
-    def run(self):
-        
-        prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
-        prev_variant_id=-1     
-        for i in range(len(self.chunk["variants/ID"])):
-            infoDict={}
-            chr=self.chunk["variants/CHROM"][i].replace("chr","")
-            if chr!=prev_chr:
-                self.writeIntoHDF(prev_chr)
-                prev_chr=chr             
-            ref=self.chunk["variants/REF"][i]
-            pos=self.chunk["variants/POS"][i]
-            for altIndex in range(len(self.chunk["variants/ALT"][i])):
-                alt=self.chunk["variants/ALT"][i][altIndex]
-                if alt!="":
-                    if tuple((chr, ref, alt)) in self.variantIndex:
-                        variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
-                        
-                        if variant_id!=prev_variant_id:
-                            self.get_geno(variant_id,i,altIndex)
-                            prev_variant_id=variant_id
-                        
-                    else:
-                        rec=[str(chr),str(pos),ref,alt]  
-                        msg=normalize_variant(RefGenome(self.build).crr, rec, 0, 1, 2, 3)
-                        if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
-                            variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
-                            if variant_id!=prev_variant_id:
-                                self.get_geno(variant_id,i,altIndex)
-                                prev_variant_id=variant_id
-        self.writeIntoHDF(chr)
-
-
-@app.task(bind=True,default_retry_delay=10,serializer="pickle")
-def do_work(self, chunk,variantIndex,start_sample,end_sample,sample_ids, 
-        proc_index,dbLocation,genotype_info,build):
-        worker=HDF5GenotypeImportWorker(chunk,variantIndex,start_sample,end_sample,sample_ids,proc_index,dbLocation,genotype_info,build)
-        worker.run()
 
 
 
 class AssoTestsWorker:
     '''Association test calculator'''
-    def __init__(self, param, grps, args,path):
-
+    def __init__(self, param, grps, args,path,projName):
+        param=json.loads(param)
         self.param = param
-        self.proj = param.proj
-        self.table = param.table
-        self.sample_IDs = param.sample_IDs
-        self.phenotypes = param.phenotypes
-        self.covariates = param.covariates
-        self.phenotype_names = param.phenotype_names
-        self.covariate_names = param.covariate_names
-        self.var_info = param.var_info
-        self.geno_info = param.geno_info
-        self.tests = self.getAssoTests(args.methods,len(args.covariates),[])
-        self.group_names = param.group_names
-        self.missing_ind_ge = param.missing_ind_ge
-        self.missing_var_ge = param.missing_var_ge
-        self.sample_names = param.sample_names
+        self.table = param["table"]
+        self.sample_IDs = param["sample_IDs"]
+        self.phenotypes = param["phenotypes"]
+        self.covariates = param["covariates"]
+        self.phenotype_names = param["phenotype_names"]
+        self.covariate_names = param["covariate_names"]
+        self.var_info = param["var_info"]
+        self.geno_info = param["geno_info"]
+        self.tests = self.getAssoTests(args["methods"],len(args["covariates"]),[])
+        self.group_names = param["group_names"]
+        self.missing_ind_ge = param["missing_ind_ge"]
+        self.missing_var_ge = param["missing_var_ge"]
+        self.sample_names = param["sample_names"]
         
-        self.num_extern_tests = param.num_extern_tests
+        self.num_extern_tests = param["num_extern_tests"]
         self.grps = grps
         
         self.path=path
-        self.param.tests=self.tests
-        self.results = ResultRecorder(self.param, args.to_db, args.delimiter, args.force)
+        self.param["tests"]=self.tests
+        self.results = ResultRecorder(self.param, args["to_db"], args["delimiter"], args["force"])
    
         # self.shelves = {}
         #
 
         self.db = DatabaseEngine()
-        self.db.connect(self.path+"/"+param.proj.name+'.proj',readonly=True)
+        self.db.connect(self.path+"/"+projName+'.proj',readonly=True)
 
         # self.db.attach(param.proj.name + '.proj', '__fromVariant', lock=self.shelf_lock) 
         
@@ -596,14 +437,14 @@ class ResultRecorder:
         self.succ_count = 0
         self.failed_count = 0
         #
-        self.group_names = params.group_names
+        self.group_names = params["group_names"]
         self.fields = []
         self.group_fields = []
-        for n,t in zip(params.group_names, params.group_types):
+        for n,t in zip(params["group_names"], params["group_types"]):
             self.group_fields.append(Field(name=n, index=None, type=t, adj=None, fmt=None, comment=n))
         self.fields.extend(self.group_fields)
 
-        for test in params.tests:
+        for test in params["tests"]:
             if test.name:
                 self.fields.extend([
                     Field(name='{}_{}'.format(x.name, test.name), index=None,
@@ -697,8 +538,102 @@ class ResultRecorder:
         if self.writer:
             self.writer.finalize()
 
-@app.task(bind=True,default_retry_delay=10,serializer="pickle")
-def run_grp_association(self, param, grps, args,path):
-        worker=AssoTestsWorker(param, grps, args,path)
-        return worker.run()
+
+        
+
+def worker():
+    # Setup ZMQ.
+    try:
+        context = zmq.Context()
+        sock = context.socket(zmq.REQ)
+        projectFolder=os.environ.get("PROJECTFOLDER")
+        portFilePath=projectFolder+"/randomPort.txt"
+        while not os.path.exists(portFilePath):
+            time.sleep(1)
+        selected_port=""
+        if os.path.isfile(portFilePath):
+            with open(portFilePath,"r") as portFile:
+               selected_port=portFile.read()
+        else:
+            raise ValueError("%s isn't a file!" % portFilePath)
+        
+        # if os.environ.get("NODENAME") is None:
+        #     os.environ["NODENAME"]="127.0.0.1"
+        if os.environ.get("ZEROMQIP") is None:
+            os.environ["ZEROMQIP"]="127.0.0.1"
+
+
+        sock.connect("tcp://"+os.environ["ZEROMQIP"]+":"+selected_port) # IP of master
+       
+        param=None
+        grps=None 
+        args=None 
+        path=None
+        projName=None
+        result=""
+        work={}
+
+        # LOG_LEVELS = (logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR, logging.CRITICAL)
+
+        # port = "6001"
+        # level = logging.DEBUG
+        # ctx = zmq.Context()
+        # pub = ctx.socket(zmq.PUB)
+        # pub.connect("tcp://"+os.environ["ZEROMQIP"]+":"+port)
+
+        # logger = logging.getLogger(str(os.getpid()))
+        # logger.setLevel(level)
+        # handler = PUBHandler(pub)
+        # logger.addHandler(handler)
+        # print("starting logger at %i with level=%s" % (os.getpid(), level))
+        # logger.log(level, "Hello from %i!" % os.getpid())
+        # endtime=time.time()
+
+        while True:
+            # Say we're available.
+            try:
+                sock.send_json({ "msg": "available"},flags=zmq.NOBLOCK)
+            except zmq.error.ZMQError as e:
+                pass
+
+            # Retrieve work and run the computation.
+            try:
+                work = sock.recv_json(flags=zmq.NOBLOCK)
+                if work == {}:
+                    continue
+                if "noMoreWork" in work:
+                    break
+                param = work['param']
+                grps = work['grps']
+                args=work['args']
+                path=work["path"]
+                projName=work["projName"]
+                print("running computation")
+                # logger.log(level, str(os.environ["NODENAME"])+" "+time.asctime(time.localtime(time.time()) )+" "+str(time.time()-endtime))
+                # starttime=time.time()
+                worker = AssoTestsWorker(param, grps, args,path,projName)
+                result=worker.run()
+                result =json.dumps(result)
+                # logger.log(level, str(os.environ["NODENAME"])+" "+str(time.time()-starttime))
+                # endtime=time.time()
+            except zmq.error.Again as e:
+                pass
+            
+            # We have a result, let's inform the master about that, and receive the
+            # "thanks".
+            try:
+                if result!="":
+                    sock.send_json({ "msg": "result", "result": result},flags=zmq.NOBLOCK)
+                    sock.recv()
+                    # count+=1
+            except zmq.error.ZMQError as e:
+                pass
+    except Exception as e:
+        print(e)
+        return
+    finally:
+        sock.close()   
+
+if __name__ == "__main__":
+    worker()
 
