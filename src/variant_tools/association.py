@@ -311,6 +311,9 @@ class AssociationTestManager:
                              'Please use command "vtools show tests" for a list of tests')
         tests = []
         for m in methods:
+            m=m.replace("\\","")
+            m=m.strip('"')
+            common_args=[common_arg.strip('"') for common_arg in common_args]
             name = m.split()[0]
             args = m.split()[1:] + common_args
             try:
@@ -1175,13 +1178,13 @@ def generate_works(asso,args):
         grps.append(grp)
         if count%10==0:
             work={"projName":projName,"param":json.dumps(asso.__dict__), "grps":grps,
-            "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,},"path": os.getcwd()}
+            "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,"unknown_args":args.unknown_args},"path": os.getcwd()}
             yield work
             grps=[]
         count+=1
     if(len(grps)>0):
         work={"projName":projName,"param":json.dumps(asso.__dict__), "grps":grps,
-        "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,},"path": os.getcwd()}
+        "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,"unknown_args":args.unknown_args},"path": os.getcwd()}
         yield work
 
 def send_next_work(sock, works):

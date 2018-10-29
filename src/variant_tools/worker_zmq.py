@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import zmq
 import subprocess
 import time
@@ -7,14 +8,13 @@ import glob
 import numpy as np
 from variant_tools.accessor import *
 from variant_tools.tester import *
-# from variant_tools.association_hdf5 import generateHDFbyGroup,getGenotype_HDF5,generateHDFbyGroup_update
 from variant_tools.assoTests import AssoData
 from variant_tools.utils import DatabaseEngine,executeUntilSucceed,PrettyPrinter
 from variant_tools.project import AnnoDBWriter
 import json
 import logging
 from zmq.log.handlers import PUBHandler
-
+import sys
 
 
 
@@ -32,7 +32,7 @@ class AssoTestsWorker:
         self.covariate_names = param["covariate_names"]
         self.var_info = param["var_info"]
         self.geno_info = param["geno_info"]
-        self.tests = self.getAssoTests(args["methods"],len(args["covariates"]),[])
+        self.tests = self.getAssoTests(args["methods"],len(args["covariates"]),args["unknown_args"])
         self.group_names = param["group_names"]
         self.missing_ind_ge = param["missing_ind_ge"]
         self.missing_var_ge = param["missing_var_ge"]
@@ -123,6 +123,9 @@ class AssoTestsWorker:
                              'Please use command "vtools show tests" for a list of tests')
         tests = []
         for m in methods:
+            m=m.replace("\\","")
+            m=m.strip('"')
+            common_args=[common_arg.strip('"') for common_arg in common_args]
             name = m.split()[0]
             args = m.split()[1:] + common_args
             try:
@@ -556,15 +559,11 @@ def worker():
                selected_port=portFile.read()
         else:
             raise ValueError("%s isn't a file!" % portFilePath)
-        
         # if os.environ.get("NODENAME") is None:
         #     os.environ["NODENAME"]="127.0.0.1"
         if os.environ.get("ZEROMQIP") is None:
             os.environ["ZEROMQIP"]="127.0.0.1"
-
-
         sock.connect("tcp://"+os.environ["ZEROMQIP"]+":"+selected_port) # IP of master
-       
         param=None
         grps=None 
         args=None 
@@ -572,7 +571,6 @@ def worker():
         projName=None
         result=""
         work={}
-
         # LOG_LEVELS = (logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR, logging.CRITICAL)
 
         # port = "6001"
@@ -595,7 +593,6 @@ def worker():
                 sock.send_json({ "msg": "available"},flags=zmq.NOBLOCK)
             except zmq.error.ZMQError as e:
                 pass
-
             # Retrieve work and run the computation.
             try:
                 work = sock.recv_json(flags=zmq.NOBLOCK)
@@ -635,5 +632,6 @@ def worker():
         sock.close()   
 
 if __name__ == "__main__":
+    time.sleep(10)
     worker()
 
