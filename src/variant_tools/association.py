@@ -1236,6 +1236,13 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
         port_selected=sock.bind_to_random_port("tcp://"+os.environ["ZEROMQIP"])     
         with open(os.getcwd()+"/randomPort.txt","w") as outputFile:
             outputFile.write(str(port_selected))
+
+
+        poll = zmq.Poller()
+        poll.register(sock, zmq.POLLIN)
+
+        
+
         # sock.bind("tcp://"+os.environ["ZEROMQIP"]+":5557")
 
 
@@ -1262,41 +1269,53 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
         works = generate_works(asso,args)
         # endtime=time.time()
         tasks={}
+        interval=time.time()
         while groupCount < len(asso.groups):
-            # Receive;
-            # try:
-            j = sock.recv_json()
-            if j['msg'] == "available":
-                grps=send_next_work(sock, works)
-                tasks[grps]=j["pid"]
-            elif j['msg'] == "result":
-                r = j['result']       
-                # outputs.append(r)
-                # logger.log(level, time.asctime( time.localtime(time.time()) )+" "+str(time.time()-endtime))
-                result=json.loads(r)
-                for rec in result:
-                    results.record(rec)
-                    count = results.completed()
-                    prog.update(count, results.failed())
-                    groupCount+=1
-                send_thanks(sock)
-                tasks.pop(j['grps'],None)
-            elif j['msg']=="closing":
-                send_thanks(sock)
-                for grps_string,pid in tasks.items():
-                    if pid==j["pid"]:
-                        print(len(asso.groups))
-                        for grp in grps.split(","):
-                            asso.groups.append((grp,))
-                            groupCount+=1
-                        print(len(asso.groups))
-                        
-        j = sock.recv_json()
-        if j['msg'] == "available":   
-            sock.send_json({"noMoreWork":"noMoreWork"})
+            poller = dict(poll.poll(2000))
+            print(poller.get(sock))
+            if poller.get(sock) == zmq.POLLIN:
+                # Receive;
+                # try:
+                j = sock.recv_json()
+                if j['msg'] == "available":
+                    grps=send_next_work(sock, works)
+                    tasks[grps]=j["pid"]
+                elif j['msg'] == "result":
+                    r = j['result']       
+                    # outputs.append(r)
+                    # logger.log(level, time.asctime( time.localtime(time.time()) )+" "+str(time.time()-endtime))
+                    result=json.loads(r)
+                    for rec in result:
+                        results.record(rec)
+                        count = results.completed()
+                        prog.update(count, results.failed())
+                        groupCount+=1
+                    send_thanks(sock)
+                    tasks.pop(j['grps'],None)
+                    interval=time.time()
+                elif j['msg']=="closing":
+                    send_thanks(sock)
+                    for grps_string,pid in tasks.items():
+                        if pid==j["pid"]:
+                            print(len(asso.groups))
+                            for grp in grps.split(","):
+                                asso.groups.append((grp,))
+                                groupCount+=1
+                            print(len(asso.groups))
+            else:
+                if time.time()-interval>20:
+                    print("No available worker.")
+                    break
+
+           
+        # j = sock.recv_json()
+        # if j['msg'] == "available":   
+        #     sock.send_json({"noMoreWork":"noMoreWork"})
            
         results.done()
-        prog.done()
+        
+        if groupCount == len(asso.groups):
+            prog.done()
 
         asso.db=old_db
         asso.proj=old_proj
@@ -1313,7 +1332,6 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
        
     except Exception as e:
         env.logger.error(e)
-        sys.exit(1)
     finally:
         sock.close()
         context.term()
