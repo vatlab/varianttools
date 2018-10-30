@@ -570,6 +570,7 @@ def worker():
     REQUEST_RETRIES=3
     context = zmq.Context()
     client = context.socket(zmq.REQ)
+    pid=os.getpid()
     try:
         
         projectFolder=os.environ.get("PROJECTFOLDER")
@@ -624,7 +625,7 @@ def worker():
                 # except zmq.error.ZMQError as e:
                 #     pass
                 print("send available")
-                client.send_json({ "msg": "available"})
+                client.send_json({ "msg": "available","pid":pid})
                 expect_reply=True
                 while expect_reply:
                     socks = dict(poll.poll(REQUEST_TIMEOUT))
@@ -640,6 +641,7 @@ def worker():
                             expect_reply=False
                             param = work['param']
                             grps = work['grps']
+                            grps_string=','.join(elems[0] for elems in work["grps"])
                             args=work['args']
                             path=work["path"]
                             projName=work["projName"]
@@ -658,7 +660,7 @@ def worker():
                         # "thanks".
                         try:
                             if result!="":
-                                client.send_json({ "msg": "result", "result": result})
+                                client.send_json({ "msg": "result", "result": result,"pid":pid,"grps":grps_string})
                                 expect_thanks=True
                                 while expect_thanks:
                                     socks = dict(poll.poll(REQUEST_TIMEOUT))
@@ -681,7 +683,7 @@ def worker():
                                         client = context.socket(zmq.REQ)
                                         client.connect(SERVER_ENDPOINT)
                                         poll.register(client, zmq.POLLIN)
-                                        client.send_json({ "msg": "result", "result": result})
+                                        client.send_json({ "msg": "result", "result": result,"pid":pid,"grps":grps_string})
 
                         except Exception as e:
                             print(e)     
@@ -701,7 +703,7 @@ def worker():
                         client = context.socket(zmq.REQ)
                         client.connect(SERVER_ENDPOINT)
                         poll.register(client, zmq.POLLIN)
-                        client.send_json({ "msg": "available"})
+                        client.send_json({ "msg": "available","pid":pid})
                         # msg={ "msg": "available"}
                         # retry,retries_left=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
                         # print(retry,retries_left)
@@ -711,6 +713,7 @@ def worker():
         print(e)
         return
     finally:
+        client.send_json({ "msg": "closing","pid":pid})
         client.close()   
         context.term()
 

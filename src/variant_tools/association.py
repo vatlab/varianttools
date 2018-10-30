@@ -1191,6 +1191,7 @@ def send_next_work(sock, works):
     try:
         work = next(works)
         sock.send_json(work,flags=zmq.NOBLOCK)
+        return ','.join(elems[0] for elems in work["grps"])
     except zmq.error.ZMQError as e:
         pass
     except StopIteration:
@@ -1260,28 +1261,36 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
         j={}
         works = generate_works(asso,args)
         # endtime=time.time()
-
+        tasks={}
         while groupCount < len(asso.groups):
             # Receive;
-            try:
-                j = sock.recv_json(flags=zmq.NOBLOCK)
-                if j['msg'] == "available":
-                    send_next_work(sock, works)
-                elif j['msg'] == "result":
-                    r = j['result']       
-                    # outputs.append(r)
-                    # logger.log(level, time.asctime( time.localtime(time.time()) )+" "+str(time.time()-endtime))
-                    result=json.loads(r)
-                    for rec in result:
-                        results.record(rec)
-                        count = results.completed()
-                        prog.update(count, results.failed())
-                        groupCount+=1
-                    send_thanks(sock)
-                    # endtime=time.time()
-            except zmq.error.Again as e:
-                pass
-                
+            # try:
+            j = sock.recv_json()
+            if j['msg'] == "available":
+                grps=send_next_work(sock, works)
+                tasks[grps]=j["pid"]
+            elif j['msg'] == "result":
+                r = j['result']       
+                # outputs.append(r)
+                # logger.log(level, time.asctime( time.localtime(time.time()) )+" "+str(time.time()-endtime))
+                result=json.loads(r)
+                for rec in result:
+                    results.record(rec)
+                    count = results.completed()
+                    prog.update(count, results.failed())
+                    groupCount+=1
+                send_thanks(sock)
+                tasks.pop(j['grps'],None)
+            elif j['msg']=="closing":
+                send_thanks(sock)
+                for grps_string,pid in tasks.items():
+                    if pid==j["pid"]:
+                        print(len(asso.groups))
+                        for grp in grps.split(","):
+                            asso.groups.append((grp,))
+                            groupCount+=1
+                        print(len(asso.groups))
+                        
         j = sock.recv_json()
         if j['msg'] == "available":   
             sock.send_json({"noMoreWork":"noMoreWork"})
@@ -1307,6 +1316,7 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
         sys.exit(1)
     finally:
         sock.close()
+        context.term()
 
 
 
