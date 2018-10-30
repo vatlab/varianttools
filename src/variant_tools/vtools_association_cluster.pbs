@@ -23,7 +23,6 @@ done
 #echo ${WORKER_NODES[@]}
 echo $HOST_NAME
 export ZEROMQIP=$(ifconfig | sed -En 's/127.0.0.1//;s/.*inet (addr:)?(([0-9]*\.){3}[0-9]*).*/\2/p')
-export RABBITMQIP="localhost"
 echo $ZEROMQIP
 export PROJECTFOLDER
 export VTOOLSFOLDER

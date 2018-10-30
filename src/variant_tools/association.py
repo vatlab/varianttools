@@ -1204,7 +1204,7 @@ def send_next_work(sock, works):
 
 def send_thanks(sock):
     try:
-        sock.send_string("") # Nothing more to say actually
+        sock.send_string("done") # Nothing more to say actually
     except zmq.error.ZMQError as e:
         pass
 

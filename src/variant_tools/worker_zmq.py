@@ -542,13 +542,36 @@ class ResultRecorder:
             self.writer.finalize()
 
 
+
+def retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg):
+    print("W: No response from server, retrying…")
+    # Socket is confused. Close and remove it.
+    client.setsockopt(zmq.LINGER, 0)
+    client.close()
+    poll.unregister(client)
+    retries_left -= 1
+    if retries_left == 0:
+        print("E: Server seems to be offline, abandoning")
+        return [0,retries_left]
+    print("I: Reconnecting and resending")
+    # Create new connection
+    client = context.socket(zmq.REQ)
+    client.connect(SERVER_ENDPOINT)
+    poll.register(client, zmq.POLLIN)
+    client.send_json(msg)
+    return [1,retries_left]
+
         
 
 def worker():
     # Setup ZMQ.
+
+    REQUEST_TIMEOUT=2500
+    REQUEST_RETRIES=3
+    context = zmq.Context()
+    client = context.socket(zmq.REQ)
     try:
-        context = zmq.Context()
-        sock = context.socket(zmq.REQ)
+        
         projectFolder=os.environ.get("PROJECTFOLDER")
         portFilePath=projectFolder+"/randomPort.txt"
         while not os.path.exists(portFilePath):
@@ -563,7 +586,14 @@ def worker():
         #     os.environ["NODENAME"]="127.0.0.1"
         if os.environ.get("ZEROMQIP") is None:
             os.environ["ZEROMQIP"]="127.0.0.1"
-        sock.connect("tcp://"+os.environ["ZEROMQIP"]+":"+selected_port) # IP of master
+        SERVER_ENDPOINT="tcp://"+os.environ["ZEROMQIP"]+":"+selected_port
+        
+        client.connect(SERVER_ENDPOINT) # IP of master
+        poll = zmq.Poller()
+        poll.register(client, zmq.POLLIN)
+   
+        retries_left = REQUEST_RETRIES
+
         param=None
         grps=None 
         args=None 
@@ -576,7 +606,7 @@ def worker():
         # port = "6001"
         # level = logging.DEBUG
         # ctx = zmq.Context()
-        # pub = ctx.socket(zmq.PUB)
+        # pub = ctx.clientet(zmq.PUB)
         # pub.connect("tcp://"+os.environ["ZEROMQIP"]+":"+port)
 
         # logger = logging.getLogger(str(os.getpid()))
@@ -586,50 +616,103 @@ def worker():
         # print("starting logger at %i with level=%s" % (os.getpid(), level))
         # logger.log(level, "Hello from %i!" % os.getpid())
         # endtime=time.time()
+        while retries_left:
+            while True:
+                # Say we're available.
+                # try:
+                #     client.send_json({ "msg": "available"},flags=zmq.NOBLOCK)
+                # except zmq.error.ZMQError as e:
+                #     pass
+                print("send available")
+                client.send_json({ "msg": "available"})
+                expect_reply=True
+                while expect_reply:
+                    socks = dict(poll.poll(REQUEST_TIMEOUT))
+                    if socks.get(client) == zmq.POLLIN:
+                       # Retrieve work and run the computation.
+                        try:
+                            work = client.recv_json(flags=zmq.NOBLOCK)
+                            if work == {}:
+                                continue
+                            if "noMoreWork" in work:
+                                break
+                            retries_left=REQUEST_RETRIES
+                            expect_reply=False
+                            param = work['param']
+                            grps = work['grps']
+                            args=work['args']
+                            path=work["path"]
+                            projName=work["projName"]
+                            print("running computation")
+                            # logger.log(level, str(os.environ["NODENAME"])+" "+time.asctime(time.localtime(time.time()) )+" "+str(time.time()-endtime))
+                            # starttime=time.time()
+                            worker = AssoTestsWorker(param, grps, args,path,projName)
+                            result=worker.run()
+                            result =json.dumps(result)
+                            # logger.log(level, str(os.environ["NODENAME"])+" "+str(time.time()-starttime))
+                            # endtime=time.time()
+                        except zmq.error.Again as e:
+                            pass
+                        
+                        # We have a result, let's inform the master about that, and receive the
+                        # "thanks".
+                        try:
+                            if result!="":
+                                client.send_json({ "msg": "result", "result": result})
+                                expect_thanks=True
+                                while expect_thanks:
+                                    socks = dict(poll.poll(REQUEST_TIMEOUT))
+                                    if socks.get(client) == zmq.POLLIN:
+                                        reply=client.recv()
+                                        expect_thanks=False
+                                        print("send back result")
+                                    else:
+                                        print("W: No response from server, retrying…")
+                                        # Socket is confused. Close and remove it.
+                                        client.setsockopt(zmq.LINGER, 0)
+                                        client.close()
+                                        poll.unregister(client)
+                                        retries_left -= 1
+                                        if retries_left == 0:
+                                            print("E: Server seems to be offline, abandoning")
+                                            break
+                                        print("I: Reconnecting and resending")
+                                        # Create new connection
+                                        client = context.socket(zmq.REQ)
+                                        client.connect(SERVER_ENDPOINT)
+                                        poll.register(client, zmq.POLLIN)
+                                        client.send_json({ "msg": "result", "result": result})
 
-        while True:
-            # Say we're available.
-            try:
-                sock.send_json({ "msg": "available"},flags=zmq.NOBLOCK)
-            except zmq.error.ZMQError as e:
-                pass
-            # Retrieve work and run the computation.
-            try:
-                work = sock.recv_json(flags=zmq.NOBLOCK)
-                if work == {}:
-                    continue
-                if "noMoreWork" in work:
-                    break
-                param = work['param']
-                grps = work['grps']
-                args=work['args']
-                path=work["path"]
-                projName=work["projName"]
-                print("running computation")
-                # logger.log(level, str(os.environ["NODENAME"])+" "+time.asctime(time.localtime(time.time()) )+" "+str(time.time()-endtime))
-                # starttime=time.time()
-                worker = AssoTestsWorker(param, grps, args,path,projName)
-                result=worker.run()
-                result =json.dumps(result)
-                # logger.log(level, str(os.environ["NODENAME"])+" "+str(time.time()-starttime))
-                # endtime=time.time()
-            except zmq.error.Again as e:
-                pass
-            
-            # We have a result, let's inform the master about that, and receive the
-            # "thanks".
-            try:
-                if result!="":
-                    sock.send_json({ "msg": "result", "result": result},flags=zmq.NOBLOCK)
-                    sock.recv()
-                    # count+=1
-            except zmq.error.ZMQError as e:
-                pass
+                        except Exception as e:
+                            print(e)     
+
+                    else:
+                        print("W: No response from server, retrying…")
+                        # Socket is confused. Close and remove it.
+                        client.setsockopt(zmq.LINGER, 0)
+                        client.close()
+                        poll.unregister(client)
+                        retries_left -= 1
+                        if retries_left == 0:
+                            print("E: Server seems to be offline, abandoning")
+                            break
+                        print("I: Reconnecting and resending")
+                        # Create new connection
+                        client = context.socket(zmq.REQ)
+                        client.connect(SERVER_ENDPOINT)
+                        poll.register(client, zmq.POLLIN)
+                        client.send_json({ "msg": "available"})
+                        # msg={ "msg": "available"}
+                        # retry,retries_left=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
+                        # print(retry,retries_left)
+                        # if retry==0:
+                        #     break
     except Exception as e:
         print(e)
         return
     finally:
-        sock.close()   
+        client.close()   
+        context.term()
 
 if __name__ == "__main__":
     time.sleep(10)
