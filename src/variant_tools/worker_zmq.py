@@ -552,14 +552,14 @@ def retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg):
     retries_left -= 1
     if retries_left == 0:
         print("E: Server seems to be offline, abandoning")
-        return [0,retries_left]
+        return [retries_left,client,poll]
     print("I: Reconnecting and resending")
     # Create new connection
     client = context.socket(zmq.REQ)
     client.connect(SERVER_ENDPOINT)
     poll.register(client, zmq.POLLIN)
     client.send_json(msg)
-    return [1,retries_left]
+    return [retries_left,client,poll]
 
         
 
@@ -669,46 +669,19 @@ def worker():
                                         expect_thanks=False
                                         print("send back result")
                                     else:
-                                        print("W: No response from server, retrying…")
-                                        # Socket is confused. Close and remove it.
-                                        client.setsockopt(zmq.LINGER, 0)
-                                        client.close()
-                                        poll.unregister(client)
-                                        retries_left -= 1
-                                        if retries_left == 0:
-                                            print("E: Server seems to be offline, abandoning")
+                                        msg={ "msg": "result", "result": result,"pid":pid,"grps":grps_string}
+                                        retries_left,client,poll=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
+                                        if retries_left==0:
                                             break
-                                        print("I: Reconnecting and resending")
-                                        # Create new connection
-                                        client = context.socket(zmq.REQ)
-                                        client.connect(SERVER_ENDPOINT)
-                                        poll.register(client, zmq.POLLIN)
-                                        client.send_json({ "msg": "result", "result": result,"pid":pid,"grps":grps_string})
 
                         except Exception as e:
                             print(e)     
 
                     else:
-                        print("W: No response from server, retrying…")
-                        # Socket is confused. Close and remove it.
-                        client.setsockopt(zmq.LINGER, 0)
-                        client.close()
-                        poll.unregister(client)
-                        retries_left -= 1
-                        if retries_left == 0:
-                            print("E: Server seems to be offline, abandoning")
+                        msg={ "msg": "available","pid":pid}
+                        retries_left,client,poll=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
+                        if retries_left==0:
                             break
-                        print("I: Reconnecting and resending")
-                        # Create new connection
-                        client = context.socket(zmq.REQ)
-                        client.connect(SERVER_ENDPOINT)
-                        poll.register(client, zmq.POLLIN)
-                        client.send_json({ "msg": "available","pid":pid})
-                        # msg={ "msg": "available"}
-                        # retry,retries_left=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
-                        # print(retry,retries_left)
-                        # if retry==0:
-                        #     break
     except Exception as e:
         print(e)
         return
