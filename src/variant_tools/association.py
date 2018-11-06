@@ -1238,8 +1238,16 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
             outputFile.write(str(port_selected))
 
 
+        hb_socket=context.socket(zmq.REP)
+        port_selected=hb_socket.bind_to_random_port("tcp://"+os.environ["ZEROMQIP"])     
+        with open(os.getcwd()+"/randomPort_heartbeat.txt","w") as outputFile:
+            outputFile.write(str(port_selected))
+
         poll = zmq.Poller()
         poll.register(sock, zmq.POLLIN)
+        poll.register(hb_socket, zmq.POLLIN)
+
+
 
         
 
@@ -1269,10 +1277,31 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
         works = generate_works(asso,args)
         # endtime=time.time()
         tasks={}
+        nodes={}
         interval=time.time()
+        last_heartbeat=time.time()
         while groupCount < len(asso.groups):
             poller = dict(poll.poll(2000))
-            print(poller.get(sock))
+            if poller.get(hb_socket) == zmq.POLLIN:
+                heartbeat=hb_socket.recv_json()       
+                hb_socket.send_json({"msg":"heartbeat"})
+                nodes[heartbeat["pid"]]=time.time()
+                print(heartbeat["pid"])
+            deadnodes=[]
+            for node,last_heartbeat in nodes.items():
+                if time.time()-last_heartbeat>5:
+                    print(str(node)+" not responding")
+                    for grps_string,pid in tasks.items():
+                        if pid==node:
+                            print(grps_string)
+                            deadnodes.append(node)       
+                            for grp in grps_string.split(","):
+                                asso.groups.append((grp,))
+                                groupCount+=1
+                    tasks.pop(grps_string,None)
+            for node in deadnodes:
+                nodes.pop(node,None)
+
             if poller.get(sock) == zmq.POLLIN:
                 # Receive;
                 # try:
@@ -1293,19 +1322,19 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
                     send_thanks(sock)
                     tasks.pop(j['grps'],None)
                     interval=time.time()
-                elif j['msg']=="closing":
-                    send_thanks(sock)
-                    for grps_string,pid in tasks.items():
-                        if pid==j["pid"]:
-                            print(len(asso.groups))
-                            for grp in grps.split(","):
-                                asso.groups.append((grp,))
-                                groupCount+=1
-                            print(len(asso.groups))
+
             else:
                 if time.time()-interval>20:
                     print("No available worker.")
                     break
+        
+        for node in nodes.keys():
+            poller = dict(poll.poll(2000))
+            if poller.get(hb_socket) == zmq.POLLIN:
+                heartbeat=hb_socket.recv_json()       
+                hb_socket.send_json({"msg":"stop"})
+
+
 
            
         # j = sock.recv_json()
@@ -1329,12 +1358,13 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
         # use the result database in the project
         if args.to_db:
             proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
-       
     except Exception as e:
         env.logger.error(e)
     finally:
         sock.close()
+        hb_socket.close()
         context.term()
+
 
 
 

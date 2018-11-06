@@ -15,6 +15,8 @@ import json
 import logging
 from zmq.log.handlers import PUBHandler
 import sys
+import threading
+
 
 
 
@@ -617,8 +619,8 @@ def worker():
         # print("starting logger at %i with level=%s" % (os.getpid(), level))
         # logger.log(level, "Hello from %i!" % os.getpid())
         # endtime=time.time()
-        while retries_left:
-            while True:
+        while True:
+            while retries_left:
                 # Say we're available.
                 # try:
                 #     client.send_json({ "msg": "available"},flags=zmq.NOBLOCK)
@@ -672,8 +674,7 @@ def worker():
                                         msg={ "msg": "result", "result": result,"pid":pid,"grps":grps_string}
                                         retries_left,client,poll=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
                                         if retries_left==0:
-                                            break
-
+                                            raise Exception("Server connection lost")
                         except Exception as e:
                             print(e)     
 
@@ -681,16 +682,50 @@ def worker():
                         msg={ "msg": "available","pid":pid}
                         retries_left,client,poll=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
                         if retries_left==0:
-                            break
+                            raise Exception("Server connection lost")
     except Exception as e:
         print(e)
         return
     finally:
-        client.send_json({ "msg": "closing","pid":pid})
         client.close()   
         context.term()
 
+
+def worker_heartbeat():
+    pid=os.getpid()
+    context=zmq.Context()
+    client = context.socket(zmq.REQ)
+    projectFolder=os.environ.get("PROJECTFOLDER")
+    portFilePath=projectFolder+"/randomPort_heartbeat.txt"
+    while not os.path.exists(portFilePath):
+        time.sleep(1)
+    selected_port=""
+    if os.path.isfile(portFilePath):
+        with open(portFilePath,"r") as portFile:
+           selected_port=portFile.read()
+    else:
+        raise ValueError("%s isn't a file!" % portFilePath)
+    if os.environ.get("ZEROMQIP") is None:
+            os.environ["ZEROMQIP"]="127.0.0.1"
+    SERVER_ENDPOINT="tcp://"+os.environ["ZEROMQIP"]+":"+selected_port
+    client.connect(SERVER_ENDPOINT) # IP of master
+    while True:
+        client.send_json({ "msg": "heartbeat","pid":pid})
+        reply = client.recv_json()
+        if reply["msg"]=="heartbeat":
+            time.sleep(2)
+        if reply["msg"]=="stop":
+            break
+
+
+
 if __name__ == "__main__":
     time.sleep(10)
+    thread=threading.Thread(target=worker_heartbeat)
+    thread.setDaemon(True)
+    thread.start()
     worker()
+
+   
+
 
