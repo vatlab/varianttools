@@ -41,10 +41,9 @@ from variant_tools.vt_sqlite3 import OperationalError
 import argparse
 import numpy as np
 from .association_hdf5 import generateHDFbyGroup,getGenotype_HDF5,generateHDFbyGroup_update
-from variant_tools.celery_main.task_receiver import run_grp_association
 
 import pickle
-from celery.result import AsyncResult
+
 from collections import deque
 import zmq
 import json
@@ -1187,19 +1186,22 @@ def generate_works(asso,args):
         "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,"unknown_args":args.unknown_args},"path": os.getcwd()}
         yield work
 
-def send_next_work(sock, works):
-    try:
-        work = next(works)
-        sock.send_json(work,flags=zmq.NOBLOCK)
-        return ','.join(elems[0] for elems in work["grps"])
-    except zmq.error.ZMQError as e:
-        pass
-    except StopIteration:
-        # If no more work is available, we still have to reply something.
-        try:
-            sock.send_json({"noMoreWork":"noMoreWork"},flags=zmq.NOBLOCK)
-        except zmq.error.ZMQError as e:
-            pass
+def send_unfinished_works(works):
+    for work in works:
+        yield work
+
+
+def send_next_work(sock, works):    
+    work = next(works)
+    sock.send_json(work)
+    return ','.join(elems[0] for elems in work["grps"])
+
+    # except StopIteration:
+    #     # If no more work is available, we still have to reply something.
+    #     try:
+    #         sock.send_json({"noMoreWork":"noMoreWork"},flags=zmq.NOBLOCK)
+    #     except zmq.error.ZMQError as e:
+    #         pass
 
 
 
@@ -1274,41 +1276,64 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
 
         # Generate the json messages for all computations.
         j={}
+        projName=asso.proj.name
         works = generate_works(asso,args)
+        unfinished_works=[]
         # endtime=time.time()
         tasks={}
         nodes={}
         interval=time.time()
         last_heartbeat=time.time()
+        deadnodes=[]
+        first=True
         while groupCount < len(asso.groups):
             poller = dict(poll.poll(2000))
             if poller.get(hb_socket) == zmq.POLLIN:
                 heartbeat=hb_socket.recv_json()       
                 hb_socket.send_json({"msg":"heartbeat"})
                 nodes[heartbeat["pid"]]=time.time()
-                print(heartbeat["pid"])
-            deadnodes=[]
+                # print(heartbeat["pid"])
+            
+            
             for node,last_heartbeat in nodes.items():
                 if time.time()-last_heartbeat>5:
                     print(str(node)+" not responding")
                     for grps_string,pid in tasks.items():
                         if pid==node:
                             print(grps_string)
-                            deadnodes.append(node)       
-                            for grp in grps_string.split(","):
-                                asso.groups.append((grp,))
-                                groupCount+=1
+                            deadnodes.append(node)
+                            unfinished_groups=[[grp] for grp in grps_string.split(",")]
+
+                            unfinished_works.append({"projName":projName,"param":json.dumps(asso.__dict__), "grps":unfinished_groups,
+            "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,"unknown_args":args.unknown_args},"path": os.getcwd()})       
+                            # for grp in grps_string.split(","):
+                            #     asso.groups.append((grp,))
+                            #     groupCount+=1
                     tasks.pop(grps_string,None)
             for node in deadnodes:
                 nodes.pop(node,None)
-
+       
             if poller.get(sock) == zmq.POLLIN:
                 # Receive;
                 # try:
                 j = sock.recv_json()
                 if j['msg'] == "available":
-                    grps=send_next_work(sock, works)
-                    tasks[grps]=j["pid"]
+                    try:
+                        grps=send_next_work(sock, works)
+                        tasks[grps]=j["pid"]
+                    except StopIteration as e:
+                        try:
+                            if first:
+                                works=send_unfinished_works(unfinished_works)
+                                first=False
+                            work=next(works)
+                            sock.send_json(work)
+                            grps=','.join(elems[0] for elems in work["grps"])
+                            tasks[grps]=j["pid"]  
+                        except StopIteration as e:
+                            sock.send_json({"noMoreWork":"noMoreWork"})
+
+
                 elif j['msg'] == "result":
                     r = j['result']       
                     # outputs.append(r)
@@ -1319,6 +1344,7 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
                         count = results.completed()
                         prog.update(count, results.failed())
                         groupCount+=1
+           
                     send_thanks(sock)
                     tasks.pop(j['grps'],None)
                     interval=time.time()
@@ -1333,13 +1359,12 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
             if poller.get(hb_socket) == zmq.POLLIN:
                 heartbeat=hb_socket.recv_json()       
                 hb_socket.send_json({"msg":"stop"})
+            if poller.get(sock)==zmq.POLLIN:
+                j = sock.recv_json()
+                if j['msg'] == "available":
+                    sock.send_json({"noMoreWork":"noMoreWork"})
 
 
-
-           
-        # j = sock.recv_json()
-        # if j['msg'] == "available":   
-        #     sock.send_json({"noMoreWork":"noMoreWork"})
            
         results.done()
         
@@ -1359,6 +1384,7 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
         if args.to_db:
             proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
     except Exception as e:
+        print("catch here")
         env.logger.error(e)
     finally:
         sock.close()
@@ -1500,19 +1526,7 @@ def associate(args):
                 else:
                     env.logger.warning("Temp files are not regenerated!")
 
-                # remove phenotype, not necessary if sample is deleted from sample table
-                # allkeep=[]
-                # for HDFfileName in HDFfileNames:
-                #     file=tb.open_file(HDFfileName)
-                #     node=file.get_node("/chr22/GT")
-                #     sampleMasked=np.where(node.sampleMask[:]==True)[0]+1
-                #     keep = ~np.in1d(node.colnames[:], sampleMasked)
-                #     allkeep.extend(keep)
 
-                # asso.sample_names=np.array(asso.sample_names)[allkeep].tolist()
-                # asso.sample_IDs=np.array(asso.sample_IDs)[allkeep].tolist()
-                # asso.phenotypes[0]=np.array(asso.phenotypes[0])[allkeep].tolist()
-                # asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
 
             if args.mpi :
                 zmq_cluster_runAssociation(args,asso,proj,results)

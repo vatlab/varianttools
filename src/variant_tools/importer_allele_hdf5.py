@@ -32,7 +32,7 @@ import glob
 from shutil import copyfile
 from .accessor import *
 from subprocess import call
-# from variant_tools.celery_main.task_receiver import do_work
+
 import json
 import pickle
 

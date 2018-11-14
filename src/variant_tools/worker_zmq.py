@@ -574,7 +574,7 @@ def worker():
     client = context.socket(zmq.REQ)
     pid=os.getpid()
     try:
-        
+
         projectFolder=os.environ.get("PROJECTFOLDER")
         portFilePath=projectFolder+"/randomPort.txt"
         while not os.path.exists(portFilePath):
@@ -585,10 +585,7 @@ def worker():
                selected_port=portFile.read()
         else:
             raise ValueError("%s isn't a file!" % portFilePath)
-        # if os.environ.get("NODENAME") is None:
-        #     os.environ["NODENAME"]="127.0.0.1"
-        if os.environ.get("ZEROMQIP") is None:
-            os.environ["ZEROMQIP"]="127.0.0.1"
+
         SERVER_ENDPOINT="tcp://"+os.environ["ZEROMQIP"]+":"+selected_port
         
         client.connect(SERVER_ENDPOINT) # IP of master
@@ -653,6 +650,8 @@ def worker():
                             worker = AssoTestsWorker(param, grps, args,path,projName)
                             result=worker.run()
                             result =json.dumps(result)
+
+
                             # logger.log(level, str(os.environ["NODENAME"])+" "+str(time.time()-starttime))
                             # endtime=time.time()
                         except zmq.error.Again as e:
@@ -685,7 +684,6 @@ def worker():
                             raise Exception("Server connection lost")
     except Exception as e:
         print(e)
-        return
     finally:
         client.close()   
         context.term()
@@ -695,6 +693,7 @@ def worker_heartbeat():
     pid=os.getpid()
     context=zmq.Context()
     client = context.socket(zmq.REQ)
+
     projectFolder=os.environ.get("PROJECTFOLDER")
     portFilePath=projectFolder+"/randomPort_heartbeat.txt"
     while not os.path.exists(portFilePath):
@@ -705,8 +704,7 @@ def worker_heartbeat():
            selected_port=portFile.read()
     else:
         raise ValueError("%s isn't a file!" % portFilePath)
-    if os.environ.get("ZEROMQIP") is None:
-            os.environ["ZEROMQIP"]="127.0.0.1"
+
     SERVER_ENDPOINT="tcp://"+os.environ["ZEROMQIP"]+":"+selected_port
     client.connect(SERVER_ENDPOINT) # IP of master
     while True:
@@ -720,11 +718,18 @@ def worker_heartbeat():
 
 
 if __name__ == "__main__":
-    time.sleep(10)
-    thread=threading.Thread(target=worker_heartbeat)
-    thread.setDaemon(True)
-    thread.start()
-    worker()
+    try:
+        if os.environ.get("PROJECTFOLDER") is None:
+            raise ValueError("Please set PROJECTFOLDER.")
+        if os.environ.get("ZEROMQIP") is None:
+            os.environ["ZEROMQIP"]="127.0.0.1"
+        time.sleep(10)
+        thread=threading.Thread(target=worker_heartbeat)
+        thread.setDaemon(True)
+        thread.start()
+        worker()
+    except Exception as e:
+        print(e)
 
    
 
