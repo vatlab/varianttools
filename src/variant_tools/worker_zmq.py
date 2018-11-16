@@ -16,6 +16,7 @@ import logging
 from zmq.log.handlers import PUBHandler
 import sys
 import threading
+from multiprocessing.pool import ThreadPool
 
 
 
@@ -565,11 +566,10 @@ def retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg):
 
         
 
-def worker():
+def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
     # Setup ZMQ.
 
-    REQUEST_TIMEOUT=2500
-    REQUEST_RETRIES=3
+    
     context = zmq.Context()
     client = context.socket(zmq.REQ)
     pid=os.getpid()
@@ -577,7 +577,8 @@ def worker():
 
         projectFolder=os.environ.get("PROJECTFOLDER")
         portFilePath=projectFolder+"/randomPort.txt"
-        while not os.path.exists(portFilePath):
+        starttime=time.time()
+        while not os.path.exists(portFilePath) and time.time()-starttime<5:
             time.sleep(1)
         selected_port=""
         if os.path.isfile(portFilePath):
@@ -616,120 +617,160 @@ def worker():
         # print("starting logger at %i with level=%s" % (os.getpid(), level))
         # logger.log(level, "Hello from %i!" % os.getpid())
         # endtime=time.time()
-        while True:
-            while retries_left:
-                # Say we're available.
-                # try:
-                #     client.send_json({ "msg": "available"},flags=zmq.NOBLOCK)
-                # except zmq.error.ZMQError as e:
-                #     pass
-                print("send available")
-                client.send_json({ "msg": "available","pid":pid})
-                expect_reply=True
-                while expect_reply:
-                    socks = dict(poll.poll(REQUEST_TIMEOUT))
-                    if socks.get(client) == zmq.POLLIN:
-                       # Retrieve work and run the computation.
-                        try:
-                            work = client.recv_json(flags=zmq.NOBLOCK)
-                            if work == {}:
-                                continue
-                            if "noMoreWork" in work:
-                                break
-                            retries_left=REQUEST_RETRIES
+        # while True:
+        while retries_left:
+            # Say we're available.
+            # try:
+            #     client.send_json({ "msg": "available"},flags=zmq.NOBLOCK)
+            # except zmq.error.ZMQError as e:
+            #     pass
+            env.logger.info("send available")
+            client.send_json({ "msg": "available","pid":pid})
+            expect_reply=True
+            while expect_reply:
+                socks = dict(poll.poll(REQUEST_TIMEOUT))
+                if socks.get(client) == zmq.POLLIN:
+                   # Retrieve work and run the computation.
+                    try:
+                        work = client.recv_json(flags=zmq.NOBLOCK)
+                        if work == {}:
+                            continue     
+                        if "preprocessing" in work:
+                            print("preprocessing")
                             expect_reply=False
-                            param = work['param']
-                            grps = work['grps']
-                            grps_string=','.join(elems[0] for elems in work["grps"])
-                            args=work['args']
-                            path=work["path"]
-                            projName=work["projName"]
-                            print("running computation")
-                            # logger.log(level, str(os.environ["NODENAME"])+" "+time.asctime(time.localtime(time.time()) )+" "+str(time.time()-endtime))
-                            # starttime=time.time()
-                            worker = AssoTestsWorker(param, grps, args,path,projName)
-                            result=worker.run()
-                            result =json.dumps(result)
+                            continue
+                        if "noMoreWork" in work:
+                            break
+                        retries_left=REQUEST_RETRIES
+                        expect_reply=False
+                        param = work['param']
+                        grps = work['grps']
+                        grps_string=','.join(elems[0] for elems in work["grps"])
+                        args=work['args']
+                        path=work["path"]
+                        projName=work["projName"]
+                        env.logger.info("running computation")
+                        # logger.log(level, str(os.environ["NODENAME"])+" "+time.asctime(time.localtime(time.time()) )+" "+str(time.time()-endtime))
+                        # starttime=time.time()
+                        worker = AssoTestsWorker(param, grps, args,path,projName)
+                        result=worker.run()
+                        result =json.dumps(result)
 
 
-                            # logger.log(level, str(os.environ["NODENAME"])+" "+str(time.time()-starttime))
-                            # endtime=time.time()
-                        except zmq.error.Again as e:
-                            pass
-                        
-                        # We have a result, let's inform the master about that, and receive the
-                        # "thanks".
-                        try:
-                            if result!="":
-                                client.send_json({ "msg": "result", "result": result,"pid":pid,"grps":grps_string})
-                                expect_thanks=True
-                                while expect_thanks:
-                                    socks = dict(poll.poll(REQUEST_TIMEOUT))
-                                    if socks.get(client) == zmq.POLLIN:
-                                        reply=client.recv()
-                                        expect_thanks=False
-                                        print("send back result")
-                                    else:
-                                        msg={ "msg": "result", "result": result,"pid":pid,"grps":grps_string}
-                                        retries_left,client,poll=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
-                                        if retries_left==0:
-                                            raise Exception("Server connection lost")
-                        except Exception as e:
-                            print(e)     
+                        # logger.log(level, str(os.environ["NODENAME"])+" "+str(time.time()-starttime))
+                        # endtime=time.time()
+                    except zmq.error.Again as e:
+                        pass
+                    
+                    # We have a result, let's inform the master about that, and receive the
+                    # "thanks".
+                    try:
+                        if result!="":
+                            client.send_json({ "msg": "result", "result": result,"pid":pid,"grps":grps_string})
+                            expect_thanks=True
+                            while expect_thanks:
+                                socks = dict(poll.poll(REQUEST_TIMEOUT))
+                                if socks.get(client) == zmq.POLLIN:
+                                    reply=client.recv()
+                                    expect_thanks=False
+                                    env.logger.info("send back result")
+                                else:
+                                    msg={ "msg": "result", "result": result,"pid":pid,"grps":grps_string}
+                                    retries_left,client,poll=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
+                                    if retries_left==0:
+                                        raise Exception("Server connection lost")
+                    except Exception as e:
+                        print(e)
+                        break     
 
-                    else:
-                        msg={ "msg": "available","pid":pid}
-                        retries_left,client,poll=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
-                        if retries_left==0:
-                            raise Exception("Server connection lost")
+                else:
+                    msg={ "msg": "available","pid":pid}
+                    retries_left,client,poll=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
+                    if retries_left==0:
+                        raise Exception("Server connection lost")
     except Exception as e:
         print(e)
     finally:
+        print("called here")
         client.close()   
         context.term()
 
 
 def worker_heartbeat():
-    pid=os.getpid()
-    context=zmq.Context()
-    client = context.socket(zmq.REQ)
+    try:
+        pid=os.getpid()
+        context=zmq.Context()
+        hb_socket = context.socket(zmq.REQ)
 
-    projectFolder=os.environ.get("PROJECTFOLDER")
-    portFilePath=projectFolder+"/randomPort_heartbeat.txt"
-    while not os.path.exists(portFilePath):
-        time.sleep(1)
-    selected_port=""
-    if os.path.isfile(portFilePath):
-        with open(portFilePath,"r") as portFile:
-           selected_port=portFile.read()
-    else:
-        raise ValueError("%s isn't a file!" % portFilePath)
+        projectFolder=os.environ.get("PROJECTFOLDER")
+        portFilePath=projectFolder+"/randomPort_heartbeat.txt"
+        starttime=time.time()
+        while not os.path.exists(portFilePath) and time.time()-starttime<5:
+            time.sleep(1)
+        selected_port=""
+        if os.path.isfile(portFilePath):
+            with open(portFilePath,"r") as portFile:
+               selected_port=portFile.read()
+        else:
+            raise ValueError("%s isn't a file!" % portFilePath)
 
-    SERVER_ENDPOINT="tcp://"+os.environ["ZEROMQIP"]+":"+selected_port
-    client.connect(SERVER_ENDPOINT) # IP of master
-    while True:
-        client.send_json({ "msg": "heartbeat","pid":pid})
-        reply = client.recv_json()
-        if reply["msg"]=="heartbeat":
-            time.sleep(2)
-        if reply["msg"]=="stop":
-            break
+        SERVER_ENDPOINT="tcp://"+os.environ["ZEROMQIP"]+":"+selected_port
+        hb_socket.connect(SERVER_ENDPOINT) # IP of master
+        poll = zmq.Poller()
+        poll.register(hb_socket, zmq.POLLIN)
+        retries_left=REQUEST_RETRIES
+        # while retries_left:
+        while True:
+            print("send")
+            hb_socket.send_json({ "msg": "heartbeat","pid":pid})
+            sock = dict(poll.poll(2500))
+            if sock.get(hb_socket) == zmq.POLLIN:
+                reply = hb_socket.recv_json()
+                if reply["msg"]=="heartbeat":
+                    time.sleep(2)
+                if reply["msg"]=="stop":
+                    break
+            else:
+                # msg={ "msg": "heartbeat","pid":pid}
+                # retries_left,client,poll=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
+                # if retries_left==0:
+                break
+        print("heartbeat stop")
+    except ValueError as e:
+        print(e)
+    except Exception as e:
+        print(e)
+    finally:
+        print("called there")
+        hb_socket.setsockopt(zmq.LINGER, 0)
+        poll.unregister(hb_socket)
+        hb_socket.close()   
+        context.term()
 
 
 
 if __name__ == "__main__":
     try:
+        REQUEST_TIMEOUT=2500
+        REQUEST_RETRIES=3
         if os.environ.get("PROJECTFOLDER") is None:
             raise ValueError("Please set PROJECTFOLDER.")
         if os.environ.get("ZEROMQIP") is None:
             os.environ["ZEROMQIP"]="127.0.0.1"
-        time.sleep(10)
+        # time.sleep(5)
+       
         thread=threading.Thread(target=worker_heartbeat)
-        thread.setDaemon(True)
+        # thread.setDaemon(True)
         thread.start()
-        worker()
+        worker(REQUEST_TIMEOUT,REQUEST_RETRIES)
+        
+        thread.join()
+        print("done")
+
+        
     except Exception as e:
         print(e)
+
 
    
 

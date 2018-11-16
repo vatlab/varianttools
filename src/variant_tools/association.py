@@ -50,6 +50,8 @@ import json
 from zmq.log.handlers import PUBHandler
 import logging
 import uuid
+import threading
+
 
 
 def associateArguments(parser):
@@ -1211,6 +1213,142 @@ def send_thanks(sock):
     except zmq.error.ZMQError as e:
         pass
 
+def zmq_cluster_runAssociation_try(args,asso,proj,results,sock,hb_socket,poll,context):
+    try:
+       
+        prog = ProgressBar('Testing for association', len(asso.groups))
+        grps=[]
+        old_db=asso.db
+        old_proj=asso.proj
+        old_proj_db=asso.proj.db
+        old_proj_annoDB=asso.proj.annoDB
+        old_test=asso.tests
+        asso.db=""
+        asso.proj.db=""
+        asso.proj.annoDB=""
+        asso.tests=""
+        groupCount=0
+
+
+       
+        j={}
+        projName=asso.proj.name
+        works = generate_works(asso,args)
+        unfinished_works=[]
+        # endtime=time.time()
+        tasks={}
+        nodes={}
+        interval=time.time()
+        last_heartbeat=time.time()
+        deadnodes=[]
+        first=True
+        while groupCount < len(asso.groups):
+            poller = dict(poll.poll(2000))
+            if poller.get(hb_socket) == zmq.POLLIN:
+                heartbeat=hb_socket.recv_json()       
+                hb_socket.send_json({"msg":"heartbeat"})
+                nodes[heartbeat["pid"]]=time.time()
+                # print(heartbeat["pid"])
+            
+            
+            for node,last_heartbeat in nodes.items():
+                if time.time()-last_heartbeat>5:
+                    print(str(node)+" not responding")
+                    for grps_string,pid in tasks.items():
+                        if pid==node:
+                            print(grps_string)
+                            deadnodes.append(node)
+                            unfinished_groups=[[grp] for grp in grps_string.split(",")]
+
+                            unfinished_works.append({"projName":projName,"param":json.dumps(asso.__dict__), "grps":unfinished_groups,
+            "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,"unknown_args":args.unknown_args},"path": os.getcwd()})       
+                            # for grp in grps_string.split(","):
+                            #     asso.groups.append((grp,))
+                            #     groupCount+=1
+                    tasks.pop(grps_string,None)
+            for node in deadnodes:
+                nodes.pop(node,None)
+       
+            if poller.get(sock) == zmq.POLLIN:
+                # Receive;
+                # try:
+                j = sock.recv_json()
+                if j['msg'] == "available":
+                    try:
+                        grps=send_next_work(sock, works)
+                        tasks[grps]=j["pid"]
+                    except StopIteration as e:
+                        try:
+                            if first:
+                                works=send_unfinished_works(unfinished_works)
+                                first=False
+                            work=next(works)
+                            sock.send_json(work)
+                            grps=','.join(elems[0] for elems in work["grps"])
+                            tasks[grps]=j["pid"]  
+                        except StopIteration as e:
+                            sock.send_json({"noMoreWork":"noMoreWork"})
+
+
+                elif j['msg'] == "result":
+                    r = j['result']       
+                    # outputs.append(r)
+                    # logger.log(level, time.asctime( time.localtime(time.time()) )+" "+str(time.time()-endtime))
+                    result=json.loads(r)
+                    for rec in result:
+                        results.record(rec)
+                        count = results.completed()
+                        prog.update(count, results.failed())
+                        groupCount+=1
+           
+                    send_thanks(sock)
+                    tasks.pop(j['grps'],None)
+                    interval=time.time()
+
+            else:
+                if time.time()-interval>20:
+                    print("No available worker.")
+                    break
+        
+        for node in nodes.keys():
+            poller = dict(poll.poll(2000))
+            if poller.get(hb_socket) == zmq.POLLIN:
+                heartbeat=hb_socket.recv_json()       
+                hb_socket.send_json({"msg":"stop"})
+            if poller.get(sock)==zmq.POLLIN:
+                j = sock.recv_json()
+                if j['msg'] == "available":
+                    sock.send_json({"noMoreWork":"noMoreWork"})
+
+
+           
+        results.done()
+        
+        if groupCount == len(asso.groups):
+            prog.done()
+
+        asso.db=old_db
+        asso.proj=old_proj
+        asso.tests=old_test
+        asso.proj.db=old_proj_db
+        asso.proj.annoDB=old_proj_annoDB
+        
+        # summary
+        env.logger.info('Association tests on {} groups have completed. {} failed.'.\
+                         format(results.completed(), results.failed()))
+        # use the result database in the project
+        if args.to_db:
+            proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
+    except Exception as e:
+        print("catch here")
+        env.logger.error(e)
+    finally:
+        sock.close()
+        hb_socket.close()
+        context.term()
+        os.remove(os.getcwd()+"/randomPort.txt")
+        os.remove(os.getcwd()+"/randomPort_heartbeat.txt")
+
 
 def zmq_cluster_runAssociation(args,asso,proj,results):
     try:
@@ -1390,6 +1528,8 @@ def zmq_cluster_runAssociation(args,asso,proj,results):
         sock.close()
         hb_socket.close()
         context.term()
+        os.remove(os.getcwd()+"/randomPort.txt")
+        os.remove(os.getcwd()+"/randomPort_heartbeat.txt")
 
 
 
@@ -1465,12 +1605,52 @@ def cluster_runAssociation(args,asso,proj,results):
         sys.exit(1)
 
 
+def server_alive(poll,sock):
+    # print("before")
+    global preprocessing
+    preprocessing=True
+    while preprocessing:
+        poller = dict(poll.poll(1000))
+        if poller.get(sock) == zmq.POLLIN:
+            j = sock.recv_json()
+            if j['msg'] == "available":
+                sock.send_json({'preprocessing':'preprocessing'})
+
 
 
 
 def associate(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
+            sock,hb_socket,poll,context,port_selected=[None]*5
+            if args.mpi:                
+                if os.environ.get("ZEROMQIP") is None:
+                    os.environ["ZEROMQIP"]="127.0.0.1"
+
+                context = zmq.Context()
+                sock = context.socket(zmq.REP)
+
+                port_selected=sock.bind_to_random_port("tcp://"+os.environ["ZEROMQIP"])     
+                with open(os.getcwd()+"/randomPort.txt","w") as outputFile:
+                    outputFile.write(str(port_selected))
+
+
+                hb_socket=context.socket(zmq.REP)
+                port_selected=hb_socket.bind_to_random_port("tcp://"+os.environ["ZEROMQIP"])     
+                with open(os.getcwd()+"/randomPort_heartbeat.txt","w") as outputFile:
+                    outputFile.write(str(port_selected))
+
+                poll = zmq.Poller()
+                poll.register(sock, zmq.POLLIN)
+                poll.register(hb_socket, zmq.POLLIN)
+                
+                
+                thread=threading.Thread(target=server_alive,args=(poll,sock))
+                thread.start()
+
+    
+                
+
             # step 0: create an association testing object with all group information
             try:
                 asso = AssociationTestManager(proj, args.variants, args.phenotypes, args.covariates,
@@ -1529,13 +1709,18 @@ def associate(args):
 
 
             if args.mpi :
-                zmq_cluster_runAssociation(args,asso,proj,results)
+                # zmq_cluster_runAssociation(args,asso,proj,results)
+                global preprocessing
+                preprocessing=False
+                thread.join()                
+                zmq_cluster_runAssociation_try(args,asso,proj,results,sock,hb_socket,poll,context)
                 #cluster_runAssociation(args,asso,proj,results)
             else :
                 runAssociation(args,asso,proj,results)
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
+
 
 def getAllTests():
     '''List all tests (all classes that subclasses of NullTest/GLMBurdenTest) in this module'''
