@@ -526,12 +526,6 @@ class ResultRecorder:
                 # commit the records from time to time to write data to disk
         self.writer.db.commit()
 
-           
-            # print(time.time(),self.last_commit)
-            # if time.time() - self.last_commit > 5:
-            #     print("commit")
-                
-            #     self.last_commit = time.time()
 
     def completed(self):
         return self.succ_count
@@ -578,7 +572,7 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
         projectFolder=os.environ.get("PROJECTFOLDER")
         portFilePath=projectFolder+"/randomPort.txt"
         starttime=time.time()
-        while not os.path.exists(portFilePath) and time.time()-starttime<5:
+        while not os.path.exists(portFilePath) and time.time()-starttime<20:
             time.sleep(1)
         selected_port=""
         if os.path.isfile(portFilePath):
@@ -602,29 +596,10 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
         projName=None
         result=""
         work={}
-        # LOG_LEVELS = (logging.DEBUG, logging.INFO, logging.WARN, logging.ERROR, logging.CRITICAL)
-
-        # port = "6001"
-        # level = logging.DEBUG
-        # ctx = zmq.Context()
-        # pub = ctx.clientet(zmq.PUB)
-        # pub.connect("tcp://"+os.environ["ZEROMQIP"]+":"+port)
-
-        # logger = logging.getLogger(str(os.getpid()))
-        # logger.setLevel(level)
-        # handler = PUBHandler(pub)
-        # logger.addHandler(handler)
-        # print("starting logger at %i with level=%s" % (os.getpid(), level))
-        # logger.log(level, "Hello from %i!" % os.getpid())
-        # endtime=time.time()
-        # while True:
+       
         while retries_left:
-            # Say we're available.
-            # try:
-            #     client.send_json({ "msg": "available"},flags=zmq.NOBLOCK)
-            # except zmq.error.ZMQError as e:
-            #     pass
-            env.logger.info("send available")
+            
+            # env.logger.info("send available")
             client.send_json({ "msg": "available","pid":pid})
             expect_reply=True
             while expect_reply:
@@ -636,7 +611,7 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
                         if work == {}:
                             continue     
                         if "preprocessing" in work:
-                            print("preprocessing")
+                            # print("preprocessing")
                             expect_reply=False
                             continue
                         if "noMoreWork" in work:
@@ -649,21 +624,15 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
                         args=work['args']
                         path=work["path"]
                         projName=work["projName"]
-                        env.logger.info("running computation")
-                        # logger.log(level, str(os.environ["NODENAME"])+" "+time.asctime(time.localtime(time.time()) )+" "+str(time.time()-endtime))
-                        # starttime=time.time()
+                        # env.logger.info("running computation")
+              
                         worker = AssoTestsWorker(param, grps, args,path,projName)
                         result=worker.run()
                         result =json.dumps(result)
 
-
-                        # logger.log(level, str(os.environ["NODENAME"])+" "+str(time.time()-starttime))
-                        # endtime=time.time()
                     except zmq.error.Again as e:
                         pass
                     
-                    # We have a result, let's inform the master about that, and receive the
-                    # "thanks".
                     try:
                         if result!="":
                             client.send_json({ "msg": "result", "result": result,"pid":pid,"grps":grps_string})
@@ -673,7 +642,7 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
                                 if socks.get(client) == zmq.POLLIN:
                                     reply=client.recv()
                                     expect_thanks=False
-                                    env.logger.info("send back result")
+                                    # env.logger.info("send back result")
                                 else:
                                     msg={ "msg": "result", "result": result,"pid":pid,"grps":grps_string}
                                     retries_left,client,poll=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
@@ -691,7 +660,6 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
     except Exception as e:
         print(e)
     finally:
-        print("called here")
         client.close()   
         context.term()
 
@@ -705,7 +673,7 @@ def worker_heartbeat():
         projectFolder=os.environ.get("PROJECTFOLDER")
         portFilePath=projectFolder+"/randomPort_heartbeat.txt"
         starttime=time.time()
-        while not os.path.exists(portFilePath) and time.time()-starttime<5:
+        while not os.path.exists(portFilePath) and time.time()-starttime<20:
             time.sleep(1)
         selected_port=""
         if os.path.isfile(portFilePath):
@@ -721,7 +689,7 @@ def worker_heartbeat():
         retries_left=REQUEST_RETRIES
         # while retries_left:
         while True:
-            print("send")
+            # print("send")
             hb_socket.send_json({ "msg": "heartbeat","pid":pid})
             sock = dict(poll.poll(2500))
             if sock.get(hb_socket) == zmq.POLLIN:
@@ -741,7 +709,6 @@ def worker_heartbeat():
     except Exception as e:
         print(e)
     finally:
-        print("called there")
         hb_socket.setsockopt(zmq.LINGER, 0)
         poll.unregister(hb_socket)
         hb_socket.close()   
@@ -757,7 +724,7 @@ if __name__ == "__main__":
             raise ValueError("Please set PROJECTFOLDER.")
         if os.environ.get("ZEROMQIP") is None:
             os.environ["ZEROMQIP"]="127.0.0.1"
-        # time.sleep(5)
+        #time.sleep(5)
        
         thread=threading.Thread(target=worker_heartbeat)
         # thread.setDaemon(True)
@@ -767,7 +734,6 @@ if __name__ == "__main__":
         thread.join()
         print("done")
 
-        
     except Exception as e:
         print(e)
 

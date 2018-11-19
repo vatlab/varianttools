@@ -33,4 +33,4 @@ for node in "${WORKER_NODES[@]}";
 do
   echo $node >> $HOSTFILE
 done
-mpiexec -d -x PATH  -H $HOST_NAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -np 24 -wdir $VTOOLSFOLDER ./worker_zmq.py
+mpiexec -d -x PATH  -H $HOST_NAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -npernode 8 -wdir $VTOOLSFOLDER ./worker_zmq.py
