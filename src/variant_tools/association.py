@@ -1423,9 +1423,9 @@ def server_alive(poll,sock,hb_socket):
             if j['msg'] == "available":
                 sock.send_json({'preprocessing':'preprocessing'})
         if poller.get(hb_socket) == zmq.POLLIN:
-            j=sock.recv_json()
+            j=hb_socket.recv_json()
             if j['msg']=="heartbeat":
-                sock.send_json({"msg":"heartbeat"})
+                hg_socket.send_json({"msg":"heartbeat"})
 
 
 
