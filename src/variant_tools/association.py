@@ -1425,7 +1425,7 @@ def server_alive(poll,sock,hb_socket):
         if poller.get(hb_socket) == zmq.POLLIN:
             j=hb_socket.recv_json()
             if j['msg']=="heartbeat":
-                hg_socket.send_json({"msg":"heartbeat"})
+                hb_socket.send_json({"msg":"heartbeat"})
 
 
 
