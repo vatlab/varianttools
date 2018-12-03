@@ -3,9 +3,6 @@
 #PBS -V
 #PBS -q short
 
-bash
-source activate VariantTools
-VTOOLSFOLDER="path to vtools installation folder"
 PROJECTFOLDER="path to project folder"
 COMMAND='vtools associate variant disease --discard_variants %(NA)>0.1 --method "BurdenBt --name BurdenTest --alternative 2" --group_by refgene.name2  -j 8 -v 2 -mpi'
 
@@ -33,4 +30,4 @@ for node in "${WORKER_NODES[@]}";
 do
   echo $node >> $HOSTFILE
 done
-mpiexec -d -x PATH  -H $HOST_NAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -npernode 8 -wdir $VTOOLSFOLDER ./worker_zmq.py
+mpiexec -d -x PATH  -H $HOST_NAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -npernode 8  worker_run

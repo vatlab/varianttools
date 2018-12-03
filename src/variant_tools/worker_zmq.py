@@ -669,6 +669,8 @@ def worker_heartbeat():
         pid=os.getpid()
         context=zmq.Context()
         hb_socket = context.socket(zmq.REQ)
+        poll = zmq.Poller()
+        poll.register(hb_socket, zmq.POLLIN)
 
         projectFolder=os.environ.get("PROJECTFOLDER")
         portFilePath=projectFolder+"/randomPort_heartbeat.txt"
@@ -684,8 +686,8 @@ def worker_heartbeat():
 
         SERVER_ENDPOINT="tcp://"+os.environ["ZEROMQIP"]+":"+selected_port
         hb_socket.connect(SERVER_ENDPOINT) # IP of master
-        poll = zmq.Poller()
-        poll.register(hb_socket, zmq.POLLIN)
+        
+        
         retries_left=REQUEST_RETRIES
         # while retries_left:
         while True:
@@ -716,7 +718,7 @@ def worker_heartbeat():
 
 
 
-if __name__ == "__main__":
+def main():
     try:
         REQUEST_TIMEOUT=2500
         REQUEST_RETRIES=3

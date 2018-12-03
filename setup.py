@@ -758,6 +758,7 @@ setup(name = "variant_tools",
 [console_scripts]
 vtools = variant_tools.vtools:main
 vtools_report = variant_tools.vtools_report:main
+worker_run=variant_tools.worker_zmq:main
 ''',
     ext_modules = ext_modules
 )
