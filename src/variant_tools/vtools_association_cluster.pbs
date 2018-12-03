@@ -3,8 +3,9 @@
 #PBS -V
 #PBS -q short
 
-PROJECTFOLDER="path to project folder"
-COMMAND='vtools associate variant disease --discard_variants %(NA)>0.1 --method "BurdenBt --name BurdenTest --alternative 2" --group_by refgene.name2  -j 8 -v 2 -mpi'
+#PROJECTFOLDER="path to project folder"
+PROJECTFOLDER="/workspace/jma7/2k_short_hdf5/"
+COMMAND='vtools associate variant disease --discard_variants %(NA)>0.1 --method "BurdenBt --name BurdenTest --alternative 2" --group_by refgene.name2 -j 8 -v 2 -mpi'
 
 HOST_NAME=$(printenv | grep "HOSTNAME" | sed -e "s/HOSTNAME=//g")
 NODE_LIST=`cat $PBS_NODEFILE | uniq`
@@ -21,7 +22,6 @@ echo $HOST_NAME
 export ZEROMQIP=$(ifconfig | sed -En 's/127.0.0.1//;s/.*inet (addr:)?(([0-9]*\.){3}[0-9]*).*/\2/p')
 echo $ZEROMQIP
 export PROJECTFOLDER
-export VTOOLSFOLDER
 HOSTFILE="$PROJECTFOLDER/hostlist.txt"
 
 rm -rf $HOSTFILE
@@ -29,4 +29,5 @@ for node in "${WORKER_NODES[@]}";
 do
   echo $node >> $HOSTFILE
 done
-mpiexec -d -x PATH  -H $HOST_NAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -npernode 8  worker_run
+MPIEXECPATH=$(which mpiexec)
+$MPIEXECPATH -d -x PATH  -H $HOST_NAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -npernode 8  worker_run

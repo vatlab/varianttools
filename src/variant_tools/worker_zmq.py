@@ -688,7 +688,7 @@ def worker_heartbeat():
         hb_socket.connect(SERVER_ENDPOINT) # IP of master
         
         
-        retries_left=REQUEST_RETRIES
+       # retries_left=REQUEST_RETRIES
         # while retries_left:
         while True:
             # print("send")
@@ -734,7 +734,7 @@ def main():
         worker(REQUEST_TIMEOUT,REQUEST_RETRIES)
         
         thread.join()
-        print("done")
+        #print("done")
 
     except Exception as e:
         print(e)
