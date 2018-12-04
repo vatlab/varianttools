@@ -4,8 +4,8 @@
 #PBS -q short
 
 #PROJECTFOLDER="path to project folder"
-PROJECTFOLDER="/workspace/jma7/2k_short_hdf5/"
-COMMAND='vtools associate variant disease --discard_variants %(NA)>0.1 --method "BurdenBt --name BurdenTest --alternative 2" --group_by refgene.name2 -j 8 -v 2 -mpi'
+PROJECTFOLDER="/workspace/jma7/test2k/"
+COMMAND='vtools associate variant disease --discard_variants %(NA)>0.1 --method "BurdenBt --name BurdenTest --alternative 2" --group_by refgene.name2  -j 8 -v 2 -mpi'
 
 HOST_NAME=$(printenv | grep "HOSTNAME" | sed -e "s/HOSTNAME=//g")
 NODE_LIST=`cat $PBS_NODEFILE | uniq`

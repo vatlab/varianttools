@@ -1211,6 +1211,12 @@ class AnnoDBWriter:
             self.update_existing = False
             self.createAnnoDB()
         else:
+            self.db.connect(self.name)
+            count=0
+            for table in [self.name, self.name + '_field', self.name + '_info']:
+            	while not self.db.hasTable(table) and count<5:
+                    count+=1
+                    time.sleep(1)
             self.update_existing = True
             self.updateAnnoDB(overwrite_existing_fields)
 
