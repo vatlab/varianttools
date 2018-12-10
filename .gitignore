@@ -1,6 +1,6 @@
-src/variant_tools/celery_main/*DB
+src/zeromq-4.0.3/
+src/variant_tools/celery_main/
 src/variant_tools/io_vcf_read.c
-src/variant_tools/celery_main/*.pbs
 src/variant_tools.egg-info/
 test/*.log
 test/*.DB

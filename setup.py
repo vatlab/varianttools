@@ -564,6 +564,36 @@ if not EMBEDDED_BOOST:
         print('The boost C++ library version 1.49.0 is not found under the current directory. Will try to use the system libraries.')
 
 
+EMBEDDED_ZMQ= os.path.isdir('src/zeromq-4.0.3')
+if not EMBEDDED_ZMQ:
+    def downloadProgress(count, blockSize, totalSize):
+        perc = count * blockSize * 100 // totalSize
+        if perc > downloadProgress.counter:
+            sys.stdout.write('.' * (perc - downloadProgress.counter))
+            downloadProgress.counter = perc
+        sys.stdout.flush()
+    if sys.version_info.major == 2:
+        from urllib import urlretrieve
+    else:
+        from urllib.request import urlretrieve
+    import tarfile
+    downloadProgress.counter = 0
+    try:
+        BOOST_URL = 'http://download.zeromq.org/zeromq-4.0.3.tar.gz'
+        sys.stdout.write('Downloading ZeroMQ version 4.0.3')
+        sys.stdout.flush()
+        if not os.path.isfile('src/zeromq-4.0.3.tar.gz'):
+            urlretrieve(BOOST_URL, 'src/zeromq-4.0.3.tar.gz', downloadProgress)
+        sys.stdout.write('\n')
+        # extract needed files
+        with tarfile.open('src/zeromq-4.0.3.tar.gz', 'r:gz') as tar:
+            tar.extractall(path='src')
+        os.remove('src/zeromq-4.0.3.tar.gz')
+        EMBEDDED_ZMQ = True
+    except Exception as e:
+        print(e)
+        print('The ZeroMQ version 4.0.3 is not found under the current directory.')
+
 #
 # During development, if an interface file needs to be re-generated, please
 # remove these files and they will be re-generated with SWIG
@@ -629,6 +659,23 @@ if EMBEDDED_BOOST:
             c.create_static_lib(objects, "embedded_boost", output_dir='build')
     except Exception as e:
         sys.exit("Failed to build embedded boost library: {}".format(e))
+
+
+if EMBEDDED_ZMQ:
+  currentdir=os.getcwd()
+  try:
+    if not os.path.isfile("./src/zeromq-4.0.3/Makefile"):
+      os.chdir("./src/zeromq-4.0.3")
+      ret=subprocess.call(["./configure", "--prefix="+currentdir+"/src/zeromq-4.0.3"],shell=True)
+      if ret != 0: sys.exit('Failed to install zmq.')
+      ret=subprocess.call(["make", "install"],shell=True)
+      if ret != 0: sys.exit('Failed to install zmq.')
+  except OSError as e:
+        sys.exit('Failed to install zmq.')
+  finally:
+    os.chdir(currentdir)
+
+
 
 # building other libraries
 for files, incs, macs, libname in [
@@ -749,9 +796,9 @@ setup(name = "variant_tools",
             'Programming Language :: Python :: 3',
             'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
-    #install_requires=[
-    #   'varstore'
-    #],
+    install_requires=[
+       'pyzmq'
+    ],
     packages = find_packages('src'),
     package_dir = {'': 'src'},
     entry_points = '''
