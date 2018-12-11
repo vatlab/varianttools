@@ -541,7 +541,7 @@ class ResultRecorder:
 
 
 def retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg):
-    print("W: No response from server, retrying…")
+    #print("W: No response from server, retrying…")
     # Socket is confused. Close and remove it.
     client.setsockopt(zmq.LINGER, 0)
     client.close()
@@ -550,7 +550,7 @@ def retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg):
     if retries_left == 0:
         print("E: Server seems to be offline, abandoning")
         return [retries_left,client,poll]
-    print("I: Reconnecting and resending")
+    #print("I: Reconnecting and resending")
     # Create new connection
     client = context.socket(zmq.REQ)
     client.connect(SERVER_ENDPOINT)
@@ -705,7 +705,7 @@ def worker_heartbeat():
                 # retries_left,client,poll=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
                 # if retries_left==0:
                 break
-        print("heartbeat stop")
+        #print("heartbeat stop")
     except ValueError as e:
         print(e)
     except Exception as e:
@@ -734,7 +734,7 @@ def main():
         worker(REQUEST_TIMEOUT,REQUEST_RETRIES)
         
         thread.join()
-        #print("done")
+
 
     except Exception as e:
         print(e)

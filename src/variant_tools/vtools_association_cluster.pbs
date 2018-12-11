@@ -6,6 +6,8 @@
 
 [[ -z "${PROJECTFOLDER}" ]] && PROJECTFOLDER='path to project folder' || PROJECTFOLDER="${PROJECTFOLDER}"
 COMMAND='vtools associate variant disease --discard_variants %(NA)>0.1 --method "BurdenBt --name BurdenTest --alternative 2" --group_by refgene.name2  -j 8 -v 2 -mpi'
+NUMBER_OF_PROCESSES_PER_NODE=8
+
 
 HOST_NAME=$(printenv | grep "HOSTNAME" | sed -e "s/HOSTNAME=//g")
 NODE_LIST=`cat $PBS_NODEFILE | uniq`
@@ -28,4 +30,4 @@ do
   echo $node >> $HOSTFILE
 done
 MPIEXECPATH=$(which mpiexec)
-$MPIEXECPATH -d -x PATH  -H $HOST_NAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -npernode 8  worker_run
+$MPIEXECPATH -d -x PATH  -H $HOST_NAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -npernode $NUMBER_OF_PROCESSES_PER_NODE  worker_run
