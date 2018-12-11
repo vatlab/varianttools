@@ -722,11 +722,36 @@ def main():
     try:
         REQUEST_TIMEOUT=2500
         REQUEST_RETRIES=3
+
         if os.environ.get("PROJECTFOLDER") is None:
             raise ValueError("Please set PROJECTFOLDER.")
         if os.environ.get("ZEROMQIP") is None:
             os.environ["ZEROMQIP"]="127.0.0.1"
         time.sleep(5)
+
+       
+        thread=threading.Thread(target=worker_heartbeat)
+        # thread.setDaemon(True)
+        thread.start()
+        worker(REQUEST_TIMEOUT,REQUEST_RETRIES)
+        
+        thread.join()
+
+
+    except Exception as e:
+        print(e)
+
+if __name__ == "__main__":
+    try:
+        REQUEST_TIMEOUT=2500
+        REQUEST_RETRIES=3
+
+        if os.environ.get("PROJECTFOLDER") is None:
+            raise ValueError("Please set PROJECTFOLDER.")
+        if os.environ.get("ZEROMQIP") is None:
+            os.environ["ZEROMQIP"]="127.0.0.1"
+        time.sleep(5)
+
        
         thread=threading.Thread(target=worker_heartbeat)
         # thread.setDaemon(True)

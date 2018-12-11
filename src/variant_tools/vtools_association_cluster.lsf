@@ -12,12 +12,11 @@
 COMMAND='vtools associate variant disease --discard_variants %(NA)>0.1 --method "BurdenBt --name BurdenTest --alternative 2" --group_by refgene.name2  -j 8 -v 2 -mpi'
 NUMBER_OF_PROCESSES=24
 
-HOST_NAME=$(printenv | grep "HOSTNAME" | sed -e "s/HOSTNAME=//g")
 NODE_LIST=($LSB_HOSTS)
 WORKER_NODES=()
 for node in "${NODE_LIST[@]}";
 do
- if [ "$node" != "$HOST_NAME" ]; then
+ if [ "$node" != "$HOSTNAME" ]; then
    if [[ ! " ${WORKER_NODES[@]} " =~ " ${node} " ]]; then
         WORKER_NODES+=($node)
    fi
@@ -36,4 +35,4 @@ do
 done
 
 MPIEXECPATH=$(which mpiexec)
-$MPIEXECPATH -d -x PATH  -H $HOST_NAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -np $NUMBER_OF_PROCESSES  worker_run
+$MPIEXECPATH -d -x PATH  -H $HOSTNAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -np $NUMBER_OF_PROCESSES  worker_run

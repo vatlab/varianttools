@@ -9,13 +9,12 @@ COMMAND='vtools associate variant disease --discard_variants %(NA)>0.1 --method 
 NUMBER_OF_PROCESSES_PER_NODE=8
 
 
-HOST_NAME=$(printenv | grep "HOSTNAME" | sed -e "s/HOSTNAME=//g")
 NODE_LIST=`cat $PBS_NODEFILE | uniq`
 WORKER_NODES=()
 nodes=(`echo $NODE_LIST | cut -d " "  --output-delimiter=" " -f 1-`)
 for node in "${nodes[@]}"
 do
-   if [ "$node" != "$HOST_NAME" ]; then
+   if [ "$node" != "$HOSTNAME" ]; then
       WORKER_NODES+=($node)
    fi
 done
@@ -30,4 +29,4 @@ do
   echo $node >> $HOSTFILE
 done
 MPIEXECPATH=$(which mpiexec)
-$MPIEXECPATH -d -x PATH  -H $HOST_NAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -npernode $NUMBER_OF_PROCESSES_PER_NODE  worker_run
+$MPIEXECPATH -d -x PATH  -H $HOSTNAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -npernode $NUMBER_OF_PROCESSES_PER_NODE  worker_run
