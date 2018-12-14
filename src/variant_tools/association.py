@@ -1198,14 +1198,6 @@ def send_next_work(sock, works):
     sock.send_json(work)
     return ','.join(elems[0] for elems in work["grps"])
 
-    # except StopIteration:
-    #     # If no more work is available, we still have to reply something.
-    #     try:
-    #         sock.send_json({"noMoreWork":"noMoreWork"},flags=zmq.NOBLOCK)
-    #     except zmq.error.ZMQError as e:
-    #         pass
-
-
 
 def send_thanks(sock):
     try:
@@ -1234,7 +1226,7 @@ def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,contex
         projName=asso.proj.name
         works = generate_works(asso,args)
         unfinished_works=[]
-        # endtime=time.time()
+      
         tasks={}
         nodes={}
         interval=time.time()
@@ -1252,15 +1244,11 @@ def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,contex
                     print(str(node)+" not responding")
                     for grps_string,pid in tasks.items():
                         if pid==node:
-                            # print(grps_string)
                             deadnodes.append(node)
                             unfinished_groups=[[grp] for grp in grps_string.split(",")]
-
                             unfinished_works.append({"projName":projName,"param":json.dumps(asso.__dict__), "grps":unfinished_groups,
             "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,"unknown_args":args.unknown_args},"path": os.getcwd()})       
-                            # for grp in grps_string.split(","):
-                            #     asso.groups.append((grp,))
-                            #     groupCount+=1
+                
                     tasks.pop(grps_string,None)
             for node in deadnodes:
                 nodes.pop(node,None)
@@ -1298,10 +1286,11 @@ def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,contex
                     interval=time.time()
 
             else:
-                if time.time()-interval>20:
-                    print("No available worker.")
+                if time.time()-interval>60:
+                    print("No available worker. Not receiving any result from worker in 60 seconds.")
                     break
         
+        # terminate 
         for node in nodes.keys():
             poller = dict(poll.poll(2000))
             if poller.get(hb_socket) == zmq.POLLIN:
@@ -1340,80 +1329,7 @@ def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,contex
         os.remove(os.getcwd()+"/randomPort_heartbeat.txt")
 
 
-
-def cluster_runAssociation(args,asso,proj,results):
-    try:
-       
-        prog = ProgressBar('Testing for association', len(asso.groups))
-        count=1
-        grps=[]
-        old_db=asso.db
-        old_proj_db=asso.proj.db
-        old_proj_annoDB=asso.proj.annoDB
-        old_test=asso.tests
-        asso.db=""
-        asso.proj.db=""
-        asso.proj.annoDB=""
-        asso.tests=""
-        outputs=[]
-        for grp in asso.groups:
-            grps.append(grp)
-            if count%10==0:
-                output=run_grp_association.delay(asso, grps,
-                    args,os.getcwd())
-                outputs.append(output.id)
-                grps=[]
-            count+=1
-        if len(grps)!=0:
-            output=run_grp_association.delay(asso, grps,
-                    args,os.getcwd())
-            outputs.append(output.id)
-
-       
-        outputs=deque(outputs)
-        begintime=time.time()
-        endtime=time.time()
-        while outputs:
-            output=outputs.popleft()
-            
-            result=AsyncResult(output)
-            if result.state=="SUCCESS":
-                print("wait ",time.time()-endtime)
-                starttime=time.time()
-                for rec in result.get():
-                    results.record(rec)
-                    count = results.completed()
-                    prog.update(count, results.failed())
-                print("process ",time.time()-starttime)
-                endtime=time.time()
-            else :
-                if result.state!="FAILURE":
-                    outputs.append(output)
-    
-        print("total ",time.time()-begintime)
-        results.done()
-
-        prog.done()
-
-        asso.db=old_db
-        asso.proj.db=old_proj_db
-        asso.proj.annoDB=old_proj_annoDB
-        asso.tests=old_test
-        
-        # summary
-        env.logger.info('Association tests on {} groups have completed. {} failed.'.\
-                         format(results.completed(), results.failed()))
-        # use the result database in the project
-        if args.to_db:
-            proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
-       
-    except Exception as e:
-        env.logger.error(e)
-        sys.exit(1)
-
-
 def server_alive(poll,sock,hb_socket):
-    # print("before")
     global preprocessing
     preprocessing=True
     while preprocessing:
@@ -1433,10 +1349,13 @@ def associate(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
             sock,hb_socket,poll,context,port_selected=[None]*5
+
+            #The main program has started but is not ready to send jobs to worker yet, sends a message "preprocessing" to let 
+            #worker know that the main program is running.
+
             if args.mpi:                
                 if os.environ.get("ZEROMQIP") is None:
                     os.environ["ZEROMQIP"]="127.0.0.1"
-
                 context = zmq.Context()
                 sock = context.socket(zmq.REP)
 
@@ -1457,9 +1376,6 @@ def associate(args):
                 
                 thread=threading.Thread(target=server_alive,args=(poll,sock,hb_socket))
                 thread.start()
-
-    
-                
 
             # step 0: create an association testing object with all group information
             try:
@@ -1507,11 +1423,7 @@ def associate(args):
                 HDFfileGroupNames=glob.glob("tmp*multi_genes.h5")
             
                 if len(HDFfileGroupNames)==0 or args.force:
-                 
                     nJobs = max(args.jobs, 1)
-                    
-                    # generateHDFbyGroup_update(asso,nJobs)
-                    # generate HDF5 with variants grouped by gene name.
                     generateHDFbyGroup(asso,nJobs)
                 else:
                     env.logger.warning("Temp files are not regenerated!")

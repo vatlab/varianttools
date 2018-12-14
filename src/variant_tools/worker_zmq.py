@@ -562,8 +562,6 @@ def retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg):
 
 def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
     # Setup ZMQ.
-
-    
     context = zmq.Context()
     client = context.socket(zmq.REQ)
     pid=os.getpid()
@@ -572,6 +570,7 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
         projectFolder=os.environ.get("PROJECTFOLDER")
         portFilePath=projectFolder+"/randomPort.txt"
         starttime=time.time()
+        #wait for main program to start up
         while not os.path.exists(portFilePath) and time.time()-starttime<20:
             time.sleep(1)
         selected_port=""
@@ -582,7 +581,6 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
             raise ValueError("%s isn't a file!" % portFilePath)
 
         SERVER_ENDPOINT="tcp://"+os.environ["ZEROMQIP"]+":"+selected_port
-        
         client.connect(SERVER_ENDPOINT) # IP of master
         poll = zmq.Poller()
         poll.register(client, zmq.POLLIN)
@@ -624,8 +622,8 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
                         args=work['args']
                         path=work["path"]
                         projName=work["projName"]
-                        # env.logger.info("running computation")
-              
+                       
+                        # Running association
                         worker = AssoTestsWorker(param, grps, args,path,projName)
                         result=worker.run()
                         result =json.dumps(result)
@@ -642,7 +640,6 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
                                 if socks.get(client) == zmq.POLLIN:
                                     reply=client.recv()
                                     expect_thanks=False
-                                    # env.logger.info("send back result")
                                 else:
                                     msg={ "msg": "result", "result": result,"pid":pid,"grps":grps_string}
                                     retries_left,client,poll=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
@@ -687,11 +684,8 @@ def worker_heartbeat():
         SERVER_ENDPOINT="tcp://"+os.environ["ZEROMQIP"]+":"+selected_port
         hb_socket.connect(SERVER_ENDPOINT) # IP of master
         
-        
-       # retries_left=REQUEST_RETRIES
-        # while retries_left:
+
         while True:
-            # print("send")
             hb_socket.send_json({ "msg": "heartbeat","pid":pid})
             sock = dict(poll.poll(2500))
             if sock.get(hb_socket) == zmq.POLLIN:
@@ -705,7 +699,6 @@ def worker_heartbeat():
                 # retries_left,client,poll=retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg)
                 # if retries_left==0:
                 break
-        #print("heartbeat stop")
     except ValueError as e:
         print(e)
     except Exception as e:
