@@ -33,6 +33,9 @@ from shutil import copyfile
 from .accessor import *
 from subprocess import call
 
+import json
+import pickle
+
 try:
     from variant_tools.cgatools import normalize_variant
 except ImportError as e:
@@ -1438,7 +1441,9 @@ def updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDF5fileN
             cur.execute(sql,task)
         except Exception as e:
             print(e)
-        
+  
+
+     
     
 
 
@@ -1585,6 +1590,11 @@ def importGenotypesInParallel(importer,num_sample=0):
                     updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge)
                     taskQueue.put(HDF5GenotypeImportWorker(chunk, importer.variantIndex, start_sample, end_sample, 
                         sample_ids,variant_import_count[job], job,HDFfile_Merge,importer.genotype_info,importer.build))
+
+             
+                    # do_work.delay(chunk,importer.variantIndex,start_sample, end_sample, 
+                    #      sample_ids, job,HDFfile_Merge,importer.genotype_info,importer.build)
+           
                 else:
                     originalFile="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
                     HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_sort_genotypes.h5"

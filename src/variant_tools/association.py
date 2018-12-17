@@ -42,6 +42,17 @@ import argparse
 import numpy as np
 from .association_hdf5 import generateHDFbyGroup,getGenotype_HDF5,generateHDFbyGroup_update
 
+import pickle
+
+from collections import deque
+import zmq
+import json
+from zmq.log.handlers import PUBHandler
+import logging
+import uuid
+import threading
+
+
 
 def associateArguments(parser):
     data = parser.add_argument_group('Genotype, phenotype, and covariates')
@@ -121,6 +132,8 @@ def associateArguments(parser):
             the result database.''')
     parser.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
         help='''Number of processes to carry out association tests.'''),
+    parser.add_argument('-mpi',action="store_true",
+        help='''Submit vtools association job to cluster, please check bash script.''')
     # parser.add_argument('--HDF5', action='store_true',
     #     help='''Store genotypes into HDF5 files'''),
 
@@ -299,6 +312,9 @@ class AssociationTestManager:
                              'Please use command "vtools show tests" for a list of tests')
         tests = []
         for m in methods:
+            m=m.replace("\\","")
+            m=m.strip('"')
+            common_args=[common_arg.strip('"') for common_arg in common_args]
             name = m.split()[0]
             args = m.split()[1:] + common_args
             try:
@@ -1080,6 +1096,9 @@ def runAssociation(args,asso,proj,results):
         maintenance_flag = Value('L', 1)
         maintenance = MaintenanceProcess(proj, {'genotype_index': asso.sample_IDs}, maintenance_flag)
         maintenance.start()
+
+
+
         # step 2: workers work on genotypes
         # the group queue is used to send groups
         grpQueue = Queue()
@@ -1088,6 +1107,8 @@ def runAssociation(args,asso,proj,results):
         # see if all workers are ready
         ready_flags = Array('L', [0]*nJobs)
         shelf_lock = Lock()
+
+        
         for j in range(nJobs):
             # the dictionary has the number of temporary database for each sample
             AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j, 
@@ -1148,12 +1169,215 @@ def runAssociation(args,asso,proj,results):
         sys.exit(1)
 
 
+def generate_works(asso,args):
+    count=1
+    grps=[]
+    projName=asso.proj.name
+    asso.proj=None
+
+    for grp in asso.groups:
+        grps.append(grp)
+        if count%10==0:
+            work={"projName":projName,"param":json.dumps(asso.__dict__), "grps":grps,
+            "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,"unknown_args":args.unknown_args},"path": os.getcwd()}
+            yield work
+            grps=[]
+        count+=1
+    if(len(grps)>0):
+        work={"projName":projName,"param":json.dumps(asso.__dict__), "grps":grps,
+        "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,"unknown_args":args.unknown_args},"path": os.getcwd()}
+        yield work
+
+def send_unfinished_works(works):
+    for work in works:
+        yield work
+
+
+def send_next_work(sock, works):    
+    work = next(works)
+    sock.send_json(work)
+    return ','.join(elems[0] for elems in work["grps"])
+
+
+def send_thanks(sock):
+    try:
+        sock.send_string("done") # Nothing more to say actually
+    except zmq.error.ZMQError as e:
+        pass
+
+def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,context):
+    try:
+       
+        prog = ProgressBar('Testing for association', len(asso.groups))
+        grps=[]
+        old_db=asso.db
+        old_proj=asso.proj
+        old_proj_db=asso.proj.db
+        old_proj_annoDB=asso.proj.annoDB
+        old_test=asso.tests
+        asso.db=""
+        asso.proj.db=""
+        asso.proj.annoDB=""
+        asso.tests=""
+        groupCount=0
+
+       
+        j={}
+        projName=asso.proj.name
+        works = generate_works(asso,args)
+        unfinished_works=[]
+      
+        tasks={}
+        nodes={}
+        interval=time.time()
+        deadnodes=[]
+        first=True
+        while groupCount < len(asso.groups):
+            poller = dict(poll.poll(2000))
+            if poller.get(hb_socket) == zmq.POLLIN:
+                heartbeat=hb_socket.recv_json()       
+                hb_socket.send_json({"msg":"heartbeat"})
+                nodes[heartbeat["pid"]]=time.time()
+       
+            for node,last_heartbeat in nodes.items():
+                if time.time()-last_heartbeat>5:
+                    print(str(node)+" not responding")
+                    for grps_string,pid in tasks.items():
+                        if pid==node:
+                            deadnodes.append(node)
+                            unfinished_groups=[[grp] for grp in grps_string.split(",")]
+                            unfinished_works.append({"projName":projName,"param":json.dumps(asso.__dict__), "grps":unfinished_groups,
+            "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,"unknown_args":args.unknown_args},"path": os.getcwd()})       
+                
+                    tasks.pop(grps_string,None)
+            for node in deadnodes:
+                nodes.pop(node,None)
+       
+            if poller.get(sock) == zmq.POLLIN:
+                j = sock.recv_json()
+                if j['msg'] == "available":
+                    try:
+                        grps=send_next_work(sock, works)
+                        tasks[grps]=j["pid"]
+                    except StopIteration as e:
+                        try:
+                            if first:
+                                works=send_unfinished_works(unfinished_works)
+                                first=False
+                            work=next(works)
+                            sock.send_json(work)
+                            grps=','.join(elems[0] for elems in work["grps"])
+                            tasks[grps]=j["pid"]  
+                        except StopIteration as e:
+                            sock.send_json({"noMoreWork":"noMoreWork"})
+
+
+                elif j['msg'] == "result":
+                    r = j['result']       
+                    result=json.loads(r)
+                    for rec in result:
+                        results.record(rec)
+                        count = results.completed()
+                        prog.update(count, results.failed())
+                        groupCount+=1
+           
+                    send_thanks(sock)
+                    tasks.pop(j['grps'],None)
+                    interval=time.time()
+
+            else:
+                if time.time()-interval>60:
+                    print("No available worker. Not receiving any result from worker in 60 seconds.")
+                    break
+        
+        # terminate 
+        for node in nodes.keys():
+            poller = dict(poll.poll(2000))
+            if poller.get(hb_socket) == zmq.POLLIN:
+                heartbeat=hb_socket.recv_json()       
+                hb_socket.send_json({"msg":"stop"})
+            if poller.get(sock)==zmq.POLLIN:
+                j = sock.recv_json()
+                if j['msg'] == "available":
+                    sock.send_json({"noMoreWork":"noMoreWork"})
+          
+        results.done()
+        
+        if groupCount == len(asso.groups):
+            prog.done()
+
+        asso.db=old_db
+        asso.proj=old_proj
+        asso.tests=old_test
+        asso.proj.db=old_proj_db
+        asso.proj.annoDB=old_proj_annoDB
+        
+        # summary
+        env.logger.info('Association tests on {} groups have completed. {} failed.'.\
+                         format(results.completed(), results.failed()))
+        # use the result database in the project
+        if args.to_db:
+            proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
+    except Exception as e:
+      
+        env.logger.error(e)
+    finally:
+        sock.close()
+        hb_socket.close()
+        context.term()
+        os.remove(os.getcwd()+"/randomPort.txt")
+        os.remove(os.getcwd()+"/randomPort_heartbeat.txt")
+
+
+def server_alive(poll,sock,hb_socket):
+    global preprocessing
+    preprocessing=True
+    while preprocessing:
+        poller = dict(poll.poll(2000))
+        if poller.get(sock) == zmq.POLLIN:
+            j = sock.recv_json()
+            if j['msg'] == "available":
+                sock.send_json({'preprocessing':'preprocessing'})
+        if poller.get(hb_socket) == zmq.POLLIN:
+            j=hb_socket.recv_json()
+            if j['msg']=="heartbeat":
+                hb_socket.send_json({"msg":"heartbeat"})
+
 
 
 def associate(args):
 
     try:
         with Project(verbosity=args.verbosity) as proj:
+            sock,hb_socket,poll,context,port_selected=[None]*5
+
+            #The main program has started but is not ready to send jobs to worker yet, sends a message "preprocessing" to let 
+            #worker know that the main program is running.
+
+            if args.mpi:                
+                if os.environ.get("ZEROMQIP") is None:
+                    os.environ["ZEROMQIP"]="127.0.0.1"
+                context = zmq.Context()
+                sock = context.socket(zmq.REP)
+
+                port_selected=sock.bind_to_random_port("tcp://"+os.environ["ZEROMQIP"])     
+                with open(os.getcwd()+"/randomPort.txt","w") as outputFile:
+                    outputFile.write(str(port_selected))
+
+
+                hb_socket=context.socket(zmq.REP)
+                port_selected=hb_socket.bind_to_random_port("tcp://"+os.environ["ZEROMQIP"])     
+                with open(os.getcwd()+"/randomPort_heartbeat.txt","w") as outputFile:
+                    outputFile.write(str(port_selected))
+
+                poll = zmq.Poller()
+                poll.register(sock, zmq.POLLIN)
+                poll.register(hb_socket, zmq.POLLIN)
+                
+                
+                thread=threading.Thread(target=server_alive,args=(poll,sock,hb_socket))
+                thread.start()
+
             # step 0: create an association testing object with all group information
             try:
                 asso = AssociationTestManager(proj, args.variants, args.phenotypes, args.covariates,
@@ -1199,40 +1423,23 @@ def associate(args):
             
                 HDFfileGroupNames=glob.glob("tmp*multi_genes.h5")
                 if len(HDFfileGroupNames)==0 or args.force:
-                 
                     nJobs = max(args.jobs, 1)
-                    
-                    # generateHDFbyGroup_update(asso,nJobs)
-                    # generate HDF5 with variants grouped by gene name.
                     generateHDFbyGroup(asso,nJobs)
                 else:
                     env.logger.warning("Temp files are not regenerated!")
 
-                # remove phenotype, not necessary if sample is deleted from sample table
-                # allkeep=[]
-                # for HDFfileName in HDFfileNames:
-                #     file=tb.open_file(HDFfileName)
-                #     node=file.get_node("/chr22/GT")
-                #     sampleMasked=np.where(node.sampleMask[:]==True)[0]+1
-                #     keep = ~np.in1d(node.colnames[:], sampleMasked)
-                #     allkeep.extend(keep)
-        
-                # asso.sample_names=np.array(asso.sample_names)[allkeep].tolist()
-                # asso.sample_IDs=np.array(asso.sample_IDs)[allkeep].tolist()
-                # asso.phenotypes[0]=np.array(asso.phenotypes[0])[allkeep].tolist()
-                # asso.covariates[0]=np.array(asso.covariates[0])[allkeep].tolist()
-
-                # print(len(asso.sample_names))
-                # print(len(asso.sample_IDs))
-                # print(len(asso.phenotypes[0]))
-                # print(len(asso.covariates[0]))
-             
-
-            runAssociation(args,asso,proj,results)
-
+            if args.mpi :
+                global preprocessing
+                preprocessing=False
+                thread.join()                
+                zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,context)
+               
+            else :
+                runAssociation(args,asso,proj,results)
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
+
 
 def getAllTests():
     '''List all tests (all classes that subclasses of NullTest/GLMBurdenTest) in this module'''

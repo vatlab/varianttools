@@ -385,7 +385,6 @@ def getGenotype_HDF5(worker, group):
     cur = worker.db.cursor()
     # variant info
     var_info, variant_ids = worker.getVarInfo(group, where_clause)
-    
     chr=getChr(variant_ids[0],cur)
     chrEnd=getChr(variant_ids[-1],cur)
 
@@ -401,6 +400,7 @@ def getGenotype_HDF5(worker, group):
     geno_info = {x:[] for x in worker.geno_info}
     # getting samples locally from my own connection
     geneSymbol=transformGeneName(group[0])
+
     if len(group)==2:
         geneSymbol="pos"+str(group[1])
     HDFfileNames=glob.glob("tmp*_genotypes_multi_genes.h5")
@@ -415,8 +415,7 @@ def getGenotype_HDF5(worker, group):
             HDFfileNames.append(filename[0].replace(".h5","_multi_genes.h5"))
 
     HDFfileNames=sorted(HDFfileNames, key=lambda name: int(name.split("_")[1]))
-    for fileName in HDFfileNames:
-         
+    for fileName in HDFfileNames:    
         accessEngine=Engine_Access.choose_access_engine(fileName)
         if len(chrs)==1:
             # colnames=accessEngine.get_colnames(chr,geneSymbol)
