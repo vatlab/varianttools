@@ -242,7 +242,7 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
             % PyString_AsString(chr_str)).str();
     }
 
-    char * chr = PyUnicode_AsUTF8(chr_obj);
+    const char * chr = PyUnicode_AsUTF8(chr_obj);
     if (chr == NULL)
          return("Failed to decode chromosome name.");
     PyObject * pos_obj = PyList_GetItem(rec, pos_idx);
@@ -252,8 +252,8 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
     uint32_t pos = int_pos ? PyInt_AsLong(pos_obj) : atol(PyUnicode_AsUTF8(pos_obj));
     PyObject * ref_obj = PyList_GetItem(rec, ref_idx);
     PyObject * alt_obj = PyList_GetItem(rec, alt_idx);
-    char * ref = PyUnicode_AsUTF8(ref_obj);
-    char * alt = PyUnicode_AsUTF8(alt_obj);
+    const char * ref = PyUnicode_AsUTF8(ref_obj);
+    const char * alt = PyUnicode_AsUTF8(alt_obj);
     if (ref == NULL)
         return("Invalid reference allele");
     if (alt == NULL)
@@ -296,7 +296,7 @@ std::string normalize_variant(cgatools::reference::CrrFile * crr, PyObject * rec
     // check - and other characters
     for (size_t i = 0; i < 2; ++i) {
         std::string allele;
-        char * a = i == 0 ? ref : alt;
+        const char * a = i == 0 ? ref : alt;
         for (; *a != '\0'; ++a) {
             switch (*a) {
             case '-':
