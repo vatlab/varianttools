@@ -25,7 +25,8 @@
 include setup.py
 include README
 # libplinkio
-recursive-include src *.py *.c *.cpp *.h *.hpp *.i
+recursive-include src *.py *.c *.cpp *.h *.hpp *.i *.ipp *.pyx
+recursive-include src/zeromq* *.cpp *.h *.hpp *sh *.am *.m4 *.in config* dep* *.ipp
 recursive-include test *.py
 #
 prune src/boost_1_49_0/boost/accumulators
