@@ -25,46 +25,9 @@
 #
 from distutils.ccompiler import new_compiler
 from setuptools import find_packages, setup, Extension
-
-# parallel compilation
-import multiprocessing, multiprocessing.pool
 import numpy as np
-from Cython.Build import cythonize
-
-
-
-
-def compile_parallel(
-        self,
-        sources,
-        output_dir=None,
-        macros=None,
-        include_dirs=None,
-        debug=0,
-        extra_preargs=None,
-        extra_postargs=None,
-        depends=None):
-
-    # Copied from distutils.ccompiler.CCompiler
-    macros, objects, extra_postargs, pp_opts, build = self._setup_compile(
-        output_dir, macros, include_dirs, sources, depends, extra_postargs)
-    cc_args = self._get_cc_args(pp_opts, debug, extra_preargs)
-    #
-    def _single_compile(obj):
-
-        try:
-            src, ext = build[obj]
-        except KeyError:
-            return
-        self._compile(obj, src, ext, cc_args, extra_postargs, pp_opts)
-    # convert to list, imap is evaluated on-demand
-    list(multiprocessing.pool.ThreadPool(multiprocessing.cpu_count()).imap(_single_compile, objects))
-    return objects
-
-import distutils.ccompiler
-distutils.ccompiler.CCompiler.compile=compile_parallel
-#
 import sys, os, subprocess
+from Cython.Build import cythonize
 # use ccache to speed up build
 # try:
 #     if subprocess.call(['ccache'], stderr = open(os.devnull, "w")):
@@ -651,6 +614,7 @@ if EMBEDDED_BOOST:
         c = new_compiler()
         if not os.path.isfile(os.path.join('build', c.static_lib_format % ('embedded_boost', c.static_lib_extension))):
             # -w suppress all warnings caused by the use of boost libraries
+            print('Building embedded boost library')
             objects = c.compile(LIB_BOOST,
                 include_dirs=['src/boost_1_49_0'] + ENV_INCLUDE_DIRS,
                 output_dir='build',
@@ -665,6 +629,7 @@ if EMBEDDED_ZMQ:
   currentdir=os.getcwd()
   try:
     if not os.path.isfile("./src/zeromq-4.0.3/Makefile"):
+      print('Building embedded zeromq library')
       os.chdir("./src/zeromq-4.0.3")
       ret=subprocess.call(["./configure", "--prefix="+currentdir+"/src/zeromq-4.0.3"],shell=True)
       if ret != 0: sys.exit('Failed to install zmq.')
