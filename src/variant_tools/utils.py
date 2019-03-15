@@ -2149,6 +2149,7 @@ def downloadURL(URL, dest, quiet, message=None):
         with open(dest_tmp, 'wb') as f:
             c = pycurl.Curl()
             c.setopt(pycurl.URL, str(URL))
+            c.setopt(pycurl.FOLLOWLOCATION, 1)
             c.setopt(pycurl.WRITEFUNCTION, f.write)
             if not quiet:
                 c.setopt(pycurl.NOPROGRESS, False)
