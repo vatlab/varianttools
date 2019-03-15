@@ -1164,11 +1164,11 @@ class HDF5_Store(Base_Store):
                     workload[i % jobs] += 1
                 numTasks=len(workload)
                 variantIndex = self.proj.createVariantMap('variant', False)
-
-                if IDs[0]==1:
-                    start_sample =0
-                else:
-                    start_sample=IDs[0]-1
+                start_sample=0
+                # if IDs[0]==1:
+                #     start_sample =0
+                # else:
+                #     start_sample=IDs[0]-1
         
                 for job in range(numTasks):
                     # readQueue[job].put(chunk)
