@@ -152,7 +152,7 @@ class RConfig:
         configstr = self.load(rlist)
         if configstr is None:
             return
-        self.conf.readfp(io.BytesIO(configstr))
+        self.conf.readfp(io.StringIO(configstr))
         for section in self.conf.sections():
             try:
                 self.parse(section)
