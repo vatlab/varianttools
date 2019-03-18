@@ -11,9 +11,9 @@ RUN     apt-get -y install swig  gcc g++ build-essential bzip2 libbz2-dev libz-d
 RUN	conda update python
 RUN	conda install cython
 
-RUN wget http://www.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.4.tar.gz \
- && tar -zxvf hdf5-1.10.4.tar.gz \
- && cd hdf5-1.10.4 \
+RUN wget http://www.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.gz \
+ && tar -zxvf hdf5-1.10.5.tar.gz \
+ && cd hdf5-1.10.5 \
  && ./configure --prefix=/usr/local --enable-build-mode=production --enable-threadsafe --disable-hl \
  && make -j4 \
  && make install \
