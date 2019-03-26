@@ -34,6 +34,9 @@ RUN mv /zeromq-4.0.3 ./src
 RUN mv /boost_1_49_0 ./src
 
 RUN     python setup.py install
+# https://community.paperspace.com/t/storage-and-h5py-pytables-e-g-keras-save-weights-issues-heres-why-and-how-to-solve-it/430
+# HDF5 locking issues
+ENV     HDF5_USE_FILE_LOCKING FALSE
 
 #ENV     HOME /home/bpeng
 #RUN     mkdir /home/bpeng/temp
