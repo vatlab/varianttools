@@ -140,9 +140,11 @@ class HDF5Engine_storage(Base_Storage):
             # i=self.rownames.index(variant_id)
             # i=np.where(rownames==res[0])[0][0]
             check=np.where(rownames==res[0])
+
             if check[0].size!=0:
                 i=check[0][0]
                 group.rowmask[check]=True
+
 
     # def recover_variant(self,variant_id,chr,groupName=""):
     #     group=self.file.get_node("/chr"+chr+"/"+groupName)
@@ -672,6 +674,7 @@ class HDF5Engine_access(Base_Access):
             chrs.extend(range(1,23))
         for chr in chrs:
             try:
+
                 node=self.file.get_node("/chr"+str(chr))
                 rownames=node.rownames[:].tolist()
                 # print(self.fileName,variantIDs,chr,rownames)
@@ -698,9 +701,11 @@ class HDF5Engine_access(Base_Access):
                     try:
                         minPos
                         maxPos
-                        genoinfo=node.GT[minPos:maxPos,colpos]           
-                        updated_rownames,updated_colnames,updated_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[],"GT")
+                        # genoinfo=node.GT[minPos:maxPos,colpos]
+                        genoinfo=node.GT[minPos:maxPos,:]
                         
+                        updated_rownames,updated_colnames,updated_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[],"GT")
+                    
                     except NameError:
                         env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
                 else:

@@ -4659,14 +4659,16 @@ def remove(args):
                 if len(args.items) == 0:
                     raise ValueError(
                         'Please specify variant tables that contain variants to be removed')
-                proj.db.attach(proj.name + '_genotype')
+                if proj.store=="sqlite":
+                    proj.db.attach(proj.name + '_genotype')
                 for table in args.items:
                     proj.removeVariants(encodeTableName(table))
             elif args.type == 'genotypes':
                 if len(args.items) == 0:
                     raise ValueError(
                         'Please specify conditions to select genotypes to be removed')
-                proj.db.attach(proj.name + '_genotype')
+                if proj.store=="sqlite":
+                    proj.db.attach(proj.name + '_genotype')
                 proj.removeGenotypes(' AND '.join(
                     ['({})'.format(x) for x in args.items]))
             elif args.type == 'phenotypes':

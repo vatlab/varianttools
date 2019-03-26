@@ -3532,9 +3532,10 @@ def execute(args):
     def executeQuery():
         with Project(verbosity=args.verbosity) as proj:
             # if there is no output,
-            proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
-            # for backward compatibility
-            proj.db.attach('{}_genotype'.format(proj.name))
+            if proj.store=="sqlite":
+                proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
+                # for backward compatibility
+                proj.db.attach('{}_genotype'.format(proj.name))
             cur = proj.db.cursor()
             #
             query = args.specfile + ' ' + ' '.join(args.pipelines)

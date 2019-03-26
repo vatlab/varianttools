@@ -107,7 +107,6 @@ class GroupHDFGenerator(Process):
                         if chr==chrEnd:
                             # updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
                             updated_rownames,colnames,subMatrix=accessEngine.get_genotype(ids,"",[chr])
-                            
                             if subMatrix is not None:
                                 storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
                                 storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")

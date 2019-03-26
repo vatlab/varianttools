@@ -615,6 +615,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             return
         else:
             env.logger.info('{} samples are selected'.format(len(IDs)))
+
     #
     #
     # NOTE: this function could be implemented using one or more query more
@@ -665,7 +666,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     if numSample == 0:
         env.logger.warning('No sample is selected.')
         return
-    
+    prog = ProgressBar('Counting variants', len(IDs))
     
     
 
@@ -793,7 +794,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
  
  
     
-    prog = ProgressBar('Counting variants', len(IDs))
+    
     prog_step = max(len(IDs) // 100, 1) 
 
     sampleDict=dict()
@@ -1103,7 +1104,8 @@ def update(args):
                 raise ValueError('Please specify one of --from_file, --set '
                     'and --from_stat for command vtools upate')
             if args.from_file:
-                proj.db.attach(proj.name + '_genotype')
+                if (proj.store=="sqlite"):
+                    proj.db.attach(proj.name + '_genotype')
                 updater = Updater(proj=proj, table=encodeTableName(args.table), files=args.from_file,
                     build=args.build, format=args.format, jobs=args.jobs, 
                     sample_name=args.sample_name, fmt_args=args.unknown_args)
@@ -1117,7 +1119,8 @@ def update(args):
                 setFieldValue(proj, encodeTableName(args.table), args.set, proj.build)
                 #, ' AND '.join(['({})'.format(x) for x in args.samples]))
             if args.from_stat:
-                proj.db.attach(proj.name + '_genotype')
+                if (proj.store=="sqlite"):
+                    proj.db.attach(proj.name + '_genotype')
                 variant_table = encodeTableName(args.table) if args.table else 'variant'
                 if not proj.db.hasTable(variant_table):
                     raise ValueError('Variant table {} does not exist'.format(decodeTableName(variant_table)))
