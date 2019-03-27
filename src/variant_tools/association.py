@@ -906,9 +906,15 @@ class AssoTestsWorker(Process):
         self.pydata['name'] = grpname
         #
         if recode_missing:
-            self.pydata['genotype'] = [[missing_code if math.isnan(e) else e for e in x] for idx, x in enumerate(geno) if which[idx]]
+            if self.proj.store=="sqlite":
+                self.pydata['genotype'] = [[missing_code if math.isnan(e) else e for e in x] for idx, x in enumerate(geno) if which[idx]]
+            elif self.proj.store=="hdf5": 
+                self.pydata['genotype'] = [[missing_code if math.isnan(e) else e.astype(int).item() for e in x] for idx, x in enumerate(geno) if which[idx]]
         else:
-            self.pydata['genotype'] = [x for idx, x in enumerate(geno) if which[idx]]
+            if self.proj.store=="sqlite":
+                self.pydata['genotype'] = [x for idx, x in enumerate(geno) if which[idx]]
+            elif self.proj.store=="hdf5":
+                self.pydata['genotype'] = [x.astype(int).item() for idx, x in enumerate(geno) if which[idx]]
         #
         try:
             self.pydata['coordinate'] = [(str(x), str(y)) for x, y in zip(var_info['variant.chr'], var_info['variant.pos'])]
