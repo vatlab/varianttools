@@ -110,9 +110,9 @@ class TestAssociate(ProcessTestCase):
         'Test action pyaction'
         self.assertSucc('vtools associate variant phen2 -m "test_associate.PyActionTester" -g chr')
 
-    # def testRext(self):
-    #     'Test R extensions'
-    #     self.assertSucc('vtools associate variant phen1 -m "SKAT --name SKAT disease -k IBS" -g chr')
+    def testRext(self):
+        'Test R extensions'
+        self.assertSucc('vtools associate variant phen1 -m "SKAT --name SKAT disease -k IBS" -g chr')
 
 if __name__ == '__main__':
     unittest.main()
