@@ -1621,132 +1621,139 @@ class Project:
         return cls._instance
 
     def __init__(self, name=None, store='sqlite', mode=[], verbosity=None, **kwargs):
-        '''Create a new project or connect to an existing one.'''
-        if isinstance(mode, str):
-            self.mode = [mode]
-        else:
-            self.mode = mode
-        #
-        self._attachedDB = []
-        # version of vtools, useful when opening a project created by a previous
-        # version of vtools.
-        self.version = VTOOLS_VERSION
-        #
-        # There is no revision information after migrating from SVN to GIT
-        #
-        #self.revision = VTOOLS_REVISION
-        #
-        files = glob.glob('*.proj')
-        if 'NEW_PROJ' in self.mode:  # new project
-            if len(files) > 0:
-                if 'REMOVE_EXISTING' in self.mode:
-                    existing_files = glob.glob('*.proj') + glob.glob('*.lck') + \
-                        glob.glob('*.proj-journal') + \
-                        glob.glob('*_genotype.DB') + glob.glob("tmp*.h5")
-                    for f in existing_files:
-                        # if the project was created or updated in the past
-                        # 24 hours, do not check for update
-                        if time.time() - os.path.getmtime(f) < 60 * 60 * 24:
-                            self.mode.append('NO_CHECK_UPDATE')
-                        try:
-                            os.remove(f)
-                        except:
-                            # we might not be able to remove files...
-                            raise OSError(
-                                'Failed to remove existing project {}'.format(f))
-                else:
-                    raise ValueError(
-                        'A project can only be created in a directory without another project.')
-            if name is None:
-                raise ValueError('A new project must have a name')
-            # if a file is specified...
-            elif '.' in name or os.path.split(name)[0]:
-                raise ValueError(
-                    'A project name cannot have extension or path')
-            elif name[0].isdigit():
-                raise ValueError('A project name cannot start with a number.')
-            elif not name.replace('_', '').isalnum():
-                raise ValueError(
-                    'A project name can only contain alpha-numeric characters and underscores.')
-        else:  # exisitng project
-            if len(files) == 0:
-                if 'ALLOW_NO_PROJ' in self.mode:
-                    self.build = None
-                    self.name = None
-                    env.temp_dir = None
-                    return
-                else:
-                    raise ValueError(
-                        'Cannot find any project in the current directory.')
-            elif len(files) > 1:
-                raise ValueError(
-                    'More than one project exists in the current directory.')
-            elif not os.access(files[0], os.W_OK):
-                self.mode.append('READONLY')
-            if name is None:
-                name = files[0][:-5]
-            elif name != files[0][:-5]:
-                raise ValueError(
-                    'Another project {} already exists in the current directory'.format(files[0]))
-        #
-        self.name = name
-        self.store = store
-        self.proj_file = self.name + '.proj'
-        #
-        # create a temporary directory
-        self.db = DatabaseEngine()
-        self.db.connect(self.proj_file)
-        env.cache_dir = self.loadProperty('__option_cache_dir', None)
-        #
-        env.treat_missing_as_wildtype = self.loadProperty(
-            '__option_treat_missing_as_wildtype', None)
-        env.association_timeout = self.loadProperty(
-            '__option_association_timeout', None)
-        env.logfile_verbosity = self.loadProperty(
-            '__option_logfile_verbosity', None)
-        env.term_width = self.loadProperty('__option_term_width', None)
-        #env.check_update = self.loadProperty('__option_check_update', True)
-        env.associate_num_of_readers = self.loadProperty(
-            '__option_associate_num_of_readers', None)
-        if verbosity is None and 'NEW_PROJ' not in self.mode:
-            # try to get saved verbosity level
-            verbosity = self.loadProperty('__option_verbosity', None)
-        # set global verbosity level and temporary directory
-        env.verbosity = verbosity
-        # env.verbosity will affect the creation of logger
-        if 'NEW_PROJ' in self.mode and os.path.isfile(self.name + '.log'):
-            os.remove(self.name + '.log')
-        env.logger = '{}.log'.format(self.name)
-        env.logger.debug('')
-        env.logger.debug(env.command_line)
-        # if option temp_dir is set, the path will be used
-        # if not, None will be passed, and a temporary directory will be used.
         try:
-            env.temp_dir = self.loadProperty('__option_temp_dir', None)
-        except Exception as e:
-            env.logger.warning(
-                'Failed to use temporary directory as specified in runtime option temp_dir: {}'.format(e))
-            env.temp_dir = None
-        env.logger.debug('Using temporary directory {}'.format(env.temp_dir))
-        #
-        if 'NEW_PROJ' in self.mode:
-            self.create(**kwargs)
-            if 'NO_CHECK_UPDATE' not in self.mode:
-                self.checkUpdate()
-        else:
-            self.open()
-            if 'READONLY' not in self.mode and 'SKIP_VERIFICATION' not in self.mode:
-                try:
-                    self.checkIntegrity()
-                except Exception as e:
-                    env.logger.warning(
-                        'Skip checking integrity of project: {}'.format(e))
+            '''Create a new project or connect to an existing one.'''
+            if isinstance(mode, str):
+                self.mode = [mode]
+            else:
+                self.mode = mode
             #
-            if 'READONLY' not in self.mode:
-                try:
-                    self.analyze()
-                except Exception as e:
-                    env.logger.warning('Skip analyzing project: {}'.format(e))
+            self._attachedDB = []
+            # version of vtools, useful when opening a project created by a previous
+            # version of vtools.
+            self.version = VTOOLS_VERSION
+            #
+            # There is no revision information after migrating from SVN to GIT
+            #
+            #self.revision = VTOOLS_REVISION
+            #
+            files = glob.glob('*.proj')
+            if 'NEW_PROJ' in self.mode:  # new project
+                if len(files) > 0:
+                    if 'REMOVE_EXISTING' in self.mode:
+                        existing_files = glob.glob('*.proj') + glob.glob('*.lck') + \
+                            glob.glob('*.proj-journal') + \
+                            glob.glob('*_genotype.DB') + glob.glob("tmp*.h5")
+                        for f in existing_files:
+                            # if the project was created or updated in the past
+                            # 24 hours, do not check for update
+                            if time.time() - os.path.getmtime(f) < 60 * 60 * 24:
+                                self.mode.append('NO_CHECK_UPDATE')
+                            try:
+                                os.remove(f)
+                            except:
+                                # we might not be able to remove files...
+                                raise OSError(
+                                    'Failed to remove existing project {}'.format(f))
+                    else:
+                        raise ValueError(
+                            'A project can only be created in a directory without another project.')
+                if name is None:
+                    raise ValueError('A new project must have a name')
+                # if a file is specified...
+                elif '.' in name or os.path.split(name)[0]:
+                    raise ValueError(
+                        'A project name cannot have extension or path')
+                elif name[0].isdigit():
+                    raise ValueError('A project name cannot start with a number.')
+                elif not name.replace('_', '').isalnum():
+                    raise ValueError(
+                        'A project name can only contain alpha-numeric characters and underscores.')
+            else:  # exisitng project
+                if len(files) == 0:
+                    if 'ALLOW_NO_PROJ' in self.mode:
+                        self.build = None
+                        self.name = None
+                        env.temp_dir = None
+                        return
+                    else:
+                        raise ValueError(
+                            'Cannot find any project in the current directory.')
+                elif len(files) > 1:
+                    raise ValueError(
+                        'More than one project exists in the current directory.')
+                elif not os.access(files[0], os.W_OK):
+                    self.mode.append('READONLY')
+                if name is None:
+                    name = files[0][:-5]
+                elif name != files[0][:-5]:
+                    raise ValueError(
+                        'Another project {} already exists in the current directory'.format(files[0]))
+            #
+            self.name = name
+            self.store = store
+            self.proj_file = self.name + '.proj'
+            #
+            # create a temporary directory
+            self.db = DatabaseEngine()
+            self.db.connect(self.proj_file)
+            env.cache_dir = self.loadProperty('__option_cache_dir', None)
+            #
+            env.treat_missing_as_wildtype = self.loadProperty(
+                '__option_treat_missing_as_wildtype', None)
+            env.association_timeout = self.loadProperty(
+                '__option_association_timeout', None)
+            env.logfile_verbosity = self.loadProperty(
+                '__option_logfile_verbosity', None)
+            env.term_width = self.loadProperty('__option_term_width', None)
+            #env.check_update = self.loadProperty('__option_check_update', True)
+            env.associate_num_of_readers = self.loadProperty(
+                '__option_associate_num_of_readers', None)
+            if verbosity is None and 'NEW_PROJ' not in self.mode:
+                # try to get saved verbosity level
+                verbosity = self.loadProperty('__option_verbosity', None)
+            # set global verbosity level and temporary directory
+            env.verbosity = verbosity
+            # env.verbosity will affect the creation of logger
+            if 'NEW_PROJ' in self.mode and os.path.isfile(self.name + '.log'):
+                os.remove(self.name + '.log')
+            env.logger = '{}.log'.format(self.name)
+            env.logger.debug('')
+            env.logger.debug(env.command_line)
+            # if option temp_dir is set, the path will be used
+            # if not, None will be passed, and a temporary directory will be used.
+            try:
+                env.temp_dir = self.loadProperty('__option_temp_dir', None)
+            except Exception as e:
+                env.logger.warning(
+                    'Failed to use temporary directory as specified in runtime option temp_dir: {}'.format(e))
+                env.temp_dir = None
+            env.logger.debug('Using temporary directory {}'.format(env.temp_dir))
+            #
+            if 'NEW_PROJ' in self.mode:
+                self.create(**kwargs)
+                if 'NO_CHECK_UPDATE' not in self.mode:
+                    self.checkUpdate()
+            else:
+                self.open()
+                if 'READONLY' not in self.mode and 'SKIP_VERIFICATION' not in self.mode:
+                    try:
+                        self.checkIntegrity()
+                    except Exception as e:
+                        env.logger.warning(
+                            'Skip checking integrity of project: {}'.format(e))
+                #
+                if 'READONLY' not in self.mode:
+                    try:
+                        self.analyze()
+                    except Exception as e:
+                        env.logger.warning('Skip analyzing project: {}'.format(e))
+        except Exception as e:
+            from .utils import get_traceback
+            if verbosity and int(verbosity) > 2:
+                sys.stderr.write(get_traceback())
+            env.logger.error(e)
+            sys.exit(1)
 
     def create(self, **kwargs):
         '''Create a new project'''
