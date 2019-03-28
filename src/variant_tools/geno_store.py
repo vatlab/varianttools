@@ -1058,6 +1058,7 @@ class Sqlite_Store(Base_Store):
 class HDF5_Store(Base_Store):
     def __init__(self, proj):
         self.proj=proj
+        self.cache={}
         super(HDF5_Store, self).__init__(proj)
 
 
@@ -1317,13 +1318,14 @@ class HDF5_Store(Base_Store):
     def geno_fields(self, sampleID):
         HDFfileName=self.get_sampleFileName(sampleID)
         genoFields=""
-        if HDFfileName is not None:
+        if HDFfileName is not None and HDFfileName not in self.cache:
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
             genoFields=storageEngine.geno_fields(sampleID)
             genoFields.sort()
             # genoFields=[x.lower() for x in genoFields]
             storageEngine.close()
-        return genoFields
+            self.cache[HDFfileName]=genoFields
+        return self.cache[HDFfileName]
 
     def geno_fields_nolower(self, sampleID):
         HDFfileName=self.get_sampleFileName(sampleID)
@@ -1448,7 +1450,9 @@ class HDF5_Store(Base_Store):
         queue=Queue()
         accessEngines=[]
         procs=[]
+ 
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
+
             filename=HDFfileName.split("/")[-1]
             if filename in sampleFileMap:
                 samplesInfile=sampleFileMap[filename]
@@ -1511,7 +1515,7 @@ class HDF5_Store(Base_Store):
             p.join()
         for accessEngine in accessEngines:
             accessEngine.close()
-        prog.done()
+        # prog.done()
         return master
 
 

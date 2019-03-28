@@ -666,7 +666,11 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     if numSample == 0:
         env.logger.warning('No sample is selected.')
         return
-    prog = ProgressBar('Counting variants', len(IDs))
+    prog=None
+    if proj.store=="sqlite":
+        prog = ProgressBar('Counting variants', len(IDs))
+    else:
+        env.logger.info("Reading genotype info for processing....")
     
     
 
@@ -677,9 +681,11 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     # 3) if no fields are valid and no core stats were requested (i.e., alt, het, hom, other), then sample_stat is exited
     genotypeFieldTypes = {}
     fieldInTable = defaultdict(list)
+    store=GenoStore(proj)
+   
     for id in IDs:
-        store=GenoStore(proj)
         fields=["variant_id"]
+        starttime=time.time()
         fields.extend(store.geno_fields(id))
         for field in fields:
             fieldInTable[field].append(id)
@@ -696,8 +702,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                     # further down in the code.
                     # raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
     validGenotypeIndices = []
-
-
+    
 
 
     for stat in from_stat:
@@ -760,7 +765,6 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                 .format(numMales, numFemales))
     
   
-
     coreDestinations = [alt, hom, het, other, GT, missing, wtGT, mutGT, maf]
     for index, field in enumerate(genotypeFields):
         if field.lower() not in [x.lower() for x in list(genotypeFieldTypes.keys())]:
@@ -793,7 +797,6 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             proj.checkFieldName(name, exclude='variant')
  
  
-    
     
     prog_step = max(len(IDs) // 100, 1) 
 
@@ -869,7 +872,6 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         ' ,'.join(['{}={}'.format(x, proj.db.PH) for x in queryDestinations if x is not None]))
 
     count = 0
-
     for count,id in enumerate(variants):
         value = variants[id]
         res = []
@@ -1013,7 +1015,8 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
 
 
     proj.db.commit()
-    env.logger.info('{} records are updated'.format(count + 1))
+    if proj.store=="sqlite":
+        env.logger.info('{} records are updated'.format(count + 1))
 
 
 def updateArguments(parser):
