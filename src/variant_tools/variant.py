@@ -303,7 +303,8 @@ def select(args, reverse=False):
             # if limiting to specified samples
             if args.samples:
                 # we save genotype in a separate database to keep the main project size tolerable.
-                proj.db.attach(proj.name + '_genotype')
+                if proj.store=="sqlite":
+                    proj.db.attach(proj.name + '_genotype')
                 IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.samples]))
                 store=GenoStore(proj)
                 where_clause=store.get_noWT_variants(IDs,proj,where_clause,args)

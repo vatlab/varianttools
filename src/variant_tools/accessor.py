@@ -860,11 +860,11 @@ class HDF5Engine_access(Base_Access):
             sub_Mask=sub_Mask.astype(float)
             sub_Mask[sub_Mask==-1.0]=np.nan
             sub_geno=np.multiply(genoinfo,sub_Mask)
-    
+            
             rowMasked=np.where(rowMask==True)[0]
 
             # sampleMasked=np.where(sampleMask==True)[0]
-            
+           
             if len(rowpos)>0:
                 selectRows=rowpos[minPos:maxPos]
                 rownames=rownames[selectRows==1]
@@ -872,7 +872,9 @@ class HDF5Engine_access(Base_Access):
             
             colnames=colnames[colpos]
             sub_geno=sub_geno[:,colpos]
+            
             if len(rowpos)==0 and len(rowMasked)>0:
+               
                 rownames=rownames[np.where(rowMask==False)]
                 sub_geno=np.delete(sub_geno,rowMasked,0)
 
@@ -881,6 +883,7 @@ class HDF5Engine_access(Base_Access):
             #     # sub_geno=np.delete(sub_geno,sampleMasked,1)
             #     colnames=colnames[colpos]
             #     sub_geno=sub_geno[:,colpos]
+
             return np.array(rownames),colnames,np.array(sub_geno)
         except Exception as e:
             print(e)
