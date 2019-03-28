@@ -732,10 +732,15 @@ class AssoTestsWorker(Process):
         self.result_fields = result_fields
         self.shelf_lock = shelf_lock
         self.shelves = {}
-        #
         self.db = DatabaseEngine()
-        self.db.connect(param.proj.name + '_genotype.DB', readonly=True, lock=self.shelf_lock) 
-        self.db.attach(param.proj.name + '.proj', '__fromVariant', lock=self.shelf_lock)
+        if self.proj.store=="sqlite":
+            self.db.connect(param.proj.name + '_genotype.DB', readonly=True, lock=self.shelf_lock) 
+            self.db.attach(param.proj.name + '.proj', '__fromVariant', lock=self.shelf_lock)
+        elif self.proj.store=="hdf5":
+            self.db.connect(param.proj.name + '.proj', lock=self.shelf_lock)
+
+
+
         #
         self.g_na = float('NaN')
         if env.treat_missing_as_wildtype:
@@ -750,8 +755,13 @@ class AssoTestsWorker(Process):
 
     def getVarInfo(self, group, where_clause):
         var_info = {x:[] for x in self.var_info}
-        query = 'SELECT variant_id {0} FROM __fromVariant.__asso_tmp WHERE ({1})'.format(
+        if self.proj.store=="sqlite":
+            query = 'SELECT variant_id {0} FROM __fromVariant.__asso_tmp WHERE ({1})'.format(
+                ','+','.join([x.replace('.', '_') for x in self.var_info]) if self.var_info else '', where_clause)
+        elif self.proj.store=="hdf5":
+            query = 'SELECT variant_id {0} FROM __asso_tmp WHERE ({1})'.format(
             ','+','.join([x.replace('.', '_') for x in self.var_info]) if self.var_info else '', where_clause)
+
         #env.logger.debug('Running query: {}'.format(query))
         cur = self.db.cursor()
         # SELECT can fail when the disk is slow which causes database lock problem.
@@ -1097,14 +1107,15 @@ def runAssociation(args,asso,proj,results):
                 loader.join()
         
 
-
         # step 1.5, start a maintenance process to create indexes, if needed.
         maintenance_flag = Value('L', 1)
-        maintenance = MaintenanceProcess(proj, {'genotype_index': asso.sample_IDs}, maintenance_flag)
-        maintenance.start()
+        if proj.store=="sqlite":
+            
+            maintenance = MaintenanceProcess(proj, {'genotype_index': asso.sample_IDs}, maintenance_flag)
+            maintenance.start()
 
 
-
+     
         # step 2: workers work on genotypes
         # the group queue is used to send groups
         grpQueue = Queue()
@@ -1114,7 +1125,7 @@ def runAssociation(args,asso,proj,results):
         ready_flags = Array('L', [0]*nJobs)
         shelf_lock = Lock()
 
-        
+   
         for j in range(nJobs):
             # the dictionary has the number of temporary database for each sample
             AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j, 
@@ -1165,11 +1176,12 @@ def runAssociation(args,asso,proj,results):
         if args.to_db:
             proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
         # tells the maintenance process to stop
-        maintenance_flag.value = 0
-        # wait for the maitenance process to stop
-        with delayedAction(env.logger.info,
-                "Maintaining database. This might take a few minutes.", delay=10):
-            maintenance.join()
+        if proj.store=="sqlite":
+            maintenance_flag.value = 0
+            # wait for the maitenance process to stop
+            with delayedAction(env.logger.info,
+                    "Maintaining database. This might take a few minutes.", delay=10):
+                maintenance.join()
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
@@ -1428,11 +1440,28 @@ def associate(args):
                     sys.exit()
             
                 HDFfileGroupNames=glob.glob("tmp*multi_genes.h5")
-                if len(HDFfileGroupNames)==0 or args.force:
-                    nJobs = max(args.jobs, 1)
-                    generateHDFbyGroup(asso,nJobs)
+
+                if args.force:
+                    if len(HDFfileGroupNames)>0:
+                        for HDFfileGroupName in HDFfileGroupNames:
+                            os.remove(HDFfileGroupName)
+                        env.logger.warning("HDF5 group files will be regenerated!")
                 else:
-                    env.logger.warning("Temp files are not regenerated!")
+                    if len(HDFfileGroupNames)>0:
+                        env.logger.warning("New entries will be added to HDF5 group files!")
+                    else:
+                        env.logger.warning("HDF5 group files will be generated!")
+
+
+                nJobs = max(args.jobs, 1)
+                generateHDFbyGroup(asso,nJobs)
+
+                
+                # if len(HDFfileGroupNames)==0 or args.force:
+                #     nJobs = max(args.jobs, 1)
+                #     generateHDFbyGroup(asso,nJobs)
+                # else:
+                #     env.logger.warning("HDF5 temp files are not regenerated!")
 
             if args.mpi :
                 global preprocessing

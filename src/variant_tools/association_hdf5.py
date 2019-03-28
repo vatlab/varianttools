@@ -56,10 +56,9 @@ class GroupHDFGenerator(Process):
                 break
 
             HDFfileGroupName=HDFfileName.replace(".h5","_multi_genes.h5")
-            if (os.path.isfile(HDFfileGroupName)):
-                os.remove(HDFfileGroupName)
+            # if (os.path.isfile(HDFfileGroupName)):
+            #     os.remove(HDFfileGroupName)
                 
-
             
             accessEngine=Engine_Access.choose_access_engine(HDFfileName)
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileGroupName)
@@ -80,12 +79,13 @@ class GroupHDFGenerator(Process):
                         chr=row[0]
                         pos=row[1]
                         id=row[2]
-                        updated_rownames,colnames,subMatrix=accessEngine.get_genotype([id],"",[chr])
-                        if subMatrix is not None:
-                            storageEngine.store(subMatrix,chr,"pos"+str(pos)+"/GT")
-                            storageEngine.store(updated_rownames,chr,"pos"+str(pos)+"/rownames")
-                            if not storageEngine.checkGroup(chr,"colnames"):
-                                storageEngine.store(colnames,chr,"colnames")
+                        if not storageEngine.checkGroup(chr,"pos"+str(pos)):
+                            updated_rownames,colnames,subMatrix=accessEngine.get_genotype([id],"",[chr])
+                            if subMatrix is not None:
+                                storageEngine.store(subMatrix,chr,"pos"+str(pos)+"/GT")
+                                storageEngine.store(updated_rownames,chr,"pos"+str(pos)+"/rownames")
+                                if not storageEngine.checkGroup(chr,"colnames"):
+                                    storageEngine.store(colnames,chr,"colnames")
 
 
                 else:
@@ -100,27 +100,30 @@ class GroupHDFGenerator(Process):
                         # ids.sort()
                         chr= getChr(ids[0],db.cursor())
                         chrEnd=getChr(ids[-1],db.cursor())
+
+                        if not storageEngine.checkGroup(chr,geneSymbol):
                         
-                        # subMatrix=accessEngine.get_geno_info_by_variant_IDs(ids,chr,"GT")
-                        # if subMatrix is not None and subMatrix.indices is not None:
-                        #     storageEngine.store(subMatrix,chr,geneSymbol
-                        if chr==chrEnd:
-                            # updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
-                            updated_rownames,colnames,subMatrix=accessEngine.get_genotype(ids,"",[chr])
-                            if subMatrix is not None:
-                                storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
-                                storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
-                                if not storageEngine.checkGroup(chr,"colnames"):
-                                    storageEngine.store(colnames,chr,"colnames")
-                        else:
-                            varDict=getChrs(ids,db.cursor())
-                            for chr,vids in varDict.items():
-                                updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_sep_variant_ids(vids,chr)
+                            # subMatrix=accessEngine.get_geno_info_by_variant_IDs(ids,chr,"GT")
+                            # if subMatrix is not None and subMatrix.indices is not None:
+                            #     storageEngine.store(subMatrix,chr,geneSymbol
+                            if chr==chrEnd:
+                                # updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
+                                updated_rownames,colnames,subMatrix=accessEngine.get_genotype(ids,"",[chr])
                                 if subMatrix is not None:
                                     storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
                                     storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
                                     if not storageEngine.checkGroup(chr,"colnames"):
                                         storageEngine.store(colnames,chr,"colnames")
+                            else:
+                                varDict=getChrs(ids,db.cursor())
+                                for chr,vids in varDict.items():
+                                    updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_sep_variant_ids(vids,chr)
+                                    if subMatrix is not None:
+                                        storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
+                                        storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
+                                        if not storageEngine.checkGroup(chr,"colnames"):
+                                            storageEngine.store(colnames,chr,"colnames")
+                    
 
                     # storageEngine.close() 
                 accessEngine.close()
@@ -145,6 +148,7 @@ def generateHDFbyGroup(testManager,njobs):
     taskQueue=queue.Queue()
     start=time.time()
     groupGenerators=[None]*min(njobs,len(HDFfileNames))
+
     if len(testManager.sample_IDs)>0:
         HDFfileNames=[]
         cur = testManager.db.cursor()
@@ -154,6 +158,7 @@ def generateHDFbyGroup(testManager,njobs):
         res=cur.fetchall()
         for filename in res:
             HDFfileNames.append(filename[0])
+
     for HDFfileName in HDFfileNames:
         fileQueue.put(HDFfileName)
     for i in range(len(HDFfileNames)):
@@ -344,7 +349,7 @@ def generateHDFbyGroup_update(testManager,njobs):
                 break
     for groupHDFGenerator in groupGenerators:
         groupHDFGenerator.join()
-    print(("group time: ",time.time()-start))
+    # print(("group time: ",time.time()-start))
 
 
 
