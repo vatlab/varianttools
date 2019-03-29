@@ -462,7 +462,6 @@ class Exporter:
                                     .format(rec[col] if type(col) is int else \
                                         [rec[x] for x in col], col, e))
                 # step two: apply adjusters
-                
                 columns = [adj(fields[col] if type(col) is int else \
                     [fields[x] for x in col]) if adj else fields[col] \
                     for adj, col in col_adj]

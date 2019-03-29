@@ -493,7 +493,6 @@ class VariantWorker_HDF5(Process):
         # result=accessEngine.get_genoType_forExport_from_HDF5(self.samples,self.geno_fields)  
         self.output.send(None)
         last_id = None
-
         for key,val in vardict.items():
             if key!=last_id:
                 last_id=key
