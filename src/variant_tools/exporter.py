@@ -525,7 +525,8 @@ def exportArguments(parser):
 def export(args):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            proj.db.attach(proj.name + '_genotype')
+            if proj.store=="sqlite":
+                proj.db.attach(proj.name + '_genotype')
             if args.filename:
                 raise ValueError('Specifying output filename without --output is deprecated.')
             exporter = Exporter(proj=proj, table=args.table, filename=args.output,

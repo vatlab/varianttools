@@ -1252,7 +1252,7 @@ class HDF5_Store(Base_Store):
 
     def remove_genotype_workder(self,storageEngine,cond):
         storageEngine.remove_genotype(cond)
-       
+        storageEngine.close()
 
 
     def remove_genotype(self,cond):
