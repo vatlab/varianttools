@@ -7,15 +7,26 @@ python:
     - "3.4"
     - "3.5"
     - "3.6"
-before_install:
-    - sudo apt-get install swig zlibc zlib1g zlib1g-dev libblas-dev liblapack-dev
-install: "python setup.py install"
-before_script: cd test
+sudo: required
+services:
+    - docker
+# before_install:
+#     - sudo apt-get install swig zlibc zlib1g zlib1g-dev libblas-dev liblapack-dev
+# install: "python setup.py install"
+# before_script: cd test
+# script:
+#     - python run_tests.py
+install:
+    - docker pull junmahouston/vtools_test:latest
+    - docker run -dt --name vtools_test junmahouston/vtools_test:latest
+    - docker exec vtools_test  rm -rf /home/bpeng/VariantTools
+    - docker cp . vtools_test:/home/bpeng/VariantTools
+    - docker exec vtools_test bash -c "cd VariantTools && python setup.py install"
 script:
-    - python run_tests.py
-notifications:
-    email:
-        recipients:
-            - junmahouston@gmail.com
-        on_success: never
-        on_failure: always
+    - docker exec vtools_test bash -c "cd VariantTools/test && python test_import.py" 
+
+email:
+    recipients:
+        - junmahouston@gmail.com
+    on_success: never
+    on_failure: always

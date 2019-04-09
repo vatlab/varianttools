@@ -33,32 +33,32 @@ RUN     git pull
 RUN mv /zeromq-4.0.3 ./src
 RUN mv /boost_1_49_0 ./src
 
-RUN     python setup.py install
+RUN python setup.py install
 
-#ENV     HOME /home/bpeng
-#RUN     mkdir /home/bpeng/temp
+ENV     HOME /home/bpeng
+RUN     mkdir /home/bpeng/temp
 
 # download hg19 reference genome and refGene database
-#WORKDIR /home/bpeng/temp
-#RUN     touch temp.vcf
-#RUN     vtools init test --build hg19
-#RUN     vtools import temp.vcf
-#RUN     vtools use refGene
+WORKDIR /home/bpeng/temp
+RUN     touch temp.vcf
+RUN     vtools init test --build hg19
+RUN     vtools import temp.vcf
+RUN     vtools use refGene
 
-#WORKDIR /home/bpeng
-#RUN     rm -rf temp
+WORKDIR /home/bpeng
+RUN     rm -rf temp
 
-#RUN     mkdir /home/bpeng/temp
+RUN     mkdir /home/bpeng/temp
 
 # download hg18 reference genome and refGene database
-#WORKDIR /home/bpeng/temp
-#RUN     touch temp.vcf
-#RUN     vtools init test --build hg18
-#RUN     vtools import temp.vcf
-#RUN     vtools use refGene
+WORKDIR /home/bpeng/temp
+RUN     touch temp.vcf
+RUN     vtools init test --build hg18
+RUN     vtools import temp.vcf
+RUN     vtools use refGene
 
-#WORKDIR /home/bpeng
-#RUN     rm -rf temp
+WORKDIR /home/bpeng
+RUN     rm -rf temp
 
 
 
