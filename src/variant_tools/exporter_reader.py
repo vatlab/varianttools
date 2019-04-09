@@ -489,11 +489,8 @@ class VariantWorker_HDF5_multi(Process):
             if rec[0] != last_id:
                 last_id = rec[0]
                 chr=rec[3]
-                val=accessEngine.get_geno_by_row_pos(rec[0],chr,sortedID)
-                try:
-                    val=np.where(np.isnan(val), None, val)
-                except Exception as e:
-                    print(val)
+                val=accessEngine.get_geno_by_row_pos(rec[0],chr,sortedID,self.samples)
+                val=np.where(np.isnan(val), None, val)
                 self.output.send([rec[0]]+val.tolist())
         self.output.send(None)
         db.close()

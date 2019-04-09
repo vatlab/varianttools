@@ -959,9 +959,18 @@ class HDF5Engine_access(Base_Access):
     
 
 
-    def get_geno_by_row_pos(self,rowpos,chr,sortedID,groupName=""):
+    def get_geno_by_row_pos(self,rowpos,chr,sortedID,sampleNamesgroupName=""):
         try:
             node=self.file.get_node("/chr"+str(chr))
+            colpos=[]
+            colnames=node.colnames[:].tolist()
+                sampleNames.sort()
+
+                if (len(sampleNames)>0):
+                    colpos=list(map(lambda x:colnames.index(x),sampleNames))
+
+
+
             pos=binarySearch(sortedID,0,len(sortedID)-1,rowpos)
             if pos!=-1:
                 posInNode=sortedID[pos][1]
@@ -974,6 +983,11 @@ class HDF5Engine_access(Base_Access):
             print("exception",rowpos,chr,pos,sortedID[pos])
             print(e)
             pass
+
+
+     sub_rownames,updated_colnames,sub_geno=self.filter_on_genotypes(cond,chr,node,"GT",minPos,maxPos,colpos,rowpos)
+
+
 
 
 
