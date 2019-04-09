@@ -10,6 +10,7 @@ from .utils import env,chunks_start_stop
 
 from multiprocessing import Process,Manager
 import queue
+from .merge_sort_parallel import binarySearch
 
 
 
@@ -958,9 +959,27 @@ class HDF5Engine_access(Base_Access):
     
 
 
-    def get_geno_by_row_pos(self,rowpos,chr,groupName=""):
-        pass
+    def get_geno_by_row_pos(self,rowpos,chr,sortedID,groupName=""):
+        try:
+            node=self.file.get_node("/chr"+str(chr))
+            pos=binarySearch(sortedID,0,len(sortedID)-1,rowpos)
+            if pos!=-1:
+                posInNode=sortedID[pos][1]
+                return node.GT[posInNode,:]
+            else:
+                return np.zeros(shape=(len(node.GT[1,:])),dtype=int)
+        except tb.exceptions.NoSuchNodeError:
+            return np.zeros(shape=(len(node.GT[1,:])),dtype=int)                             
+        except Exception as e:
+            print("exception",rowpos,chr,pos,sortedID[pos])
+            print(e)
+            pass
 
+
+
+
+
+    
 
     def get_geno_by_variant_ID(self,variantID,chr,groupName=""):
         pass

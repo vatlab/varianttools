@@ -40,6 +40,8 @@ from .preprocessor import *
 from .accessor import *
 import glob as glob
 
+from .merge_sort_parallel import sorted_HDF5_rowIDs
+
 MAX_COLUMN = 62
 def VariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
         export_alt_build, IDs, jobs):
@@ -361,7 +363,9 @@ class MultiVariantReader(BaseVariantReader):
                     if len(overlapSamples)>0:
                         r, w = Pipe(False)
                         self.jobs+=1
-                        p=VariantWorker_HDF5(HDFfileName,overlapSamples,self.geno_fields,w)
+                        # p=VariantWorker_HDF5(HDFfileName,overlapSamples,self.geno_fields,w)
+                        print(HDFfileName)
+                        p=VariantWorker_HDF5_multi(proj.name, proj.annoDB, self.getVariantQuery(),HDFfileName,overlapSamples,self.geno_fields,lock,w)
                         self.workers.append(p)
                         self.readers.append(r)
 
@@ -412,7 +416,6 @@ class MultiVariantReader(BaseVariantReader):
                         elif id != val[0]:
                             raise ValueError('Read different IDs from multiple processes')
                         rec.extend(val[1:])             
-                       
                         if idx == last:
                             yield rec
                             rec = []
@@ -452,6 +455,50 @@ class MultiVariantReader(BaseVariantReader):
             for p in self.workers:
                 p.terminate()
 
+
+class VariantWorker_HDF5_multi(Process):
+    # this class starts a process and used passed query to read variants
+    def __init__(self,dbname, annoDB, query,HDFfileName,samples, geno_fields,lock,output):
+        self.dbname = dbname
+        self.annoDB = annoDB
+        self.query = query
+        self.lock = lock
+        self.fileName=HDFfileName
+        self.samples=samples
+        self.geno_fields=geno_fields
+        self.output = output   
+        Process.__init__(self)
+
+    def run(self):
+        accessEngine=Engine_Access.choose_access_engine(self.fileName)
+        sortedID=index_HDF5_rowIDs(self.fileName)
+        vardict={}
+        genoinfo_fields=[field.replace("_geno","") for field in self.geno_fields]
+        if "GT" in genoinfo_fields:
+            genoinfo_fields.remove("GT")
+        db = DatabaseEngine()
+        db.connect(self.dbname + '.proj', readonly=True, lock=self.lock)
+       
+        for anno in self.annoDB:
+            db.attach(os.path.join(anno.dir, anno.filename), lock=self.lock)
+        cur = db.cursor()
+        cur.execute(self.query)
+        self.output.send(None)
+        last_id = None
+        for rec in cur:
+            if rec[0] != last_id:
+                last_id = rec[0]
+                chr=rec[3]
+                val=accessEngine.get_geno_by_row_pos(rec[0],chr,sortedID)
+                try:
+                    val=np.where(np.isnan(val), None, val)
+                except Exception as e:
+                    print(val)
+                self.output.send([rec[0]]+val.tolist())
+        self.output.send(None)
+        db.close()
+            
+    
 
 
 
