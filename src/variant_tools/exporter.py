@@ -363,6 +363,7 @@ class Exporter:
                 # no fmt: single or None
                 #
                 # this is extremely ugly but are we getting any performance gain?
+
                 if multi_records:
                     try:
                         fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
@@ -388,6 +389,7 @@ class Exporter:
                                 raise ValueError('Failed to format value {} at col {}: {}'.format(
                                     rec[col] if type(col) is int else [rec[x] for x in col], col, e))
                 # step two: apply adjusters
+
                 try:
                     #
                     # adj: single or list
@@ -406,9 +408,12 @@ class Exporter:
                         except:
                             raise ValueError('Failed to apply adjust functor to column {}'.format(col))
                 # step three: output columns
+                # print(rec,columns)
+
                 line = sep.join(columns)
                 output.write(line + '\n')
                 count += 1
+                
             except Exception as e:
                 env.logger.debug('Failed to process record {}: {}'.format(rec, e))
                 failed_count += 1

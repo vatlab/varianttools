@@ -884,7 +884,6 @@ class HDF5Engine_access(Base_Access):
             #     # sub_geno=np.delete(sub_geno,sampleMasked,1)
             #     colnames=colnames[colpos]
             #     sub_geno=sub_geno[:,colpos]
-
             return np.array(rownames),colnames,np.array(sub_geno)
         except Exception as e:
             print(e)
@@ -912,7 +911,7 @@ class HDF5Engine_access(Base_Access):
         # if field=="GQ" and "/chr"+str(chr)+"/GQ" in self.file:
         #     genoinfo=node.GQ[startPos:endPos,:]
         #     genoinfo=np.nan_to_num(genoinfo)
-
+       
         if len(cond)>0:
             if type(cond) is str:
                 cond=cond.replace("(","").replace(")","")
@@ -959,33 +958,38 @@ class HDF5Engine_access(Base_Access):
     
 
 
-    def get_geno_by_row_pos(self,rowpos,chr,sortedID,sampleNamesgroupName=""):
+    def get_geno_by_row_pos(self,rowpos,chr,sortedID,sampleNames,groupName=""):
         try:
             node=self.file.get_node("/chr"+str(chr))
             colpos=[]
             colnames=node.colnames[:].tolist()
-                sampleNames.sort()
+            sampleNames.sort()
 
-                if (len(sampleNames)>0):
-                    colpos=list(map(lambda x:colnames.index(x),sampleNames))
-
+            if (len(sampleNames)>0):
+                colpos=list(map(lambda x:colnames.index(x),sampleNames))
+            else:
+                colpos=list(map(lambda x:colnames.index(x),colnames))
 
 
             pos=binarySearch(sortedID,0,len(sortedID)-1,rowpos)
             if pos!=-1:
                 posInNode=sortedID[pos][1]
-                return node.GT[posInNode,:]
+                sub_rownames,updated_colnames,row_geno=self.filter_on_genotypes([],chr,node,"GT",posInNode,posInNode+1,colpos,[])
+           
+                return row_geno[0]
             else:
-                return np.zeros(shape=(len(node.GT[1,:])),dtype=int)
+                #return np.zeros(shape=(len(node.GT[1,colpos])),dtype=int)
+                # return [None]*len(node.GT[1,colpos])
+                return np.full(len(node.GT[1,colpos]),np.nan)
         except tb.exceptions.NoSuchNodeError:
-            return np.zeros(shape=(len(node.GT[1,:])),dtype=int)                             
+            # return np.zeros(shape=(len(node.GT[1,colpos])),dtype=int)
+            # return [None]*len(node.GT[1,colpos])
+            return np.full(len(node.GT[1,colpos]),np.nan)                             
         except Exception as e:
             print("exception",rowpos,chr,pos,sortedID[pos])
             print(e)
             pass
 
-
-     sub_rownames,updated_colnames,sub_geno=self.filter_on_genotypes(cond,chr,node,"GT",minPos,maxPos,colpos,rowpos)
 
 
 

@@ -40,7 +40,7 @@ from .preprocessor import *
 from .accessor import *
 import glob as glob
 
-from .merge_sort_parallel import sorted_HDF5_rowIDs
+from .merge_sort_parallel import index_HDF5_rowIDs
 
 MAX_COLUMN = 62
 def VariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
@@ -364,7 +364,6 @@ class MultiVariantReader(BaseVariantReader):
                         r, w = Pipe(False)
                         self.jobs+=1
                         # p=VariantWorker_HDF5(HDFfileName,overlapSamples,self.geno_fields,w)
-                        print(HDFfileName)
                         p=VariantWorker_HDF5_multi(proj.name, proj.annoDB, self.getVariantQuery(),HDFfileName,overlapSamples,self.geno_fields,lock,w)
                         self.workers.append(p)
                         self.readers.append(r)
@@ -415,7 +414,7 @@ class MultiVariantReader(BaseVariantReader):
                             id = val[0]
                         elif id != val[0]:
                             raise ValueError('Read different IDs from multiple processes')
-                        rec.extend(val[1:])             
+                        rec.extend(val[1:])    
                         if idx == last:
                             yield rec
                             rec = []
@@ -440,11 +439,11 @@ class MultiVariantReader(BaseVariantReader):
                     while notSameID:
                         for idx,reader in enumerate(self.readers[1:]):
                             val=reader.recv()
-                           
                             if id ==val[0]:
                                 rec.extend(val[1:])
                                 if idx+1==last:
                                     notSameID=False
+
                                     yield rec
                                     rec=[]
                                     break
