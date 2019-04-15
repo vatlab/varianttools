@@ -488,9 +488,29 @@ class VariantWorker_HDF5_multi(Process):
             if rec[0] != last_id:
                 last_id = rec[0]
                 chr=rec[3]
-                val=accessEngine.get_geno_by_row_pos(rec[0],chr,sortedID,self.samples)
+                # val=accessEngine.get_geno_by_row_pos(rec[0],chr,sortedID,self.samples,genoinfo_fields)
+                sub_all=accessEngine.get_geno_by_row_pos(rec[0],chr,sortedID,self.samples,genoinfo_fields)
+                genoType=sub_all[0][0]
+                val=None
+                # numrow,numcol=genoType.shape[0],genoType.shape[1]
+                numcol=len(genoType)
+                if len(self.geno_fields)==0:
+                    val=genoType
+                else:
+                    val=np.zeros(shape=(numcol*(len(self.geno_fields))),dtype=float)
+                    for col in range(numcol):
+                        val[col*len(self.geno_fields)]=genoType[col]
+                    if len(genoinfo_fields)>0:
+                        for pos,field in enumerate(genoinfo_fields):  
+                            genoInfo=sub_all[pos+1][0]
+                            for col in range(numcol):
+                                val[col*len(self.geno_fields)+pos+1]=genoInfo[col]
                 val=np.where(np.isnan(val), None, val)
-                self.output.send([rec[0]]+val.tolist())
+                val=[ int(i) if i is not None else i for i in val]
+                self.output.send([rec[0]]+val)
+                # val=accessEngine.get_geno_by_row_pos(rec[0],chr,sortedID,self.samples,genoinfo_fields)
+                # val=np.where(np.isnan(val), None, val)
+                # self.output.send([rec[0]]+val.tolist())
         self.output.send(None)
         db.close()
             
@@ -572,5 +592,6 @@ class VariantWorker(Process):
             if rec[0] != last_id:
                 last_id = rec[0]
                 self.output.send(rec)
+
         self.output.send(None)
         db.close()
