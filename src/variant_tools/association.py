@@ -1003,7 +1003,8 @@ class AssoTestsWorker(Process):
                 if self.proj.store=="sqlite":
                     genotype, which, var_info, geno_info = self.getGenotype(grp)
                 elif self.proj.store=="hdf5":
-                    genotype, which, var_info, geno_info = getGenotype_HDF5(self,grp)
+                    genotype, which, var_info, geno_info = getGenotype_HDF5(self,grp,self.sample_IDs)
+            
                 # if I throw an exception here, the program completes in 5 minutes, indicating
                 # the data collection part takes an insignificant part of the process.
                 # 
@@ -1064,7 +1065,7 @@ def runAssociation(args,asso,proj,results):
             if not os.path.isfile(asso.proj.name + '_genotype.DB') or os.stat(asso.proj.name + '_genotype.DB').st_size == 0:
                 env.logger.error("The genotype DB is not generated, please run vtools import without --HDF5 tag to generate sqlite genotype DB first.")
                 sys.exit()
-          
+            
             for i in range(nLoaders):
                 loader = GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples)
                 loader.start()

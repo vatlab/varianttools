@@ -305,7 +305,7 @@ class AssoTestsWorker:
 
 
 
-    def getGenotype_HDF5(self,group):
+    def getGenotype_HDF5(self,group, sample_IDs):
         """This function gets genotype of variants in specified group.
         """
         where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
