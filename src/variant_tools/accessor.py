@@ -654,10 +654,12 @@ class HDF5Engine_access(Base_Access):
         try:
             rowPos=[np.where(rownames==id)[0][0] for id in rowIDs]
             update_rownames=rownames[rowPos]
-            sub_geno=group.GT[rowPos,:]    
-            sub_Mask=group.Mask[rowPos,:]
-            sub_geno=np.multiply(sub_geno,sub_Mask)
+            sub_geno=group.GT[rowPos,:]
 
+            sub_Mask=group.Mask[rowPos,:]
+            sub_Mask=sub_Mask.astype(float)
+            sub_Mask[sub_Mask==-1.0]=np.nan
+            sub_geno=np.multiply(sub_geno,sub_Mask)
             update_rowMask=rowMask[rowPos]
             rowMasked=np.where(update_rowMask==True)[0]
             sampleMasked=np.where(sampleMask==True)[0]
@@ -697,6 +699,7 @@ class HDF5Engine_access(Base_Access):
                     colpos=list(map(lambda x:colnames.index(x),sampleNames))
                 else:
                     colpos=list(map(lambda x:colnames.index(x),colnames))
+
                 if len(variantIDs)>0:
                     for id in variantIDs:
                         try:

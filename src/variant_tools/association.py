@@ -1009,6 +1009,7 @@ class AssoTestsWorker(Process):
                 # the data collection part takes an insignificant part of the process.
                 # 
                 # set C++ data object
+               
                 if (len(self.tests) - self.num_extern_tests) > 0:
                     self.setGenotype(which, genotype, geno_info, grpname)
                     self.setPhenotype(which)

@@ -91,14 +91,12 @@ class GroupHDFGenerator(Process):
                     select_group="SELECT {0}, group_concat(variant_id) from (select {0},t.variant_id from __asso_tmp as t join variant as v on t.variant_id=v.variant_id  order by v.pos) group by {0}".\
                        format(self.group_names[0])
                     
-
                     for row in cur.execute(select_group):
 
                         geneSymbol=transformGeneName(row[0])
                         ids=row[1].split(",")
                         ids=[int(x) for x in ids]
                        
-                        
                         # ids.sort()
                         chr= getChr(ids[0],db.cursor())
                         chrEnd=getChr(ids[-1],db.cursor())
