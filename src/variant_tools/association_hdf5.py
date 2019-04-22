@@ -90,43 +90,42 @@ class GroupHDFGenerator(Process):
                 else:
                     select_group="SELECT {0}, group_concat(variant_id) from (select {0},t.variant_id from __asso_tmp as t join variant as v on t.variant_id=v.variant_id  order by v.pos) group by {0}".\
                        format(self.group_names[0])
-                    
+                    cur.execute('SELECT value FROM project WHERE name="multiVCF";')
+                    multiVCF=cur.fetchall()
+                    cur.execute('SELECT DISTINCT(file_id) from sample where HDF5="{0}"'.format(HDFfileName))
+                    file_id=cur.fetchall()
                     for row in cur.execute(select_group):
-
                         geneSymbol=transformGeneName(row[0])
                         ids=row[1].split(",")
                         ids=[int(x) for x in ids]
-                       
                         # ids.sort()
                         chr= getChr(ids[0],db.cursor())
-                        chrEnd=getChr(ids[-1],db.cursor())
                         if not storageEngine.checkGroup(chr,geneSymbol):
-                        
-
-                            # if chr==chrEnd:
-                            #     # updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
-                            #     updated_rownames,colnames,subMatrix=accessEngine.get_genotype(ids,"",[chr])
-                            #     if subMatrix is not None:
-                            #         storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
-                            #         storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
-                            #         if not storageEngine.checkGroup(chr,"colnames"):
-                            #             storageEngine.store(colnames,chr,"colnames")
-                            # else:
-                            varDict=getChrs(ids,db.cursor())
-                            for chr,vids in varDict.items():
-                                try:
-                                    updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_sep_variant_ids(vids,chr)
-                                    if subMatrix is not None:
-                                        storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
-                                        storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
-                                        if not storageEngine.checkGroup(chr,"colnames"):
-                                            storageEngine.store(colnames,chr,"colnames")
-                                    else:
-                                        storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
-                                        if not storageEngine.checkGroup(chr,"colnames"):
-                                            storageEngine.store(colnames,chr,"colnames")
-                                except TypeError:
-                                    pass
+                            if int(multiVCF[0][0])==0 or (int(multiVCF[0][0])==1 and int(file_id[0][0])==1):
+                                # updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
+                            
+                                updated_rownames,colnames,subMatrix=accessEngine.get_genotype(ids,"",[chr])
+                                if subMatrix is not None:
+                                    storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
+                                    storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
+                                    if not storageEngine.checkGroup(chr,"colnames"):
+                                        storageEngine.store(colnames,chr,"colnames")
+                            else:
+                                varDict=getChrs(ids,db.cursor())
+                                for chr,vids in varDict.items():
+                                    try:
+                                        updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_sep_variant_ids(vids,chr)
+                                        if subMatrix is not None:
+                                            storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
+                                            storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
+                                            if not storageEngine.checkGroup(chr,"colnames"):
+                                                storageEngine.store(colnames,chr,"colnames")
+                                        else:
+                                            storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
+                                            if not storageEngine.checkGroup(chr,"colnames"):
+                                                storageEngine.store(colnames,chr,"colnames")
+                                    except TypeError:
+                                        pass
                     
 
                     # storageEngine.close() 

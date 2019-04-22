@@ -1786,6 +1786,7 @@ class Project:
         self.saveProperty('build', self.build)
         self.saveProperty('alt_build', self.alt_build)
         self.saveProperty('annoDB', str(self.annoDB))
+        self.saveProperty("multiVCF",0)
         #
         self.createFilenameTable()
         self.createMasterVariantTable()

@@ -546,11 +546,19 @@ class Importer:
         sample_ids = []
         with delayedAction(env.logger.info, 'Creating {} genotype tables'.format(len(sampleNames))):
             #
-            for samplename in sampleNames:
-                cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
-                    (filenameID, '' if samplename is None else samplename))
-                sid = cur.lastrowid
-                sample_ids.append(sid)
+            cur.execute('SELECT sample_id FROM sample where sample_name={0}'.format(self.db.PH),(sampleNames[0],))
+            rec=cur.fetchall()
+            cur.execute('SELECT count(*) FROM sample'.format(self.db.PH))
+            count=cur.fetchall()
+            if len(rec)==0 and int(count[0][0])>0:
+                cur.execute('UPDATE project SET value={0} WHERE name={0};'.format(
+                    self.db.PH), (1, "multiVCF"))
+            else:
+                for samplename in sampleNames:
+                    cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
+                        (filenameID, '' if samplename is None else samplename))
+                    sid = cur.lastrowid
+                    sample_ids.append(sid)
         return sample_ids
 
     def addVariant(self, cur, rec):
