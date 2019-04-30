@@ -101,7 +101,8 @@ class GroupHDFGenerator(Process):
                         # ids.sort()
                         chr= getChr(ids[0],db.cursor())
                         if not storageEngine.checkGroup(chr,geneSymbol):
-                            if int(multiVCF[0][0])==0 or (int(multiVCF[0][0])==1 and int(file_id[0][0])==1):
+                            # if int(multiVCF[0][0])==0 or (int(multiVCF[0][0])==1 and int(file_id[0][0])==1):
+                            if int(multiVCF[0][0])==0:
                                 # updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
                             
                                 updated_rownames,colnames,subMatrix=accessEngine.get_genotype(ids,"",[chr])

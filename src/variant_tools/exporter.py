@@ -356,6 +356,7 @@ class Exporter:
                     rec_alleles[0] = raw_rec[0]
                     rec_alleles[1] = raw_rec[1]
                     rec = raw_rec[2:]
+
                 # step one: apply formatters 
                 # if there is no fmt, the item must be either empty or a single item
                 #
@@ -363,7 +364,6 @@ class Exporter:
                 # no fmt: single or None
                 #
                 # this is extremely ugly but are we getting any performance gain?
-
                 if multi_records:
                     try:
                         fields = [fmt(None if col is None else (rec[col] if type(col) is int else [rec[x] for x in col])) \
@@ -389,7 +389,6 @@ class Exporter:
                                 raise ValueError('Failed to format value {} at col {}: {}'.format(
                                     rec[col] if type(col) is int else [rec[x] for x in col], col, e))
                 # step two: apply adjusters
-
                 try:
                     #
                     # adj: single or list

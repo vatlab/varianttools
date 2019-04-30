@@ -365,7 +365,7 @@ class MultiVariantReader(BaseVariantReader):
                         r, w = Pipe(False)
                         self.jobs+=1
 
-                        # p=VariantWorker_HDF5(HDFfileName,overlapSamples,self.geno_fields,w)
+                        #p=VariantWorker_HDF5(HDFfileName,overlapSamples,self.geno_fields,w)
                         p=VariantWorker_HDF5_multi(proj.name, proj.annoDB, self.getVariantQuery(),HDFfileName,overlapSamples,self.geno_fields,lock,w)
                         self.workers.append(p)
                         self.readers.append(r)
@@ -507,6 +507,7 @@ class VariantWorker_HDF5_multi(Process):
                             genoInfo=sub_all[pos+1][0]
                             for col in range(numcol):
                                 val[col*len(self.geno_fields)+pos+1]=genoInfo[col]
+
                 val=np.where(np.isnan(val), None, val)
                 val=[ int(i) if i is not None else i for i in val]
                 self.output.send([rec[0]]+val)
@@ -593,6 +594,7 @@ class VariantWorker(Process):
         for rec in cur:
             if rec[0] != last_id:
                 last_id = rec[0]
+             
                 self.output.send(rec)
 
         self.output.send(None)
