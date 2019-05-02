@@ -5190,7 +5190,7 @@ def adminArguments(parser):
     resource = parser.add_argument_group('Download or update resources')
     resource.add_argument('--update_resource', nargs='?', metavar='TYPE',
                           const='current',
-                          choices=['current', 'all', 'existing', 'hg18', 'hg19', 'annotation',
+                          choices=['current', 'all', 'existing', 'hg18', 'hg19', 'hg38', 'mm10', 'annotation',
                                    'format', 'snapshot', 'pipeline'],
                           help='''Download resources of specified type, which can be 'current'
             (latest version of all resources), 'all' (all resources including

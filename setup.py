@@ -766,7 +766,8 @@ setup(name = "variant_tools",
             'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
     install_requires=[
-       'pyzmq'
+       'pyzmq',
+       'tables',
     ],
     packages = find_packages('src'),
     package_dir = {'': 'src'},

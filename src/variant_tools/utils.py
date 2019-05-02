@@ -49,6 +49,8 @@ from html.parser import HTMLParser
 import tarfile
 import binascii
 from itertools import chain
+from shutil import which
+
 # import site_options
 from . import site_options
 
@@ -76,7 +78,7 @@ Setting it to a different physical disk than user projects can generally
 improve the performance of variant tools. It should also be set to a directory
 with at least 500G of free diskspace if the default temporary partition
 is small.'''),
-    ('search_path', 'http://bioinformatics.mdanderson.org/Software/VariantTools/repository/;http://bioinformatics.mdanderson.org/Software/VariantTools/archive/', '''
+    ('search_path', 'https://bioinformatics.mdanderson.org/Software/VariantTools/repository/;https://bioinformatics.mdanderson.org/Software/VariantTools/archive/', '''
 A ;-separated list of URL that host the variant tools repository. This option
 should only be changed if you have created a local mirror of the variant tools
 repository. Adding the URL before the default URL might provide better
@@ -2086,44 +2088,6 @@ def TEMP(filename):
     else:
         return '{}_tmp{}'.format(filename, os.getpid())
 
-
-# the following is copied from shutils.which from Python 3.3
-def which(cmd, mode=os.F_OK | os.X_OK, path=None):
-    """Given a command, mode, and a PATH string, return the path which
-    conforms to the given mode on the PATH, or None if there is no such
-    file.
-
-    `mode` defaults to os.F_OK | os.X_OK. `path` defaults to the result
-    of os.environ.get("PATH"), or can be overridden with a custom search
-    path.
-
-    """
-    # Check that a given file can be accessed with the correct mode.
-    # Additionally check that `file` is not a directory, as on Windows
-    # directories pass the os.access check.
-    def _access_check(fn, mode):
-        return (os.path.exists(fn) and os.access(fn, mode)
-                and not os.path.isdir(fn))
-
-    # Short circuit. If we're given a full path which matches the mode
-    # and it exists, we're done here.
-    if _access_check(cmd, mode):
-        return cmd
-
-    path = (path or os.environ.get("PATH", os.defpath)).split(os.pathsep)
-    files = [cmd]
-
-    seen = set()
-    for dir in path:
-        dir = os.path.normcase(dir)
-        if not dir in seen:
-            seen.add(dir)
-            for thefile in files:
-                name = os.path.join(dir, thefile)
-                if _access_check(name, mode):
-                    return name
-    return None
-
 #
 # Well, it is not easy to do reliable download
 # 
@@ -2187,22 +2151,9 @@ def downloadURL(URL, dest, quiet, message=None):
             except OSError:
                 pass
             raise RuntimeError('Failed to download {} using wget'.format(URL))
-    # use python urllib?
-    if not quiet:
-        prog = ProgressBar(message)
-    try:
-        urllib.request.URLopener().open(URL)
-    except IOError as error_code:
-        if error_code[1] == 404:
-            raise RuntimeError('ERROR 404: Not Found.')
-        else:
-            raise RuntimeError('Unknown error has happend: {}'.format(error_code[1]))
     else:
-        dest_tmp = TEMP(dest)
-        urllib.request.urlretrieve(URL, dest_tmp, reporthook=None if quiet else prog.urllibUpdate)
-        os.rename(dest_tmp, dest)
-    if not quiet:
-        prog.done()
+        raise RuntimeError('Please install either python module pycurl or program wget for downloading from variant tools repository.')
+
     # all methods tried
     if os.path.isfile(dest):
         return dest
