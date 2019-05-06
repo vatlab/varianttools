@@ -92,6 +92,10 @@ class GroupHDFGenerator(Process):
                        format(self.group_names[0])
                     cur.execute('SELECT value FROM project WHERE name="multiVCF";')
                     multiVCF=cur.fetchall()
+                    if len(multiVCF)==0:
+                        multiVCF=0
+                    else:
+                        multiVCF=int(multiVCF[0][0])
                     cur.execute('SELECT DISTINCT(file_id) from sample where HDF5="{0}"'.format(HDFfileName))
                     file_id=cur.fetchall()
                     for row in cur.execute(select_group):
@@ -102,17 +106,18 @@ class GroupHDFGenerator(Process):
                         chr= getChr(ids[0],db.cursor())
                         if not storageEngine.checkGroup(chr,geneSymbol):
                             # if int(multiVCF[0][0])==0 or (int(multiVCF[0][0])==1 and int(file_id[0][0])==1):
-                            if int(multiVCF[0][0])==0:
+                            varDict=getChrs(ids,db.cursor())
+                            if multiVCF==0 and len(varDict.keys())==1:
                                 # updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
                             
                                 updated_rownames,colnames,subMatrix=accessEngine.get_genotype(ids,"",[chr])
+
                                 if subMatrix is not None:
                                     storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
                                     storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
                                     if not storageEngine.checkGroup(chr,"colnames"):
                                         storageEngine.store(colnames,chr,"colnames")
                             else:
-                                varDict=getChrs(ids,db.cursor())
                                 for chr,vids in varDict.items():
                                     try:
                                         updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_sep_variant_ids(vids,chr)
@@ -398,7 +403,6 @@ def getGenotype_HDF5(worker, group, sample_IDs):
     var_info, variant_ids = worker.getVarInfo(group, where_clause)
     chr=getChr(variant_ids[0],cur)
     chrEnd=getChr(variant_ids[-1],cur)
-
     if chr!=chrEnd:
         varDict=getChrs(variant_ids,cur)
         chrs=list(varDict.keys())
@@ -406,12 +410,12 @@ def getGenotype_HDF5(worker, group, sample_IDs):
         varDict={chr:variant_ids}
         chrs=[chr]
 
+
     # get genotypes / genotype info
     genotype = []
     geno_info = {x:[] for x in worker.geno_info}
     # getting samples locally from my own connection
     geneSymbol=transformGeneName(group[0])
-
     if len(group)==2:
         geneSymbol="pos"+str(group[1])
     HDFfileNames=glob.glob("tmp*_genotypes_multi_genes.h5")
@@ -429,7 +433,6 @@ def getGenotype_HDF5(worker, group, sample_IDs):
 
     for fileName in HDFfileNames:
         accessEngine=Engine_Access.choose_access_engine(fileName)
-        
         if len(chrs)==1:
             # colnames=accessEngine.get_colnames(chr,geneSymbol)
             # snpdict=accessEngine.get_geno_info_by_group(geneSymbol,chr)
@@ -439,9 +442,7 @@ def getGenotype_HDF5(worker, group, sample_IDs):
             colnames=accessEngine.get_colnames(chr)
 
             colnames=intersection(sample_IDs,colnames.tolist())
-            
             snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
-
             accessEngine.close()
             for ID in colnames:
                 data=snpdict[ID]
@@ -456,16 +457,16 @@ def getGenotype_HDF5(worker, group, sample_IDs):
                     geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
         else:   
             colnames=accessEngine.get_colnames(chrs[0])
-                
             for ID in colnames:
                 gtmp=[]
                 for chr in chrs:
                     snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
                     data=snpdict[ID]
-                    
-                    gtmp.extend([data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]])
+                    # gtmp.extend([data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]])
+                    gtmp.extend([data.get(x) for x in varDict[chr]])
                     # handle -1 coding (double heterozygotes)     
                 genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
+
                 #
                 # handle genotype_info
                 #

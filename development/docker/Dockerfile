@@ -11,9 +11,9 @@ RUN     apt-get -y install swig  gcc g++ build-essential bzip2 libbz2-dev libz-d
 RUN	conda update python
 RUN	conda install cython
 
-RUN wget http://www.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.4.tar.gz \
- && tar -zxvf hdf5-1.10.4.tar.gz \
- && cd hdf5-1.10.4 \
+RUN wget http://www.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.gz \
+ && tar -zxvf hdf5-1.10.5.tar.gz \
+ && cd hdf5-1.10.5 \
  && ./configure --prefix=/usr/local --enable-build-mode=production --enable-threadsafe --disable-hl \
  && make -j4 \
  && make install \
@@ -38,30 +38,33 @@ RUN     python setup.py install
 # HDF5 locking issues
 ENV     HDF5_USE_FILE_LOCKING FALSE
 
-#ENV     HOME /home/bpeng
-#RUN     mkdir /home/bpeng/temp
+
+ENV     HOME /home/bpeng
+RUN     mkdir /home/bpeng/temp
 
 # download hg19 reference genome and refGene database
-#WORKDIR /home/bpeng/temp
-#RUN     touch temp.vcf
-#RUN     vtools init test --build hg19
-#RUN     vtools import temp.vcf
-#RUN     vtools use refGene
+WORKDIR /home/bpeng/temp
+RUN     touch temp.vcf
+RUN     vtools init test --build hg19
+RUN     vtools import temp.vcf
+RUN     vtools use refGene
 
-#WORKDIR /home/bpeng
-#RUN     rm -rf temp
 
-#RUN     mkdir /home/bpeng/temp
+WORKDIR /home/bpeng
+RUN     rm -rf temp
+
+RUN     mkdir /home/bpeng/temp
 
 # download hg18 reference genome and refGene database
-#WORKDIR /home/bpeng/temp
-#RUN     touch temp.vcf
-#RUN     vtools init test --build hg18
-#RUN     vtools import temp.vcf
-#RUN     vtools use refGene
+WORKDIR /home/bpeng/temp
+RUN     touch temp.vcf
+RUN     vtools init test --build hg18
+RUN     vtools import temp.vcf
+RUN     vtools use refGene
 
-#WORKDIR /home/bpeng
-#RUN     rm -rf temp
+
+WORKDIR /home/bpeng
+RUN     rm -rf temp
 
 
 
