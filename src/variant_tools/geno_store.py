@@ -1638,7 +1638,7 @@ def GenoStore(proj,importer=None):
     elif proj.store == 'hdf5':
         if importer is None or importer.format=="vcf":
             return HDF5_Store(proj)
-        elif importer.format is None:
+        else:
             return Sqlite_Store(proj)
     else:
         raise RuntimeError('Unsupported genotype storage model {}'.format(proj.store))
