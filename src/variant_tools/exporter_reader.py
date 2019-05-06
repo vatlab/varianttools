@@ -356,6 +356,12 @@ class MultiVariantReader(BaseVariantReader):
             # self.jobs=len(samplefiles)+1
             
             self.jobs=1
+            cur.execute('SELECT value FROM project WHERE name="multiVCF";')
+            multiVCF=cur.fetchall()
+            if len(multiVCF)==0:
+                multiVCF=0
+            else:
+                multiVCF=int(multiVCF[0][0])
             for HDFfileName in samplefiles:
                 filename=HDFfileName.split("/")[-1]
                 if filename in sampleFileMap:
@@ -364,9 +370,10 @@ class MultiVariantReader(BaseVariantReader):
                     if len(overlapSamples)>0:
                         r, w = Pipe(False)
                         self.jobs+=1
-
-                        #p=VariantWorker_HDF5(HDFfileName,overlapSamples,self.geno_fields,w)
-                        p=VariantWorker_HDF5_multi(proj.name, proj.annoDB, self.getVariantQuery(),HDFfileName,overlapSamples,self.geno_fields,lock,w)
+                        if multiVCF==0:
+                            p=VariantWorker_HDF5(HDFfileName,overlapSamples,self.geno_fields,w)
+                        else:
+                            p=VariantWorker_HDF5_multi(proj.name, proj.annoDB, self.getVariantQuery(),HDFfileName,overlapSamples,self.geno_fields,lock,w)
                         self.workers.append(p)
                         self.readers.append(r)
 
