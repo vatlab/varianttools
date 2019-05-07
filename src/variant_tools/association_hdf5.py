@@ -391,7 +391,8 @@ def getChrs(variantIDs,cur):
     return varDict
 
 def intersection(lst1, lst2): 
-    return list(set(lst1) & set(lst2)) 
+    lst3 = [value for value in lst1 if value in lst2] 
+    return lst3 
 
 
 def getGenotype_HDF5(worker, group, sample_IDs):
@@ -430,37 +431,35 @@ def getGenotype_HDF5(worker, group, sample_IDs):
             HDFfileNames.append(filename[0].replace(".h5","_multi_genes.h5"))
 
     HDFfileNames=sorted(HDFfileNames, key=lambda name: int(name.split("_")[1]))
-
     for fileName in HDFfileNames:
         accessEngine=Engine_Access.choose_access_engine(fileName)
+        colnames=accessEngine.get_colnames(chr)
+        colnames=intersection(sample_IDs,colnames.tolist())
+
         if len(chrs)==1:
-            # colnames=accessEngine.get_colnames(chr,geneSymbol)
-            # snpdict=accessEngine.get_geno_info_by_group(geneSymbol,chr)
-
-            # for chr in chrs:
-            
-            colnames=accessEngine.get_colnames(chr)
-
-            colnames=intersection(sample_IDs,colnames.tolist())
             snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
             accessEngine.close()
+
             for ID in colnames:
                 data=snpdict[ID]
                 gtmp = [data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]]
+
                 # handle -1 coding (double heterozygotes)     
                 genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
-
                 #
                 # handle genotype_info
                 #
                 for idx, key in enumerate(worker.geno_info):
                     geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
         else:   
-            colnames=accessEngine.get_colnames(chrs[0])
+            alldict={}
+            for chr in chrs:
+                alldict[chr]=accessEngine.get_geno_by_group(chr,geneSymbol)
             for ID in colnames:
                 gtmp=[]
                 for chr in chrs:
-                    snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
+                    # snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
+                    snpdict=alldict[chr]
                     data=snpdict[ID]
                     # gtmp.extend([data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]])
                     gtmp.extend([data.get(x) for x in varDict[chr]])

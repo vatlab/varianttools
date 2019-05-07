@@ -1004,7 +1004,6 @@ class AssoTestsWorker(Process):
                     genotype, which, var_info, geno_info = self.getGenotype(grp)
                 elif self.proj.store=="hdf5":
                     genotype, which, var_info, geno_info = getGenotype_HDF5(self,grp,self.sample_IDs)
-            
                 # if I throw an exception here, the program completes in 5 minutes, indicating
                 # the data collection part takes an insignificant part of the process.
                 # 

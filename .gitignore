@@ -14,6 +14,7 @@ test/10
 test/ann/testNSFP.DB
 test/parent/
 test/tmp_*_genotypes.h5
+test/tmp_*_genotypes_multi_genes.h5
 test/ceu/
 test/sam1/
 build
