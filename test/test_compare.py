@@ -152,11 +152,11 @@ class TestCompare(ProcessTestCase):
         # do not use the default project
         self.runCmd('vtools init test -f --store '+self.storeMode)
         self.runCmd('vtools import vcf/compare.vcf --build hg18')
-        if self.storeMode=="sqlite":
-            self.runCmd('vtools execute "DELETE FROM genotype.genotype_1 WHERE GT=0"')
-            self.runCmd('vtools execute "DELETE FROM genotype.genotype_2 WHERE GT=0"')
-        elif self.storeMode=="hdf5":
-            self.runCmd('vtools remove genotypes "GT_geno is nan"')
+        # if self.storeMode=="sqlite":
+        #     self.runCmd('vtools execute "DELETE FROM genotype.genotype_1 WHERE GT=0"')
+        #     self.runCmd('vtools execute "DELETE FROM genotype.genotype_2 WHERE GT=0"')
+        # elif self.storeMode=="hdf5":
+        #     self.runCmd('vtools remove genotypes "GT_geno is nan"')
         self.runCmd('vtools select variant "variant_id in (1, 2)" -t T1')
         self.runCmd('vtools select variant "variant_id in (1, 3, 4)" -t T2')
         # variant

@@ -409,7 +409,7 @@ class Importer:
             raise ValueError('Please specify the reference genome of the input data.')
         #
         # try to guess file type
-        self.format=None
+        self.format=format
         if not format:
             filename = files[0].lower()
             if filename.endswith('.vcf') or filename.endswith('.vcf.gz'):

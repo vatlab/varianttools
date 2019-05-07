@@ -1583,6 +1583,7 @@ class HDF5_Store(Base_Store):
         g=set()
         NULL_to_0 = env.treat_missing_as_wildtype
         rownames,colnames,genoinfo=accessEngine.get_genotype(ids,[sample_ID],chrs)
+        accessEngine.close()
         for idx,id in enumerate(rownames.tolist()):
             GT=genoinfo[idx][0]
             if np.isnan(GT):
