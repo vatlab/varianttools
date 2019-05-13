@@ -1451,7 +1451,7 @@ def remove_duplicate_samples(cur,original_sample_ids):
         for id in original_sample_ids:
             sql="DELETE from SAMPLE where sample_id in (?)"
             cur.execute(sql,[str(id)])
-        cur.execute('UPDATE project SET value=1 WHERE name="multiVCF')
+        cur.execute('UPDATE project SET value=1 WHERE name="multiVCF"')
     except Exception as e:
         print(e)
   

@@ -618,15 +618,18 @@ class HDF5Engine_access(Base_Access):
         self.colnames=group.colnames[:].tolist()
         group=self.getGroup(chr,groupName)
         self.rownames=group.rownames[:].tolist()
+        
         if "GT" in group:
             self.GT=group.GT[:]
+
             snpdict=dict.fromkeys(self.colnames,{})
             for key,value in snpdict.items():
                 snpdict[key]=dict.fromkeys(self.rownames,(0,))
 
             for rowidx,rowID in enumerate(self.rownames):
                 for colidx,colID in enumerate(self.colnames):
-                    snpdict[colID][rowID]=(self.GT[rowidx,colidx],)
+                   snpdict[colID][rowID]=(self.GT[rowidx,colidx],)
+                    
         else:
             snpdict=dict.fromkeys(self.colnames,{})
             for key,value in snpdict.items():
@@ -650,12 +653,11 @@ class HDF5Engine_access(Base_Access):
         sampleMask=group.samplemask[:]
 
         # rowPos=[rownames.index(id) for id in rowIDs]
-       
+
         try:
             rowPos=[np.where(rownames==id)[0][0] for id in rowIDs]
             update_rownames=rownames[rowPos]
             sub_geno=group.GT[rowPos,:]
-
             sub_Mask=group.Mask[rowPos,:]
             sub_Mask=sub_Mask.astype(float)
             sub_Mask[sub_Mask==-1.0]=np.nan
@@ -672,7 +674,18 @@ class HDF5Engine_access(Base_Access):
                 sub_geno=np.delete(sub_geno,sampleMasked,1)
             return np.array(update_rownames),colnames,np.array(sub_geno)
         except IndexError:
-            return np.full(len(rowIDs),np.nan),colnames,None
+            update_rownames=[]
+            sub_geno=[]
+            for id in rowIDs:
+                try:
+                    rowPos=np.where(rownames==id)[0][0]
+                    update_rownames.append(rownames[rowPos])
+                    sub_geno.append(group.GT[rowPos,:])
+                except IndexError:
+                    update_rownames.append(id)
+                    sub_geno.append(np.full(len(colnames),np.nan))
+            return np.array(update_rownames),colnames,np.array(sub_geno)
+            # return np.full(len(rowIDs),np.nan),colnames,None
         except NameError:
             env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
         except Exception as e:
