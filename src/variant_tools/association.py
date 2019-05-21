@@ -443,15 +443,17 @@ class AssociationTestManager:
         #
         cur.execute('DROP TABLE IF EXISTS __asso_tmp;')
         cur.execute('DROP INDEX IF EXISTS __asso_tmp_index;')
+        
 
         cur.execute('SELECT value FROM project WHERE name="HDF5_table";')
-        HDF5_table=cur.fetchall()
+        HDF5_table=cur.fetchone()
         cur.execute('SELECT value FROM project WHERE name="HDF5_group";')
-        HDF5_group=cur.fetchall()
-        if HDF5_table[0][0]!=self.table or HDF5_group[0][0]!=group_by[0]:
-            self.force=True
-        cur.execute('UPDATE project SET value="{0}" WHERE name="HDF5_table"'.format(self.table))
-        cur.execute('UPDATE project SET value="{0}" WHERE name="HDF5_group"'.format(group_by[0]))
+        HDF5_group=cur.fetchone()
+        if HDF5_table!=None and HDF5_group!=None:
+            if HDF5_table[0][0]!=self.table or HDF5_group[0][0]!=group_by[0]:
+                self.force=True
+            cur.execute('UPDATE project SET value="{0}" WHERE name="HDF5_table"'.format(self.table))
+            cur.execute('UPDATE project SET value="{0}" WHERE name="HDF5_group"'.format(group_by[0]))
 
         # this table has
         #  variant_id
