@@ -219,6 +219,7 @@ class AssociationTestManager:
         #     prog.done()
         #
         # step 6: get groups
+        self.force=False
         self.group_names, self.group_types, self.groups = self.identifyGroups(group_by)
 
      
@@ -442,6 +443,16 @@ class AssociationTestManager:
         #
         cur.execute('DROP TABLE IF EXISTS __asso_tmp;')
         cur.execute('DROP INDEX IF EXISTS __asso_tmp_index;')
+
+        cur.execute('SELECT value FROM project WHERE name="HDF5_table";')
+        HDF5_table=cur.fetchall()
+        cur.execute('SELECT value FROM project WHERE name="HDF5_group";')
+        HDF5_group=cur.fetchall()
+        if HDF5_table[0][0]!=self.table or HDF5_group[0][0]!=group_by[0]:
+            self.force=True
+        cur.execute('UPDATE project SET value="{0}" WHERE name="HDF5_table"'.format(self.table))
+        cur.execute('UPDATE project SET value="{0}" WHERE name="HDF5_group"'.format(group_by[0]))
+
         # this table has
         #  variant_id
         #  groups (e.g. chr, pos)
@@ -1446,6 +1457,12 @@ def associate(args):
                         for HDFfileGroupName in HDFfileGroupNames:
                             os.remove(HDFfileGroupName)
                         env.logger.warning("HDF5 group files will be regenerated!")
+                elif asso.force:
+                    if len(HDFfileGroupNames)>0:
+                        for HDFfileGroupName in HDFfileGroupNames:
+                            os.remove(HDFfileGroupName)
+                        env.logger.warning("HDF5 group files will be regenerated!")
+
                 else:
                     if len(HDFfileGroupNames)>0:
                         env.logger.warning("New entries will be added to HDF5 group files!")

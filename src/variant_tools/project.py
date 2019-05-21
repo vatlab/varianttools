@@ -1787,6 +1787,8 @@ class Project:
         self.saveProperty('alt_build', self.alt_build)
         self.saveProperty('annoDB', str(self.annoDB))
         self.saveProperty("multiVCF",0)
+        self.saveProperty("HDF5_table","")
+        self.saveProperty("HDF5_group","")
         #
         self.createFilenameTable()
         self.createMasterVariantTable()
