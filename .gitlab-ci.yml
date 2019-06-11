@@ -1,79 +1,80 @@
-image:  bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_test:latest
+image:   bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_hdf5_ci:test
 stages:
+        # - testSqlite
+        # - testHDF5
         - test
 
 # variables:
 #          LOCALRESOURCE: "/home/jma7/.variant_tools"
 
 before_script:
-                # - git checkout gitlabCI
-                # - git pull
-                # - cp -r /home/bpeng/VariantTools/src/boost_1_49_0 ./src
-                # - cp -r /home/bpeng/VariantTools/src/cgatools ./src
-                # - cp -r /home/bpeng/VariantTools/src/gsl ./src
-                # - cp -r /home/bpeng/VariantTools/src/libplinkio ./src
-                # - cp -r /home/bpeng/VariantTools/src/rext ./src
-                # - cp -r /home/bpeng/VariantTools/src/sqlite ./src
-                # - cp -r /home/bpeng/VariantTools/src/ucsc ./src
+                - git pull gitlabCI
+                - cp -r /home/bpeng/VariantTools/src/boost_1_49_0 ./src
+                - cp -r /home/bpeng/VariantTools/src/cgatools ./src
+                - cp -r /home/bpeng/VariantTools/src/gsl ./src
+                - cp -r /home/bpeng/VariantTools/src/libplinkio ./src
+                - cp -r /home/bpeng/VariantTools/src/rext ./src
+                - cp -r /home/bpeng/VariantTools/src/sqlite ./src
+                - cp -r /home/bpeng/VariantTools/src/ucsc ./src
                 # - cp -r /home/bpeng/.variant_tools ../
                 - python setup.py install
                 - cd test
 
-# test_admin-associate-avg_depth-compare:
-#         stage: test
-#         variables:
-#                 STOREMODE: "sqlite"
-#         script:
-#                 - python test_admin.py
-#                 - python test_associate.py
-#                 - python test_avg_depth.py
-#                 - python test_compare.py
+test_admin-associate-avg_depth-compare:
+        stage: test
+        variables:
+                STOREMODE: "sqlite"
+        script:
+                - python test_admin.py
+                - python test_associate.py
+                - python test_avg_depth.py
+                - python test_compare.py
 
-# test_show-trans_ratio-update-use:
-#         stage: test
-#         variables:
-#                 STOREMODE: "sqlite"
+test_show-trans_ratio-update-use:
+        stage: test
+        variables:
+                STOREMODE: "sqlite"
 
-#         script:
-#                 - python test_show.py
-#                 - python test_trans_ratio.py
-#                 - python test_update.py
-#                 - python test_use.py
+        script:
+                - python test_show.py
+                - python test_trans_ratio.py
+                - python test_update.py
+                - python test_use.py
 
-# test_exclude-execute-export:
-#         stage: test
-#         variables:
-#                 STOREMODE: "sqlite"
-#         script:
-#                 - python test_exclude.py
-#                 - python test_execute.py
-#                 - python test_export.py
+test_exclude-execute-export:
+        stage: test
+        variables:
+                STOREMODE: "sqlite"
+        script:
+                - python test_exclude.py
+                - python test_execute.py
+                - python test_export.py
 
-# test_output-phenotype-remove-select:
-#         stage: test
-#         variables:
-#                 STOREMODE: "sqlite"
-#         script:
-#                 - python test_output.py
-#                 - python test_phenotype.py
-#                 - python test_remove.py
-#                 - python test_select.py
+test_output-phenotype-remove-select:
+        stage: test
+        variables:
+                STOREMODE: "sqlite"
+        script:
+                - python test_output.py
+                - python test_phenotype.py
+                - python test_remove.py
+                - python test_select.py
 
-# test_import:
-#         stage: test
-#         variables:
-#                 STOREMODE: "sqlite"
-#         script:
-#                 - python test_import.py
+test_import:
+        stage: test
+        variables:
+                STOREMODE: "sqlite"
+        script:
+                - python test_import.py
 
-# test_init-listover-func:
-#         stage: test
-#         variables:
-#                 STOREMODE: "sqlite"
-#         script:
-#                 - python test_init.py
-#                 - python test_liftover.py
-#                 - python test_func.py
+test_init-listover-func:
+        stage: test
+        variables:
+                STOREMODE: "sqlite"
+        script:
+                - python test_init.py
+                - python test_liftover.py
+                - python test_func.py
 
 
 HDF5_test_admin-associate-avg_depth-compare:
@@ -135,3 +136,67 @@ HDF5_test_init-listover-func:
 
 
 
+# test_associate:
+#         stage: test
+#         script:
+#                 - python test_associate.py
+
+# test_avg_depth:
+#         stage: test
+#         script:
+#                 - python test_avg_depth.py
+
+# test_compare:
+#         stage: test
+#         script:
+#                 - python test_compare.py
+
+
+# test_execute:
+#         stage: test
+#         script:
+#                 - python test_execute.py
+
+# test_export:
+#         stage: test
+#         script:
+#                 - python test_export.py
+
+# test_func:
+#         stage: test
+#         script:
+#                 - python test_func.py
+
+
+
+# test_phenotype:
+#         stage: test
+#         script:
+#                 - python test_phenotype.py
+
+# test_remove:
+#         stage: test
+#         script:
+#                 - python test_remove.py
+
+# test_select:
+#         stage: test
+#         script:
+#                 - python test_select.py
+
+
+
+# test_trans_ratio:
+#         stage: test
+#         script:
+#                 - python test_trans_ratio.py
+
+# test_update:
+#         stage: test
+#         script:
+#                 - python test_update.py
+
+# test_use:
+#         stage: test
+#         script:
+#                 - python test_use.py
