@@ -1,7 +1,5 @@
-image:   junmahouston/vtools_test:latest
+image:  bcbdockerdevreg.mdanderson.edu:5443/jma7/vtools_test:latest
 stages:
-        # - testSqlite
-        # - testHDF5
         - test
 
 # variables:
