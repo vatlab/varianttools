@@ -8,7 +8,7 @@ stages:
 #          LOCALRESOURCE: "/home/jma7/.variant_tools"
 
 before_script:
-                - git pull gitlabCI
+               
                 - cp -r /home/bpeng/VariantTools/src/boost_1_49_0 ./src
                 - cp -r /home/bpeng/VariantTools/src/cgatools ./src
                 - cp -r /home/bpeng/VariantTools/src/gsl ./src
