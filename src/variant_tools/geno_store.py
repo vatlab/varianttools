@@ -1058,6 +1058,7 @@ class Sqlite_Store(Base_Store):
 class HDF5_Store(Base_Store):
     def __init__(self, proj):
         self.proj=proj
+        self.cache={}
         super(HDF5_Store, self).__init__(proj)
 
 
@@ -1228,15 +1229,22 @@ class HDF5_Store(Base_Store):
 
     def remove_variants_worker(self,storageEngine,variantIDs):
         storageEngine.remove_variants(variantIDs)
-        storageEngine.close()
-
+     
 
     def remove_variants(self,variantIDs,table):
         HDFfileNames=glob.glob("tmp*_genotypes.h5")
+        storageEngines=[]
+        procs=[]
         for HDFfileName in HDFfileNames:
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+            storageEngines.append(storageEngine)
             p=Process(target=self.remove_variants_worker,args=(storageEngine,variantIDs)) 
+            procs.append(p)
             p.start()
+        for proc in procs:
+            proc.join()
+        for storageEngine in storageEngines:
+            storageEngine.close()
         env.logger.info('Removing table {} itself'.format(decodeTableName(table)))
         self.proj.db.removeTable(table)
         self.proj.db.commit()
@@ -1248,10 +1256,18 @@ class HDF5_Store(Base_Store):
 
 
     def remove_genotype(self,cond):
+        storageEngines=[]
+        procs=[]
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+            storageEngines.append(storageEngine)
             p=Process(target=self.remove_genotype_workder,args=(storageEngine,cond)) 
+            procs.append(p)
             p.start()
+        for proc in procs:
+            proc.join()
+        for storageEngine in storageEngines:
+            storageEngine.close()
 
     def remove_genofields(self,IDs,items):
         HDFfileNames=glob.glob("tmp*_genotypes.h5")
@@ -1302,13 +1318,14 @@ class HDF5_Store(Base_Store):
     def geno_fields(self, sampleID):
         HDFfileName=self.get_sampleFileName(sampleID)
         genoFields=""
-        if HDFfileName is not None:
+        if HDFfileName is not None and HDFfileName not in self.cache:
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
             genoFields=storageEngine.geno_fields(sampleID)
             genoFields.sort()
             # genoFields=[x.lower() for x in genoFields]
             storageEngine.close()
-        return genoFields
+            self.cache[HDFfileName]=genoFields
+        return self.cache[HDFfileName]
 
     def geno_fields_nolower(self, sampleID):
         HDFfileName=self.get_sampleFileName(sampleID)
@@ -1433,7 +1450,9 @@ class HDF5_Store(Base_Store):
         queue=Queue()
         accessEngines=[]
         procs=[]
+ 
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
+
             filename=HDFfileName.split("/")[-1]
             if filename in sampleFileMap:
                 samplesInfile=sampleFileMap[filename]
@@ -1496,7 +1515,7 @@ class HDF5_Store(Base_Store):
             p.join()
         for accessEngine in accessEngines:
             accessEngine.close()
-        prog.done()
+        # prog.done()
         return master
 
 
@@ -1564,6 +1583,7 @@ class HDF5_Store(Base_Store):
         g=set()
         NULL_to_0 = env.treat_missing_as_wildtype
         rownames,colnames,genoinfo=accessEngine.get_genotype(ids,[sample_ID],chrs)
+        accessEngine.close()
         for idx,id in enumerate(rownames.tolist()):
             GT=genoinfo[idx][0]
             if np.isnan(GT):
@@ -1619,7 +1639,7 @@ def GenoStore(proj,importer=None):
     elif proj.store == 'hdf5':
         if importer is None or importer.format=="vcf":
             return HDF5_Store(proj)
-        elif importer.format is None:
+        else:
             return Sqlite_Store(proj)
     else:
         raise RuntimeError('Unsupported genotype storage model {}'.format(proj.store))

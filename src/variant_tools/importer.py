@@ -409,7 +409,7 @@ class Importer:
             raise ValueError('Please specify the reference genome of the input data.')
         #
         # try to guess file type
-        self.format=None
+        self.format=format
         if not format:
             filename = files[0].lower()
             if filename.endswith('.vcf') or filename.endswith('.vcf.gz'):
@@ -418,6 +418,7 @@ class Importer:
             else:
                 raise ValueError('Cannot guess input file format from filename "{}"'
                     .format(files[0]))
+
         try:
             fmt = fileFMT(format, fmt_args)
         except Exception as e:
@@ -546,6 +547,14 @@ class Importer:
         sample_ids = []
         with delayedAction(env.logger.info, 'Creating {} genotype tables'.format(len(sampleNames))):
             #
+            cur.execute('SELECT sample_id FROM sample where sample_name={0}'.format(self.db.PH),(sampleNames[0],))
+            rec=cur.fetchall()
+            cur.execute('SELECT count(*) FROM sample'.format(self.db.PH))
+            count=cur.fetchall()
+            if len(rec)==0 and int(count[0][0])>0:
+                cur.execute('UPDATE project SET value={0} WHERE name={0};'.format(
+                    self.db.PH), (1, "multiVCF"))
+            
             for samplename in sampleNames:
                 cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
                     (filenameID, '' if samplename is None else samplename))

@@ -40,6 +40,8 @@ from .preprocessor import *
 from .accessor import *
 import glob as glob
 
+from .merge_sort_parallel import index_HDF5_rowIDs
+
 MAX_COLUMN = 62
 def VariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
         export_alt_build, IDs, jobs):
@@ -349,10 +351,17 @@ class MultiVariantReader(BaseVariantReader):
                 if res[1] not in sampleFileMap:
                     sampleFileMap[res[1]]=[]
                 sampleFileMap[res[1]].append(res[0])
-            samplefiles=glob.glob("tmp*genotypes.h5")      
-            samplefiles.sort(key=lambda x:x.split("_")[1])
+            samplefiles=glob.glob("tmp*genotypes.h5")     
+            samplefiles.sort(key=lambda x:int(x.split("_")[1]))
             # self.jobs=len(samplefiles)+1
+            
             self.jobs=1
+            cur.execute('SELECT value FROM project WHERE name="multiVCF";')
+            multiVCF=cur.fetchall()
+            if len(multiVCF)==0:
+                multiVCF=0
+            else:
+                multiVCF=int(multiVCF[0][0])
             for HDFfileName in samplefiles:
                 filename=HDFfileName.split("/")[-1]
                 if filename in sampleFileMap:
@@ -361,7 +370,10 @@ class MultiVariantReader(BaseVariantReader):
                     if len(overlapSamples)>0:
                         r, w = Pipe(False)
                         self.jobs+=1
-                        p=VariantWorker_HDF5(HDFfileName,overlapSamples,self.geno_fields,w)
+                        if multiVCF==0:
+                            p=VariantWorker_HDF5(HDFfileName,overlapSamples,self.geno_fields,w)
+                        else:
+                            p=VariantWorker_HDF5_multi(proj.name, proj.annoDB, self.getVariantQuery(),HDFfileName,overlapSamples,self.geno_fields,lock,w)
                         self.workers.append(p)
                         self.readers.append(r)
 
@@ -411,8 +423,7 @@ class MultiVariantReader(BaseVariantReader):
                             id = val[0]
                         elif id != val[0]:
                             raise ValueError('Read different IDs from multiple processes')
-                        rec.extend(val[1:])             
-                       
+                        rec.extend(val[1:])    
                         if idx == last:
                             yield rec
                             rec = []
@@ -437,11 +448,11 @@ class MultiVariantReader(BaseVariantReader):
                     while notSameID:
                         for idx,reader in enumerate(self.readers[1:]):
                             val=reader.recv()
-                           
                             if id ==val[0]:
                                 rec.extend(val[1:])
                                 if idx+1==last:
                                     notSameID=False
+
                                     yield rec
                                     rec=[]
                                     break
@@ -452,6 +463,68 @@ class MultiVariantReader(BaseVariantReader):
             for p in self.workers:
                 p.terminate()
 
+
+class VariantWorker_HDF5_multi(Process):
+    # this class starts a process and used passed query to read variants
+    def __init__(self,dbname, annoDB, query,HDFfileName,samples, geno_fields,lock,output):
+        self.dbname = dbname
+        self.annoDB = annoDB
+        self.query = query
+        self.lock = lock
+        self.fileName=HDFfileName
+        self.samples=samples
+        self.geno_fields=geno_fields
+        self.output = output   
+        Process.__init__(self)
+
+    def run(self):
+        accessEngine=Engine_Access.choose_access_engine(self.fileName)
+        sortedID=index_HDF5_rowIDs(self.fileName)
+        vardict={}
+        genoinfo_fields=[field.replace("_geno","") for field in self.geno_fields]
+        if "GT" in genoinfo_fields:
+            genoinfo_fields.remove("GT")
+        db = DatabaseEngine()
+        db.connect(self.dbname + '.proj', readonly=True, lock=self.lock)
+       
+        for anno in self.annoDB:
+            db.attach(os.path.join(anno.dir, anno.filename), lock=self.lock)
+        cur = db.cursor()
+        cur.execute(self.query)
+        self.output.send(None)
+        last_id = None
+        for rec in cur:
+            if rec[0] != last_id:
+                last_id = rec[0]
+                chr=rec[3]
+                # val=accessEngine.get_geno_by_row_pos(rec[0],chr,sortedID,self.samples,genoinfo_fields)
+                sub_all=accessEngine.get_geno_by_row_pos(rec[0],chr,sortedID,self.samples,genoinfo_fields)
+                genoType=sub_all[0][0]
+                val=None
+                # numrow,numcol=genoType.shape[0],genoType.shape[1]
+                numcol=len(genoType)
+                if len(self.geno_fields)==0:
+                    val=genoType
+                else:
+                    val=np.zeros(shape=(numcol*(len(self.geno_fields))),dtype=float)
+                    for col in range(numcol):
+                        val[col*len(self.geno_fields)]=genoType[col]
+                    if len(genoinfo_fields)>0:
+                        for pos,field in enumerate(genoinfo_fields):  
+                            genoInfo=sub_all[pos+1][0]
+                            for col in range(numcol):
+                                val[col*len(self.geno_fields)+pos+1]=genoInfo[col]
+
+                val=np.where(np.isnan(val), None, val)
+                val=[ int(i) if i is not None else i for i in val]
+                self.output.send([rec[0]]+val)
+                # val=accessEngine.get_geno_by_row_pos(rec[0],chr,sortedID,self.samples,genoinfo_fields)
+                # val=np.where(np.isnan(val), None, val)
+                # self.output.send([rec[0]]+val.tolist())
+        self.output.send(None)
+        db.close()
+            
+    
 
 
 
@@ -493,7 +566,6 @@ class VariantWorker_HDF5(Process):
         # result=accessEngine.get_genoType_forExport_from_HDF5(self.samples,self.geno_fields)  
         self.output.send(None)
         last_id = None
-
         for key,val in vardict.items():
             if key!=last_id:
                 last_id=key
@@ -529,6 +601,8 @@ class VariantWorker(Process):
         for rec in cur:
             if rec[0] != last_id:
                 last_id = rec[0]
+             
                 self.output.send(rec)
+
         self.output.send(None)
         db.close()

@@ -10,6 +10,7 @@ from .utils import env,chunks_start_stop
 
 from multiprocessing import Process,Manager
 import queue
+from .merge_sort_parallel import binarySearch
 
 
 
@@ -140,9 +141,11 @@ class HDF5Engine_storage(Base_Storage):
             # i=self.rownames.index(variant_id)
             # i=np.where(rownames==res[0])[0][0]
             check=np.where(rownames==res[0])
+
             if check[0].size!=0:
                 i=check[0][0]
                 group.rowmask[check]=True
+
 
     # def recover_variant(self,variant_id,chr,groupName=""):
     #     group=self.file.get_node("/chr"+chr+"/"+groupName)
@@ -615,16 +618,28 @@ class HDF5Engine_access(Base_Access):
         self.colnames=group.colnames[:].tolist()
         group=self.getGroup(chr,groupName)
         self.rownames=group.rownames[:].tolist()
-        self.GT=group.GT[:]
+        
+        if "GT" in group:
+            self.GT=group.GT[:]
 
-        snpdict=dict.fromkeys(self.colnames,{})
-        for key,value in snpdict.items():
-            snpdict[key]=dict.fromkeys(self.rownames,(0,))
+            snpdict=dict.fromkeys(self.colnames,{})
+            for key,value in snpdict.items():
+                snpdict[key]=dict.fromkeys(self.rownames,(0,))
 
-        for rowidx,rowID in enumerate(self.rownames):
-            for colidx,colID in enumerate(self.colnames):
-                snpdict[colID][rowID]=(self.GT[rowidx,colidx],)
+            for rowidx,rowID in enumerate(self.rownames):
+                for colidx,colID in enumerate(self.colnames):
+                   snpdict[colID][rowID]=(self.GT[rowidx,colidx],)
+                    
+        else:
+            snpdict=dict.fromkeys(self.colnames,{})
+            for key,value in snpdict.items():
+                snpdict[key]=dict.fromkeys(self.rownames,(0,))
+
+            for rowidx,rowID in enumerate(self.rownames):
+                for colidx,colID in enumerate(self.colnames):
+                    snpdict[colID][rowID]=(None,)
         return snpdict
+
 
      
     def get_geno_by_sep_variant_ids(self,rowIDs,chr,groupName=""):
@@ -638,14 +653,15 @@ class HDF5Engine_access(Base_Access):
         sampleMask=group.samplemask[:]
 
         # rowPos=[rownames.index(id) for id in rowIDs]
-        rowPos=[np.where(rownames==id)[0][0] for id in rowIDs]
-       
-        try:
-            update_rownames=rownames[rowPos]
-            sub_geno=group.GT[rowPos,:]    
-            sub_Mask=group.Mask[rowPos,:]
-            sub_geno=np.multiply(sub_geno,sub_Mask)
 
+        try:
+            rowPos=[np.where(rownames==id)[0][0] for id in rowIDs]
+            update_rownames=rownames[rowPos]
+            sub_geno=group.GT[rowPos,:]
+            sub_Mask=group.Mask[rowPos,:]
+            sub_Mask=sub_Mask.astype(float)
+            sub_Mask[sub_Mask==-1.0]=np.nan
+            sub_geno=np.multiply(sub_geno,sub_Mask)
             update_rowMask=rowMask[rowPos]
             rowMasked=np.where(update_rowMask==True)[0]
             sampleMasked=np.where(sampleMask==True)[0]
@@ -656,10 +672,24 @@ class HDF5Engine_access(Base_Access):
             if len(sampleMasked)>0:
                 colnames=colnames[np.where(sampleMask==False)[0]]
                 sub_geno=np.delete(sub_geno,sampleMasked,1)
-        
             return np.array(update_rownames),colnames,np.array(sub_geno)
+        except IndexError:
+            update_rownames=[]
+            sub_geno=[]
+            for id in rowIDs:
+                try:
+                    rowPos=np.where(rownames==id)[0][0]
+                    update_rownames.append(rownames[rowPos])
+                    sub_geno.append(group.GT[rowPos,:])
+                except IndexError:
+                    update_rownames.append(id)
+                    sub_geno.append(np.full(len(colnames),np.nan))
+            return np.array(update_rownames),colnames,np.array(sub_geno)
+            # return np.full(len(rowIDs),np.nan),colnames,None
         except NameError:
             env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
+        except Exception as e:
+            print(e)
 
 
 
@@ -672,6 +702,7 @@ class HDF5Engine_access(Base_Access):
             chrs.extend(range(1,23))
         for chr in chrs:
             try:
+
                 node=self.file.get_node("/chr"+str(chr))
                 rownames=node.rownames[:].tolist()
                 # print(self.fileName,variantIDs,chr,rownames)
@@ -681,6 +712,7 @@ class HDF5Engine_access(Base_Access):
                     colpos=list(map(lambda x:colnames.index(x),sampleNames))
                 else:
                     colpos=list(map(lambda x:colnames.index(x),colnames))
+
                 if len(variantIDs)>0:
                     for id in variantIDs:
                         try:
@@ -698,9 +730,11 @@ class HDF5Engine_access(Base_Access):
                     try:
                         minPos
                         maxPos
-                        genoinfo=node.GT[minPos:maxPos,colpos]           
-                        updated_rownames,updated_colnames,updated_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[],"GT")
+                        # genoinfo=node.GT[minPos:maxPos,colpos]
+                        genoinfo=node.GT[minPos:maxPos,:]
                         
+                        updated_rownames,updated_colnames,updated_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[],"GT")
+                    
                     except NameError:
                         env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
                 else:
@@ -856,11 +890,11 @@ class HDF5Engine_access(Base_Access):
             sub_Mask=sub_Mask.astype(float)
             sub_Mask[sub_Mask==-1.0]=np.nan
             sub_geno=np.multiply(genoinfo,sub_Mask)
-    
+            
             rowMasked=np.where(rowMask==True)[0]
 
             # sampleMasked=np.where(sampleMask==True)[0]
-            
+           
             if len(rowpos)>0:
                 selectRows=rowpos[minPos:maxPos]
                 rownames=rownames[selectRows==1]
@@ -868,7 +902,9 @@ class HDF5Engine_access(Base_Access):
             
             colnames=colnames[colpos]
             sub_geno=sub_geno[:,colpos]
+            
             if len(rowpos)==0 and len(rowMasked)>0:
+               
                 rownames=rownames[np.where(rowMask==False)]
                 sub_geno=np.delete(sub_geno,rowMasked,0)
 
@@ -904,7 +940,7 @@ class HDF5Engine_access(Base_Access):
         # if field=="GQ" and "/chr"+str(chr)+"/GQ" in self.file:
         #     genoinfo=node.GQ[startPos:endPos,:]
         #     genoinfo=np.nan_to_num(genoinfo)
-
+        
         if len(cond)>0:
             if type(cond) is str:
                 cond=cond.replace("(","").replace(")","")
@@ -951,9 +987,61 @@ class HDF5Engine_access(Base_Access):
     
 
 
-    def get_geno_by_row_pos(self,rowpos,chr,groupName=""):
-        pass
+    def get_geno_by_row_pos(self,rowpos,chr,sortedID,sampleNames,validGenotypeFields,groupName=""):
+        try:
+            sub_all=[]
+            node=self.file.get_node("/chr"+str(chr))
+            colpos=[]
+            colnames=node.colnames[:].tolist()
+            sampleNames.sort()
 
+            if (len(sampleNames)>0):
+                colpos=list(map(lambda x:colnames.index(x),sampleNames))
+            else:
+                colpos=list(map(lambda x:colnames.index(x),colnames))
+            pos=binarySearch(sortedID,0,len(sortedID)-1,rowpos)
+            
+            if pos!=-1:
+                posInNode=sortedID[pos][1]
+                _,_,row_geno=self.filter_on_genotypes([],chr,node,"GT",posInNode,posInNode+1,colpos,[])
+                sub_all.append(np.array(row_geno))
+                if len(validGenotypeFields)>0:
+                    for pos,field in enumerate(validGenotypeFields):
+                        _,_,row_info=self.filter_on_genotypes([],chr,node,field,posInNode,posInNode+1,colpos,[])
+                        # row_geno[0].extend(np.array(row_info))
+                        sub_all.append(np.array(row_info))
+                return sub_all
+            else:
+                #return np.zeros(shape=(len(node.GT[1,colpos])),dtype=int)
+                # return [None]*len(node.GT[1,colpos])
+
+                sub_all.append([np.full(len(node.GT[1,colpos]),np.nan)])
+                if len(validGenotypeFields)>0:
+                    for pos,field in enumerate(validGenotypeFields):
+                        sub_all.append([np.full(len(node.GT[1,colpos]),np.nan)])
+                return sub_all
+        except tb.exceptions.NoSuchNodeError:
+            # return np.zeros(shape=(len(node.GT[1,colpos])),dtype=int)
+            # return [None]*len(node.GT[1,colpos])
+            
+            sub_all.append(np.full(len(node.GT[1,colpos]),np.nan))
+            if len(validGenotypeFields)>0:
+                for pos,field in enumerate(validGenotypeFields):
+                    sub_all.append([np.full(len(node.GT[1,colpos]),np.nan)])
+            return sub_all                         
+        except Exception as e:
+            print("exception",rowpos,chr,pos,sortedID[pos])
+            print(e)
+            pass
+
+
+
+
+
+
+
+
+    
 
     def get_geno_by_variant_ID(self,variantID,chr,groupName=""):
         pass

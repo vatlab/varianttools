@@ -1433,6 +1433,7 @@ def updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDF5fileN
     #     start_sample=start_sample+1
     #     end_sample=end_sample+1
     #     adjust=1
+    #print(start_sample,end_sample,sample_ids,HDF5fileName)
     for id in range(start_sample,end_sample):
         try:
             sql="UPDATE sample SET HDF5=? WHERE sample_id=? and sample_name=?"
@@ -1441,10 +1442,20 @@ def updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDF5fileN
             cur.execute(sql,task)
         except Exception as e:
             print(e)
+
+def remove_duplicate_samples(cur,original_sample_ids):
+    try:       
+        # sql="DELETE from SAMPLE where sample_id in (%s)" % ','.join(['?'] * len(original_sample_ids))
+        # print(sql)
+        # cur.execute(sql,original_sample_ids)
+        for id in original_sample_ids:
+            sql="DELETE from SAMPLE where sample_id in (?)"
+            cur.execute(sql,[str(id)])
+        cur.execute('UPDATE project SET value=1 WHERE name="multiVCF"')
+    except Exception as e:
+        print(e)
   
 
-     
-    
 
 
 def manageHDF5(cur,allNames={}):
@@ -1470,7 +1481,7 @@ def manageHDF5(cur,allNames={}):
 def importGenotypesInParallel(importer,num_sample=0):
     cur=importer.db.cursor()
     allNames=manageHDF5(cur)
-    
+
     for count, input_filename in enumerate(importer.files):
 
         env.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(importer.files)))
@@ -1485,12 +1496,15 @@ def importGenotypesInParallel(importer,num_sample=0):
         if importer.genotype_field:
             importer.prober.reset()
         # if there are samples?
-        sample_ids, genotype_status,names = importer.getSampleIDs(input_filename)
-        if len(sample_ids) == 0:
+        original_sample_ids, genotype_status,names = importer.getSampleIDs(input_filename)
+        if len(original_sample_ids) == 0:
             continue
         allNames=manageHDF5(cur,allNames)
         sample_ids=[int(allNames[name]) for name in names]
+        if original_sample_ids[0]!=sample_ids[0]:
+            remove_duplicate_samples(cur,original_sample_ids)
         workload=None
+
         
         #determine number of samples to be processed in each process
         if num_sample>0:
@@ -1576,6 +1590,7 @@ def importGenotypesInParallel(importer,num_sample=0):
         efirst=[Value('b',True) for x in range(numTasks)]
       
         start=time.time()
+
         for chunk, _, _, _ in it:
             start_sample =0
             for job in range(numTasks):

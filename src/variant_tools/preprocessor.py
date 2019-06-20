@@ -997,6 +997,8 @@ class GenoFormatter:
 
     def fmt_genotype(self, item):
         global rec_alleles
+        if type(item)==float and item is not None:
+            item=int(item) 
         if type(item) == int:
             # single genotype case
             ref = self.null if rec_alleles[0] == '-' else rec_alleles[0]
@@ -1038,6 +1040,8 @@ class GenoFormatter:
 
     def fmt_plink(self, item):
         global rec_alleles
+        if type(item)==float and item is not None:
+            item=int(item) 
         if type(item) == int:
             # single genotype case
             ref = self.null if rec_alleles[0] == '-' else rec_alleles[0]

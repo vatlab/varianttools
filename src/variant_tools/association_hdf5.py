@@ -32,7 +32,7 @@ import time
 from .utils import DatabaseEngine
 
 from .accessor import Engine_Access, Engine_Storage
-
+import numpy as np
 import glob
 
 
@@ -56,10 +56,9 @@ class GroupHDFGenerator(Process):
                 break
 
             HDFfileGroupName=HDFfileName.replace(".h5","_multi_genes.h5")
-            if (os.path.isfile(HDFfileGroupName)):
-                os.remove(HDFfileGroupName)
-                
-
+            # if (os.path.isfile(HDFfileGroupName)):
+            #     os.remove(HDFfileGroupName)
+            
             
             accessEngine=Engine_Access.choose_access_engine(HDFfileName)
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileGroupName)
@@ -73,55 +72,67 @@ class GroupHDFGenerator(Process):
                 
                 # select_group="SELECT {0}, group_concat(variant_id) from __asso_tmp group by {0}".\
                 #    format(self.group_names[0])
-
                 if self.group_names[0]=="variant_chr" and self.group_names[1]=="variant_pos":
                     select_group="select t.variant_chr,t.variant_pos,t.variant_id from __asso_tmp as t join variant as v on t.variant_id=v.variant_id  order by v.pos"
                     for row in cur.execute(select_group):
                         chr=row[0]
                         pos=row[1]
                         id=row[2]
-                        updated_rownames,colnames,subMatrix=accessEngine.get_genotype([id],"",[chr])
-                        if subMatrix is not None:
-                            storageEngine.store(subMatrix,chr,"pos"+str(pos)+"/GT")
-                            storageEngine.store(updated_rownames,chr,"pos"+str(pos)+"/rownames")
-                            if not storageEngine.checkGroup(chr,"colnames"):
-                                storageEngine.store(colnames,chr,"colnames")
+                        if not storageEngine.checkGroup(chr,"pos"+str(pos)):
+                            updated_rownames,colnames,subMatrix=accessEngine.get_genotype([id],"",[chr])
+                            if subMatrix is not None:
+                                storageEngine.store(subMatrix,chr,"pos"+str(pos)+"/GT")
+                                storageEngine.store(updated_rownames,chr,"pos"+str(pos)+"/rownames")
+                                if not storageEngine.checkGroup(chr,"colnames"):
+                                    storageEngine.store(colnames,chr,"colnames")
 
 
                 else:
                     select_group="SELECT {0}, group_concat(variant_id) from (select {0},t.variant_id from __asso_tmp as t join variant as v on t.variant_id=v.variant_id  order by v.pos) group by {0}".\
                        format(self.group_names[0])
-                    
-
+                    cur.execute('SELECT value FROM project WHERE name="multiVCF";')
+                    multiVCF=cur.fetchall()
+                    if len(multiVCF)==0:
+                        multiVCF=0
+                    else:
+                        multiVCF=int(multiVCF[0][0])
+                    cur.execute('SELECT DISTINCT(file_id) from sample where HDF5="{0}"'.format(HDFfileName))
+                    file_id=cur.fetchall()
                     for row in cur.execute(select_group):
                         geneSymbol=transformGeneName(row[0])
                         ids=row[1].split(",")
                         ids=[int(x) for x in ids]
                         # ids.sort()
                         chr= getChr(ids[0],db.cursor())
-                        chrEnd=getChr(ids[-1],db.cursor())
-                        
-                        # subMatrix=accessEngine.get_geno_info_by_variant_IDs(ids,chr,"GT")
-                        # if subMatrix is not None and subMatrix.indices is not None:
-                        #     storageEngine.store(subMatrix,chr,geneSymbol
-                        if chr==chrEnd:
-                            # updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
-                            updated_rownames,colnames,subMatrix=accessEngine.get_genotype(ids,"",[chr])
-                            
-                            if subMatrix is not None:
-                                storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
-                                storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
-                                if not storageEngine.checkGroup(chr,"colnames"):
-                                    storageEngine.store(colnames,chr,"colnames")
-                        else:
+                        if not storageEngine.checkGroup(chr,geneSymbol):
+                            # if int(multiVCF[0][0])==0 or (int(multiVCF[0][0])==1 and int(file_id[0][0])==1):
                             varDict=getChrs(ids,db.cursor())
-                            for chr,vids in varDict.items():
-                                updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_sep_variant_ids(vids,chr)
+                            if multiVCF==0 and len(varDict.keys())==1:
+                                # updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
+                            
+                                updated_rownames,colnames,subMatrix=accessEngine.get_genotype(ids,"",[chr])
+
                                 if subMatrix is not None:
                                     storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
                                     storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
                                     if not storageEngine.checkGroup(chr,"colnames"):
                                         storageEngine.store(colnames,chr,"colnames")
+                            else:
+                                for chr,vids in varDict.items():
+                                    try:
+                                        updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_sep_variant_ids(vids,chr)
+                                        if subMatrix is not None:
+                                            storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
+                                            storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
+                                            if not storageEngine.checkGroup(chr,"colnames"):
+                                                storageEngine.store(colnames,chr,"colnames")
+                                        else:
+                                            storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
+                                            if not storageEngine.checkGroup(chr,"colnames"):
+                                                storageEngine.store(colnames,chr,"colnames")
+                                    except TypeError:
+                                        pass
+                    
 
                     # storageEngine.close() 
                 accessEngine.close()
@@ -146,6 +157,7 @@ def generateHDFbyGroup(testManager,njobs):
     taskQueue=queue.Queue()
     start=time.time()
     groupGenerators=[None]*min(njobs,len(HDFfileNames))
+
     if len(testManager.sample_IDs)>0:
         HDFfileNames=[]
         cur = testManager.db.cursor()
@@ -155,6 +167,7 @@ def generateHDFbyGroup(testManager,njobs):
         res=cur.fetchall()
         for filename in res:
             HDFfileNames.append(filename[0])
+
     for HDFfileName in HDFfileNames:
         fileQueue.put(HDFfileName)
     for i in range(len(HDFfileNames)):
@@ -345,7 +358,7 @@ def generateHDFbyGroup_update(testManager,njobs):
                 break
     for groupHDFGenerator in groupGenerators:
         groupHDFGenerator.join()
-    print(("group time: ",time.time()-start))
+    # print(("group time: ",time.time()-start))
 
 
 
@@ -377,8 +390,12 @@ def getChrs(variantIDs,cur):
         varDict[rec[0]].append(rec[1])
     return varDict
 
+def intersection(lst1, lst2): 
+    lst3 = [value for value in lst1 if value in lst2] 
+    return lst3 
 
-def getGenotype_HDF5(worker, group):
+
+def getGenotype_HDF5(worker, group, sample_IDs):
     """This function gets genotype of variants in specified group.
     """
     where_clause = ' AND '.join(['{0}={1}'.format(x, worker.db.PH) for x in worker.group_names])
@@ -387,7 +404,6 @@ def getGenotype_HDF5(worker, group):
     var_info, variant_ids = worker.getVarInfo(group, where_clause)
     chr=getChr(variant_ids[0],cur)
     chrEnd=getChr(variant_ids[-1],cur)
-
     if chr!=chrEnd:
         varDict=getChrs(variant_ids,cur)
         chrs=list(varDict.keys())
@@ -395,12 +411,12 @@ def getGenotype_HDF5(worker, group):
         varDict={chr:variant_ids}
         chrs=[chr]
 
+
     # get genotypes / genotype info
     genotype = []
     geno_info = {x:[] for x in worker.geno_info}
     # getting samples locally from my own connection
     geneSymbol=transformGeneName(group[0])
-
     if len(group)==2:
         geneSymbol="pos"+str(group[1])
     HDFfileNames=glob.glob("tmp*_genotypes_multi_genes.h5")
@@ -415,41 +431,41 @@ def getGenotype_HDF5(worker, group):
             HDFfileNames.append(filename[0].replace(".h5","_multi_genes.h5"))
 
     HDFfileNames=sorted(HDFfileNames, key=lambda name: int(name.split("_")[1]))
-    for fileName in HDFfileNames:    
+    for fileName in HDFfileNames:
         accessEngine=Engine_Access.choose_access_engine(fileName)
-        if len(chrs)==1:
-            # colnames=accessEngine.get_colnames(chr,geneSymbol)
-            # snpdict=accessEngine.get_geno_info_by_group(geneSymbol,chr)
+        colnames=accessEngine.get_colnames(chr)
+        colnames=intersection(sample_IDs,colnames.tolist())
 
-            # for chr in chrs:
-                
-            colnames=accessEngine.get_colnames(chr)
+        if len(chrs)==1:
             snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
             accessEngine.close()
+
             for ID in colnames:
                 data=snpdict[ID]
-                
                 gtmp = [data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]]
+
                 # handle -1 coding (double heterozygotes)     
                 genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
-
                 #
                 # handle genotype_info
                 #
                 for idx, key in enumerate(worker.geno_info):
                     geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
-        else:    
-            colnames=accessEngine.get_colnames(chrs[0])
-                
+        else:   
+            alldict={}
+            for chr in chrs:
+                alldict[chr]=accessEngine.get_geno_by_group(chr,geneSymbol)
             for ID in colnames:
                 gtmp=[]
                 for chr in chrs:
-                    snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
+                    # snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
+                    snpdict=alldict[chr]
                     data=snpdict[ID]
-                    
-                    gtmp.extend([data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]])
+                    # gtmp.extend([data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]])
+                    gtmp.extend([data.get(x) for x in varDict[chr]])
                     # handle -1 coding (double heterozygotes)     
                 genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
+
                 #
                 # handle genotype_info
                 #

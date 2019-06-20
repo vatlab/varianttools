@@ -8,8 +8,7 @@ stages:
 #          LOCALRESOURCE: "/home/jma7/.variant_tools"
 
 before_script:
-                - git checkout v3_clean_geno
-                - git pull
+               
                 - cp -r /home/bpeng/VariantTools/src/boost_1_49_0 ./src
                 - cp -r /home/bpeng/VariantTools/src/cgatools ./src
                 - cp -r /home/bpeng/VariantTools/src/gsl ./src
