@@ -345,7 +345,7 @@ class Sample:
                 fldtype = self.db.typeOfColumn('sample', field)
                 count[2] += 1  # updated
             null_count = defaultdict(int)
-            starttime=time.time()
+         
             id_records={}
             for key,rec in records.items():
                 # by sample_name only
