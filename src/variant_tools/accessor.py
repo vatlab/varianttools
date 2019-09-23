@@ -11,6 +11,7 @@ from .utils import env,chunks_start_stop
 from multiprocessing import Process,Manager
 import queue
 from .merge_sort_parallel import binarySearch
+import time
 
 
 
@@ -315,12 +316,12 @@ class HDF5Engine_storage(Base_Storage):
         else:
             group=self.file.create_group("/","chr"+chr,"chromosome")
         if len(groupName)>0:
-            node="/chr"+chr+"/"+groupName
-
-            if self.checkGroup(chr,groupName):
-                group=self.file.get_node(node)
-            else:
-                group=self.file.create_group("/chr"+chr,groupName)
+            if "_" not in chr:
+                node="/chr"+chr+"/"+groupName
+                if self.checkGroup(chr,groupName):
+                    group=self.file.get_node(node)
+                else:
+                    group=self.file.create_group("/chr"+chr,groupName)
         return group
 
     def close(self):
@@ -503,10 +504,11 @@ class HDF5Engine_access(Base_Access):
         group=self.file.get_node(node)
         groupName=str(groupName)
         if len(groupName)>0:
-            node="/chr"+chr+"/"+groupName
-            if node not in self.file:
-                self.file.create_group("/chr"+chr,groupName)
-            group=self.file.get_node(node)
+            if "_" not in chr:
+                node="/chr"+chr+"/"+groupName
+                if node not in self.file:
+                    self.file.create_group("/chr"+chr,groupName)
+                group=self.file.get_node(node)
         return group
 
     def checkGroup(self,chr,groupName=""):
@@ -621,7 +623,7 @@ class HDF5Engine_access(Base_Access):
         
         if "GT" in group:
             self.GT=group.GT[:]
-
+           
             snpdict=dict.fromkeys(self.colnames,{})
             for key,value in snpdict.items():
                 snpdict[key]=dict.fromkeys(self.rownames,(0,))
@@ -629,6 +631,7 @@ class HDF5Engine_access(Base_Access):
             for rowidx,rowID in enumerate(self.rownames):
                 for colidx,colID in enumerate(self.colnames):
                    snpdict[colID][rowID]=(self.GT[rowidx,colidx],)
+
                     
         else:
             snpdict=dict.fromkeys(self.colnames,{})
@@ -711,7 +714,7 @@ class HDF5Engine_access(Base_Access):
                 if (len(sampleNames)>0):
                     colpos=list(map(lambda x:colnames.index(x),sampleNames))
                 else:
-                    colpos=list(map(lambda x:colnames.index(x),colnames))
+                    colpos=range(0,len(colnames))
 
                 if len(variantIDs)>0:
                     for id in variantIDs:
@@ -732,9 +735,7 @@ class HDF5Engine_access(Base_Access):
                         maxPos
                         # genoinfo=node.GT[minPos:maxPos,colpos]
                         genoinfo=node.GT[minPos:maxPos,:]
-                        
                         updated_rownames,updated_colnames,updated_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[],"GT")
-                    
                     except NameError:
                         env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
                 else:
