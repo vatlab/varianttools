@@ -345,7 +345,9 @@ class Sample:
                 fldtype = self.db.typeOfColumn('sample', field)
                 count[2] += 1  # updated
             null_count = defaultdict(int)
-            for key, rec in records.items():
+            starttime=time.time()
+            id_records={}
+            for key,rec in records.items():
                 # by sample_name only
                 if len(key) == 1:
                     # get matching sample
@@ -359,29 +361,39 @@ class Sample:
                 if len(ids) == 0:
                     invalid_sample_names.add(key[0])
                     continue
-                #
-                for id in [x for x in ids if x in allowed_samples]:
-                    count[0] += 1
-                    if rec[idx] == na_str:
+                for id in ids:
+                    id_records[id]=rec
+ 
+           #
+            #CHANGE: for deal with large sample list
+            # for id in [x for x in ids if x in allowed_samples]:
+            allowed_samples=np.array(allowed_samples)
+            phenoIDs=np.array(list(id_records.keys()))
+            overlapIDs=np.intersect1d(phenoIDs,allowed_samples,assume_unique=True)
+
+            for id in overlapIDs:
+                count[0] += 1
+                rec=id_records[id]
+                if rec[idx] == na_str:
+                    null_count[field] += 1
+                    rec[idx] = None
+                elif fldtype.upper().startswith('INT'):
+                    try:
+                        int(rec[idx])
+                    except:
+                        env.logger.warning('Value "{}" is treated as missing in phenotype {}'
+                            .format(rec[idx], field))
                         null_count[field] += 1
                         rec[idx] = None
-                    elif fldtype.upper().startswith('INT'):
-                        try:
-                            int(rec[idx])
-                        except:
-                            env.logger.warning('Value "{}" is treated as missing in phenotype {}'
-                                .format(rec[idx], field))
-                            null_count[field] += 1
-                            rec[idx] = None
-                    elif fldtype.upper().startswith('FLOAT'):
-                        try:
-                            float(rec[idx])
-                        except:
-                            env.logger.warning('Value "{}" is treated as missing in phenotype {}'
-                                .format(rec[idx], field))
-                            null_count[field] += 1
-                            rec[idx] = None
-                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
+                elif fldtype.upper().startswith('FLOAT'):
+                    try:
+                        float(rec[idx])
+                    except:
+                        env.logger.warning('Value "{}" is treated as missing in phenotype {}'
+                            .format(rec[idx], field))
+                        null_count[field] += 1
+                        rec[idx] = None
+                cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
         for f,c in list(null_count.items()):
             env.logger.warning('{} missing values are identified for phenotype {}'
                 .format(c, f))
