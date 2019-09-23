@@ -2312,6 +2312,19 @@ class Project:
         query += ');'
         cur.execute(query)
         self.db.commit()
+        self.createIndexOnSampleTable()
+
+
+    def createIndexOnSampleTable(self):
+        try:   
+            if not self.db.hasIndex('idx_sample_name'):
+                self.db.execute(
+                    '''CREATE UNIQUE INDEX idx_sample_name ON sample (sample_name);''')
+            if not self.db.hasIndex('idx_file_ID'):
+                self.db.execute(
+                    '''CREATE INDEX idx_file_ID ON sample (file_id);''')
+        except Exception as e:
+                env.logger.debug(e)
 
     def createNewSampleVariantTable(self, cur, table, genotype=True, fields=[]):
         '''Create a table ``genotype_??`` to store genotype data'''
