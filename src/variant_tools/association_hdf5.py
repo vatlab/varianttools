@@ -430,12 +430,11 @@ def getGenotype_HDF5(worker, group, sample_IDs):
             HDFfileNames.append(filename[0].replace(".h5","_multi_genes.h5"))
 
     HDFfileNames=sorted(HDFfileNames, key=lambda name: int(name.split("_")[1]))
+    sample_IDs=np.array(sample_IDs)
     for fileName in HDFfileNames:
         accessEngine=Engine_Access.choose_access_engine(fileName)
         colnames=accessEngine.get_colnames(chr)
 
-       
-        sample_IDs=np.array(sample_IDs)
         colnames=np.array(colnames.tolist())
         colnames=np.intersect1d(sample_IDs,colnames)
         

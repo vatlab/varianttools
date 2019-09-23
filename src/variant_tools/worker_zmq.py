@@ -333,7 +333,7 @@ class AssoTestsWorker:
         # files=glob.glob("tmp*_genotypes_multi_genes.h5")
 
         files=sorted(files, key=lambda name: int(name.split("/")[-1].split("_")[1]))
- 
+        sampleIDs=np.array(self.sample_IDs)
         for fileName in files:   
             accessEngine=Engine_Access.choose_access_engine(fileName)
 
@@ -344,6 +344,8 @@ class AssoTestsWorker:
                 # for chr in chrs:
                     
                 colnames=accessEngine.get_colnames(chr)
+                colnames=np.array(colnames.tolist())
+                colnames=np.intersect1d(sampleIDs,colnames)
                 snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
                 accessEngine.close()
                 for ID in colnames:
@@ -360,6 +362,8 @@ class AssoTestsWorker:
                         geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
             else:    
                 colnames=accessEngine.get_colnames(chrs[0])
+                colnames=np.array(colnames.tolist())
+                colnames=np.intersect1d(sampleIDs,colnames)
                     
                 for ID in colnames:
                     gtmp=[]
