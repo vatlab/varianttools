@@ -1328,8 +1328,9 @@ def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,contex
                     interval=time.time()
 
             else:
-                if time.time()-interval>100:
-                    print("No available worker. Not receiving any result from worker in 60 seconds.")
+                delay=1000
+                if time.time()-interval>delay:
+                    print("No available worker. Not receiving any result from worker in {} seconds.".format(delay))
                     break
         
         # terminate 

@@ -403,7 +403,6 @@ class AssoTestsWorker:
             self.data = AssoData()
             self.pydata = {}
             values = list(grp)
-
             try:                
                 genotype, which, var_info, geno_info = self.getGenotype_HDF5(grp)
                 # if I throw an exception here, the program completes in 5 minutes, indicating
