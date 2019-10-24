@@ -386,7 +386,8 @@ setup(name = "variant_tools",
        'numpy',
        'Cython',
        'scipy',
-       'pyzmq'
+       'pyzmq',
+       'pycurl'
     ],
     packages = find_packages('src'),
     package_dir = {'': 'src'},
