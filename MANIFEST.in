@@ -23,7 +23,7 @@
 #
 
 include setup.py
-include README
+include README.md
 include LICENSE
 # libplinkio
 recursive-include src *.py *.c *.cpp *.h *.hpp *.i *.ipp *.pyx
