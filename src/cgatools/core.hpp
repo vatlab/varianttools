@@ -43,7 +43,9 @@
 // Use version 2 of the Boost Filesystem library.
 // This stopped being the default as of Boost 1.44 and
 // will no longer be supported in Boost 1.48.
-#define BOOST_FILESYSTEM_VERSION 2
+
+// Changed by Bo Peng from 2 to 3 to support newer version of boost
+#define BOOST_FILESYSTEM_VERSION 3
 
 #include <boost/cstdint.hpp>
 #include <limits>
