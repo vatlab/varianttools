@@ -47,7 +47,8 @@ namespace cgatools { namespace util { namespace files {
             for ( boost::filesystem::directory_iterator itr( directory ); itr != end_itr; ++itr )
             {
                 if (!is_directory(itr->status())) {
-                    if (boost::regex_search(itr->path().leaf().c_str(), re))
+                    // changed by Bo Peng from leaf() to filename() to support newer version of boost
+                    if (boost::regex_search(itr->path().filename().c_str(), re))
                     {
                         if (completePaths) {
                             filesFound.push_back(boost::filesystem::system_complete(itr->path()));
@@ -59,7 +60,8 @@ namespace cgatools { namespace util { namespace files {
                 }
                 else {
                     if (includeDir) {
-                        if (boost::regex_search(itr->path().leaf().c_str(), re)) {
+                        // changed by Bo Peng from leaf() to filename() to support newer version of boost
+                        if (boost::regex_search(itr->path().filename().c_str(), re)) {
                             if (completePaths) {
                                 filesFound.push_back(boost::filesystem::system_complete(itr->path()));
                             }
@@ -95,7 +97,8 @@ namespace cgatools { namespace util { namespace files {
         for (boost::filesystem::directory_iterator it(dir), itEnd; it != itEnd; ++it)
         {
             boost::smatch what;
-            std::string fname(it->leaf());
+            // changed by Bo Peng from leaf() to path().filename() to support newer version of boost
+            std::string fname(it->path().filename().string());
             if (boost::regex_match(fname, re)) {
                 result.push_back(fname);
                 if (--maxFiles==0)
@@ -122,10 +125,13 @@ namespace cgatools { namespace util { namespace files {
         for (size_t ii = 0; ii < extCount; ++ii)
         {
             boost::filesystem::path p = dir / (baseName + exts[ii]);
-            if (InputStream::isReadable(p.external_file_string()))
-                return p.external_file_string();
+            // changed by Bo Peng from external_file_string() to native() to support newer version of boost
+            if (InputStream::isReadable(p.native()))
+                // changed by Bo Peng from external_file_string() to native() to support newer version of boost
+                return p.native();
         }
-        return (dir / baseName).external_file_string();
+        // changed by Bo Peng from external_file_string() to native() to support newer version of boost
+        return (dir / baseName).native();
     }
 
     std::string findDataFileRegex(const boost::filesystem::path& dir, const std::string& baseName)
@@ -137,10 +143,12 @@ namespace cgatools { namespace util { namespace files {
         {
             vector<string> fns = listDir(dir, baseName+exts[ii], 2);
             if (fns.size() > 1)
+                // changed by Bo Peng from external_file_string() to native() to support newer version of boost
                 throw Exception("multiple files matching regex "+baseName+exts[ii]+
-                                " in directory "+dir.external_file_string());
+                                " in directory "+dir.native());
             if (1 == fns.size())
-                return (dir / fns[0]).external_file_string();
+                // changed by Bo Peng from external_file_string() to native() to support newer version of boost
+                return (dir / fns[0]).native();
         }
         return "";
     }
@@ -161,7 +169,8 @@ namespace cgatools { namespace util { namespace files {
         if (exnOnFail)
         {
             string nameList = boost::join(possibleBaseNames, " or ");
-            throw Exception("failed to find "+nameList+" in "+dir.external_file_string());
+            // changed by Bo Peng from external_file_string() to native() to support newer version of boost
+            throw Exception("failed to find "+nameList+" in "+dir.native());
         }
         return "";
     }
