@@ -344,43 +344,6 @@ LIB_GSL = [
    'src/gsl/permutation/permute.c'
     ]
 
-LIB_BOOST = [
-    'src/boost_1_49_0/libs/iostreams/src/bzip2.cpp',
-    'src/boost_1_49_0/libs/iostreams/src/file_descriptor.cpp',
-    'src/boost_1_49_0/libs/iostreams/src/gzip.cpp',
-    'src/boost_1_49_0/libs/iostreams/src/mapped_file.cpp',
-    'src/boost_1_49_0/libs/iostreams/src/zlib.cpp',
-    'src/boost_1_49_0/libs/regex/src/c_regex_traits.cpp',
-    'src/boost_1_49_0/libs/regex/src/cpp_regex_traits.cpp',
-    'src/boost_1_49_0/libs/regex/src/cregex.cpp',
-    'src/boost_1_49_0/libs/regex/src/fileiter.cpp',
-    'src/boost_1_49_0/libs/regex/src/icu.cpp',
-    'src/boost_1_49_0/libs/regex/src/instances.cpp',
-    'src/boost_1_49_0/libs/regex/src/posix_api.cpp',
-    'src/boost_1_49_0/libs/regex/src/regex.cpp',
-    'src/boost_1_49_0/libs/regex/src/regex_debug.cpp',
-    'src/boost_1_49_0/libs/regex/src/regex_raw_buffer.cpp',
-    'src/boost_1_49_0/libs/regex/src/regex_traits_defaults.cpp',
-    'src/boost_1_49_0/libs/regex/src/static_mutex.cpp',
-    'src/boost_1_49_0/libs/regex/src/usinstances.cpp',
-    'src/boost_1_49_0/libs/regex/src/w32_regex_traits.cpp',
-    'src/boost_1_49_0/libs/regex/src/wc_regex_traits.cpp',
-    'src/boost_1_49_0/libs/regex/src/wide_posix_api.cpp',
-    'src/boost_1_49_0/libs/regex/src/winstances.cpp',
-    'src/boost_1_49_0/libs/filesystem/v3/src/codecvt_error_category.cpp',
-    'src/boost_1_49_0/libs/filesystem/v3/src/operations.cpp',
-    'src/boost_1_49_0/libs/filesystem/v3/src/path.cpp',
-    'src/boost_1_49_0/libs/filesystem/v3/src/path_traits.cpp',
-    'src/boost_1_49_0/libs/filesystem/v3/src/portability.cpp',
-    'src/boost_1_49_0/libs/filesystem/v3/src/unique_path.cpp',
-    'src/boost_1_49_0/libs/filesystem/v3/src/utf8_codecvt_facet.cpp',
-    'src/boost_1_49_0/libs/filesystem/v3/src/windows_file_codecvt.cpp',
-    'src/boost_1_49_0/libs/filesystem/v2/src/v2_operations.cpp',
-    'src/boost_1_49_0/libs/filesystem/v2/src/v2_portability.cpp',
-    'src/boost_1_49_0/libs/filesystem/v2/src/v2_path.cpp',
-    'src/boost_1_49_0/libs/system/src/error_code.cpp'
-]
-
 LIB_PLINKIO = [
     'src/libplinkio/cplinkio.c',
     'src/libplinkio/snparray.c',
@@ -488,75 +451,6 @@ LIB_UCSC_FILES = [
 ]
     
 LIB_STAT = ['src/variant_tools/fisher2.c']
-
-EMBEDDED_BOOST = os.path.isdir('src/boost_1_49_0')
-if not EMBEDDED_BOOST:
-    def downloadProgress(count, blockSize, totalSize):
-        perc = count * blockSize * 100 // totalSize
-        if perc > downloadProgress.counter: 
-            sys.stdout.write('.' * (perc - downloadProgress.counter))
-            downloadProgress.counter = perc
-        sys.stdout.flush()
-    if sys.version_info.major == 2:
-        from urllib import urlretrieve
-    else:
-        from urllib.request import urlretrieve
-    import tarfile
-    downloadProgress.counter = 0
-    try:
-        BOOST_URL = 'http://downloads.sourceforge.net/project/boost/boost/1.49.0/boost_1_49_0.tar.gz?r=&ts=1435893980&use_mirror=iweb'
-        sys.stdout.write('Downloading boost C++ library 1.49.0 ')
-        sys.stdout.flush()
-        if not os.path.isfile('src/boost_1_49_0.tar.gz'):
-            urlretrieve(BOOST_URL, 'src/boost_1_49_0.tar.gz', downloadProgress)
-        sys.stdout.write('\n')
-        # extract needed files
-        with tarfile.open('src/boost_1_49_0.tar.gz', 'r:gz') as tar:
-            files = [h for h in tar.getmembers() if h.name.startswith('boost_1_49_0/boost') \
-                or h.name.startswith('boost_1_49_0/libs/iostreams') \
-                or h.name.startswith('boost_1_49_0/libs/regex') \
-                or h.name.startswith('boost_1_49_0/libs/filesystem') \
-                or h.name.startswith('boost_1_49_0/libs/detail') \
-                or h.name.startswith('boost_1_49_0/libs/system') ]
-            sys.stdout.write('Extracting %d files\n' % len(files))
-            tar.extractall(path='src', members=files)
-        os.remove('src/boost_1_49_0.tar.gz')
-        EMBEDDED_BOOST = True
-    except Exception as e:
-        print(e)
-        print('The boost C++ library version 1.49.0 is not found under the current directory. Will try to use the system libraries.')
-
-
-EMBEDDED_ZMQ= os.path.isdir('src/zeromq-4.0.3')
-if not EMBEDDED_ZMQ:
-    def downloadProgress(count, blockSize, totalSize):
-        perc = count * blockSize * 100 // totalSize
-        if perc > downloadProgress.counter:
-            sys.stdout.write('.' * (perc - downloadProgress.counter))
-            downloadProgress.counter = perc
-        sys.stdout.flush()
-    if sys.version_info.major == 2:
-        from urllib import urlretrieve
-    else:
-        from urllib.request import urlretrieve
-    import tarfile
-    downloadProgress.counter = 0
-    try:
-        BOOST_URL = 'http://download.zeromq.org/zeromq-4.0.3.tar.gz'
-        sys.stdout.write('Downloading ZeroMQ version 4.0.3')
-        sys.stdout.flush()
-        if not os.path.isfile('src/zeromq-4.0.3.tar.gz'):
-            urlretrieve(BOOST_URL, 'src/zeromq-4.0.3.tar.gz', downloadProgress)
-        sys.stdout.write('\n')
-        # extract needed files
-        with tarfile.open('src/zeromq-4.0.3.tar.gz', 'r:gz') as tar:
-            tar.extractall(path='src')
-        os.remove('src/zeromq-4.0.3.tar.gz')
-        EMBEDDED_ZMQ = True
-    except Exception as e:
-        print(e)
-        print('The ZeroMQ version 4.0.3 is not found under the current directory.')
-
 #
 # During development, if an interface file needs to be re-generated, please
 # remove these files and they will be re-generated with SWIG
@@ -609,38 +503,6 @@ else:
 ENV_INCLUDE_DIRS = [x for x in os.environ.get('LD_INCLUDE_PATH', '').split(os.pathsep) if x]
 ENV_LIBRARY_DIRS = [x for x in os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep) if x]
 
-if EMBEDDED_BOOST:
-    try:
-        c = new_compiler()
-        if not os.path.isfile(os.path.join('build', c.static_lib_format % ('embedded_boost', c.static_lib_extension))):
-            # -w suppress all warnings caused by the use of boost libraries
-            print('Building embedded boost library')
-            objects = c.compile(LIB_BOOST,
-                include_dirs=['src/boost_1_49_0'] + ENV_INCLUDE_DIRS,
-                output_dir='build',
-                extra_preargs = ['-w', '-fPIC'],
-                macros = [('BOOST_ALL_NO_LIB', None)])
-            c.create_static_lib(objects, "embedded_boost", output_dir='build')
-    except Exception as e:
-        sys.exit("Failed to build embedded boost library: {}".format(e))
-
-
-if EMBEDDED_ZMQ:
-  currentdir=os.getcwd()
-  try:
-    if not os.path.isfile("./src/zeromq-4.0.3/Makefile"):
-      print('Building embedded zeromq library')
-      os.chdir("./src/zeromq-4.0.3")
-      ret=subprocess.call(["./configure", "--prefix="+currentdir+"/src/zeromq-4.0.3"],shell=True)
-      if ret != 0: sys.exit('Failed to install zmq.')
-      ret=subprocess.call(["make", "install"],shell=True)
-      if ret != 0: sys.exit('Failed to install zmq.')
-  except OSError as e:
-        sys.exit('Failed to install zmq.')
-  finally:
-    os.chdir(currentdir)
-
-
 
 # building other libraries
 for files, incs, macs, libname in [
@@ -650,7 +512,7 @@ for files, incs, macs, libname in [
         [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
          ('_USE_KNETFILE', None), ('BGZF_CACHE', None)],
         'ucsc'),
-    (LIB_CGATOOLS, ['src', 'src/cgatools', 'src/boost_1_49_0'],
+    (LIB_CGATOOLS, ['src', 'src/cgatools'],
         [('CGA_TOOLS_IS_PIPELINE', 0), ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
         'cgatools'),
     (LIB_GSL, ['src', 'src/gsl'], [], 'gsl')]:
@@ -660,7 +522,6 @@ for files, incs, macs, libname in [
     try:
         print('Building embedded library {}'.format(libname))
         c = new_compiler()
-        # -w suppress all warnings caused by the use of boost libraries
         objects = c.compile(files,
             include_dirs=incs  + ENV_INCLUDE_DIRS,
             output_dir='build',
@@ -699,15 +560,15 @@ ext_modules=[
             # stop warning message for sqlite because it is written by us.
             sources = ['src/sqlite/vt_sqlite3_ext.cpp'],
             include_dirs = ["src/", 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools',
-                'src/sqlite', "src/variant_tools", "src/gsl", "src/cgatools", "src/boost_1_49_0"] + ENV_INCLUDE_DIRS,
+                'src/sqlite', "src/variant_tools", "src/gsl", "src/cgatools"] + ENV_INCLUDE_DIRS,
             library_dirs = ["build"] + ENV_LIBRARY_DIRS,
             libraries = ['sqlite_gsl', 'stat', 'ucsc', 'cgatools'] + \
-                (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']) + \
+                ['boost_iostreams', 'boost_regex', 'boost_filesystem'] + \
                 ['z', 'bz2'],
             extra_compile_args = gccargs,
             define_macros = [
                 ('MODULE_NAME', '"vt_sqlite3"'),
-                ('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
+                ('CGA_TOOLS_IS_PIPELINE', 0),
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"'), ('USE_TABIX', '1'), ('USE_BAM', '1'),
                 ('_FILE_OFFSET_BITS', '64'), ('_USE_KNETFILE', None),
                 ('BGZF_CACHE', None)],
@@ -715,14 +576,14 @@ ext_modules=[
         Extension('variant_tools._cgatools',
             sources = [CGATOOLS_WRAPPER_CPP_FILE],
             libraries = ['cgatools'] + \
-                (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']) + \
+                ['boost_iostreams', 'boost_regex', 'boost_filesystem'] + \
                 ['z', 'bz2'] + ENV_INCLUDE_DIRS,
-            define_macros = [('BOOST_ALL_NO_LIB', None),  ('CGA_TOOLS_IS_PIPELINE', 0),
+            define_macros = [('CGA_TOOLS_IS_PIPELINE', 0),
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
             extra_compile_args = gccargs,
             swig_opts = ['-O', '-shadow', '-c++', '-keyword'],
 
-            include_dirs = ["src", "src/cgatools", "src/boost_1_49_0"] + ENV_INCLUDE_DIRS,
+            include_dirs = ["src", "src/cgatools"] + ENV_INCLUDE_DIRS,
             library_dirs = ["build"] + ENV_LIBRARY_DIRS,
 
         ),
@@ -771,6 +632,7 @@ setup(name = "variant_tools",
        'numpy',
        'Cython',
        'scipy',
+       'pyzmq'
     ],
     packages = find_packages('src'),
     package_dir = {'': 'src'},
