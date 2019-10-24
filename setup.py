@@ -330,7 +330,7 @@ ext_modules=[
         Extension('variant_tools._cgatools',
             sources = [CGATOOLS_WRAPPER_CPP_FILE],
             libraries = ['cgatools'] + \
-                ['boost_iostreams', 'boost_regex', 'boost_filesystem'] + \
+                ['boost_iostreams', 'boost_regex', 'boost_filesystem', 'boost_system'] + \
                 ['z', 'bz2'] + ENV_INCLUDE_DIRS,
             define_macros = [('CGA_TOOLS_IS_PIPELINE', 0),
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
