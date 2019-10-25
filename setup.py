@@ -46,7 +46,7 @@ try:
 except ImportError:
     sys.exit('variant tools requires Python 3.2 or higher. Please upgrade your version (%s) of Python and try again.' % (sys.version.split()[0]))
 
-# do not import variant_tools because __init__ might not be imported properly 
+# do not import variant_tools because __init__ might not be imported properly
 # before installation
 with open('src/variant_tools/_version.py') as init:
     for line in init:
@@ -111,7 +111,7 @@ LIB_PLINKIO = [
     'src/libplinkio/plinkio.c',
     'src/libplinkio/file.c',
     'src/libplinkio/bed_header.c',
-    'src/libplinkio/libcsv.c', 
+    'src/libplinkio/libcsv.c',
 ]
 
 LIB_CGATOOLS = [
@@ -205,7 +205,7 @@ LIB_UCSC_FILES = [
     'src/ucsc/samtools/sam_header.c',
     'src/ucsc/samtools/bam_aux.c',
 ]
-    
+
 LIB_STAT = ['src/variant_tools/fisher2.c']
 #
 # During development, if an interface file needs to be re-generated, please
@@ -244,7 +244,7 @@ if not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE) or not os.path.isfile(UCSCTOOLS
     if ret != 0:
         sys.exit('Failed to generate wrapper file for ucsctools.')
     os.rename('src/variant_tools/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE)
-         
+
 # Under linux/gcc, lib stdc++ is needed for C++ based extension.
 if sys.platform in 'linux2':
     libs = ['stdc++']
@@ -256,14 +256,16 @@ else:
     libs = []
     gccargs = ['-O3', '-Wno-unused-local-typedef', '-Wno-return-type']
 
-ENV_INCLUDE_DIRS = [x for x in os.environ.get('LD_INCLUDE_PATH', '').split(os.pathsep) if x]
+
+ENV_INCLUDE_DIRS = [os.path.join(os.environ['CONDA_PREFIX'], 'include')] if 'CONDA_PREFIX' in os.environ else []
+ENV_INCLUDE_DIRS += [x for x in os.environ.get('LD_INCLUDE_PATH', '').split(os.pathsep) if x]
 ENV_LIBRARY_DIRS = [x for x in os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep) if x]
 
 
 # building other libraries
 for files, incs, macs, libname in [
     (LIB_STAT, ['src'], [], 'stat'),
-    (LIB_UCSC_FILES, ['src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools'], 
+    (LIB_UCSC_FILES, ['src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools'],
         [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
          ('_USE_KNETFILE', None), ('BGZF_CACHE', None)],
         'ucsc'),
