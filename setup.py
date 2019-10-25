@@ -346,7 +346,7 @@ ext_modules=[
         Extension('variant_tools._assoTests',
             sources = [ASSO_WRAPPER_CPP_FILE] + ASSOC_FILES,
             extra_compile_args = gccargs,
-            libraries = libs + ['gsl', 'stat'], #, 'blas'],
+            libraries = libs + ['gsl', 'stat', 'blas'],
             library_dirs = ["build"] + ENV_LIBRARY_DIRS,
             include_dirs = ["src", "src/variant_tools"] + ENV_INCLUDE_DIRS,
 
