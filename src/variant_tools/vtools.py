@@ -271,7 +271,8 @@ def main():
     # commands that accepts format and other subparsers can pass arbitrary
     # parameter to subparsers
     if args.func in [association.associate, importer.importVariants,
-                     update.update, exporter.export, pipeline.execute]:
+                     update.update, exporter.export, pipeline.execute,
+                     pipeline.simulate]:
         args.unknown_args = argv
     elif len(argv) > 0:
         master_parser.print_usage(sys.stderr)

@@ -48,7 +48,7 @@ from collections import defaultdict
 from .pipeline import PipelineAction
 from .project import Project
 
-from ucsctools import tabixFetch
+from .ucsctools import tabixFetch
 
 
 def FineScaleRecombinator(regions=None, scale=1, defaultRate=1e-8, output=None):
@@ -73,9 +73,9 @@ def FineScaleRecombinator(regions=None, scale=1, defaultRate=1e-8, output=None):
         if len(regions[0]) > 2:
             for reg in regions:
                 if reg[0] in lociPos:
-                    lociPos[reg[0]].extend(range(reg[1], reg[2]+1))
+                    lociPos[reg[0]].extend(list(range(reg[1], reg[2]+1)))
                 else:
-                    lociPos[reg[0]] = range(reg[1], reg[2]+1)
+                    lociPos[reg[0]] = list(range(reg[1], reg[2]+1))
         elif len(regions[0]) == 2:
             # single-locus regions
             for (chr, pos) in regions:
@@ -89,7 +89,7 @@ def FineScaleRecombinator(regions=None, scale=1, defaultRate=1e-8, output=None):
         for ch in range(regions.numChrom()):
             lociPos[regions.chromName(ch)] = [int(regions.locusPos(x)) for x in range(regions.chromBegin(ch), regions.chromEnd(ch))]
     #
-    chroms = lociPos.keys()
+    chroms = list(lociPos.keys())
     chroms.sort()
     #
     # download the map
@@ -410,7 +410,7 @@ class MutantInfo:
             all_loci = defaultdict(set)
             nLoci = 0
             for reg in regions:
-                all_loci[reg[0]] = all_loci[reg[0]].union(range(reg[1], reg[2]+1))
+                all_loci[reg[0]] = all_loci[reg[0]].union(list(range(reg[1], reg[2]+1)))
                 nLoci += len(all_loci[reg[0]])
             # find the number of loci on each chromosome
             chroms = sorted(all_loci.keys())
@@ -428,7 +428,7 @@ class MutantInfo:
                 for reg in stru['coding']:
                     # get reference sequence and positions
                     seq += ref.getSequence(reg[0], reg[1], reg[2])
-                    pos.extend(range(reg[1], reg[2]+1))
+                    pos.extend(list(range(reg[1], reg[2]+1)))
                 ch = reg[0]
                 # now, try to divide coding regions by codon. Note that a codon
                 # can consist of nucleotie across two exon.
@@ -751,9 +751,9 @@ class CreatePopulation(PipelineAction):
         regions = expandRegions(self.regions)
         for r in regions:
             if r[0] in lociPos:
-                lociPos[r[0]].extend(range(r[1], r[2] + 1))
+                lociPos[r[0]].extend(list(range(r[1], r[2] + 1)))
             else:
-                lociPos[r[0]] = range(r[1], r[2] + 1)
+                lociPos[r[0]] = list(range(r[1], r[2] + 1))
         #
         if self.sourceFile is not None:
             if self.sourceFile.lower().endswith('.vcf') or self.sourceFile.lower().endswith('.vcf.gz'):
@@ -768,7 +768,7 @@ class CreatePopulation(PipelineAction):
                     'population of size {} is requested'.format(self.sourceFile,
                     pop.popSize(), self.size))
         else:
-            chroms = lociPos.keys()
+            chroms = list(lociPos.keys())
             chroms.sort()
             pop = sim.Population(size=self.size, loci=[len(lociPos[x]) for x in chroms],
                 chromNames=chroms, lociPos=sum([lociPos[x] for x in chroms], []),
@@ -781,7 +781,7 @@ class CreatePopulation(PipelineAction):
         return True
 
     def _importFromVcf(self, lociPos):
-        chroms = lociPos.keys()
+        chroms = list(lociPos.keys())
         chroms.sort()
         #
         allele_map = {'0': 0, '1': 1, '2': 1, '.': 0}
@@ -827,7 +827,7 @@ class CreatePopulation(PipelineAction):
             seeds = ms.readline()
             ms.readline()
             # current we do not handle multiple populations etc
-            chroms = lociPos.keys()
+            chroms = list(lociPos.keys())
             chroms.sort()
             #
             all_indexes = []

@@ -788,7 +788,7 @@ class PipelineAction:
 SkiptableAction = PipelineAction
 
 try:
-    from simulation import *
+    from .simulation import *
     hasSimuPOP = True
 except ImportError as e:
     hasSimuPOP = False
@@ -3685,7 +3685,6 @@ def simulate(args):
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
-
 
 if __name__ == '__main__':
     pass
