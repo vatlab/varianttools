@@ -1,10 +1,37 @@
 #!/usr/bin/env python
+#
+# $File: accessor.py $
+# $LastChangedDate$
+# $Rev$
+#
+# This file is part of variant_tools, a software application to annotate,
+# summarize, and filter variants for next-gen sequencing ananlysis.
+# Please visit http://varianttools.sourceforge.net for details.
+#
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 from scipy.sparse import csr_matrix
+
+import os
+os.environ['NUMEXPR_MAX_THREADS'] = '8'
+
 import tables as tb
 import numpy as np
 import math
 
-import os
 import sys
 from .utils import env,chunks_start_stop
 
@@ -28,7 +55,7 @@ class Engine_Storage(object):
         """
         if dbPath.split(".")[-1]=="h5":
             return HDF5Engine_storage(dbPath)
-      
+
 
     # choose_storage_engine=staticmethod(choose_storage_engine)
 
@@ -48,7 +75,7 @@ class Base_Storage(object):
             Args:
 
                - data
-               - chr (string): the chromosome 
+               - chr (string): the chromosome
                - groupName (string): the group name, for example gene name
         """
         raise NotImplementedError()
@@ -78,12 +105,12 @@ class HDF5Engine_storage(Base_Storage):
     def store(self,data,chr,groupName=""):
 
         self.store_genoInfo(data,chr,groupName)
-        
-       
+
+
 
 
     def store_genoInfo(self,data,chr="",groupName=""):
-        filters = tb.Filters(complevel=9, complib='blosc')       
+        filters = tb.Filters(complevel=9, complib='blosc')
         group=self.getGroup(chr)
         if not self.checkGroup(chr,groupName):
             groups=groupName.split("/")
@@ -154,7 +181,7 @@ class HDF5Engine_storage(Base_Storage):
     #     i=np.where(rownames==variant_id)[0][0]
     #     group.rowmask[i]=False
 
-    
+
     def remove_sample(self,sample_id):
         chrs=["X","Y"]
         chrs.extend(range(1,23))
@@ -169,7 +196,7 @@ class HDF5Engine_storage(Base_Storage):
                 group.samplemask[i]=True
             except:
                 pass
-        
+
 
     def remove_genotype(self,cond):
         chrs=["X","Y"]
@@ -188,15 +215,15 @@ class HDF5Engine_storage(Base_Storage):
                 cond=cond.replace("_geno","")
                 for startPos,endPos in chunkPos:
 
-                    if "GT" in cond and "/chr"+str(chr)+"/GT" in self.file: 
+                    if "GT" in cond and "/chr"+str(chr)+"/GT" in self.file:
                         GT=node.GT[startPos:endPos,:]
                         if "nan" in cond:
                             GT=np.nan_to_num(GT)
                             cond="GT==0"
-                    if "DP" in cond and "/chr"+str(chr)+"/DP" in self.file:    
+                    if "DP" in cond and "/chr"+str(chr)+"/DP" in self.file:
                         DP=node.DP[startPos:endPos,:]
                         DP[DP==-1]=0
-                    if "GQ" in cond and "/chr"+str(chr)+"/GQ" in self.file:    
+                    if "GQ" in cond and "/chr"+str(chr)+"/GQ" in self.file:
                         GQ=node.GQ[startPos:endPos,:]
                         GQ=np.nan_to_num(GQ)
                     if "GD" in cond and "/chr"+str(chr)+"/GD" in self.file:
@@ -224,18 +251,18 @@ class HDF5Engine_storage(Base_Storage):
                     startPos=endPos
 
             except tb.exceptions.NoSuchNodeError:
-                pass 
+                pass
             except Exception as e:
                 # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
                 print(e)
-                pass        
-  
+                pass
+
 
     def removeNode(self,chrs=[],info=""):
         # for chr in range(1,23):
         if chrs==[]:
             chrs=["X","Y"]
-            chrs.extend(range(1,23))    
+            chrs.extend(range(1,23))
         for chr in chrs:
             try:
                 if self.checkGroup(str(chr),info):
@@ -245,7 +272,7 @@ class HDF5Engine_storage(Base_Storage):
                     else:
                         self.file.remove_node("/chr"+str(chr),recursive=True)
             except tb.exceptions.NoSuchNodeError:
-                pass                              
+                pass
             except Exception as e:
                 print(e)
                 pass
@@ -259,13 +286,13 @@ class HDF5Engine_storage(Base_Storage):
                 genoNode="/chr"+str(chr)
                 try:
                     self.file.remove_node("/chr"+str(chr)+"/"+item)
-                   
+
                 except tb.exceptions.NoSuchNodeError:
-                    pass 
+                    pass
                 except Exception as e:
                     # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
                     print(e)
-                    pass        
+                    pass
 
 
 
@@ -274,7 +301,7 @@ class HDF5Engine_storage(Base_Storage):
 
             Args:
 
-               - chr (string): the chromosome 
+               - chr (string): the chromosome
                - groupName (string): the group name, for example gene name
 
             Returns:
@@ -297,7 +324,7 @@ class HDF5Engine_storage(Base_Storage):
 
             Args:
 
-               - chr (string): the chromosome 
+               - chr (string): the chromosome
                - groupName (string): the group name, for example gene name
 
             Returns:
@@ -357,13 +384,13 @@ class Base_Access(object):
         self.dbPath=dbLocation
 
     def get_geno_info_by_variant_IDs(self,variant_ids,chr,groupName):
-        """This function gets a slice of genotype info specified by a list of variant ids. 
-            **The position of these variants should be consecutive.**  
+        """This function gets a slice of genotype info specified by a list of variant ids.
+            **The position of these variants should be consecutive.**
 
             Args:
-                
-                - rowIDs (list): a list of variant ids. 
-                - chr (string): the chromosome 
+
+                - rowIDs (list): a list of variant ids.
+                - chr (string): the chromosome
                 - groupName (string): the group name, if not specified, default is genotype
 
             Returns:
@@ -374,12 +401,12 @@ class Base_Access(object):
         raise NotImplementedError()
 
     def get_geno_info_by_sample_ID(self,sample_id,chr,groupName):
-        """This function gets the genotype info of a sample specified by the sample ID in the colnames. 
+        """This function gets the genotype info of a sample specified by the sample ID in the colnames.
 
             Args:
 
                 - sampleID : the sample ID stored in colnames
-                - chr (string): the chromosome 
+                - chr (string): the chromosome
                 - groupName (string): the group which variants are in, for example gene name
 
             Returns:
@@ -405,12 +432,12 @@ class Base_Access(object):
         raise NotImplementedError();
 
     def get_geno_info_by_variant_ID(self,variant_id,chr,groupname):
-        """This function gets the genotype info of a variant specified by the variant_id stored in rownames. 
+        """This function gets the genotype info of a variant specified by the variant_id stored in rownames.
 
             Args:
 
-                - variantID : the variant ID stored in rownames 
-                - chr (string): the chromosome  
+                - variantID : the variant ID stored in rownames
+                - chr (string): the chromosome
                 - groupName (string): the group which variants are in, for example gene name
 
             Returns:
@@ -423,7 +450,7 @@ class Base_Access(object):
         raise NotImplementedError()
 
     def get_geno_info_by_row_pos(self,rowPos,chr,grouopName):
-        """This function gets the genotype info of a variant specified by the position of the variant in the matrix. 
+        """This function gets the genotype info of a variant specified by the position of the variant in the matrix.
 
             Args:
                 - rowpos (int): the position of the variant in the matrix
@@ -464,15 +491,15 @@ class HDF5Engine_access(Base_Access):
         self.shape=None
         self.chr=None
         self.file=tb.open_file(self.dbPath,"a")
- 
 
-    
+
+
     def __load_HDF5_by_chr(self,chr,groupName=""):
         """This function loads matrix, rownames and colnames of specified chromosome into memory
 
             Args:
 
-               - chr (string): the chromosome 
+               - chr (string): the chromosome
 
 
         """
@@ -484,7 +511,7 @@ class HDF5Engine_access(Base_Access):
 
             Args:
 
-               - chr (string): the chromosome 
+               - chr (string): the chromosome
                - groupName (string): the group name, for example gene name
 
             Returns:
@@ -514,7 +541,7 @@ class HDF5Engine_access(Base_Access):
 
             Args:
 
-                - chr (string): the chromosome 
+                - chr (string): the chromosome
                 - groupName (string): the group name, for example gene name
 
             Returns:
@@ -577,7 +604,7 @@ class HDF5Engine_access(Base_Access):
             # data=group.data[colPos]
             data=genoinfo[:,colPos]
             numNan=np.where(np.isnan(data))
-            numNone=np.where(data==-1) 
+            numNone=np.where(data==-1)
             # totalNum+=numVariants-len(numNan[0])-len(numNone[0])
             totalNum+=numVariants-len(numNan[0])
             numCount[chr]=numVariants-len(numNan[0])
@@ -590,7 +617,7 @@ class HDF5Engine_access(Base_Access):
         for rownames,colnames,genoinfo in self.get_all_genotype_filter([sampleID],genotypes):
             if cond is None:
                 numNan=np.where(np.isnan(genoinfo))
-                numNone=np.where(genoinfo==-1) 
+                numNone=np.where(genoinfo==-1)
                 totalNum+=len(rownames)-len(numNan[0])
             else:
                 numNan=np.where(np.isnan(genoinfo))
@@ -618,7 +645,7 @@ class HDF5Engine_access(Base_Access):
         self.colnames=group.colnames[:].tolist()
         group=self.getGroup(chr,groupName)
         self.rownames=group.rownames[:].tolist()
-        
+
         if "GT" in group:
             self.GT=group.GT[:]
 
@@ -629,7 +656,7 @@ class HDF5Engine_access(Base_Access):
             for rowidx,rowID in enumerate(self.rownames):
                 for colidx,colID in enumerate(self.colnames):
                    snpdict[colID][rowID]=(self.GT[rowidx,colidx],)
-                    
+
         else:
             snpdict=dict.fromkeys(self.colnames,{})
             for key,value in snpdict.items():
@@ -641,10 +668,10 @@ class HDF5Engine_access(Base_Access):
         return snpdict
 
 
-     
+
     def get_geno_by_sep_variant_ids(self,rowIDs,chr,groupName=""):
 
-     
+
         group=self.getGroup(chr,groupName)
         # rownames=group.rownames[:].tolist()
         rownames=group.rownames[:]
@@ -732,9 +759,9 @@ class HDF5Engine_access(Base_Access):
                         maxPos
                         # genoinfo=node.GT[minPos:maxPos,colpos]
                         genoinfo=node.GT[minPos:maxPos,:]
-                        
+
                         updated_rownames,updated_colnames,updated_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[],"GT")
-                    
+
                     except NameError:
                         env.logger.error("varaintIDs of this gene are not found on this chromosome {}".format(chr))
                 else:
@@ -742,12 +769,12 @@ class HDF5Engine_access(Base_Access):
                     chunkPos=chunks_start_stop(shape[0])
                     for minPos,maxPos in chunkPos:
                         if "/chr"+str(chr)+"/GT" in self.file:
-                            genoinfo=node.GT[minPos:maxPos,colpos]           
-                            sub_rownames,updated_colnames,sub_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[],"GT")                    
+                            genoinfo=node.GT[minPos:maxPos,colpos]
+                            sub_rownames,updated_colnames,sub_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[],"GT")
                             updated_rownames.extend(sub_rownames)
                             updated_geno.extend(sub_geno)
             except tb.exceptions.NoSuchNodeError:
-                pass                              
+                pass
             except Exception as e:
                 print(e)
                 pass
@@ -777,7 +804,7 @@ class HDF5Engine_access(Base_Access):
                         yield np.array(sub_rownames),np.array(updated_colnames),np.array(sub_geno)
 
             except tb.exceptions.NoSuchNodeError:
-                pass                              
+                pass
             except Exception as e:
                 print(e)
                 pass
@@ -810,7 +837,7 @@ class HDF5Engine_access(Base_Access):
                         yield np.array(sub_rownames),np.array(updated_colnames),np.array(sub_geno)
 
             except tb.exceptions.NoSuchNodeError:
-                pass                              
+                pass
             except Exception as e:
                 print(e)
                 pass
@@ -821,7 +848,7 @@ class HDF5Engine_access(Base_Access):
 
 
     def get_genotype_genoinfo_by_chunk(self,sampleNames,varIDs,validGenotypeFields,cond,chrs=""):
-        
+
         if chrs=="":
             chrs=["X","Y"]
             chrs.extend(range(1,23))
@@ -839,7 +866,7 @@ class HDF5Engine_access(Base_Access):
                 shape=node.shape[:].tolist()
                 chunkPos=chunks_start_stop(shape[0])
                 rowpos=[]
-                
+
                 if len(varIDs)>0:
                     rownames=node.rownames[:].tolist()
                     rowpos=np.array([0]*len(rownames))
@@ -847,12 +874,12 @@ class HDF5Engine_access(Base_Access):
                     selected=[x for x in selectPos if x is not None]
                     rowpos[selected]=1
                     if np.sum(rowpos)==0:
-                        continue 
-  
+                        continue
+
                 for minPos,maxPos in chunkPos:
                     sub_all=[]
                     if "/chr"+str(chr)+"/GT" in self.file and minPos!=maxPos:
-        
+
                         sub_rownames,updated_colnames,sub_geno=self.filter_on_genotypes(cond,chr,node,"GT",minPos,maxPos,colpos,rowpos)
 
                         sub_all.append(np.array(sub_geno))
@@ -864,7 +891,7 @@ class HDF5Engine_access(Base_Access):
                         yield np.array(sub_rownames),np.array(updated_colnames),sub_all
 
             except tb.exceptions.NoSuchNodeError:
-                pass                              
+                pass
             except Exception as e:
                 print(e)
                 pass
@@ -890,21 +917,21 @@ class HDF5Engine_access(Base_Access):
             sub_Mask=sub_Mask.astype(float)
             sub_Mask[sub_Mask==-1.0]=np.nan
             sub_geno=np.multiply(genoinfo,sub_Mask)
-            
+
             rowMasked=np.where(rowMask==True)[0]
 
             # sampleMasked=np.where(sampleMask==True)[0]
-           
+
             if len(rowpos)>0:
                 selectRows=rowpos[minPos:maxPos]
                 rownames=rownames[selectRows==1]
                 sub_geno=sub_geno[selectRows==1,:]
-            
+
             colnames=colnames[colpos]
             sub_geno=sub_geno[:,colpos]
-            
+
             if len(rowpos)==0 and len(rowMasked)>0:
-               
+
                 rownames=rownames[np.where(rowMask==False)]
                 sub_geno=np.delete(sub_geno,rowMasked,0)
 
@@ -921,10 +948,10 @@ class HDF5Engine_access(Base_Access):
 
     def filter_on_genotypes(self,cond,chr,node,field,startPos,endPos,colpos,rowpos):
         genoinfo=None
-       
+
         if field in self.file.get_node("/chr"+str(chr)):
             genoinfo=self.file.get_node("/chr"+str(chr)+"/"+field)[startPos:endPos,:]
-            if field != "GT": 
+            if field != "GT":
                 genoinfo[genoinfo==-1]=0
                 genoinfo=np.nan_to_num(genoinfo)
             else:
@@ -940,7 +967,7 @@ class HDF5Engine_access(Base_Access):
         # if field=="GQ" and "/chr"+str(chr)+"/GQ" in self.file:
         #     genoinfo=node.GQ[startPos:endPos,:]
         #     genoinfo=np.nan_to_num(genoinfo)
-        
+
         if len(cond)>0:
             if type(cond) is str:
                 cond=cond.replace("(","").replace(")","")
@@ -974,7 +1001,7 @@ class HDF5Engine_access(Base_Access):
                 NS[NS==-1]=0
             genoinfo=np.where(eval("~("+cond+")"),np.nan,genoinfo)
         rownames,colnames,genoinfo=self.filter_removed_genotypes(startPos,endPos,genoinfo,node,colpos,rowpos)
-  
+
         return rownames,colnames,genoinfo
 
     def find_element_in_list(self,element, list_element):
@@ -984,7 +1011,7 @@ class HDF5Engine_access(Base_Access):
         except ValueError:
             pass
 
-    
+
 
 
     def get_geno_by_row_pos(self,rowpos,chr,sortedID,sampleNames,validGenotypeFields,groupName=""):
@@ -1000,7 +1027,7 @@ class HDF5Engine_access(Base_Access):
             else:
                 colpos=list(map(lambda x:colnames.index(x),colnames))
             pos=binarySearch(sortedID,0,len(sortedID)-1,rowpos)
-            
+
             if pos!=-1:
                 posInNode=sortedID[pos][1]
                 _,_,row_geno=self.filter_on_genotypes([],chr,node,"GT",posInNode,posInNode+1,colpos,[])
@@ -1023,12 +1050,12 @@ class HDF5Engine_access(Base_Access):
         except tb.exceptions.NoSuchNodeError:
             # return np.zeros(shape=(len(node.GT[1,colpos])),dtype=int)
             # return [None]*len(node.GT[1,colpos])
-            
+
             sub_all.append(np.full(len(node.GT[1,colpos]),np.nan))
             if len(validGenotypeFields)>0:
                 for pos,field in enumerate(validGenotypeFields):
                     sub_all.append([np.full(len(node.GT[1,colpos]),np.nan)])
-            return sub_all                         
+            return sub_all
         except Exception as e:
             print("exception",rowpos,chr,pos,sortedID[pos])
             print(e)
@@ -1041,17 +1068,17 @@ class HDF5Engine_access(Base_Access):
 
 
 
-    
+
 
     def get_geno_by_variant_ID(self,variantID,chr,groupName=""):
         pass
 
 
-        
-   
-    
+
+
+
     def show_file_node(self):
-        """This function prints the nodes in the file. 
+        """This function prints the nodes in the file.
 
         """
         for node in self.file:
@@ -1061,10 +1088,10 @@ class HDF5Engine_access(Base_Access):
 
     def get_rownames(self,chr,groupName=""):
         """This function gets variant IDs of specified group.
-            
+
             Args:
 
-                - chr (string): the chromosome 
+                - chr (string): the chromosome
                 - groupName (string): the group name, for example gene name
 
             Return:
@@ -1076,10 +1103,10 @@ class HDF5Engine_access(Base_Access):
 
     def get_colnames(self,chr,groupName=""):
         """This function gets sample IDs of specified group.
-            
+
             Args:
 
-                - chr (string): the chromosome 
+                - chr (string): the chromosome
                 - groupName (string): the group name, for example gene name
 
             Return:
@@ -1091,10 +1118,10 @@ class HDF5Engine_access(Base_Access):
 
     def get_shape(self,chr,groupName=""):
         """This function gets shape of specified group.
-            
+
             Args:
 
-                - chr (string): the chromosome 
+                - chr (string): the chromosome
                 - groupName (string): the group name, for example gene name
 
             Return:
@@ -1104,7 +1131,7 @@ class HDF5Engine_access(Base_Access):
         group=self.getGroup(chr,groupName)
         return group.shape[:]
 
-   
+
 
     def close(self):
         """This function closes db file
@@ -1145,12 +1172,12 @@ class HDF5Engine_access(Base_Access):
 
 
 #     def get_geno_info_by_variant_ID(self,variantID,chr,groupName=""):
-#         """This function gets the genotype info of a variant specified by the variant_id stored in rownames. 
+#         """This function gets the genotype info of a variant specified by the variant_id stored in rownames.
 
 #             Args:
 
-#                 - variantID : the variant ID stored in rownames 
-#                 - chr (string): the chromosome  
+#                 - variantID : the variant ID stored in rownames
+#                 - chr (string): the chromosome
 #                 - groupName (string): the group which variants are in, for example gene name
 
 #             Returns:
@@ -1164,14 +1191,14 @@ class HDF5Engine_access(Base_Access):
 #         for file in self.files:
 #             taskQueue.put(AccessEachHDF5(file,variantID,result,chr,groupName))
 #         while taskQueue.qsize()>0:
-#             for i in range(self.jobs):    
+#             for i in range(self.jobs):
 #                 if importers[i] is None or not importers[i].is_alive():
 #                     task=taskQueue.get()
 #                     importers[i]=task
-#                     importers[i].start()           
-#                     break 
+#                     importers[i].start()
+#                     break
 #         for worker in importers:
-#             worker.join() 
+#             worker.join()
 #         print(result)
 
 

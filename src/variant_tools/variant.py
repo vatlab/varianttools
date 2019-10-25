@@ -48,7 +48,7 @@ def generalOutputArguments(parser):
             parameter is given without parameter, a default header will be derived from
             field names.'''),
     grp.add_argument('-d', '--delimiter', default=None,
-        help='''Delimiter use to separate columns of output. The default output 
+        help='''Delimiter use to separate columns of output. The default output
             uses tabs to delimit columns padded to the same width by spaces. You
             can use '-d,' for csv output, or -d'\\t' for unpadded tab-delimited
             output.''')
@@ -63,14 +63,14 @@ def generalOutputArguments(parser):
     grp.add_argument('--build',
         help='''Output reference genome. If set to alternative build, chr and pos
             in the fields will be replaced by alt_chr and alt_pos''')
-    grp.add_argument('-g', '--group_by', nargs='*', metavar='FIELD',
+    grp.add_argument('-g', '--group_by', '--group-by', nargs='*', metavar='FIELD',
         help='''Group output by fields. This option is useful for aggregation output
             where summary statistics are grouped by one or more fields.''')
     grp.add_argument('--all', action='store_true',
         help='''Variant tools by default output only one of the records if a
             variant matches multiple records in an annotation database. This
             option tells variant tools to output all matching records.''')
-    grp.add_argument('--order_by', nargs='+', metavar='FIELD',
+    grp.add_argument('--order_by', '--order-by', nargs='+', metavar='FIELD',
         help='''Order output by specified fields in ascending order, or descending
             order if field name is followed by DESC (e.g. --order_by 'num DESC')''')
 
@@ -139,13 +139,13 @@ def outputVariants(proj, table_name, output_fields, args, query=None, reverse=Fa
         if 'variant.variant_id' in tmp_fields:
             tmp_fields.remove('variant.variant_id')
         #
-        # change the from_clause to FROM the result of a SELECT clause. The 
+        # change the from_clause to FROM the result of a SELECT clause. The
         # key here is the use of group_by variant_id clause.
         from_clause = ('FROM (SELECT min(variant.variant_id) AS variant_variant_ID, '
             '{} {} {} GROUP BY variant.variant_id) AS _TMP'.format(
                 ', '.join(['{} AS {}'.format(x, x.replace('.', '_')) for x in tmp_fields]),
                 from_clause, where_clause))
-        # 
+        #
         # because SELECT and GROUP BY are now from the intermediate table,
         # group by and select clause should be changed
         for fld in select_fields:
@@ -203,7 +203,7 @@ def output(args):
             outputVariants(proj, args.table, args.fields, args)
     except Exception as e:
         env.logger.error(e)
-        sys.exit(1) 
+        sys.exit(1)
 
 def selectArguments(parser):
     parser.add_argument('from_table', help='''Source variant table.''')
@@ -233,7 +233,7 @@ def selectArguments(parser):
 def select(args, reverse=False):
     try:
         with Project(verbosity=args.verbosity) as proj:
-            
+
             # separate table and message
             if args.to_table:
                 if len(args.to_table) > 2:
@@ -249,7 +249,7 @@ def select(args, reverse=False):
                 raise ValueError('Variant table {} does not exist.'.format(args.from_table))
             if not args.to_table and not args.output and not args.count:
                 raise ValueError('Neither --to_table and --output/--count is specified. Nothing to do.')
-            if len(args.condition) > 0:    
+            if len(args.condition) > 0:
                 # fields? We need to replace things like sift_score to dbNSFP.sift_score
                 condition, fields = consolidateFieldName(proj, encodeTableName(args.from_table), ' AND '.join(['({})'.format(x) for x in args.condition]))
 #                for field in fields:
@@ -261,7 +261,7 @@ def select(args, reverse=False):
 #                    except:
 #                        continue
                     #
-                    # STOP automatic indexing fields used in vtools select because creating indexes can be 
+                    # STOP automatic indexing fields used in vtools select because creating indexes can be
                     # very time-consuming for sqlite databases, and the performance benefit is uncertain.
                     #
                     # db is one of the annotation database but fld has already been indexed
@@ -282,11 +282,11 @@ def select(args, reverse=False):
                     #except Exception as e:
                     #    env.logger.debug('Failed to create index: {}'.format(e))
                     #del s
-                # 
+                #
                 fields_info = sum([proj.linkFieldToTable(x, encodeTableName(args.from_table)) for x in fields], [])
                 # WHERE clause: () is important because OR in condition might go beyond condition
                 where_clause = ' WHERE ({})'.format(condition)
-                # 
+                #
                 # FROM clause
                 from_clause = 'FROM {} '.format(encodeTableName(args.from_table))
                 # avoid duplicate
@@ -308,7 +308,7 @@ def select(args, reverse=False):
                 IDs = proj.selectSampleByPhenotype(' AND '.join(['({})'.format(x) for x in args.samples]))
                 store=GenoStore(proj)
                 where_clause=store.get_noWT_variants(IDs,proj,where_clause,args)
-                       
+
             #
             # we are treating different outcomes different, for better performance
             #
@@ -329,7 +329,7 @@ def select(args, reverse=False):
             if args.count and not args.to_table and not args.output:
                 query = 'SELECT COUNT(DISTINCT {}.variant_id) {} {};'.format(encodeTableName(args.from_table),
                     from_clause, where_clause)
-                
+
                 env.logger.trace('Running query {}'.format(query))
                 proj.db.startProgress('Counting variants')
                 cur = proj.db.cursor()
@@ -346,7 +346,7 @@ def select(args, reverse=False):
                 proj.createVariantTable(encodeTableName(args.to_table))
                 proj.describeTable(encodeTableName(args.to_table), args.table_desc, True, True)
                 if not reverse:
-                    query = 'INSERT INTO {0} SELECT DISTINCT {1}.variant_id, {1}.chr {2} {3};'.format(encodeTableName(args.to_table), 
+                    query = 'INSERT INTO {0} SELECT DISTINCT {1}.variant_id, {1}.chr {2} {3};'.format(encodeTableName(args.to_table),
                         encodeTableName(args.from_table),
                         from_clause, where_clause)
                 else:
@@ -355,7 +355,7 @@ def select(args, reverse=False):
                 env.logger.trace('Running query {}'.format(query))
                 #
                 cur = proj.db.cursor()
-                
+
                 proj.db.startProgress('Running')
                 cur.execute(query)
                 proj.db.stopProgress()
@@ -368,18 +368,18 @@ def select(args, reverse=False):
                 if args.count:
                     print(count)
             # case 3: output, but do not write to table, and not count
-            elif args.output: 
+            elif args.output:
                 query = 'SELECT DISTINCT {}.variant_id {} {}'.format(encodeTableName(args.from_table),
                     from_clause, where_clause)
-               
+
                 outputVariants(proj, args.from_table, args.output, args, query, reverse)
-            # 
+            #
             # clean up temporary table
-            if args.samples and proj.db.hasTable('__variants_from_samples'): 
+            if args.samples and proj.db.hasTable('__variants_from_samples'):
                 cur.execute('DROP TABLE __variants_from_samples')
     except Exception as e:
         env.logger.error(e)
-        sys.exit(1) 
+        sys.exit(1)
 
 def excludeArguments(parser):
     parser.add_argument('from_table', help='''Source variant table.''')

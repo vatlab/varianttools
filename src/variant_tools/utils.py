@@ -83,7 +83,7 @@ A ;-separated list of URL that host the variant tools repository. This option
 should only be changed if you have created a local mirror of the variant tools
 repository. Adding the URL before the default URL might provide better
 downloading performance for your users. Removing the default URL is possible
-but not recommended.'''),    
+but not recommended.'''),
     ('shared_resource', None, '''
  A directory for shared resource files. It can be configured as
  1. NO shared resource (default). All users maintain their own resource
@@ -106,7 +106,7 @@ but not recommended.'''),
  copy). Files under these directories are NOT maintained by variant tools
  (no manifest or md5 signatures are monitors). Currently only local files are
  allowed (no URL to a remote server). By setting this option to ~/.variant_tools
- (default) resource files under that directory will be usable even if they 
+ (default) resource files under that directory will be usable even if they
  are not managed by variant tools''')]
 
 
@@ -135,7 +135,7 @@ else:
 for k, v in list(_user_options.items()):
     if not hasattr(site_options, k):
         setattr(site_options, k, v)
-               
+
 try:
     # not all platforms/installations of python support bz2
     import bz2
@@ -244,7 +244,7 @@ class RuntimeEnvironments(object):
         if not cls._instance:
             # *args, **kwargs are not passed to avoid
             # DeprecationWarning: object.__new__() takes no parameters
-            # cls._instance = super(Singleton, cls).__new__(cls, *args, **kwargs) 
+            # cls._instance = super(Singleton, cls).__new__(cls, *args, **kwargs)
             cls._instance = super(RuntimeEnvironments, cls).__new__(cls) #, *args, **kwargs)
         return cls._instance
 
@@ -373,7 +373,7 @@ class RuntimeEnvironments(object):
                     .format(filename, e))
         self._lock_files = []
 
-    # 
+    #
     # attribute check_update
     #
     #def _set_check_update(self, v):
@@ -504,7 +504,7 @@ class RuntimeEnvironments(object):
         else:
             # the usual case
             if self._temp_dir is None:
-                self._proj_temp_dir = tempfile.mkdtemp() 
+                self._proj_temp_dir = tempfile.mkdtemp()
             try:
                 if not os.path.isdir(os.path.expanduser(self._proj_temp_dir)):
                     os.makedirs(os.path.expanduser(self._proj_temp_dir))
@@ -555,7 +555,7 @@ class RuntimeEnvironments(object):
         except:
             pass
     #
-    association_timeout = property(lambda self: 0 if self._association_timeout is None else int(self._association_timeout), _set_association_timeout) 
+    association_timeout = property(lambda self: 0 if self._association_timeout is None else int(self._association_timeout), _set_association_timeout)
     #
     # attribute associate_num_of_readers
     def _set_associate_num_of_readers(self, val):
@@ -569,7 +569,7 @@ class RuntimeEnvironments(object):
         except:
             pass
     #
-    associate_num_of_readers = property(lambda self: 0 if self._associate_num_of_readers is None else int(self._associate_num_of_readers), _set_associate_num_of_readers) 
+    associate_num_of_readers = property(lambda self: 0 if self._associate_num_of_readers is None else int(self._associate_num_of_readers), _set_associate_num_of_readers)
     #
     # attribute search_path
     def _set_search_path(self, val):
@@ -687,14 +687,14 @@ SQL_KEYWORDS = set([
 
 
 def matchName(pattern, name):
-    # 
+    #
     for char in ('(', ')', '[', ']', '{', '}', '.', '+', '$', '|'):
         pattern = pattern.replace(char, '\\' + char)
     pattern = pattern.replace('?', '.{1}').replace('*', '.*')
     return re.match(pattern, name, re.I)
-                                
+
 def validFieldName(name, reserved=[]):
-    '''Return a valid field name from a name by converting non-alnum 
+    '''Return a valid field name from a name by converting non-alnum
     characters with _, and add _ if the name starts with a number. If
     the new name is one of reserved, prefix it with _'''
     new_name = re.sub('[\W]+', '_', name.strip())
@@ -904,7 +904,7 @@ class PrettyPrinter:
 
     #
     # MODE 3: cached, untrimmed print
-    # 
+    #
     def cached_print(self, raw_data):
         data = [self.formatter(x) for x in raw_data]
         self.rows.append(data)
@@ -934,7 +934,7 @@ class PrettyPrinter:
                 [col.ljust(width) for col, width in zip(row, self.width)])
             for row in self.rows])))
         self.rows = []
-    
+
     def uncached_print(self, data):
         print((self.delimiter.join(
             [col.ljust(width) for col, width in zip(data, self.width)])))
@@ -997,7 +997,7 @@ def openFile(filename):
         # text file
         # because readline() from gzip.open will be byte, not string, we should return
         # binary here in order to process them equally in order for things to work
-        # correctly under python 3 
+        # correctly under python 3
         return open(filename, 'rb')
 
 
@@ -1026,16 +1026,16 @@ def safeMapFloat(x, nan = True):
         if not nan and x[i] != x[i]:
             raise
     return x
-        
+
 class delayedAction(object):
-    '''Call the passed function with param after a few seconds. It is most often 
+    '''Call the passed function with param after a few seconds. It is most often
     used to display certain message only if an action takes a long time.
 
         action = delayedAction(env.logger.info, 'This might take a while', 5)
         some_action_that_might_take_a_while
         del action
 
-    if the action finishes very quick, the message will not be displayed.    
+    if the action finishes very quick, the message will not be displayed.
     '''
     def __init__(self, func, param, delay=5):
         self.timer = threading.Timer(delay, func, (param,))
@@ -1135,7 +1135,7 @@ class ProgressBar:
     def handle_resize(self, signum=None, frame=None):
         'Tries to catch resize signals sent from the terminal.'
         self.term_width = getTermWidth()
-        
+
     def reset(self, msg='', totalCount = None):
         if msg:
             self.message = '{} - {}'.format(self.main, msg)
@@ -1143,7 +1143,7 @@ class ProgressBar:
         self.count = 0
         self.failed_count = 0
         self.totalCount = totalCount
-        self.min_progress_count = None if self.totalCount is None else self.totalCount / 1000 
+        self.min_progress_count = None if self.totalCount is None else self.totalCount / 1000
         self.last_progress_count = 0
         self.start_time = None
         self.last_time = None
@@ -1174,13 +1174,13 @@ class ProgressBar:
             self.count += self.last_progress_count
             self.outputProgress()
             self.last_progress_count = 0
-        
+
     def curlUpdate(self, total, existing, upload_t, upload_d):
         '''Update called from pycurl'''
         self.count = existing
         self.totalCount = total
         self.outputProgress()
-        
+
     def urllibUpdate(self, count, blockSize, totalSize):
         '''Update called from urllib'''
         self.count = count * blockSize
@@ -1361,7 +1361,7 @@ def getSnapshotInfo(name):
 
 class GenomicRegions(object):
     '''A class to interpret user specified regions. Regions can be
-    chr:start-end, chr:end-start, annoDB.field:value, 
+    chr:start-end, chr:end-start, annoDB.field:value,
     chr:start-end,start1-end1, annoDB.field:value1,value2, and their
     union (|), intersection (&), difference(-), and symmetric_difference (^)
     '''
@@ -1392,7 +1392,7 @@ class GenomicRegions(object):
     def field_region(self, region):
         if self.proj is None:
             from variant_tools.project import Project
-            self.proj = Project() 
+            self.proj = Project()
         # if the regions have been probed before
         regions = self.proj.loadProperty('__region_{}'.format(region), None)
         if regions is not None:
@@ -1400,7 +1400,7 @@ class GenomicRegions(object):
         regions = []
         field, value = region.rsplit(':', 1)
         # what field is this?
-        query, fields = consolidateFieldName(self.proj, 'variant', field, False) 
+        query, fields = consolidateFieldName(self.proj, 'variant', field, False)
         # query should be just one of the fields according to things that are passed
         annoName = query.split('.')[0]
         if query.strip() not in fields:
@@ -1443,10 +1443,10 @@ class GenomicRegions(object):
                 continue
             regions.append((str(chr), int(start), int(end), '{} {}'.format(field, idx+1)))
         if not regions:
-            env.logger.warning('No valid chromosomal region is identified for {}'.format(region)) 
+            env.logger.warning('No valid chromosomal region is identified for {}'.format(region))
         self.proj.saveProperty('__region_{}'.format(region), str(regions))
         return regions
- 
+
     def mergeRegions(self, regions):
         while True:
             merged = False
@@ -1456,7 +1456,7 @@ class GenomicRegions(object):
                     r2 = regions[j]
                     if r1 is None or r2 is None:
                         continue
-                    # 
+                    #
                     if r1[0] == r2[0] and r1[2] >= r2[1] and r1[1] <= r2[2]:
                         env.logger.debug('Merging regions {}:{}-{} ({}) and {}:{}-{} ({})'
                             .format(r2[0], r2[1], r2[2], r2[3], r1[0], r1[1], r1[2], r1[3]))
@@ -1554,8 +1554,8 @@ class GenomicRegions(object):
 
 def expandRegions(regions, proj=None, mergeRegions=True, zeroBased=False):
     return GenomicRegions(regions, zeroBased).expand(proj, mergeRegions)
-    
-    
+
+
 class ShelfDB:
     '''A sqlite implementation of shelf'''
     def __init__(self, filename, mode='n', lock=None):
@@ -1584,7 +1584,7 @@ class ShelfDB:
     # python 2 and 3 have slightly different types and methods for pickling.
     def _add_py2(self, key, value):
         # return value from dumps needs to be converted to buffer (bytes)
-        self.cur.execute(self.insert_query, 
+        self.cur.execute(self.insert_query,
             (key, memoryview(pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL))))
 
     def _get_py2(self, key):
@@ -1595,7 +1595,7 @@ class ShelfDB:
 
     def _add_py3(self, key, value):
         # return values for dumps is already bytes...
-        self.cur.execute(self.insert_query, 
+        self.cur.execute(self.insert_query,
             (key, pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)))
 
     def _get_py3(self, key):
@@ -1652,7 +1652,7 @@ def calculateMD5(filename, partial=False):
     return md5.hexdigest()
 
 class ResourceManager:
-    '''This class manages a list of resource files managed by 
+    '''This class manages a list of resource files managed by
     '''
     def __init__(self):
         self.manifest = {}
@@ -1688,7 +1688,7 @@ class ResourceManager:
                 total_size += min(info[0], 2**26)
             prog.update(total_size)
         prog.done()
-    
+
     def writeManifest(self, dest_file=None, URLs=False):
         if dest_file is None:
             if os.path.isdir(env.shared_resource) and \
@@ -1706,12 +1706,12 @@ class ResourceManager:
                     manifest.write('{0}\t{1[0]}\t{1[1]}\t{1[2]}\t{1[3]}\t{1[4]}\n'.format(key, self.manifest[key]))
                 else:
                     manifest.write('{0}\t{1[0]}\t{1[1]}\t{1[2]}\t{1[3]}\n'.format(key, self.manifest[key]))
-        
+
     def addResource(self, filename, resource_dir=None):
         if resource_dir is None:
             resource_dir = os.path.expanduser(env.local_resource)
         #
-        # if resource_dir is specified, filename 
+        # if resource_dir is specified, filename
         #
         rel_path = os.path.relpath(filename, resource_dir)
         if rel_path.startswith('.'):
@@ -1722,12 +1722,12 @@ class ResourceManager:
         comment = self.getComment(filename).replace('\n', ' ').replace('\t', ' ').strip()
         self.manifest[rel_path] = (filesize, md5, refGenome, comment, '')
         return self.manifest[rel_path]
-        
+
     def getCommentFromConfigFile(self, filename, section, option):
         '''Get comment from annotation description file.'''
         try:
             parser = configparser.ConfigParser()
-            parser.read(filename) 
+            parser.read(filename)
             return parser.get(section, option)
         except Exception as e:
             env.logger.warning('Failed to get comment file config file {}: {}'.format(filename, e))
@@ -1782,7 +1782,7 @@ class ResourceManager:
             return '' if message is None else message
         else:      # other files, e.g. crr file
             return ''
-        
+
     def getLocalManifest(self):
         '''Get a manifest of files from local resource'''
         if os.path.isdir(env.shared_resource) and \
@@ -1908,7 +1908,7 @@ class ResourceManager:
             self.manifest = {x:y for x,y in self.manifest.items() if '*' in y[2] or 'hg19' in y[2]}
         elif resource_type == 'hg38':
             self.manifest = {x:y for x,y in self.manifest.items() if '*' in y[2] or 'hg38' in y[2]}
-        # remove obsolete annotation databases 
+        # remove obsolete annotation databases
         if resource_type in ('hg18', 'hg19', 'hg38', 'current', 'annotation'):
             # y[2] is reference genome
             annoDBs = [(x.split('-', 1), y[2]) for x,y in self.manifest.items() if x.startswith('annoDB/') and not x.endswith('.ann')]
@@ -1918,7 +1918,7 @@ class ResourceManager:
                 if refGenome not in versions:
                     versions[refGenome] = {}
                 if len(db) < 2:
-                    # no version 
+                    # no version
                     versions[refGenome][db[0]] = None
                     continue
                 if db[0] in versions[refGenome]:
@@ -1962,7 +1962,7 @@ class ResourceManager:
             if not os.path.isdir(dest_dir):
                 os.makedirs(dest_dir)
             dest_file = os.path.join(env.local_resource, filename)
-            # 
+            #
             if os.path.isfile(dest_file):
                 # do not check md5 to increase speed
                 if os.path.getsize(dest_file) != fileprop[0]:
@@ -1979,8 +1979,8 @@ class ResourceManager:
             fileprop = self.manifest[filename]
             #
             try:
-                downloaded = downloadFile(filename, dest_dir=dest_dir if dest_dir is None else os.path.join(dest_dir, os.path.split(filename)[0]), 
-                    checkUpdate=True, quiet=False, 
+                downloaded = downloadFile(filename, dest_dir=dest_dir if dest_dir is None else os.path.join(dest_dir, os.path.split(filename)[0]),
+                    checkUpdate=True, quiet=False,
                     message='{}/{} {}'.format(cnt+1, len(self.manifest), filename))
                 # check md5
                 md5 = calculateMD5(downloaded, partial=True)
@@ -2034,7 +2034,7 @@ def decompressGzFile(filename, inplace=True, force=False, md5=None):
             # if we are decompressing files from a read-only shared repository
             # write to local_resource
             if os.path.realpath(dest_dir).startswith(os.path.realpath(env.shared_resource)):
-                new_filename = '{}/{}'.format(env.local_resource, 
+                new_filename = '{}/{}'.format(env.local_resource,
                     os.path.realpath(filename)[len(os.path.realpath(env.shared_resource)):-3])
                 if os.path.isfile(new_filename) and not force:
                     if md5 is not None and md5 != calculateMD5(new_filename, partial=True):
@@ -2081,7 +2081,7 @@ def TEMP(filename):
     # turn path/filename.ext to path/filename_tmp???.ext, where ??? is
     # the process ID to avoid two processes writing to the same temp
     # files. That is to say, if two processes are working on the same step
-    # they will produce different temp files, and the final results should 
+    # they will produce different temp files, and the final results should
     # still be valid.
     if '.' in os.path.basename(filename):
         return '_tmp{}.'.format(os.getpid()).join(filename.rsplit('.', 1))
@@ -2090,7 +2090,7 @@ def TEMP(filename):
 
 #
 # Well, it is not easy to do reliable download
-# 
+#
 def downloadURL(URL, dest, quiet, message=None):
     # use libcurl? Recommended but not always available
     if 'VTOOLS_ENV' in os.environ and 'NOWEB' in os.environ['VTOOLS_ENV']:
@@ -2177,11 +2177,11 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
                 os.path.join(env.local_resource, 'reference/hg19.crr'))
     #
     # if a complete URL is given, DO NOT download from variant tools repository
-    # 
+    #
     # Downloaded file will look similar to
     #
     # ~/.variant_tools/ftp.completegenomics.com/refgenome/build36.crr
-    # 
+    #
     # unless a specific dest_dir is given. NO md5 check is possible.
     #
     # for backward compatibility, remove http://vtools.houstonbioinformatics.org and
@@ -2224,7 +2224,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
             return downloadURL(fileToGet, dest, quiet, message)
         except Exception as e:
             raise ValueError('Failed to download URL {}: {}'.format(fileToGet, e))
-    # 
+    #
     # otherwise, download from variant tools repository, but first let us check
     # if the file is in the repository
     #
@@ -2233,7 +2233,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
     resource = ResourceManager()
     resource.getLocalManifest()
     if fileToGet not in resource.manifest:
-        # update to the latest manifest and see if we still 
+        # update to the latest manifest and see if we still
         # cannot find the file
         resource.getRemoteManifest()
         if fileToGet not in resource.manifest:
@@ -2285,7 +2285,7 @@ def downloadFile(fileToGet, dest_dir = None, quiet = False, checkUpdate = False,
     #
     if not os.path.isdir(dest_dir):
         os.makedirs(dest_dir)
-    # 
+    #
     # if the file is in the repository, try to find a mirror
     servers = [fileSig[4][2*i] for i in range(len(fileSig[4])//2)]
     weights = [fileSig[4][2*i+1] for i in range(len(fileSig[4])//2)]
@@ -2370,7 +2370,7 @@ class FileInfo:
                     pass
         except Exception as e:
             raise ValueError('Corrupted file info file {}.file_info: {}'.format(self.filename, e))
-    
+
     def _getFirstLine(self, filename):
         try:
             with openFile(filename) as input:
@@ -2412,7 +2412,7 @@ class FileInfo:
 
 def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
     '''Check if ofiles is newer than ifiles. The oldest timestamp
-    of ofiles and newest timestam of ifiles will be used if 
+    of ofiles and newest timestam of ifiles will be used if
     ofiles or ifiles is a list. If a md5file is specified,
     timestamp will be ignored if md5 signature of all ofiles
     and ifiles match.'''
@@ -2493,7 +2493,7 @@ def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
                 return False
         if len(nFiles) != 2 or nFiles[1] == 0:
             env.logger.warning('Incomplete runtime information for output file {} due to interrupted execution.'.format(os.path.basename(md5file).rsplit('.',1)[0]))
-            return False    
+            return False
     #
     def samefile(x,y):
         if x == y:
@@ -2515,7 +2515,7 @@ def existAndNewerThan(ofiles, ifiles, md5file=None, pipeline=None):
         return True
     if not _ifiles:
         return True
-    # md5 not available 
+    # md5 not available
     output_timestamp = min([FileInfo(x).mtime() for x in _ofiles])
     input_timestamp = max([FileInfo(x).mtime() for x in _ifiles])
     if output_timestamp < input_timestamp:
@@ -2638,8 +2638,8 @@ class RefGenome:
             except Exception as e:
                 raise ValueError('Failed to get sequence {}:{}-{} from reference genome {}: {}'
                     .format(chr, start, end, self.name, e))
-   
-    def verify(self, chr, pos, ref):   
+
+    def verify(self, chr, pos, ref):
         try:
             if len(ref) == 1:
                 return ref == self.getBase(chr, pos)
@@ -2672,7 +2672,7 @@ class DatabaseEngine:
     def newConnection(self):
         '''Create a new connection from existing configuration'''
         return DatabaseEngine()
-        
+
     def connect(self, db, readonly=False, lock=None):
         '''Connect to a database'''
         db = os.path.expanduser(db)
@@ -2693,7 +2693,7 @@ class DatabaseEngine:
                 time.sleep(10)
         if lock is not None:
             lock.release()
-    
+
     def load_extension(self, readonly):
         if not readonly:
             # We disable PROGAMA for readonly databases because we often use mutliple readers
@@ -2918,13 +2918,13 @@ class DatabaseEngine:
         cur = self.database.cursor()
         cur.execute('DELETE FROM {};'.format(table))
         self.database.commit()
-    
+
     def renameTable(self, fromTable, toTable):
         '''Rename a table from fromTable to toTable'''
         cur = self.database.cursor()
         cur.execute('ALTER TABLE {} RENAME TO {};'.format(fromTable, toTable))
         self.database.commit()
-        
+
     def backupTable(self, table):
         '''Backup a table to table_timestamp'''
         while True:
@@ -2985,7 +2985,7 @@ class DatabaseEngine:
                 prog.update(idx + 1)
         prog.done()
         cur.execute('CREATE INDEX {0}_idx ON {0} (bin ASC, chr ASC, range_id ASC);'.format(tbl))
-        self.database.commit()          
+        self.database.commit()
 
     def removeFields(self, table, cols):
         '''Remove fields from a table'''
@@ -3003,7 +3003,7 @@ class DatabaseEngine:
             # create a new table
             cur.execute('CREATE TABLE {} ('.format(table) + ',\n'.join(new_fields) + ');')
             # insert data back
-            cur.execute('INSERT INTO {0} SELECT {1} FROM _{0}_tmp_;'.format(table, 
+            cur.execute('INSERT INTO {0} SELECT {1} FROM _{0}_tmp_;'.format(table,
                 ','.join([x.split()[0] for x in new_fields])))
             # remove old table
             cur.execute('DROP TABLE _{}_tmp_;'.format(table))
@@ -3018,7 +3018,7 @@ class DatabaseEngine:
             # create a new table
             cur.execute('CREATE TABLE {1}.{0} ('.format(tbl, db) + ',\n'.join(new_fields) + ');')
             # insert data back
-            cur.execute('INSERT INTO {2}.{0} SELECT {1} FROM {2}._{0}_tmp_;'.format(tbl, 
+            cur.execute('INSERT INTO {2}.{0} SELECT {1} FROM {2}._{0}_tmp_;'.format(tbl,
                 ','.join([x.split()[0] for x in new_fields]), db))
             # remove old table
             cur.execute('DROP TABLE {1}._{0}_tmp_;'.format(tbl, db))
@@ -3078,7 +3078,7 @@ def consolidateFieldName(proj, table, clause_or_list, alt_build=False):
     If clause is passed as a list of fields, they will be connected by ','.
     However, the list can potentially be changed to reflect for example
     wildcard character expansion in functions such as track('d*.vcf').
-    It is therefore highly recommended that you pass a list instead of a 
+    It is therefore highly recommended that you pass a list instead of a
     joint fields.
     '''
     if isinstance(clause_or_list, list):
@@ -3279,7 +3279,7 @@ def consolidateFieldName(proj, table, clause_or_list, alt_build=False):
             if cond == '1':
                 filename = '{}/_sample_id_map.txt'.format(env.cache_dir)
             else:
-                filename = '{}/_sample_id_map_{}.txt'.format(env.cache_dir, 
+                filename = '{}/_sample_id_map_{}.txt'.format(env.cache_dir,
                     binascii.hexlify(cond.encode('utf-8')).decode('utf-8'))
             cur.execute('SELECT sample_id, sample_name FROM sample, filename '
                     'WHERE sample.file_id = filename.file_id AND ({});'
@@ -3301,7 +3301,7 @@ def consolidateFieldName(proj, table, clause_or_list, alt_build=False):
                 return("genotype('{}_genotype.DB', variant.variant_id, '{}')"
                     .format(proj.name, ret))
             elif len(params) == 1:
-                if type(ret) == str:   
+                if type(ret) == str:
                     # a filename of IDs
                     return("genotype('{}_genotype.DB', variant.variant_id, '{}')"
                         .format(proj.name, ret))
@@ -3310,7 +3310,7 @@ def consolidateFieldName(proj, table, clause_or_list, alt_build=False):
                     return("genotype('{}_genotype.DB', variant.variant_id, {})"
                         .format(proj.name, ret))
             elif len(params) == 2:
-                if type(ret) == str:   
+                if type(ret) == str:
                     # a filename of IDs
                     return("genotype('{}_genotype.DB', variant.variant_id, '{}', {})"
                         .format(proj.name, ret, params[1]))
@@ -3349,7 +3349,7 @@ def consolidateFieldName(proj, table, clause_or_list, alt_build=False):
         #
         query = re.sub("__SAMPLES__\s*\(([^\)]*)\)", handleSamplesParams, query)
         query = re.sub("__GENOTYPE__\s*\(([^\)]*)\)", handleGenotypeParams, query)
-        # variant_id will be passed to samples() and genotype() function and is 
+        # variant_id will be passed to samples() and genotype() function and is
         # therefore needed.
         fields.append('variant.variant_id')
     if has_in_table_query:
@@ -3361,7 +3361,7 @@ def hasGenoInfo(proj, IDs, geno_info):
     '''return a vector of true/false for each geno_info.
     all "true" only if all sample tables has every genotype info'''
     if len(geno_info) == 0:
-        return [] 
+        return []
     result = [True] * len(geno_info)
     proj.db.attach(proj.name + '_genotype')
     try:
@@ -3373,7 +3373,7 @@ def hasGenoInfo(proj, IDs, geno_info):
     except ValueError as e:
         result[geno_info.index('{}'.format(e))] = False
     return result
-    
+
 def extractField(field):
     '''Extract pos from strings such as pos + 100'''
     if field.isalnum():
@@ -3418,33 +3418,33 @@ def splitField(clause):
 #
 # Utility function to calculate bins.
 #
-# This function implements a hashing scheme that UCSC uses (developed by Jim Kent) to 
+# This function implements a hashing scheme that UCSC uses (developed by Jim Kent) to
 # take in a genomic coordinate range and return a set of genomic "bins" that your range
 # intersects.  I found a Java implementation on-line (I need to find the URL) and I
-# simply manually converted the Java code into Python code.  
-    
-# IMPORTANT: Because this is UCSC code the start coordinates are 0-based and the end 
+# simply manually converted the Java code into Python code.
+
+# IMPORTANT: Because this is UCSC code the start coordinates are 0-based and the end
 # coordinates are 1-based!!!!!!
-        
+
 # BINRANGE_MAXEND_512M = 512 * 1024 * 1024
 # binOffsetOldToExtended = 4681; #  (4096 + 512 + 64 + 8 + 1 + 0)
 
 _BINOFFSETS = (
-    512+64+8+1,   # = 585, min val for level 0 bins (128kb binsize)    
-    64+8+1,       # =  73, min val for level 1 bins (1Mb binsize) 
-    8+1,          # =   9, min val for level 2 bins (8Mb binsize)  
-    1,            # =   1, min val for level 3 bins (64Mb binsize)  
+    512+64+8+1,   # = 585, min val for level 0 bins (128kb binsize)
+    64+8+1,       # =  73, min val for level 1 bins (1Mb binsize)
+    8+1,          # =   9, min val for level 2 bins (8Mb binsize)
+    1,            # =   1, min val for level 3 bins (64Mb binsize)
     0)            # =   0, only val for level 4 bin (512Mb binsize)
-     
-#    1:   0000 0000 0000 0001    1<<0       
+
+#    1:   0000 0000 0000 0001    1<<0
 #    8:   0000 0000 0000 1000    1<<3
 #   64:   0000 0000 0100 0000    1<<6
 #  512:   0000 0010 0000 0000    1<<9
- 
+
 _BINFIRSTSHIFT = 17;            # How much to shift to get to finest bin.
 _BINNEXTSHIFT = 3;              # How much to shift to get to next larger bin.
 _BINLEVELS = len(_BINOFFSETS)
-  
+
 #
 # IMPORTANT: the start coordinate is 0-based and the end coordinate is 1-based.
 #
@@ -3475,7 +3475,7 @@ def getMaxUcscBin(start, end):
         else:
             for i in range(startBin + offset, endBin + offset):
                 if i > bin:
-                    bin = i 
+                    bin = i
         startBin >>= _BINNEXTSHIFT
         endBin >>= _BINNEXTSHIFT
     return bin
@@ -3508,7 +3508,7 @@ def parenthetic_contents(string):
         elif c == ')' and stack:
             start = stack.pop()
             yield (len(stack), string[start + 1: i])
-            
+
 def longest_parenthetic_content(string):
     """Generate longest parenthesized contents in string"""
     stack = []
@@ -3551,9 +3551,9 @@ def whereisRPackage(package):
             break
         except:
             continue
-    if libloc == 'NULL': 
+    if libloc == 'NULL':
         libloc = installRPackage(os.path.join(env.local_resource, 'Rlib'), package)
-    return libloc 
+    return libloc
 
 def flatten(listOfLists):
     "Flatten one level of nesting"
@@ -3575,7 +3575,7 @@ def make_unique(lst):
             extension += 1
         result.append(xname)
         used.add(xname)
-    return result 
+    return result
 
 class VariableSubstitutor:
     def __init__(self, text, asString):
@@ -3656,7 +3656,7 @@ class VariableSubstitutor:
                 self.text = new_text
             count += 1
         raise ValueError('Failed to evaluate pipeline varialbe {}. Perhpas the variable is nested.'.format(self.text))
-    
+
 def substituteVars(text, PipelineVars, PipelineGlobals, asString=True):
     # if asString is to, the return value is forced to be string
     # Otherwise, the evaluate values are returned.
@@ -3788,8 +3788,8 @@ def getVariantsOnChromosomeY(proj, variant_table='variant'):
         if nPrev > len(var_chrY):
             env.logger.info('{} variants in pseudo-autosomal regions on '
                 'chromosome Y are treated as autosomal variants.'.format(nPrev - len(var_chrY)))
-    return set([x[0] for x in var_chrY])    
-        
+    return set([x[0] for x in var_chrY])
+
 def getVariantsOnManifolds(proj, variant_table='variant'):
     cur = proj.db.cursor()
     if variant_table == 'variant':
@@ -3827,7 +3827,7 @@ def call_sex(dat):
         if locus[0].lower() in ['x', '23']:
             if locus[2] == '2':
                 xhomo = True
-    # call 'F' if both '0' and '2' are observed in gt and '1' on Y chromosome not observed  
+    # call 'F' if both '0' and '2' are observed in gt and '1' on Y chromosome not observed
     if xhomo and sex == 'unknown':
         sex = 'F'
     return sex
@@ -3843,12 +3843,12 @@ codon_table = {
 
 # codon on the reverse strand, but read on the forward-strand in forward direction
 codon_table_reverse_complement = {
-    'AAG':'L', 'CTA':'*', 'TGT':'T', 'TTT':'K', 'GAT':'I', 'GTT':'N', 'TAT':'I', 'CCT':'R', 'AGG':'P', 'AGT':'T', 
-    'GCT':'S', 'CTT':'K', 'TCT':'R', 'ATG':'H', 'ATT':'N', 'AAT':'I', 'CAG':'L', 'TAG':'L', 'GAG':'L', 'GTG':'H', 
-    'CCA':'W', 'CGG':'P', 'ACT':'S', 'TGG':'P', 'TTG':'Q', 'GGG':'P', 'ATA':'Y', 'ACC':'G', 'ACA':'C', 'TCG':'R', 
-    'CTG':'Q', 'AGA':'S', 'ATC':'D', 'CCG':'R', 'AAA':'F', 'GCA':'C', 'CCC':'G', 'TCA':'*', 'TCC':'G', 'TTA':'*', 
-    'CGT':'T', 'GTA':'Y', 'GAA':'F', 'CGA':'S', 'TAA':'L', 'CAA':'L', 'GGA':'S', 'GGT':'T', 'TGA':'S', 'TGC':'A', 
-    'TAC':'V', 'GGC':'A', 'GAC':'V', 'GCC':'G', 'CGC':'A', 'CAC':'V', 'CTC':'E', 'AAC':'V', 'AGC':'A', 'GTC':'D', 
+    'AAG':'L', 'CTA':'*', 'TGT':'T', 'TTT':'K', 'GAT':'I', 'GTT':'N', 'TAT':'I', 'CCT':'R', 'AGG':'P', 'AGT':'T',
+    'GCT':'S', 'CTT':'K', 'TCT':'R', 'ATG':'H', 'ATT':'N', 'AAT':'I', 'CAG':'L', 'TAG':'L', 'GAG':'L', 'GTG':'H',
+    'CCA':'W', 'CGG':'P', 'ACT':'S', 'TGG':'P', 'TTG':'Q', 'GGG':'P', 'ATA':'Y', 'ACC':'G', 'ACA':'C', 'TCG':'R',
+    'CTG':'Q', 'AGA':'S', 'ATC':'D', 'CCG':'R', 'AAA':'F', 'GCA':'C', 'CCC':'G', 'TCA':'*', 'TCC':'G', 'TTA':'*',
+    'CGT':'T', 'GTA':'Y', 'GAA':'F', 'CGA':'S', 'TAA':'L', 'CAA':'L', 'GGA':'S', 'GGT':'T', 'TGA':'S', 'TGC':'A',
+    'TAC':'V', 'GGC':'A', 'GAC':'V', 'GCC':'G', 'CGC':'A', 'CAC':'V', 'CTC':'E', 'AAC':'V', 'AGC':'A', 'GTC':'D',
     'ACG':'R', 'TTC':'E', 'CAT':'M', 'GCG':'R'}
 
 complement_table = {
@@ -3896,7 +3896,7 @@ def genesInRegions(regions, proj):
                 'and command "vtools use refGene" to link the refGene database: {}'.format(e))
         isoforms.extend([x[0] for x in cur.fetchall()])
     return sorted(list(set(isoforms)))
-     
+
 
 def dissectGene(gene, proj):
     if 'refgene' not in [x.linked_name.lower() for x in proj.annoDB]:
@@ -4082,7 +4082,7 @@ class _DeHTMLParser(HTMLParser):
             self.__text.append('')
         elif tag == 'li':
             self.__text.append('\n\n  * ')
-            
+
     def handle_endtag(self, tag):
         if tag == 'ul':
             self.__text.append('\n\n')
@@ -4124,7 +4124,7 @@ def chunks(data, rows=200):
         yield data[i:i+rows]
 
 
-class RuntimeFiles: 
+class RuntimeFiles:
     def __init__(self, output_files=[], pid=None):
         if not output_files:
             self.sig_file = None
@@ -4144,7 +4144,7 @@ class RuntimeFiles:
             else:
                 raise ValueError('Invalid output file specification: {}'.format(output_files))
             #
-            # what is the relative 
+            # what is the relative
             # The parental directory of cache?
             cache_parent = os.path.dirname(env.cache_dir.rstrip(os.sep))
             #
@@ -4181,7 +4181,7 @@ class RuntimeFiles:
             if os.path.isfile('{}.exe_info'.format(output_file)):
                 env.logger.info('Moving {}.exe_info from older version of variant tools to local cache'.format(output_file))
                 shutil.move('{}.exe_info'.format(output_file), self.proc_info)
-            
+
     def clear(self, types=['out', 'err', 'done']):
         if self.sig_file is None:
             return

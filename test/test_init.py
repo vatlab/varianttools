@@ -31,7 +31,6 @@ import subprocess
 import shutil
 from testUtils import ProcessTestCase
 
-@unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
 class TestInit(ProcessTestCase):
     def testInit(self):
         'Test command vtools init'

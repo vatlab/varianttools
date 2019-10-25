@@ -56,7 +56,7 @@ class LineProcessor:
     def __init__(self, fields, build_info, delimiter, ranges):
         '''
         fields: a list of fields with index, adj (other items are not used)
-        build_info: reference genome and index(es) of chromosome, position, reference allele and alternative alleles. If 
+        build_info: reference genome and index(es) of chromosome, position, reference allele and alternative alleles. If
             positions are available, UCSC bins are prepended to the records. If reference
             and alternative alleles are available, the records are processed for correct
             format of ref and alt alleles.
@@ -75,7 +75,7 @@ class LineProcessor:
         self.ranges = ranges
         #
         self.first_time = True
-        self.nColumns = 0     # number of columns 
+        self.nColumns = 0     # number of columns
         self.import_var_info = True
         self.import_sample_range = None  # genotype fields might be disabled
         self.maxInputCol = 0      # sometimes processor do not have to split input all the way through
@@ -84,7 +84,7 @@ class LineProcessor:
         '''Reset the processor for its internal state, which is used when the processor
         is used to process a new batch of data (with different format), or with
         modified behavior.
-        
+
         import_var_info: if set to False, variant info will not be imported.
         import_sample_range: if set to a range, only selected samples are handled
         '''
@@ -122,7 +122,7 @@ class LineProcessor:
                     # get an instance of an extractor, or a function
                     e = eval(field.adj) if field.adj else None
                     # 1. Not all passed object has __call__ (user can define a lambda function)
-                    # 2. Althoug obj(arg) is equivalent to obj.__call__(arg), saving obj.__call__ to 
+                    # 2. Althoug obj(arg) is equivalent to obj.__call__(arg), saving obj.__call__ to
                     #    e will improve performance because __call__ does not have to be looked up each time.
                     # 3. Passing object directly has an unexpected side effect on performance because comparing
                     #    obj to 1 and 'c' later are very slow because python will look for __cmp__ of the object.
@@ -352,8 +352,8 @@ def probeSampleName(filename, prober, encoding):
                 raise e
         # if there is no data line, we cannot use cols to determine sample name
         return 0, []
-       
-       
+
+
 #
 #
 #  Command import
@@ -554,7 +554,7 @@ class Importer:
             if len(rec)==0 and int(count[0][0])>0:
                 cur.execute('UPDATE project SET value={0} WHERE name={0};'.format(
                     self.db.PH), (1, "multiVCF"))
-            
+
             for samplename in sampleNames:
                 cur.execute('INSERT INTO sample (file_id, sample_name) VALUES ({0}, {0});'.format(self.db.PH),
                     (filenameID, '' if samplename is None else samplename))
@@ -626,7 +626,7 @@ class Importer:
                             self.sample_in_file = []
                             return ([], 0,[])
                         else:
-                            raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample_name, or add a proper header to your input file that matches the columns of samples. See "vtools import -h" for details.'.format(numSample))
+                            raise ValueError('Failed to guess sample name. Please specify sample names for {} samples using parameter --sample-name, or add a proper header to your input file that matches the columns of samples. See "vtools import -h" for details.'.format(numSample))
                     else:
                         self.sample_in_file = [x for x in names]
                         return (self.recordFileAndSample(input_filename, names), 2,names)
@@ -637,7 +637,7 @@ class Importer:
                     return ([], 0,[])
         else:
             self.sample_in_file = [x for x in self.sample_name]
-            
+
             if not self.genotype_field:
                 # if no genotype, but a sample name is given
                 env.logger.debug('Input file does not contain any genotype. Only the variant ownership information is recorded.')
@@ -657,9 +657,9 @@ class Importer:
                     if len(self.sample_name) > 1:
                         raise ValueError("When there is no sample genotype, only one sample name is allowed.")
                 elif len(self.sample_name) != numSample:
-                    raise ValueError('{} sample detected but only {} sample names are specified'.format(numSample, len(self.sample_name)))                        
+                    raise ValueError('{} sample detected but only {} sample names are specified'.format(numSample, len(self.sample_name)))
                 return (self.recordFileAndSample(input_filename, self.sample_name), 1 if numSample == 0 else 2,self.sample_in_file)
- 
+
     def importVariant(self, input_filename):
         # reset text processor to allow the input of files with different number of columns
         self.processor.reset(import_var_info=True, import_sample_range=[0,0])
@@ -672,13 +672,13 @@ class Importer:
         # getNew=True so the reader only read variants not in variantIndex if no additional
         # variant info is imported
         # if self.variant_info:
-        #     reader = TextReader(self.processor, input_filename, None, True, 
+        #     reader = TextReader(self.processor, input_filename, None, True,
         #         env.import_num_of_readers, self.encoding, self.header, quiet=False)
         # else:
         #     reader = TextReader(self.processor, input_filename, self.variantIndex, True,
         #         env.import_num_of_readers, self.encoding, self.header, quiet=False)
         if self.variant_info:
-            reader = TextReader(self.processor, input_filename, None, True, 
+            reader = TextReader(self.processor, input_filename, None, True,
                 1, self.encoding, self.header, quiet=False)
         else:
             reader = TextReader(self.processor, input_filename, self.variantIndex, True,
@@ -761,14 +761,14 @@ class Importer:
         prog.done()
         env.logger.info('Coordinates of {} ({} total, {} failed to map) new variants are updated.'\
             .format(count, total_new, err_count))
-            
+
 
 
 def importVariantsArguments(parser):
     parser.add_argument('input_files', nargs='+',
         help='''A list of files that will be imported. The file should be delimiter
             separated with format described by parameter --format. Gzipped files are
-            acceptable. If a preprocessor is defined in the format, input files will 
+            acceptable. If a preprocessor is defined in the format, input files will
             be processed by the preprocessor before they are imported.''')
     parser.add_argument('--build',
         help='''Build version of the reference genome (e.g. hg18) of the input data. If
@@ -782,12 +782,12 @@ def importVariantsArguments(parser):
             imported (c.f. "vtools admin --validate_build").''')
     parser.add_argument('--format',
         help='''Format of the input text file. It can be one of the variant tools
-            supported file types such as VCF (cf. 'vtools show formats'), or a 
+            supported file types such as VCF (cf. 'vtools show formats'), or a
             local format specification file (with extension .fmt). If unspecified,
             variant tools will try to guess format from file extension. Some file
             formats accept parameters (cf. 'vtools show format FMT') and allow you
             to import additional or alternative fields defined for the format. ''')
-    parser.add_argument('--sample_name', nargs='*', default=[],
+    parser.add_argument('--sample_name', '--sample-name', nargs='*', default=[],
         help='''Name of the samples imported by the input files. The same names will be
             used for all files if multiple files are imported. If unspecified, headers
             of the genotype columns of the last comment line (line starts with #) of the
@@ -802,7 +802,7 @@ def importVariantsArguments(parser):
             not remove wrongfully imported variants from the master variant table.'''),
     parser.add_argument('-j', '--jobs', metavar='N', default=4, type=int,
         help='''Number of processes to import input file. Variant tools by default
-            uses four processes to import variants and samples genotypes in 
+            uses four processes to import variants and samples genotypes in
             parallel, and you can use more or less processes by adjusting this
             parameter. Due to the overhead of inter-process communication, more
             jobs do not automatically lead to better performance.'''),

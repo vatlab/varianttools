@@ -40,22 +40,22 @@ class AssoTestsWorker:
         self.missing_ind_ge = param["missing_ind_ge"]
         self.missing_var_ge = param["missing_var_ge"]
         self.sample_names = param["sample_names"]
-        
+
         self.num_extern_tests = param["num_extern_tests"]
         self.grps = grps
-        
+
         self.path=path
         self.param["tests"]=self.tests
         self.results = ResultRecorder(self.param, args["to_db"], args["delimiter"], args["force"])
-   
+
         # self.shelves = {}
         #
 
         self.db = DatabaseEngine()
         self.db.connect(self.path+"/"+projName+'.proj',readonly=True)
 
-        # self.db.attach(param.proj.name + '.proj', '__fromVariant', lock=self.shelf_lock) 
-        
+        # self.db.attach(param.proj.name + '.proj', '__fromVariant', lock=self.shelf_lock)
+
         #
         self.g_na = float('NaN')
         if env.treat_missing_as_wildtype:
@@ -68,10 +68,10 @@ class AssoTestsWorker:
     #     for val in list(self.shelves.values()):
     #         val.close()
 
-    
+
     def filterGenotype(self, genotype, geno_info, var_info, gname):
         '''
-        Filter genotypes for missing calls or lack of minor alleles. Not very efficient because 
+        Filter genotypes for missing calls or lack of minor alleles. Not very efficient because
         it copies genotype, var_info and geno_info skipping the loci to be removed.
             - genotype is a Individual_list * Variants_list matrix of genotype values
             - var_info is a dictionary with each key being information corresponding Variant_list
@@ -79,7 +79,7 @@ class AssoTestsWorker:
         '''
         # Step 1: filter individuals by genotype missingness at a locus
 
-       
+
         missing_ratios = [sum(list(map(math.isnan, x))) / float(len(x)) for x in genotype]
         which = [x < self.missing_ind_ge for x in missing_ratios]
         # check for non-triviality of phenotype data
@@ -213,7 +213,7 @@ class AssoTestsWorker:
             if key not in ['variant.chr', 'variant.pos']:
                 var_info[key] = [data[x][idx] if (type(data[x][idx]) in [int, float]) else float('NaN') for x in variant_id]
             else:
-                var_info[key] = [data[x][idx] for x in variant_id] 
+                var_info[key] = [data[x][idx] for x in variant_id]
         return var_info, variant_id
 
     def setPyData(self, which, geno, var_info, geno_info,
@@ -260,12 +260,12 @@ class AssoTestsWorker:
         # convert geno_info to 3 dimensions:
         # D1: samples
         # D2: variants
-        # D3: geno_info 
+        # D3: geno_info
         self.pydata['geno_info'] = list(zip(*self.pydata['geno_info']))
         self.pydata['geno_info'] = [list(zip(*item)) for item in self.pydata['geno_info']]
         unique_names = self.sample_names
         if len(self.sample_names) != len(set(self.sample_names)):
-            env.logger.warning("Duplicated sample names found. Using 'sample_ID.sample_name' as sample names") 
+            env.logger.warning("Duplicated sample names found. Using 'sample_ID.sample_name' as sample names")
             unique_names = ["{0}.{1}".format(i,s) for i,s in zip(self.sample_IDs, self.sample_names)]
         self.pydata['sample_name'] = [str(x) for idx, x in enumerate(unique_names) if which[idx]]
         self.pydata['phenotype_name'] = self.phenotype_names
@@ -333,8 +333,8 @@ class AssoTestsWorker:
         # files=glob.glob("tmp*_genotypes_multi_genes.h5")
 
         files=sorted(files, key=lambda name: int(name.split("/")[-1].split("_")[1]))
- 
-        for fileName in files:   
+
+        for fileName in files:
             accessEngine=Engine_Access.choose_access_engine(fileName)
 
             if len(chrs)==1:
@@ -342,15 +342,15 @@ class AssoTestsWorker:
                 # snpdict=accessEngine.get_geno_info_by_group(geneSymbol,chr)
 
                 # for chr in chrs:
-                    
+
                 colnames=accessEngine.get_colnames(chr)
                 snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
                 accessEngine.close()
                 for ID in colnames:
                     data=snpdict[ID]
-                    
+
                     gtmp = [data.get(x, [self.g_na] + [float('NaN')]*len(self.geno_info)) for x in varDict[chr]]
-                    # handle -1 coding (double heterozygotes)     
+                    # handle -1 coding (double heterozygotes)
                     genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
 
                     #
@@ -358,17 +358,17 @@ class AssoTestsWorker:
                     #
                     for idx, key in enumerate(self.geno_info):
                         geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
-            else:    
+            else:
                 colnames=accessEngine.get_colnames(chrs[0])
-                    
+
                 for ID in colnames:
                     gtmp=[]
                     for chr in chrs:
                         snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
                         data=snpdict[ID]
-                        
+
                         gtmp.extend([data.get(x, [self.g_na] + [float('NaN')]*len(self.geno_info)) for x in varDict[chr]])
-                        # handle -1 coding (double heterozygotes)     
+                        # handle -1 coding (double heterozygotes)
                     genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
                     #
                     # handle genotype_info
@@ -382,7 +382,7 @@ class AssoTestsWorker:
 
 
     def run(self):
-        
+
         grps = self.grps
         #
         valuePack=[]
@@ -400,11 +400,11 @@ class AssoTestsWorker:
             self.pydata = {}
             values = list(grp)
 
-            try:                
+            try:
                 genotype, which, var_info, geno_info = self.getGenotype_HDF5(grp)
                 # if I throw an exception here, the program completes in 5 minutes, indicating
                 # the data collection part takes an insignificant part of the process.
-                # 
+                #
                 # set C++ data object
                 if (len(self.tests) - self.num_extern_tests) > 0:
                     self.setGenotype(which, genotype, geno_info, grpname)
@@ -558,7 +558,7 @@ def retryConnection(client,poll,context,retries_left,SERVER_ENDPOINT,msg):
     client.send_json(msg)
     return [retries_left,client,poll]
 
-        
+
 
 def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
     # Setup ZMQ.
@@ -584,19 +584,19 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
         client.connect(SERVER_ENDPOINT) # IP of master
         poll = zmq.Poller()
         poll.register(client, zmq.POLLIN)
-   
+
         retries_left = REQUEST_RETRIES
 
         param=None
-        grps=None 
-        args=None 
+        grps=None
+        args=None
         path=None
         projName=None
         result=""
         work={}
-       
+
         while retries_left:
-            
+
             # env.logger.info("send available")
             client.send_json({ "msg": "available","pid":pid})
             expect_reply=True
@@ -607,7 +607,7 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
                     try:
                         work = client.recv_json(flags=zmq.NOBLOCK)
                         if work == {}:
-                            continue     
+                            continue
                         if "preprocessing" in work:
                             # print("preprocessing")
                             expect_reply=False
@@ -622,7 +622,7 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
                         args=work['args']
                         path=work["path"]
                         projName=work["projName"]
-                       
+
                         # Running association
                         worker = AssoTestsWorker(param, grps, args,path,projName)
                         result=worker.run()
@@ -630,7 +630,7 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
 
                     except zmq.error.Again as e:
                         pass
-                    
+
                     try:
                         if result!="":
                             client.send_json({ "msg": "result", "result": result,"pid":pid,"grps":grps_string})
@@ -647,7 +647,7 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
                                         raise Exception("Server connection lost")
                     except Exception as e:
                         print(e)
-                        break     
+                        break
 
                 else:
                     msg={ "msg": "available","pid":pid}
@@ -657,7 +657,7 @@ def worker(REQUEST_TIMEOUT,REQUEST_RETRIES):
     except Exception as e:
         print(e)
     finally:
-        client.close()   
+        client.close()
         context.term()
 
 
@@ -683,7 +683,7 @@ def worker_heartbeat():
 
         SERVER_ENDPOINT="tcp://"+os.environ["ZEROMQIP"]+":"+selected_port
         hb_socket.connect(SERVER_ENDPOINT) # IP of master
-        
+
 
         while True:
             hb_socket.send_json({ "msg": "heartbeat","pid":pid})
@@ -706,7 +706,7 @@ def worker_heartbeat():
     finally:
         hb_socket.setsockopt(zmq.LINGER, 0)
         poll.unregister(hb_socket)
-        hb_socket.close()   
+        hb_socket.close()
         context.term()
 
 
@@ -722,12 +722,12 @@ def main():
             os.environ["ZEROMQIP"]="127.0.0.1"
         time.sleep(5)
 
-       
+
         thread=threading.Thread(target=worker_heartbeat)
         # thread.setDaemon(True)
         thread.start()
         worker(REQUEST_TIMEOUT,REQUEST_RETRIES)
-        
+
         thread.join()
 
 
@@ -745,12 +745,12 @@ if __name__ == "__main__":
             os.environ["ZEROMQIP"]="127.0.0.1"
         time.sleep(5)
 
-       
+
         thread=threading.Thread(target=worker_heartbeat)
         # thread.setDaemon(True)
         thread.start()
         worker(REQUEST_TIMEOUT,REQUEST_RETRIES)
-        
+
         thread.join()
 
 
@@ -758,6 +758,6 @@ if __name__ == "__main__":
         print(e)
 
 
-   
+
 
 

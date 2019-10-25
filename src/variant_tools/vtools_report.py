@@ -139,13 +139,13 @@ def getSamples(samples, group_by=[]):
 # Command trans_ratio
 #
 def transRatioArguments(parser):
-    parser.add_argument('-n', '--num_field', required=True,
+    parser.add_argument('-n', '--num_field', '--num-field', required=True,
         help='''Name of the field that holds sample variant count, which is the field name for
             command 'vtools update table --from_stat "num=#(alt)"'.''')
-    parser.add_argument('--group_by', nargs='*', default=[],
-        help='''Output transition/transversion rate for groups of variants. e.g. --group_by 
+    parser.add_argument('--group_by', '--group-by', nargs='*', default=[],
+        help='''Output transition/transversion rate for groups of variants. e.g. --group_by
             num for each sample variant frequency group.''')
-    parser.add_argument('table', 
+    parser.add_argument('table',
         help='''Variant table for which transversion/transversion mutants are counted.''')
 
 def transRatio(args):
@@ -153,13 +153,13 @@ def transRatio(args):
     prt = PrettyPrinter()
     if args.group_by:
         prt.write(args.group_by + ['num_of_transition', 'num_of_transversion', 'ratio'])
-        transition = getoutput(['vtools', 'select', args.table, 
-            "((ref='A' AND alt='G') OR (ref='G' AND alt='A') OR (ref='C' AND alt='T') OR (ref='T' AND alt='C'))", 
+        transition = getoutput(['vtools', 'select', args.table,
+            "((ref='A' AND alt='G') OR (ref='G' AND alt='A') OR (ref='C' AND alt='T') OR (ref='T' AND alt='C'))",
             '--output'] + args.group_by + ['sum({})'.format(args.num_field), '-d', '\t', '--group_by'] + args.group_by)
-        transversion = getoutput(['vtools', 'select', args.table, 
-            "((ref='A' AND alt='C') OR (ref='C' AND alt='A') OR (ref='G' AND alt='T') OR " + 
+        transversion = getoutput(['vtools', 'select', args.table,
+            "((ref='A' AND alt='C') OR (ref='C' AND alt='A') OR (ref='G' AND alt='T') OR " +
             " (ref='T' AND alt='G') OR (ref='A' AND alt='T') OR (ref='T' AND alt='A') OR " +
-            " (ref='C' AND alt='G') OR (ref='G' AND alt='C'))", '--output'] + args.group_by +  
+            " (ref='C' AND alt='G') OR (ref='G' AND alt='C'))", '--output'] + args.group_by +
             ['sum({})'.format(args.num_field), '-d', '\t', '--group_by'] +  args.group_by)
         values = {}
         for item in transition.split('\n'):
@@ -178,29 +178,29 @@ def transRatio(args):
                 '{:.5f}'.format(int(values[k][0])/float(values[k][1]) if int(values[k][1]) > 0 else 0)])
     else:
         prt.write(['num_of_transition', 'num_of_transversion', 'ratio'])
-        transition = int(getoutput(['vtools', 'select', args.table, 
+        transition = int(getoutput(['vtools', 'select', args.table,
             "(ref='A' AND alt='G') OR (ref='G' AND alt='A') OR (ref='C' AND alt='T') OR (ref='T' AND alt='C')",
             '--output', 'sum({})'.format(args.num_field)]))
-        transversion = int(getoutput(['vtools', 'select', args.table, 
-            "(ref='A' AND alt='C') OR (ref='C' AND alt='A') OR (ref='G' AND alt='T') OR " + 
+        transversion = int(getoutput(['vtools', 'select', args.table,
+            "(ref='A' AND alt='C') OR (ref='C' AND alt='A') OR (ref='G' AND alt='T') OR " +
             "(ref='T' AND alt='G') OR (ref='A' AND alt='T') OR (ref='T' AND alt='A') OR " +
             "(ref='C' AND alt='G') OR (ref='G' AND alt='C')",
             '--output', 'sum({})'.format(args.num_field)]))
-        prt.write(['{:,}'.format(transition), '{:,}'.format(transversion), 
+        prt.write(['{:,}'.format(transition), '{:,}'.format(transversion),
             '{:.5f}'.format(transition / float(transversion) if transversion != 0 else 0)])
     prt.write_rest()
-    
+
 #
 # Command avg_depth
 #
 def avgDepthArguments(parser):
-    parser.add_argument('-n', '--num_field', required=True,
+    parser.add_argument('-n', '--num_field', '--num-field', required=True,
         help='''Name of the field that holds sample variant count, which is the field name for
             command 'vtools update table --from_stat "num=#(alt)"'.''')
-    parser.add_argument('-d', '--depth_field', required=True,
+    parser.add_argument('-d', '--depth_field', '--depth-field', required=True,
         help='''Name of the field that holds average depth of each variant, which is the field
             name for command 'vtools update table --from_stat "meanDP=avg(DP_geno)"'.''')
-    parser.add_argument('--group_by', nargs='*', default=[],
+    parser.add_argument('--group_by', '--group-by', nargs='*', default=[],
         help='''Output average depth for each group, for example,
             '--group_by NUM_FIELD to output depth for each sample variant frequency (count).''')
     parser.add_argument('table',
@@ -208,7 +208,7 @@ def avgDepthArguments(parser):
 
 def avgDepth(args):
     print(('{}num_of_variant\taverage_depth'.format(''.join([x+'\t' for x in args.group_by]))))
-    print((getoutput(['vtools', 'output', args.table] + args.group_by + 
+    print((getoutput(['vtools', 'output', args.table] + args.group_by +
         ['COUNT(1)', 'SUM({0}*{1})/SUM({0})'.format(args.num_field, args.depth_field)] +
         (['--group_by'] + args.group_by if args.group_by else []))))
 
@@ -223,17 +223,17 @@ def variantStatArguments(parser):
             a value, variants belonging to any of the samples will be counted.
             If this parameter is left unspecified, all variants, including those
             that do not belong to any samples will be counted.''')
-    parser.add_argument('-g', '--group_by', nargs='*', default=[],
+    parser.add_argument('-g', '--group_by', '--group-by', nargs='*', default=[],
         help='''Group samples by certain conditions such as 'aff=1'. A common
             usage is to group variants by 'filename' and 'sample_name' so that
             variant statistics are outputted for each sample.''')
-    parser.add_argument('table', 
+    parser.add_argument('table',
         help='''Variant table for which variant metrics are calculated.''')
 
 def variantStat(args):
     # 1) Get samples based on the conditional parameter --samples
     #    Exit the report if there are no samples to analyze.
-    print(('\t'.join(list(args.group_by) + ['num_sample', 'num_snps', 'num_insertions', 'num_deletions', 
+    print(('\t'.join(list(args.group_by) + ['num_sample', 'num_snps', 'num_insertions', 'num_deletions',
         'num_substitutions', 'min_insertion_size', 'avg_insertion_size', 'max_insertion_size',
         'min_deletion_size', 'avg_deletion_size', 'max_deletion_size'])))
     if not args.samples and not args.group_by:   # no sample is specified:
@@ -249,12 +249,12 @@ def variantStat(args):
         num_insertions, avg_insertion_size, min_insertion_size, max_insertion_size = getoutput(
             ['vtools', 'select', args.table, "ref='-'",
             '--output', 'count(alt)', 'avg(length(alt))', 'min(length(alt))', 'max(length(alt))']).split('\t')
-        #        
+        #
         # 2c) Get the metrics to characterize the deletions
-        #     command: vtools select variant "alt = '-'" --samples 'sample_id IN $sample_ids' --output 'count(ref)', 'avg(length(ref))' 'min(length(ref))' 'max(length(ref))'       
+        #     command: vtools select variant "alt = '-'" --samples 'sample_id IN $sample_ids' --output 'count(ref)', 'avg(length(ref))' 'min(length(ref))' 'max(length(ref))'
         num_deletions, avg_deletion_size, min_deletion_size, max_deletion_size = getoutput(
             ['vtools', 'select', args.table, "alt='-'",
-            '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t')     
+            '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t')
         num_samples = getoutput(['vtools', 'execute', 'SELECT COUNT(sample_id) FROM sample'])
         #
         print(('\t'.join([num_samples, num_snps, num_insertions, num_deletions,
@@ -275,17 +275,17 @@ def variantStat(args):
             num_insertions, avg_insertion_size, min_insertion_size, max_insertion_size = getoutput(
                 ['vtools', 'select', args.table, "ref='-'", '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)),
                 '--output', 'count(alt)', 'avg(length(alt))', 'min(length(alt))', 'max(length(alt))']).split('\t')
-            #        
+            #
             # 2c) Get the metrics to characterize the deletions
-            #     command: vtools select variant "alt = '-'" --samples 'sample_id IN $sample_ids' --output 'count(ref)', 'avg(length(ref))' 'min(length(ref))' 'max(length(ref))'       
+            #     command: vtools select variant "alt = '-'" --samples 'sample_id IN $sample_ids' --output 'count(ref)', 'avg(length(ref))' 'min(length(ref))' 'max(length(ref))'
             num_deletions, avg_deletion_size, min_deletion_size, max_deletion_size = getoutput(
                 ['vtools', 'select', args.table, "alt='-'", '--samples', 'sample_id IN ({})'.format(','.join(sample_ids)),
-                '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t')     
+                '--output', 'count(ref)', 'avg(length(ref))', 'min(length(ref))', 'max(length(ref))']).split('\t')
             #
             print(('\t'.join(list(group) + [str(len(sample_ids)), num_snps, num_insertions, num_deletions,
                 num_substitutions, min_insertion_size, avg_insertion_size, max_insertion_size,
                 min_deletion_size, avg_deletion_size, max_deletion_size])))
-    
+
 
 #
 # command discordance_rate
@@ -303,13 +303,13 @@ def discordanceRateArguments(parser):
             shown in command 'vtools show genotypes'). If a variant is filtered
             for one sample but not another, it will be included if runtime option
             $treat_missing_as_wildtype is set to True, and discarded otherwise.''')
-    
+
 def discordanceRate(args):
     #
     # It is possible to use SQL to speed up this funciton. E.g. instead of
     # getting all variants and their genotypes, use something like
     #   SELECT count(a.variant_id) FROM genotype_1 a, genotype_2 b ON a.variant_id = b.variant_id;
-    # 
+    #
     for grp, sample_ids, sample_names in getSamples(args.samples):
         print(('\t'.join(sample_names)))
         # get list of variant for each sample
@@ -362,16 +362,16 @@ def transcriptArguments(parser):
     parser.add_argument('regions', nargs='+', help=''''One or more chromosome regions in
         the format of chr:start-end (e.g. chr21:33,031,597-33,041,570), Field:Value
         from a region-based annotation database (e.g. refGene.name2:TRIM2 or
-        refGene_exon.name:NM_000947), or set options of several regions (&, |, -, 
+        refGene_exon.name:NM_000947), or set options of several regions (&, |, -,
         and ^ for intersection, union, difference, and symmetric difference).''')
-    parser.add_argument('--build', nargs='?', 
+    parser.add_argument('--build', nargs='?',
         help='''Output sequence at specified build of reference genome. The primary
             reference genome of the project will be used if by default.''')
-    parser.add_argument('--strand-only', action='store_true', 
+    parser.add_argument('--strand_only', '--strand-only', action='store_true',
         help='''Only output strand of genes that covers the region.''')
-    parser.add_argument('--first-transcript', action='store_true',
+    parser.add_argument('--first_transcript', '--first-transcript', action='store_true',
         help='''If set, only display the first transcript of RNA or Protein sequence''')
-    parser.add_argument('--zero-based', default=False, action='store_true',
+    parser.add_argument('--zero_based',  '--zero-based', default=False, action='store_true',
         help='''If set, user input is zero based and will be translated to 1-based
             coordinates before query. The output is always 1-based''')
 
@@ -430,19 +430,19 @@ def sequenceArguments(parser):
     parser.add_argument('regions', nargs='+', help='''One or more chromosome regions in
         the format of chr:start-end (e.g. chr21:33,031,597-33,041,570), Field:Value
         from a region-based annotation database (e.g. refGene.name2:TRIM2 or
-        refGene_exon.name:NM_000947), or set options of several regions (&, |, -, 
+        refGene_exon.name:NM_000947), or set options of several regions (&, |, -,
         and ^ for intersection, union, difference, and symmetric difference).
-        Several regions will be printed if the name matches more than one regions. 
+        Several regions will be printed if the name matches more than one regions.
         Chromosome positions are 1-based and are inclusive at both ends so the chromosome
         region has a length of end-start+1 bp. A reversed complementary sequence will be
         outputted if starting position is after the ending position.''')
-    parser.add_argument('--build', nargs='?', 
+    parser.add_argument('--build', nargs='?',
         help='''Output sequence at specified build of reference genome. The primary
             reference genome of the project will be used if by default.''')
     parser.add_argument('--numbered', nargs='?', const='left', choices=['left', 'right'],
         help='''If specified, add position of the first or last basepair of each line to
             the left or right of the line, and insert a space at every 10 basepair''')
-    parser.add_argument('--char_per_line', type=int,
+    parser.add_argument('--char_per_line', '--char-per-line', type=int,
         help='''Number of characters (excluding space and leading numbers) per line. Default to
             70 in regular and 60 in numbered format.''')
     parser.add_argument('--transcribe', nargs='*', metavar='GENE',
@@ -459,31 +459,31 @@ def sequenceArguments(parser):
             in the refGene database, find all genes that overlap with the region, locate
             exons and coding regions, transcribe and translate the DNA sequence to protein
             sequence. The complete protein sequence will be printed regardless of the
-            boundaries of specified regions. If one or more names (refGene.name) are 
+            boundaries of specified regions. If one or more names (refGene.name) are
             specified, only specified genes will be translated.''')
     parser.add_argument('--mark', nargs='*',
-        help='''Mark a location (--mark chr pos), a variant (--mark chr pos ref alt), 
+        help='''Mark a location (--mark chr pos), a variant (--mark chr pos ref alt),
             a region (e.g. refGene_exon.name:NM_000947), or a particular sequence (e.g. TCGGA)
             in red in the output. If a variant is specified, the changed nucleotide or amino
             acid will be printed. Currently only single nucleotide polymorphisms are supported.''')
-    parser.add_argument('--mark_complement', default=False, action='store_true',
+    parser.add_argument('--mark_complement', '--mark-complement',  default=False, action='store_true',
         help='''If set, also try to mark the complement of the specified sequence''')
-    parser.add_argument('--mark_reverse', default=False, action='store_true',
+    parser.add_argument('--mark_reverse', '--mark-reverse', default=False, action='store_true',
         help='''If set, also try to mark the reverse sequence of the specified sequence.
             If both mark_complemnt and mark_reverse are set, four different sequences
             will be searched.''')
-    parser.add_argument('--first-transcript', action='store_true',
+    parser.add_argument('--first_transcript', '--first-transcript', action='store_true',
         help='''If set, only display the first transcript of RNA or Protein sequence''')
-    parser.add_argument('--show-transcript', action='store_true',
+    parser.add_argument('--show_transcript', '--show-transcript', action='store_true',
         help='''Put transcript name before transcript''')
-    parser.add_argument('--marked-region', nargs='*', default=None, type=int,
-        help='''If set to a number or pair of number, print only n bp to the left and 
+    parser.add_argument('--marked_region', '--marked-region', nargs='*', default=None, type=int,
+        help='''If set to a number or pair of number, print only n bp to the left and
             m (m=n if only one number is specified) of the marked region. The sequence
             itself is no longer marked. This option is not yet supported in all
             combinations of options. ''')
-    parser.add_argument('--hide_unmatched', default=False, action='store_true',
+    parser.add_argument('--hide_unmatched', '--hide-unmatched', default=False, action='store_true',
         help='''If set, only display regions with marked variants or sequences''')
-    parser.add_argument('--zero-based', default=False, action='store_true',
+    parser.add_argument('--zero_based', '--zero-based', default=False, action='store_true',
         help='''If set, user input is zero based and will be translated to 1-based
             coordinates before query. The output is always 1-based''')
 
@@ -610,7 +610,7 @@ def printDNASequence(args, regions):
                 last_line = len(seq) // char_per_line * char_per_line
                 residue = last_line + char_per_line - len(seq)
                 print(('\n'.join([
-                    ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) + 
+                    ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) +
                     ((' ' * residue + fmt.format(start if reversed_seq else end)) if i == last_line \
                         else fmt.format(end - i - char_per_line + 1 if reversed_seq else start + i + char_per_line - 1)) \
                     for i in range(0, len(seq), char_per_line)])))
@@ -699,7 +699,7 @@ def printRNASequence(args, regions):
                     last_line = len(seq) // char_per_line * char_per_line
                     residue = last_line + char_per_line - len(seq)
                     print(('\n'.join([
-                        ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) + 
+                        ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) +
                         ((' ' * residue + fmt.format(len(seq))) if i == last_line \
                             else fmt.format(i + char_per_line)) \
                         for i in range(0, len(seq), char_per_line)])))
@@ -779,7 +779,7 @@ def printProteinSequence(args, regions):
                     last_line = len(seq) // char_per_line * char_per_line
                     residue = last_line + char_per_line - len(seq)
                     print(('\n'.join([
-                        ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) + 
+                        ' '.join([markSequence(seq[i+10*j:i+10*j+10]) for j in range(block_per_line)]) +
                         ((' ' * residue + fmt.format(len(seq))) if i == last_line \
                             else fmt.format(i + char_per_line)) \
                         for i in range(0, len(seq), char_per_line)])))
@@ -795,16 +795,16 @@ def printProteinSequence(args, regions):
 # command inbreeding_coefficient
 #
 def inbreedingCoefArguments(parser):
-    parser.add_argument('table', 
+    parser.add_argument('table',
         help='''Variants based on which individual inbreeding coefficients are evaluated.''')
     parser.add_argument('--samples', nargs='*',
         help='''Conditions based on which samples are selected to have inbreeding coefficients
               calculated. Default to all samples.''')
-    parser.add_argument('--maf_field', required=True,
+    parser.add_argument('--maf_field', '--maf-field', required=True,
         help='''Name of the field that holds minor allele frequency for sample variants,
             which is the field name for command
             'vtools update table --from_stat "maf_field=maf()" --samples ...'.''')
-    parser.add_argument('--skip_autosome', action='store_true',
+    parser.add_argument('--skip_autosome', '--skip-autosome', action='store_true',
                 # help='''With this switch, variants on autosomes as well as on pseudo-autosomal
                     # regions (PAR1 & PAR2) on chrX and chrY will be ignored.''')
                 help=argparse.SUPPRESS)
@@ -835,15 +835,15 @@ def inbreedingCoef(args):
 # transmission
 #
 def transmissionArguments(parser):
-    parser.add_argument('--parents', nargs=2, 
+    parser.add_argument('--parents', nargs=2,
         help='''Names of parents, which should uniquely identify two samples.''')
-    parser.add_argument('--offspring', nargs='+', 
+    parser.add_argument('--offspring', nargs='+',
         help='''Names of one or more offspring samples.''')
     parser.add_argument('--denovo', nargs='*',
         help='''A list of tables to store denovo variants for each offspring.
             DeNovo variants are defined as offspring variants that do not exist
             in any of the parents, including the cases when the offspring have
-            different variants from what parents have at the same genomic 
+            different variants from what parents have at the same genomic
             locations.''')
     parser.add_argument('--recessive', nargs='*',
         help='''A list of tables to store recessive variants for each offspring.
@@ -854,8 +854,8 @@ def transmissionArguments(parser):
             demonstrate mendelian inconsistencies, namely variants that are not
             passed from parents to offspring in a Mendelian fashion. Examples
             of inconsistent variants include de novo variants, homozygous variants
-            in offspring with only one parental carrier, wildtype offspring 
-            variants with a homozygous parent, heterozygous offspring variants 
+            in offspring with only one parental carrier, wildtype offspring
+            variants with a homozygous parent, heterozygous offspring variants
             with two homozygous parents, and more complicated cases when multiple
             variants appear at the same sites.''')
 
@@ -898,7 +898,7 @@ def transmission(args):
                 env.logger.info('Writing {} variants to table {}'.format(len(off_recessive), args.recessive[idx]))
                 proj.createVariantTable(encodeTableName(args.recessive[idx]),
                     variants=sorted(off_recessive))
-                proj.describeTable(encodeTableName(args.recessive[idx]), 
+                proj.describeTable(encodeTableName(args.recessive[idx]),
                     message='Recessive variants of sample {} with parents {} and {}'.format(
                         off, args.parents[0], args.parents[1]), save_date=True)
             if args.denovo:
@@ -906,30 +906,30 @@ def transmission(args):
                 env.logger.info('Writing {} variants to table {}'.format(len(off_denovo), args.denovo[idx]))
                 proj.createVariantTable(encodeTableName(args.denovo[idx]),
                     variants=sorted(off_denovo))
-                proj.describeTable(encodeTableName(args.denovo[idx]), 
+                proj.describeTable(encodeTableName(args.denovo[idx]),
                     message='de novo variants of sample {} with parents {} and {}'.format(
                         off, args.parents[0], args.parents[1]), save_date=True)
             if args.inconsistent:
 #
 # If there is only one variant at a variant site
-# 
+#
 # Mendelian mismatch cases are:
-# 
+#
 # 001
 # 002 -> de novo variant
-# 012 
+# 012
 # 022 -> single parent yield homozygous offspring
 # 020
-# 120 
-# 220 -> homozygous parent yield wildtype offspring 
+# 120
+# 220 -> homozygous parent yield wildtype offspring
 # 221 (or 22 -1)-> double homozygous parents not yield homozygous offspring
 #
 # where xyz are ordered parental (x,y) and offspring (z) genotypes.
 #
 # The situation is much more complicated when there are multiple variants
 # involved.
-# 
-# there can be at most 6 variants at a site for 3 individuals.  Let us forget 
+#
+# there can be at most 6 variants at a site for 3 individuals.  Let us forget
 # about these for now.
                 case1 = set([x for x in list(geno.keys()) if x not in par1 and x not in par2])
                 case2 = set([x for x,y in list(geno.items()) if y==2 and (x not in par1 or x not in par2)])
@@ -940,7 +940,7 @@ def transmission(args):
                 env.logger.info('Writing {} variants to table {}'.format(len(off_inconsistent), args.inconsistent[idx]))
                 proj.createVariantTable(encodeTableName(args.inconsistent[idx]),
                     variants=sorted(off_inconsistent))
-                proj.describeTable(encodeTableName(args.inconsistent[idx]), 
+                proj.describeTable(encodeTableName(args.inconsistent[idx]),
                     message='Mendelian inconsistent variants of sample {} with parents {} and {}'.format(
                         off, args.parents[0], args.parents[1]), save_date=True)
 
@@ -949,8 +949,8 @@ def transmission(args):
 # command plot_fields
 #
 def plotFieldsCommonArguments(parser):
-    parser.add_argument('--save_data', metavar='FILENAME', help='''Save data to file.''')
-    parser.add_argument('--save_script', metavar='FILENAME', help='''Save R script to file.''')
+    parser.add_argument('--save_data', '--save-data', metavar='FILENAME', help='''Save data to file.''')
+    parser.add_argument('--save_script', '--save-script', metavar='FILENAME', help='''Save R script to file.''')
     parser.add_argument('--width', metavar='px', type=int, default=800,
                         help='''Width of plot. Default to 800.''')
     parser.add_argument('--height', metavar='px', type=int, default=600,
@@ -961,7 +961,7 @@ def plotFieldsCommonArguments(parser):
             EPS, or JPG. Multiple files might be produced if more than one
             figure is produced (e.g. MyFig_$FIELD1.pdf, MyFig_$FILED2.pdf
             if MyFig.pdf is specified)''')
-    hist.add_argument('--norm_curve', action='store_true',
+    hist.add_argument('--norm_curve', '--norm-curve', action='store_true',
                 help='''Add a normal distribution N(mean, stdev) density curve to the histogram.''')
     dot = parser.add_argument_group('''Draw dot plot. Allow up to 3 input fields: for single input
     field, the values will be plotted on y-axis with index being x-axis; for two input fields, the first
@@ -969,9 +969,9 @@ def plotFieldsCommonArguments(parser):
     the third input field is represented by color of the dots.''')
     dot.add_argument('--dot', metavar='name',
         help='''File name of the outputted figure, which can have type PDF, EPS, or JPG.''')
-    dot.add_argument('--dot_size', metavar='pt', type=float, default=2.0,
+    dot.add_argument('--dot_size', '--dot-size', metavar='pt', type=float, default=2.0,
                 help='''Size of dots. Default is 2.0''')
-    dot.add_argument('--discrete_color', type=str, choices=CTHEME,
+    dot.add_argument('--discrete_color', '--discrete-color', type=str, choices=CTHEME,
                      help='''If specified, the third field of input will be treated as "factor" data.''')
     box = parser.add_argument_group('''Draw box plot. Allow one or more input fields and produce
     box plot for all fields in one graph. With --stratify option, box plot will be generated for field
@@ -982,33 +982,33 @@ def plotFieldsCommonArguments(parser):
     box.add_argument('--stratify', metavar='C', nargs='+', type=float,
                      help='''Cutoff values to stratify data in the input field for box plot.
                      When this option is on, only one input field is allowed.''')
-    box.add_argument('--outlier_size', metavar='pt', type=float, default=2.0,
+    box.add_argument('--outlier_size', '--outlier-size', metavar='pt', type=float, default=2.0,
                 help='''Size of outlier dots. Default is 2.0''')
     box.add_argument('--color', type=str, choices=CTHEME,
                      help='''Color theme for boxes.''')
-   
+
     # hist.add_argument('--title',
     #     help='''Title of the histogram. '$FIELD' in the title will be replaced
     #         by name of the field.''')
     # hist.add_argument('--group_by',
     #    help='''A field that will be used to group others. The histogram of this
     #        field will not be plotted.''')
-    
+
     # cust = parser.add_argument_group('Draw plot using user-specified script.')
-    # cust.add_argument('--script', nargs='+', metavar=('SCRIPT', 'OPT'), 
+    # cust.add_argument('--script', nargs='+', metavar=('SCRIPT', 'OPT'),
     #    help='''Path to a user-provided script, which
     #        will be called by 'Rscript $script $name' where $name is the data file
     #        generated by this command. Additional arguments of this script will be passed
     #        directly the script.''')
 
 
-    
+
 def plotFieldsArguments(parser):
     parser.add_argument('fields', nargs='+', help='A list of fields that will be outputted.')
     parser.add_argument('--variants', default='variant', metavar='TABLE',
         help='''Limit value of fields to variant in specified variant table. Default to all variants.''')
     plotFieldsCommonArguments(parser)
-    
+
 def plotFields(args):
     env.logger.info('Gathering data for plot')
     output = getoutput(['vtools', 'output', args.variants] + args.fields + ['--na', 'NA', '--header'])
@@ -1022,8 +1022,8 @@ def plotFields(args):
     if args.box is not None:
         rbox(output, args.fields, args.stratify, args.box,args.width, args.height,
              args.outlier_size, args.color, args.save_data, args.save_script)
-            
-        
+
+
 #
 # command plot_pheno_fields
 #
@@ -1032,7 +1032,7 @@ def plotPhenoFieldsArguments(parser):
     parser.add_argument('--samples', nargs='*',
         help='''Conditions based on which samples are selected. Default to all samples.''')
     plotFieldsCommonArguments(parser)
- 
+
 def plotPhenoFields(args):
     env.logger.info('Gathering data for plot')
     sarg = (['--samples'] + [convertDoubleQuote(x) for x in args.samples]) if args.samples else []
@@ -1059,11 +1059,11 @@ def plotGenoFieldsArguments(parser):
     parser.add_argument('--samples', nargs='*',
         help='''Conditions based on which samples are selected. Default to all samples.''')
     parser.add_argument('--genotypes', nargs='*',
-        help='''Conditions based on which genotypes are selected. Default to all variants.''') 
+        help='''Conditions based on which genotypes are selected. Default to all variants.''')
     plotFieldsCommonArguments(parser)
-    
+
 def plotGenoFields(args):
-    output = {x:[] for x in args.fields} 
+    output = {x:[] for x in args.fields}
     if not args.genotypes and not args.variants:
         where_clause = ''
     else:
@@ -1126,10 +1126,10 @@ class PlotAssociationOpt:
                 help='''Choose a shape theme
                 (integer 1 to 16) for dots on QQ plot.
                 Default set to 1.''')
-        parser.add_argument('--fixed_shape',
+        parser.add_argument('--fixed_shape', '--fixed-shape',
                             action='store_true',
                 help='''Use the same dot-shape theme for all plots''')
-        parser.add_argument('--no_slope',
+        parser.add_argument('--no_slope', '--no-slope',
                             action='store_true',
                 help='''Do not plot the diagonal line''')
 
@@ -1139,12 +1139,12 @@ class PlotAssociationOpt:
                 nargs = '+',
                 default=list(map(str, list(range(1,23)))) + ['X','Y','Un'],
                 help='''Specify the particular chromosome(s) to display. Can be
-                one or multiple in this list: "{}". Slicing syntax "?:?" is 
-                supported. For example "1:22" is equivalent to displaying 
-                all autosomes; "1:Y" is equivalent to displaying 
-                all mapped chromosomes. Default set to all including unmapped 
+                one or multiple in this list: "{}". Slicing syntax "?:?" is
+                supported. For example "1:22" is equivalent to displaying
+                all autosomes; "1:Y" is equivalent to displaying
+                all mapped chromosomes. Default set to all including unmapped
                 chromosomes.'''.format(' '.join(list(map(str, list(range(1,23)))) + ['X','Y','Un', '?:?'])))
-        parser.add_argument('--chrom_prefix',
+        parser.add_argument('--chrom_prefix', '--chrom-prefix',
                 metavar = 'PREFIX',
                 type = str,
                 default = 'chr',
@@ -1152,11 +1152,11 @@ class PlotAssociationOpt:
                 Default is set to "chr" (X-axis will be displayed
                 as "chr1", "chr2", etc). Use "None" for no prefix.
                 ''')
-        parser.add_argument('--gene_map',
+        parser.add_argument('--gene_map', '--gene-map',
                 metavar = 'FILE',
                 type = str,
-                help='''If the plot units are genes and the program fails to map certain genes to 
-                chromosomes, you can fix it by providing a text file of genomic coordinate 
+                help='''If the plot units are genes and the program fails to map certain genes to
+                chromosomes, you can fix it by providing a text file of genomic coordinate
                 information of these genes. Each gene in the file is a line of 3 columns
                 specifying "GENENAME CHROM MIDPOINT_POSITION", e.g., "IKBKB 8 42128820".
                 ''')
@@ -1176,17 +1176,17 @@ class PlotAssociationOpt:
                             help='''Choose a color theme from the list above to apply
                 to the plot. (via the 'RColorBrewer' package:
                 cran.r-project.org/web/packages/RColorBrewer)''')
-        settings.add_argument('--width_height',
+        settings.add_argument('--width_height', '--width-height',
                 metavar = 'INCHES',
                 nargs = 2,
                 help='''The width and height of the graphics region in inches''')
-        settings.add_argument('-s', '--same_page',
+        settings.add_argument('-s', '--same_page', '--same-page',
                             action='store_true',
                             help='''Plot multiple groups of p-values on the same graph''')
         settings.add_argument('-o', '--output',
                 metavar = 'FILE',
                 type = str,
-                help='''Specify output graph filename. 
+                help='''Specify output graph filename.
                 Output is in pdf format. It can be converted to jpg format
                 via the 'convert' command in Linux (e.g., convert -density 180 p.pdf p.jpg)''')
         labelling = parser.add_argument_group('variants/genes highlighting')
@@ -1200,20 +1200,20 @@ class PlotAssociationOpt:
                 type=float,
                 help='''Additional horizontal line(s) to
                 be drawn on the Y-axis.''')
-        labelling.add_argument('--label_top',
+        labelling.add_argument('--label_top', '--label-top',
                 metavar='INTEGER',
                             type=int,
                 default=1,
                 help='''Specify how many top hits (smallest p-values by rank)
                 you want to highlight with their identifiers in text.''')
-        labelling.add_argument('--label_these',
+        labelling.add_argument('--label_these', '--label-these',
                 metavar='NAME',
                             type=str,
                 nargs = '+',
-                help='''Specify the names of variants (chr:pos, e.g., 1:87463) 
+                help='''Specify the names of variants (chr:pos, e.g., 1:87463)
                 or genes (genename, e.g., IKBKB) you want to
                 highlight with their identifiers in text.''')
-        labelling.add_argument('-f','--font_size',
+        labelling.add_argument('-f', '--font_size', '--font-size',
                 metavar='SIZE',
                             type=float,
                 default=2.5,
@@ -1257,7 +1257,7 @@ def metaAnalysisArguments(parser):
                         default = "ssb",
                         choices = ['ssb','ivb'],
                         help='''Method (choose from "ssb" for sample based method and "ivb" for inverse variance based method), default set to "ssb"''')
-    parser.add_argument('--to_db',
+    parser.add_argument('--to_db', '--to-db',
             metavar = 'database',
             type = str,
             help='''will write the results also to a sqlite3 database compatible
@@ -1276,7 +1276,7 @@ def metaAnalysis(args):
             raise ValueError('Invalid column specification for "--beta/--pval/-n/--link": '
                                  'should be positive integers')
     se = None if args.se is 0 else args.se - 1
-    ma = MetaAnalysis(fs, beta, pval, se, size, linker, args.method) 
+    ma = MetaAnalysis(fs, beta, pval, se, size, linker, args.method)
     # calculate p_meta and print results
     print(('\t'.join(ma.header)))
     if args.to_db:
@@ -1284,7 +1284,7 @@ def metaAnalysis(args):
     res = []
     for grp in ma.groups:
         b, p = ma.calculate(grp)
-        s = ma.sample_size[grp] 
+        s = ma.sample_size[grp]
         if p > 0:
             print(('\t'.join(list(grp) + [str(b), '{:.3E}'.format(p).replace('E+00', ''), str(s)] + ['\t'.join([str(x) for x in d[1][grp] if x is not None]) for d in ma.data])))
         if args.to_db:
@@ -1300,14 +1300,14 @@ def metaAnalysis(args):
         # sys.stderr.write("Tuning database ...\n")
         ma.done()
         # sys.stderr.write("Done!\n")
-   
+
 
 def main():
     master_parser = argparse.ArgumentParser(description='''A collection of functions that
         analyze data using vtools and generate various reports''',
         prog='vtools_report',
         #formatter_class=argparse.RawDescriptionHelpFormatter,
-        fromfile_prefix_chars='@',  
+        fromfile_prefix_chars='@',
         epilog='''Use 'vtools_report cmd -h' for details about each command.
         Please contact Bo Peng (bpeng at mdanderson.org) if you have any question.''')
     master_parser.add_argument('--version', action='version', version='%(prog)s 1.0')
@@ -1330,7 +1330,7 @@ def main():
     parser = subparsers.add_parser('avg_depth',
         help='Average depth for each variant, can be divided by sample variant count',
         description='''Command 'vtools update table --from_stat "meanDP=avg(DP_geno)"' calculates the average
-            depth of variants across sample (e.g. average depth of three variants if the 
+            depth of variants across sample (e.g. average depth of three variants if the
             variant appears three times in the sample). This command report average depth
             of all variants, or variants divided by sample allele count (output count,
             number of variant, and average depth for count from 1 to 2*#sample). This
@@ -1345,7 +1345,7 @@ def main():
     parser = subparsers.add_parser('variant_stat',
         help='''Reports number of snps, insertions, deletions and substitutions for
             groups of samples with some size metrics to characterize the indels''',
-        description='''Command 'vtools variant_stat' calculates the number of 
+        description='''Command 'vtools variant_stat' calculates the number of
             snps, insertions, deletions and substitutions for groups of samples
             with some size metrics to characterize the indels. The statistics can
             be calculated for all samples (effectively for the master variant table
@@ -1394,7 +1394,7 @@ def main():
     #
     # command sequence
     parser = subparsers.add_parser('sequence',
-        help = '''Obtain DNA or protein sequence in specified chromosomal region. This command by default 
+        help = '''Obtain DNA or protein sequence in specified chromosomal region. This command by default
             outputs nucleotide sequence at the reference genome.''')
     sequenceArguments(parser)
     addCommonArgs(parser)

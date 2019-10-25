@@ -4710,7 +4710,8 @@ def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
                                          'samples', 'phenotypes', 'genotypes', 'fields', 'annotations',
                                          'annotation', 'track', 'formats', 'format', 'tests', 'test',
-                                         'runtime_options', 'runtime_option', 'snapshot', 'snapshots'],
+                                         'runtime_options', 'runtime_option', 'snapshot', 'snapshots',
+                                         'pipeline', 'pipelines', 'simulations', 'simulation'],
                         nargs='?', default='project',
                         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
@@ -4731,8 +4732,11 @@ def showArguments(parser):
             option OPT, 'snapshot' for a particular snapshot by name or
             filename, 'snapshots' for a list of publicly available snapshots,
             and snapshots of the current project saved by command
-            'vtools admin --save_snapshots'. The default parameter of
-            this command is 'project'.''')
+            'vtools admin --save_snapshots'. 'pipeline PIPELINE'
+            for details of a particular align and variant calling pipeline,
+            'pipelines' for a list of available pipelines, 'simulation MODEL' for
+            details of a simulation model, 'simulations' for a list of simulation
+            models, The default parameter of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
                         help='''Items to display, which can be, for example, name of table for
             type 'table', conditions to select samples for type 'samples',
@@ -5193,6 +5197,68 @@ def show(args):
                 nAll = nLocal + idx
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print((omitted.format(nAll - args.limit)))
+            elif args.type == 'simulations':
+                # it is very bad idea to use circular import, but I have no choice
+                if args.items:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show simulations"'.format(', '.join(args.items)))
+                res = ResourceManager()
+                res.getRemoteManifest()
+                res.selectFiles(resource_type='simulation')
+                nAll = len(res.manifest)
+                for idx, (simulation, prop) in enumerate(sorted(res.manifest.items())):
+                    if args.limit is not None and idx >= args.limit:
+                        break
+                    if simulation.endswith('.py'):
+                        continue
+                    if args.verbosity == '0':
+                        print(simulation[11:-9])
+                    else:
+                        text = '{:<23} {}'.format(simulation[11:-9], prop[3])
+                        print('\n'.join(textwrap.wrap(text, width=textWidth,
+                            subsequent_indent=' '*24)))
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
+                    print (omitted.format(nAll - args.limit))
+            elif args.type == 'simulation':
+                if len(args.items) == 0:
+                    raise ValueError('Please specify the name of a simulation model')
+                if len(args.items) > 1:
+                    raise ValueError('Please specify only one simulation model')
+                try:
+                    pipeline = PipelineDescription(args.items[0], pipeline_type='simulation')
+                except Exception as e:
+                    raise IndexError('Unrecognized simulation model {}: {}'
+                        .format(args.items[0], e))
+                pipeline.describe()
+            elif args.type == 'pipelines':
+                if args.items:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show pipelines"'
+                        .format(', '.join(args.items)))
+                res = ResourceManager()
+                res.getRemoteManifest()
+                res.selectFiles(resource_type='pipeline')
+                nAll = len(res.manifest)
+                for idx, (pipeline, prop) in enumerate(sorted(res.manifest.items())):
+                    if args.limit is not None and idx >= args.limit:
+                        break
+                    if args.verbosity == '0':
+                        print(pipeline[9:-9])
+                    else:
+                        text = '{:<23} {}'.format(pipeline[9:-9], prop[3])
+                        print('\n'.join(textwrap.wrap(text, width=textWidth,
+                            subsequent_indent=' '*24)))
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
+                    print (omitted.format(nAll - args.limit))
+            elif args.type == 'pipeline':
+                if not args.items:
+                    raise ValueError('Please specify a pipeline to display')
+                elif len(args.items) > 1:
+                    raise ValueError('Please specify only one pipeline to display')
+                try:
+                    pipeline = PipelineDescription(args.items[0])
+                except Exception as e:
+                    raise IndexError('Unrecognized pipeline {}: {}'
+                        .format(args.items[0], e))
+                pipeline.describe()
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
@@ -5200,7 +5266,7 @@ def show(args):
 
 def adminArguments(parser):
     resource = parser.add_argument_group('Download or update resources')
-    resource.add_argument('--update_resource', nargs='?', metavar='TYPE',
+    resource.add_argument('--update_resource', '--update-resource', nargs='?', metavar='TYPE',
                           const='current',
                           choices=['current', 'all', 'existing', 'hg18', 'hg19', 'hg38', 'mm10', 'annotation',
                                    'format', 'snapshot', 'pipeline'],
@@ -5214,35 +5280,35 @@ def adminArguments(parser):
             runtime option $local_resource) are ignored. Note that option
             'all' will download all versions of annotation databases which
             can be slow and take a lot of disk spaces. ''')
-    resource.add_argument('--mirror_repository', metavar='dest',
+    resource.add_argument('--mirror_repository', '--mirror-repository', metavar='dest',
                           help='''Mirror the main variant tools repository to a local directory. This
             command will check files under dest, download all missing or outdated
             files. Existing files that do not belong to the repository will not
             be removed.''')
     merge = parser.add_argument_group('Merge samples')
-    merge.add_argument('--merge_samples', action='store_true',
+    merge.add_argument('--merge_samples', '--merge-samples', action='store_true',
                        help='''Merge samples with the same sample names by combining genotypes
         belonging to these samples. Phenotypes related to individual samples will
         be merged.''')
     rename_samples = parser.add_argument_group('Rename samples')
-    rename_samples.add_argument('--rename_samples', nargs='+', metavar='COND',
+    rename_samples.add_argument('--rename_samples', '--rename-samples', nargs='+', metavar='COND',
                                 help='''This argument takes a condition by which samples are selected,
             followed by either a new sample name (assign a new name to selected
             samples) or an OLDNAME NEWNAME pair of patterns for which the first
             instance of OLDNAME in sample names will be replaced by NEWNAME.''')
     rename_table = parser.add_argument_group('Rename/describe tables')
-    rename_table.add_argument('--rename_table', nargs=2, metavar=('NAME', 'NEW_NAME'),
+    rename_table.add_argument('--rename_table', '--rename-table', nargs=2, metavar=('NAME', 'NEW_NAME'),
                               help='''Change table NAME to a NEW_NAME.''')
-    rename_table.add_argument('--describe_table', nargs=2, metavar=('TABLE', 'NEW_DESCRIPTION'),
+    rename_table.add_argument('--describe_table', '--describe-table', nargs=2, metavar=('TABLE', 'NEW_DESCRIPTION'),
                               help='''Update description for TABLE with a NEW_DESCRIPTION.''')
     validate = parser.add_argument_group('Validate reference genome')
-    validate.add_argument('--validate_build', action='store_true',
+    validate.add_argument('--validate_build', '--validate-build', action='store_true',
                           help='''Validate the build of project\'s reference genome by checking if
             the reference alleles of variants agree with the reference genome
             sequence. A reference genome will be automatically downloaded if it
             does not exist in the local resource directory.''')
     validate = parser.add_argument_group('Validate reported sex')
-    validate.add_argument('--validate_sex', nargs='?', const='report',
+    validate.add_argument('--validate_sex', '--validate-sex', nargs='?', const='report',
                           choices=['report', 'force-heterozygote'],
                           help='''Validate the sex of samples by checking the genotypes of samples
             on sex chromosomes (excluding pseudo-autosomal regions). Sex of
@@ -5253,39 +5319,39 @@ def adminArguments(parser):
             inconsistent genotype or sex), but can also be
             'force-heterozygote' for male individuals on chromosome X.''')
     snapshots = parser.add_argument_group('Save and load snapshots')
-    snapshots.add_argument('--save_snapshot', nargs=2, metavar=('NAME', 'MESSAGE'),
+    snapshots.add_argument('--save_snapshot', '--save-snapeshot', nargs=2, metavar=('NAME', 'MESSAGE'),
                            help='''Create a snapshot of the current project with NAME, which could be
             re-loaded using command 'vtools admin --load_snapshot'. A filename with
             extension .tar, .tgz or .tar.gz can be used to save the snapshot to a specific
             directory with compression but such snapshots are not listed by command
             'vtools show snapshots'. ''')
-    snapshots.add_argument('--extra_files', nargs='*', metavar='FILE',
+    snapshots.add_argument('--extra_files', '--extra-files', nargs='*', metavar='FILE',
                            help='''Additional files that will be saved along with the project and genotype
             databases. This could include customized format files, project-specific
             annotations, and results. Files outside of the current project directory
             are not allowed due to security considerations.''')
-    snapshots.add_argument('--load_snapshot', metavar='NAME',
+    snapshots.add_argument('--load_snapshot', '--load-snapshot', metavar='NAME',
                            help='''Revert the current project to specified snapshot. All changes since
         the that snapshot will be lost. The NAME should be one of the project snapshots
         or online snapshots listed by command 'vtools show snapshots', or name of a
         local snapshot file (with extension .tar, .tgz or .tar.gz).''')
     options = parser.add_argument_group(
         'Set values for some various internal options.')
-    options.add_argument('--set_runtime_option', nargs='+', metavar='OPTION',
+    options.add_argument('--set_runtime_option', '--set-runtime-option', nargs='+', metavar='OPTION',
                          help='''Set value to internal options such as the batch size for database
         options. The default values of these options were chosen to fit most usage
         patterns but tweaking them might provide better performance under certain
         circumstances. Please use command "vtools show runtime_options" to list
         all currently supported runtime options.''')
-    options.add_argument('--reset_runtime_option', metavar='OPT',
+    options.add_argument('--reset_runtime_option', '--reset-runtime-option', metavar='OPT',
                          help='''Reset value to a runtime option to its default value.''')
     options.add_argument('-g', '--global', action='store_true',
                          help='''Save option to user_options.py so that it will be automatically
         set for all user projects.''')
     utils = parser.add_argument_group('Misc utilities')
-    utils.add_argument('--record_exe_info', nargs='+', metavar='EXE_INFO',
+    utils.add_argument('--record_exe_info', '--record-exe-info', nargs='+', metavar='EXE_INFO',
                        help=argparse.SUPPRESS)
-    utils.add_argument('--partial_md5', nargs='+', metavar='FILES',
+    utils.add_argument('--partial_md5', '--partial-md5', nargs='+', metavar='FILES',
                        help=argparse.SUPPRESS)
     utils.add_argument('--fasta2crr', nargs='+', metavar='FASTA',
                        help='''Convert fasta files to a crr file (a binary format for faster
@@ -5449,7 +5515,7 @@ def admin(args):
         with Project(verbosity=args.verbosity) as proj:
             if args.rename_samples:
                 if len(args.rename_samples) not in [2, 3]:
-                    raise ValueError('Option --rename_samples accept either '
+                    raise ValueError('Option --rename-samples accept either '
                                      'a new name or a pair of oldname newname patterns.')
                 proj.renameSamples(args.rename_samples[0],
                                    args.rename_samples[1].strip(),

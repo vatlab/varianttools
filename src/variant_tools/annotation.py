@@ -477,7 +477,7 @@ def useArguments(parser):
                         help='''Use an annotation database ($source.DB or $source.DB.gz) if it is available,
             download or build the database if a description file ($source.ann) is available.
             Otherwise, this command will download a description file and the corresponding
-            database from web (c.f. runtime variable $search_path) and the latest version 
+            database from web (c.f. runtime variable $search_path) and the latest version
             of the datavase). If all means fail, this command will try to download the
             source of the annotation database (or use source files provided by option --files).''')
     grp = parser.add_argument_group('Basic link options')
@@ -485,18 +485,18 @@ def useArguments(parser):
                      help='''An alternative name for the linked database. This option allows
             the use of shorter field names (e.g. tg.chr instead of thousandGenomes.chr)
             and the use of multiple versions of the same database.''')
-    grp.add_argument('-l', '--linked_by', nargs='*', default=[], metavar='FIELD',
+    grp.add_argument('-l', '--linked_by', '--linked-by', nargs='*', default=[], metavar='FIELD',
                      help='''A list of fields that are used to link the annotation database to
             tables in the existing project. This parameter is required only for
             'field' type of annotation databases that link to fields of existing
             tables.''')
     grp = parser.add_argument_group('Advanced link options')
-    grp.add_argument('--anno_type', choices=['variant', 'position', 'range', 'field'],
+    grp.add_argument('--anno_type', '--anno-type', choices=['variant', 'position', 'range', 'field'],
                      help='''This option overrides type of an existing annotation database when it
             is attached to a project. It corresponds to key anno_type of the data sources
             section of an annotation file (with suffix .ann) but does not affect the .ann file
             or the database built from it.''')
-    grp.add_argument('--linked_fields', nargs='*',
+    grp.add_argument('--linked_fields', '--linked-fields', nargs='*',
                      help='''An alternative set of fields that are used to link the annotation database to
             the master variant table. It should have four, two, and three values for database
             of type variant, position, and range. Similar to anno_type, this option does not

@@ -1,5 +1,4 @@
 test/.snapshot.info
-src/zeromq-4.0.3/
 src/variant_tools/celery_main/
 src/variant_tools/io_vcf_read.c
 src/variant_tools.egg-info/
@@ -19,10 +18,8 @@ test/ceu/
 test/sam1/
 build
 dist
-boost_*
 cgatools
 sqlite
-gsl
 libplinkio
 ucsc
 *.swp

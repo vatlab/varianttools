@@ -197,7 +197,7 @@ class CaseCtrlBurdenTest(NullTest):
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
         parser.add_argument('--midp', action='store_true',
-            help='''This option, if evoked, will use mid-p value correction for one-sided Fisher's exact test. 
+            help='''This option, if evoked, will use mid-p value correction for one-sided Fisher's exact test.
             It is only applicable to one sided test of CMC and VT_Fisher.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
@@ -437,19 +437,19 @@ class GLMBurdenTest(NullTest):
         parser.add_argument('-q2', '--maflower', type=freq, default=0.0,
             help='''Minor allele frequency lower limit. All variants having sample MAF>m2
             will be included in analysis. Default set to 0.0''')
-        parser.add_argument('--trait_type', type=str, choices = ['quantitative','disease'], default='quantitative',
+        parser.add_argument('--trait_type', '--trait-type', type=str, choices = ['quantitative','disease'], default='quantitative',
             help='''Phenotype is quantitative trait or disease trait (0/1 coding).
             Default set to quantitative''')
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
-        parser.add_argument('--use_indicator', action='store_true',
+        parser.add_argument('--use_indicator', '--use-indicator', action='store_true',
             help='''This option, if evoked, will apply binary coding to genotype groups
             (coding will be "1" if ANY locus in the group has the alternative allele, "0" otherwise)''')
         # permutations arguments
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
             help='''Number of permutations''')
-        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+        parser.add_argument('--permute_by', '--permute-by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
             help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
@@ -457,9 +457,9 @@ class GLMBurdenTest(NullTest):
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
-        parser.add_argument('--variable_thresholds', action='store_true',
+        parser.add_argument('--variable_thresholds', '--variable-thresholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in burden test on aggregated variant loci''')
-        parser.add_argument('--extern_weight', nargs='*', default=[],
+        parser.add_argument('--extern_weight', '--extern-weight', nargs='*', default=[],
             help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
             or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequencially.
             Note that all weights will be masked if --use_indicator is evoked.
@@ -472,7 +472,7 @@ class GLMBurdenTest(NullTest):
                For details of the weighting themes, please refer to the online documentation.
             ''')
 
-        parser.add_argument('--NA_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', '--NA-adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.
             ''')
@@ -747,14 +747,14 @@ class VTtest(CaseCtrlBurdenTest):
             raise ValueError("Please specify number of permutations for VTtest method")
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Variable thresholds test for disease traits, Price et al 2010. 
+        parser = argparse.ArgumentParser(description='''Variable thresholds test for disease traits, Price et al 2010.
         The burden test statistic of a group of variants will be
         maximized over subsets of variants defined by applying different minor allele
-        frequency thresholds. This implementation provides two different statistics: 
-        the original VT statistics in Price et al 2010 (default) and an adaptive VT 
-        statistic combining the CFisher method (via "--cfisher" option). p-value is estimated by permutation test. 
-        The adaptive VT statistic will not generate uniformly distributed p-value. 
-        For a more generalized version of VT test, type "vtools show test VariableThresholdsBt / 
+        frequency thresholds. This implementation provides two different statistics:
+        the original VT statistics in Price et al 2010 (default) and an adaptive VT
+        statistic combining the CFisher method (via "--cfisher" option). p-value is estimated by permutation test.
+        The adaptive VT statistic will not generate uniformly distributed p-value.
+        For a more generalized version of VT test, type "vtools show test VariableThresholdsBt /
         VariableThresholdsQt". ''',
             prog='vtools associate --method ' + self.__class__.__name__)
         parser.add_argument('--name', default='VTtest',
@@ -768,7 +768,7 @@ class VTtest(CaseCtrlBurdenTest):
             will be included in analysis. Default set to 0.0''')
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2"). Two sided test is only
-                valid with "--cfisher" option evoked (please use "VariableThresholdsBt" otherwise). 
+                valid with "--cfisher" option evoked (please use "VariableThresholdsBt" otherwise).
                 Default set to 1''')
         # permutations arguments
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
@@ -783,7 +783,7 @@ class VTtest(CaseCtrlBurdenTest):
             help='''This option, if evoked, will use an adaptive VT test via Fisher's exact statistic.
             For more details, please refer to the online documentation.''')
         parser.add_argument('--midp', action='store_true',
-            help='''This option, if evoked, will use mid-p value correction for one-sided Fisher's exact test. 
+            help='''This option, if evoked, will use mid-p value correction for one-sided Fisher's exact test.
             It is only applicatable to one sided test with "--cfisher" option.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
             default='additive',
@@ -809,9 +809,9 @@ class KBAC(CaseCtrlBurdenTest):
             raise ValueError("Please specify number of permutations for KBAC method")
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Kernel Based Adaptive Clustering method, Liu & Leal 2010. 
-            Genotype pattern frequencies, weighted by a hypergeometric density kernel function, is compared 
-            for differences between cases and controls. p-value is calculated using permutation for consistent 
+        parser = argparse.ArgumentParser(description='''Kernel Based Adaptive Clustering method, Liu & Leal 2010.
+            Genotype pattern frequencies, weighted by a hypergeometric density kernel function, is compared
+            for differences between cases and controls. p-value is calculated using permutation for consistent
             estimate with different sample sizes (the approximation method of the original publication is not implemented).
             Two-sided KBAC test is implemented by calculating a second statistic with case/ctrl label swapped, and
             the larger of the two statistic is used as two-sided test statistic''',
@@ -859,10 +859,10 @@ class RBT(CaseCtrlBurdenTest):
             raise ValueError("Please specify number of permutations for RBT method")
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Replication Based Test for protective and deleterious variants, 
-            Ionita-Laza et al 2011. Variant sites are scored based on -log transformation of probability of having 
+        parser = argparse.ArgumentParser(description='''Replication Based Test for protective and deleterious variants,
+            Ionita-Laza et al 2011. Variant sites are scored based on -log transformation of probability of having
             more than observed variants in cases/ctrls; the RBT statistic is defined as sum of the variant sites scores.
-            One-sided RBT is implemented in addition to the two-sided statistic described in the RBT paper. 
+            One-sided RBT is implemented in addition to the two-sided statistic described in the RBT paper.
             p-value is estimated via permutation test.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         parser.add_argument('--name', default='RBT',
@@ -909,10 +909,10 @@ class aSum(CaseCtrlBurdenTest):
             raise ValueError("Please specify number of permutations for aSum method")
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''Adaptive Sum score test for protective and deleterious variants, 
-            Han & Pan 2010. In the first stage of the test, each variant site are evaluated for excess of minor alleles 
-            in controls and genotype codings are flipped, and the second stage performs a burden test similar to BRV 
-            (Morris & Zeggini 2009). This two-stage test is robust to a mixture of protective/risk variants 
+        parser = argparse.ArgumentParser(description='''Adaptive Sum score test for protective and deleterious variants,
+            Han & Pan 2010. In the first stage of the test, each variant site are evaluated for excess of minor alleles
+            in controls and genotype codings are flipped, and the second stage performs a burden test similar to BRV
+            (Morris & Zeggini 2009). This two-stage test is robust to a mixture of protective/risk variants
             within one gene, yet is computationally intensive. aSum test is a two-tailed test.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         parser.add_argument('--name', default='aSum',
@@ -950,11 +950,11 @@ class Calpha(CaseCtrlBurdenTest):
         CaseCtrlBurdenTest.__init__(self, ncovariates, *method_args)
 
     def parseArgs(self, method_args):
-        parser = argparse.ArgumentParser(description='''c-alpha test for unusual distribution of variants between 
-            cases and controls, Neale et al 2011. It tests for deviation of variance of minor allele counts in 
-            cases/ctrls from its exception based on binomial distribution. The statistic is asymptotically normally 
-            distributed. p-value can be evaluated using either permutation or asymptotic distribution as described 
-            in Neale et al 2011, although it is recommended to use permutation to estimate a reliable p-value. 
+        parser = argparse.ArgumentParser(description='''c-alpha test for unusual distribution of variants between
+            cases and controls, Neale et al 2011. It tests for deviation of variance of minor allele counts in
+            cases/ctrls from its exception based on binomial distribution. The statistic is asymptotically normally
+            distributed. p-value can be evaluated using either permutation or asymptotic distribution as described
+            in Neale et al 2011, although it is recommended to use permutation to estimate a reliable p-value.
             Calpha test is a two-tailed test''',
             prog='vtools associate --method ' + self.__class__.__name__)
         parser.add_argument('--name', default='Calpha',
@@ -1001,8 +1001,8 @@ class RareCover(CaseCtrlBurdenTest):
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''A "covering" method for detecting rare variants association,
             Bhatia et al 2010. The algorithm combines a disparate collection of rare variants and maximize the association
-            signal over the collection using a heuristic adaptive approach, which can be computationally intensive. 
-            Different from VT method, it does not require rare variants evaluated being adjacent in minor allele 
+            signal over the collection using a heuristic adaptive approach, which can be computationally intensive.
+            Different from VT method, it does not require rare variants evaluated being adjacent in minor allele
             frequency ranking. RareCover test is a two-tailed test.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         parser.add_argument('--name', default='RareCover',
@@ -1063,13 +1063,13 @@ class LinRegBurden(GLMBurdenTest):
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
-        parser.add_argument('--use_indicator', action='store_true',
+        parser.add_argument('--use_indicator', '--use-indicator', action='store_true',
             help='''This option, if evoked, will apply binary coding to genotype groups
             (coding will be "1" if ANY locus in the group has the alternative allele, "0" otherwise)''')
         # permutations arguments
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
             help='''Number of permutations''')
-        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+        parser.add_argument('--permute_by', '--permute-by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
             help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
@@ -1077,9 +1077,9 @@ class LinRegBurden(GLMBurdenTest):
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
-        parser.add_argument('--variable_thresholds', action='store_true',
+        parser.add_argument('--variable_thresholds', '--variable-threholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in burden test on aggregated variant loci''')
-        parser.add_argument('--extern_weight', nargs='*', default=[],
+        parser.add_argument('--extern_weight', '--extern-weight', nargs='*', default=[],
             help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
             or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequentially.
             Note that all weights will be masked if --use_indicator is evoked.
@@ -1090,7 +1090,7 @@ class LinRegBurden(GLMBurdenTest):
                'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')
-        parser.add_argument('--NA_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', '--NA-adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
@@ -1127,7 +1127,7 @@ class CollapseQt(GLMBurdenTest):
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
-        parser.add_argument('--NA_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', '--NA-adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
@@ -1169,7 +1169,7 @@ class BurdenQt(GLMBurdenTest):
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
-        parser.add_argument('--NA_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', '--NA-adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
@@ -1217,7 +1217,7 @@ class WeightedBurdenQt(GLMBurdenTest):
       # permutations arguments
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
             help='''Number of permutations''')
-        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+        parser.add_argument('--permute_by', '--permute-by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
             help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
@@ -1225,7 +1225,7 @@ class WeightedBurdenQt(GLMBurdenTest):
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
-        parser.add_argument('--extern_weight', nargs='*', default=[],
+        parser.add_argument('--extern_weight', '--extern-weight', nargs='*', default=[],
             help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
             or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequentially.
             Note that all weights will be masked if --use_indicator is evoked.
@@ -1236,7 +1236,7 @@ class WeightedBurdenQt(GLMBurdenTest):
                'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')
-        parser.add_argument('--NA_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', '--NA-adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
@@ -1281,7 +1281,7 @@ class VariableThresholdsQt(GLMBurdenTest):
         # permutations arguments
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
             help='''Number of permutations''')
-        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+        parser.add_argument('--permute_by', '--permute-by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
             help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
@@ -1289,7 +1289,7 @@ class VariableThresholdsQt(GLMBurdenTest):
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
-        parser.add_argument('--NA_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', '--NA-adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
@@ -1334,13 +1334,13 @@ class LogitRegBurden(GLMBurdenTest):
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
-        parser.add_argument('--use_indicator', action='store_true',
+        parser.add_argument('--use_indicator', '--use-indicator', action='store_true',
             help='''This option, if evoked, will apply binary coding to genotype groups
             (coding will be "1" if ANY locus in the group has the alternative allele, "0" otherwise)''')
         # permutations arguments
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
             help='''Number of permutations''')
-        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+        parser.add_argument('--permute_by', '--permute-by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
             help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
@@ -1348,9 +1348,9 @@ class LogitRegBurden(GLMBurdenTest):
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
-        parser.add_argument('--variable_thresholds', action='store_true',
+        parser.add_argument('--variable_thresholds', '--variable-thresholds', action='store_true',
             help='''This option, if evoked, will apply variable thresholds method to the permutation routine in burden test on aggregated variant loci''')
-        parser.add_argument('--extern_weight', nargs='*', default=[],
+        parser.add_argument('--extern_weight', '--extern-weight', nargs='*', default=[],
             help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
             or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequentially.
             Note that all weights will be masked if --use_indicator is evoked.
@@ -1361,7 +1361,7 @@ class LogitRegBurden(GLMBurdenTest):
                'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')
-        parser.add_argument('--NA_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', '--NA-adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
@@ -1399,7 +1399,7 @@ class CollapseBt(GLMBurdenTest):
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
-        parser.add_argument('--NA_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', '--NA-adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
@@ -1442,7 +1442,7 @@ class BurdenBt(GLMBurdenTest):
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
-        parser.add_argument('--NA_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', '--NA-adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
@@ -1470,8 +1470,8 @@ class WeightedBurdenBt(GLMBurdenTest):
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''Weighted genotype burden tests for disease traits,
-        using one or many arbitrary external weights as well as one of 4 internal weighting themes. 
-        External weights (variant/genotype annotation field) are passed into the test by --var_info and --geno_info options. 
+        using one or many arbitrary external weights as well as one of 4 internal weighting themes.
+        External weights (variant/genotype annotation field) are passed into the test by --var_info and --geno_info options.
         Internal weighting themes are one of "Browning_all", "Browning", "KBAC" or "RBT". p-value is based on logistic regression analysis
         and permutation procedure has to be used for "Browning", "KBAC" or "RBT" weights.''',
             prog='vtools associate --method ' + self.__class__.__name__)
@@ -1489,7 +1489,7 @@ class WeightedBurdenBt(GLMBurdenTest):
       # permutations arguments
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
             help='''Number of permutations''')
-        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+        parser.add_argument('--permute_by', '--permute-by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
             help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
@@ -1497,7 +1497,7 @@ class WeightedBurdenBt(GLMBurdenTest):
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
-        parser.add_argument('--extern_weight', nargs='*', default=[],
+        parser.add_argument('--extern_weight', '--extern-weight', nargs='*', default=[],
             help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info'
             or '--geno_info'. If multiple weights are specified, they will be applied to genotypes sequentially.
             Note that all weights will be masked if --use_indicator is evoked.
@@ -1508,7 +1508,7 @@ class WeightedBurdenBt(GLMBurdenTest):
                'Browning_all' weighting, tests using all other weighting themes has to calculate p-value via permutation.
                For details of the weighting themes, please refer to the online documentation.
             ''')
-        parser.add_argument('--NA_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', '--NA-adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
@@ -1554,7 +1554,7 @@ class VariableThresholdsBt(GLMBurdenTest):
         # permutations arguments
         parser.add_argument('-p', '--permutations', metavar='N', type=int, default=0,
             help='''Number of permutations''')
-        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+        parser.add_argument('--permute_by', '--permute-by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
             help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
@@ -1562,7 +1562,7 @@ class VariableThresholdsBt(GLMBurdenTest):
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
-        parser.add_argument('--NA_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', '--NA-adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.''')
         parser.add_argument('--moi', type=str, choices = ['additive','dominant', 'recessive'],
@@ -1586,7 +1586,7 @@ class VATStacking(GLMBurdenTest):
     def __init__(self, ncovariates, *method_args):
         # NullTest.__init__ will call parseArgs to get the parameters we need
         NullTest.__init__(self, *method_args)
-        # set fields name for output database        
+        # set fields name for output database
         self.fields = [
             Field(name='sample_size', index=None, type='INT', adj=None, fmt=None, comment='sample size'),
             Field(name='num_variants', index=None, type='INT', adj=None, fmt=None, comment='number of variants in each group (adjusted for specified MAF upper/lower bounds)'),
@@ -1615,12 +1615,12 @@ class VATStacking(GLMBurdenTest):
             help='''Minor allele frequency lower limits. All variants having sample MAF>m2
             will be included in analysis. Number of arguments for this option should be the same
             as number of algorithms involved in VAT stacking.''')
-        parser.add_argument('--trait_type', required = True, type=str, choices = ['quantitative','disease'],
+        parser.add_argument('--trait_type', '--trait-type', required = True, type=str, choices = ['quantitative','disease'],
             help='''Phenotype is quantitative trait or disease trait (0/1 coding).''')
         parser.add_argument('--alternative', metavar='TAILED', type=int, choices = [1,2], default=1,
             help='''Alternative hypothesis is one-sided ("1") or two-sided ("2").
             Default set to 1''')
-        parser.add_argument('--use_indicator', type=str, choices = ["Y", "N"], nargs = "*",
+        parser.add_argument('--use_indicator', '--use-indicator', type=str, choices = ["Y", "N"], nargs = "*",
             help='''"Y" to this option will apply binary coding to genotype groups
             (coding will be "1" if ANY locus in the group has the alternative allele, "0" otherwise).
             Use "N" for original coding. Number of arguments for this option should be the same
@@ -1628,7 +1628,7 @@ class VATStacking(GLMBurdenTest):
         # permutations arguments
         parser.add_argument('-p', '--permutations', required = True, metavar='N', type=int,
             help='''Number of permutations, required for VAT stacking algorithm''')
-        parser.add_argument('--permute_by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
+        parser.add_argument('--permute_by', '--permute-by', metavar='XY', choices = ['X','Y','x','y'], default='Y',
             help='''Permute phenotypes ("Y") or genotypes ("X"). Default is "Y"''')
         parser.add_argument('--adaptive', metavar='C', type=freq, default=0.1,
             help='''Adaptive permutation using Edwin Wilson 95 percent confidence interval for binomial distribution.
@@ -1636,16 +1636,16 @@ class VATStacking(GLMBurdenTest):
             of p-value against "C", and quit permutations with the p-value if it is larger than "C". It is recommended to
             specify a "C" that is slightly larger than the significance level for the study.
             To disable the adaptive procedure, set C=1. Default is C=0.1''')
-        parser.add_argument('--variable_thresholds',  type=str, choices = ["Y", "N"], nargs = "*",
+        parser.add_argument('--variable_thresholds', '--variable-thresholds', type=str, choices = ["Y", "N"], nargs = "*",
             help='''"Y" for this option will apply variable thresholds method to the permutation routine in burden test on aggregated variant loci. Use "N" for fixed threshold. Number of arguments for this option should be the same as number of algorithms involved in VAT stacking.''')
-        parser.add_argument('--extern_weight', nargs='*', default=[],
+        parser.add_argument('--extern_weight', '--extern-weight', nargs='*', default=[],
             help='''External weights that will be directly applied to genotype coding. Names of these weights should be in one of '--var_info' or '--geno_info'. Number of arguments for this option should be the same as number of algorithms involved in VAT stacking. Note that all weights will be masked if --use_indicator is evoked.''')
         parser.add_argument('--weight', type=str, nargs="+", choices = ['Browning_all', 'Browning', 'KBAC', 'RBT'], default = ['None'],
             help='''Internal weighting themes inspired by various association methods. Valid choices are:
                'Browning_all', 'Browning', 'KBAC' and 'RBT'. For quantitative traits weights will be based on
                pseudo case/ctrl status defined by comparison with the mean of the quantitative traits.
                Number of arguments for this option should be the same as number of algorithms involved in VAT stacking.''')
-        parser.add_argument('--NA_adjust', action='store_true',
+        parser.add_argument('--NA_adjust', '--NA-adjust', action='store_true',
             help='''This option, if evoked, will replace missing genotype values with a score relative to sample allele frequencies. The association test will
             be adjusted to incorporate the information. This is an effective approach to control for type I error due to differential degrees of missing genotypes among samples.
             ''')
@@ -1694,11 +1694,11 @@ class VATStacking(GLMBurdenTest):
         algorithm = assoTests.StackingPermutator(a, [True if v == 'Y' else False for v in self.variable_thresholds],
                                          self.permute_by.upper(), n, self.adaptive)
         return algorithm
-         
+
 #
 # External tests
 # dumping data to disk, or run external standalone programs to process the data thus written
-# 
+#
 
 class ExternTest(NullTest):
     '''Base class for tests using external programs'''
@@ -1726,7 +1726,7 @@ class ExternTest(NullTest):
         self.pydata['phenotype'] = list(map(istr, self.pydata['phenotype']))
         if len(self.pydata['geno_info']) > 0:
                 self.pydata['geno_info'] = [[list(map(istr, j)) for j in x] for x in self.pydata['geno_info']]
-        if 'covariates' in self.pydata: 
+        if 'covariates' in self.pydata:
                 self.pydata['covariates'] = [list(map(istr, x)) for x in self.pydata['covariates']]
         # write
         with open(os.path.join(tdir, '{0}_geno.txt'.format(self.gname)), 'w') as f:
@@ -1751,7 +1751,7 @@ class ExternTest(NullTest):
                                     for idx in range(self.nvar)]))
         return 0
 
-    
+
 class GroupWrite(ExternTest):
     '''Write data to disk for each testing group'''
     def __init__(self, ncovariates, *method_args):
@@ -1868,7 +1868,7 @@ class ScoreSeq(ExternTest):
                 bundle = zipfile.ZipFile(SCORE_Seq_zip)
                 bundle.extractall(env.cache_dir)
                 SCORE_Seq_Exe = os.path.join(env.cache_dir, 'SCORE-Seq')
-                os.chmod(SCORE_Seq_Exe, stat.S_IXUSR | stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH) 
+                os.chmod(SCORE_Seq_Exe, stat.S_IXUSR | stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH)
             except Exception as e:
                 raise RuntimeError('Failed to download SCORE-Seq from {}. Please check the URL or manually download the program: {}'.format(SCORE_Seq_URL, e))
         return SCORE_Seq_Exe
@@ -1878,7 +1878,7 @@ class ScoreSeq(ExternTest):
         parser = argparse.ArgumentParser(description='''SCORE-Seq implements the methods of Lin & Tang 2011,
             conducting a number of association tests for each SNP-set (gene).
             This is a wrapper for the Linux based SCORE-Seq program implemented & maintained by Dr. Danyu Lin, with a similar
-            interface and descriptions documented in http://www.bios.unc.edu/~dlin/software/SCORE-Seq/. 
+            interface and descriptions documented in http://www.bios.unc.edu/~dlin/software/SCORE-Seq/.
             To use this test you should have the SCORE-Seq program on your computer; otherwise the program will be downloaded.
             The SCORE-Seq commands applied to the data will be recorded and saved in the project log file.''',
             prog='vtools associate --method ' + self.__class__.__name__)
@@ -1893,22 +1893,22 @@ class ScoreSeq(ExternTest):
         parser.add_argument('--CR', type=freq, default=0,
             help='''Specify the call rate lower bound, which is any number between 0 and 1. Default set to 0''')
         parser.add_argument('--resample', metavar='R', type=int,
-            help='''Turn on resampling and specify the maximum number of resamples. 
-            If R is set to -1, then the default of 1 million resamples is applied; 
-            otherwise, R should be an integer between 1 million and 100 millions. 
-            In the latter case, the software will perform resampling up to R times for any 
+            help='''Turn on resampling and specify the maximum number of resamples.
+            If R is set to -1, then the default of 1 million resamples is applied;
+            otherwise, R should be an integer between 1 million and 100 millions.
+            In the latter case, the software will perform resampling up to R times for any
             resampling test that has a p-value < 1e-4 after 1 million resamples.''')
         parser.add_argument('--EREC', type=int, choices = [1,2],
-            help='''Specify the constant delta for the EREC test. 1 for binary trait; 
-            2 for standardized continuous trait. 
+            help='''Specify the constant delta for the EREC test. 1 for binary trait;
+            2 for standardized continuous trait.
             This option is effective only when resampling is turned on.''')
-        parser.add_argument('--MAFL', type=freq, 
+        parser.add_argument('--MAFL', type=freq,
             help='''Specify the MAF lower bound, which is any number between 0 and 1.''')
         parser.add_argument('--dominant', action='store_true',
             help='''Use the dominant instead of the additive model.''')
         parser.add_argument('--archive', metavar='DIR', type=str,
-            help='''If this option is specified, a zip file will be created for each gene, 
-                which will archive the input/output file of the SCORE-Seq analysis and write to DIR, 
+            help='''If this option is specified, a zip file will be created for each gene,
+                which will archive the input/output file of the SCORE-Seq analysis and write to DIR,
                 at the expense of additional disk I/O burden and storage.''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -1990,9 +1990,9 @@ class SSeq_common(ScoreSeq):
 
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''
-            This is a wrapper for common variants analysis using the Linux based SCORE-Seq program 
-            implemented & maintained by Dr. Danyu Lin, with a similar interface and descriptions 
-            documented in http://www.bios.unc.edu/~dlin/software/SCORE-Seq/. 
+            This is a wrapper for common variants analysis using the Linux based SCORE-Seq program
+            implemented & maintained by Dr. Danyu Lin, with a similar interface and descriptions
+            documented in http://www.bios.unc.edu/~dlin/software/SCORE-Seq/.
             To use this test you should have the SCORE-Seq program on your computer; otherwise the program will be downloaded.
             The SCORE-Seq commands applied to the data will be recorded and saved in the project log file.''',
             prog='vtools associate --method ' + self.__class__.__name__)
@@ -2001,13 +2001,13 @@ class SSeq_common(ScoreSeq):
                 differentiate output of different tests, or the same test with different parameters.''')
         # ScoreSeq arguments
         parser.add_argument('--MAFL', type=freq, default=0.0,
-            help='''Specify the MAF lower bound, which is any number between 0 and 1. 
+            help='''Specify the MAF lower bound, which is any number between 0 and 1.
             Default set to 0.0''')
         parser.add_argument('--dominant', action='store_true',
             help='''Use the dominant instead of the additive model.''')
         parser.add_argument('--archive', metavar='DIR', type=str,
-            help='''If this option is specified, a zip file will be created for each gene, 
-                which will archive the input/output file of the SCORE-Seq analysis and write to DIR, 
+            help='''If this option is specified, a zip file will be created for each gene,
+                which will archive the input/output file of the SCORE-Seq analysis and write to DIR,
                 at the expense of additional disk I/O burden and storage.''')
         args = parser.parse_args(method_args)
         # incorporate args to this class
@@ -2029,7 +2029,7 @@ class SSeq_rare(ScoreSeq):
         parser = argparse.ArgumentParser(description='''SCORE-Seq implements the methods of Lin & Tang 2011,
             conducting a number of association tests for each SNP-set (gene).
             This is a wrapper for the Linux based SCORE-Seq program implemented & maintained by Dr. Danyu Lin, with a similar
-            interface and descriptions documented in http://www.bios.unc.edu/~dlin/software/SCORE-Seq/. 
+            interface and descriptions documented in http://www.bios.unc.edu/~dlin/software/SCORE-Seq/.
             To use this test you should have the SCORE-Seq program on your computer; otherwise the program will be downloaded.
             The SCORE-Seq commands applied to the data will be recorded and saved in the project log file.''',
             prog='vtools associate --method ' + self.__class__.__name__)
@@ -2044,20 +2044,20 @@ class SSeq_rare(ScoreSeq):
         parser.add_argument('--CR', type=freq, default=0,
             help='''Specify the call rate lower bound, which is any number between 0 and 1. Default set to 0''')
         parser.add_argument('--resample', metavar='R', type=int,
-            help='''Turn on resampling and specify the maximum number of resamples. 
-            If R is set to -1, then the default of 1 million resamples is applied; 
-            otherwise, R should be an integer between 1 million and 100 millions. 
-            In the latter case, the software will perform resampling up to R times for any 
+            help='''Turn on resampling and specify the maximum number of resamples.
+            If R is set to -1, then the default of 1 million resamples is applied;
+            otherwise, R should be an integer between 1 million and 100 millions.
+            In the latter case, the software will perform resampling up to R times for any
             resampling test that has a p-value < 1e-4 after 1 million resamples.''')
         parser.add_argument('--EREC', type=int, choices = [1,2],
-            help='''Specify the constant delta for the EREC test. 1 for binary trait; 
-            2 for standardized continuous trait. 
+            help='''Specify the constant delta for the EREC test. 1 for binary trait;
+            2 for standardized continuous trait.
             This option is effective only when resampling is turned on.''')
         parser.add_argument('--dominant', action='store_true',
             help='''Use the dominant instead of the additive model.''')
         parser.add_argument('--archive', metavar='DIR', type=str,
-            help='''If this option is specified, a zip file will be created for each gene, 
-                which will archive the input/output file of the SCORE-Seq analysis and write to DIR, 
+            help='''If this option is specified, a zip file will be created for each gene,
+                which will archive the input/output file of the SCORE-Seq analysis and write to DIR,
                 at the expense of additional disk I/O burden and storage.''')
         args = parser.parse_args(method_args)
         # incorporate args to this class

@@ -62,7 +62,7 @@ class EmbeddedTextReader:
         self.header = header
         self.quiet = quiet
 
-    def records(self): 
+    def records(self):
         first = True
         in_header = True
         line_no = 0
@@ -114,7 +114,7 @@ class ReaderWorker(Process):
     to process input line. If multiple works are started,
     they read lines while skipping lines (e.g. 1, 3, 5, 7, ...)
     '''
-    def __init__(self, processor, input, varIdx, getNew, output, step, index, 
+    def __init__(self, processor, input, varIdx, getNew, output, step, index,
         encoding, header, quiet=False):
         '''
         processor:  line processor
@@ -138,7 +138,7 @@ class ReaderWorker(Process):
         self.header = header
         self.quiet = quiet
 
-    def run(self): 
+    def run(self):
         first = True
         in_header = True
         num_records = 0
@@ -210,7 +210,7 @@ class StandaloneTextReader:
         self.worker.start()
         # the send value is columnRange
         self.columnRange = self.reader.recv()
-        
+
     def records(self):
         while True:
             val = self.reader.recv()
@@ -241,7 +241,7 @@ class MultiTextReader:
         # the send value is columnRange
         for reader in self.readers:
             self.columnRange = reader.recv()
-        
+
     def records(self):
         all_workers = len(self.readers)
         still_working = len(self.readers)

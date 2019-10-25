@@ -130,7 +130,7 @@ class Updater:
             self.processor = LineProcessor(fmt.fields, [(RefGenome(self.build), 0, 1, 2, 3)], fmt.delimiter, self.ranges)
         else:  # position or range type
             self.processor = LineProcessor(fmt.fields, [(1,)], fmt.delimiter, self.ranges)
-        
+
 
         # probe number of sample
         if self.genotype_field or self.genotype_info:
@@ -210,7 +210,7 @@ class Updater:
             # if sample names are provided, we try to check
             #
             # 1. if sample name is provided from input file, they should match
-            # 2. if there is an sample that can be uniqly identified by 
+            # 2. if there is an sample that can be uniqly identified by
             #     sample_name and filename.
             try:
                 numSample, names = probeSampleName(input_filename, self.prober, self.encoding)
@@ -226,10 +226,10 @@ class Updater:
                     raise ValueError("When there is no sample genotype, only one sample name is allowed.")
             elif len(self.sample_name) != numSample:
                 raise ValueError('{} sample detected but only {} sample names are specified'
-                    .format(numSample, len(self.sample_name)))                        
+                    .format(numSample, len(self.sample_name)))
             elif sorted(self.sample_name) != sorted(names):
                 raise ValueError('Specified ({}) and detected sample names ({}) mismatch.'
-                    .format(', '.join(self.sample_name), ', '.join(names))) 
+                    .format(', '.join(self.sample_name), ', '.join(names)))
         #
         # now get sample ids:
         cur = self.db.cursor()
@@ -363,7 +363,7 @@ class Updater:
                     fld_cols = []
                     for idx in range(len(sample_ids)):
                         fld_cols.append([sc + (0 if sc + 1 == ec else idx) for sc,ec in col_rngs])
-               
+
             if self.count[0] - last_count > update_after:
                 last_count = self.count[0]
                 self.db.commit()
@@ -382,26 +382,26 @@ class Updater:
 
 
 
-        
+
 
     def update(self):
         '''Start updating'''
         for count,f in enumerate(self.files):
-           
+
             env.logger.info('{} variants from {} ({}/{})'.format('Updating', f, count + 1, len(self.files)))
-            
+
             if self.proj.store=="sqlite" or (self.proj.store=="hdf5" and "vcf" not in f):
                 self.updateFromFile(f)
                 env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.count[8],
                     '' if self.count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.count[1])))
-                
+
             elif self.proj.store=="hdf5":
                 self.updateHDF5FromFile(f)
             self.sample_name=''
             for i in range(len(self.count)):
                 self.total_count[i] += self.count[i]
                 self.count[i] = 0
-        
+
         # if len(self.files) > 1:
         #     env.logger.info('Field{} {} of {:,} variants{} are updated'.format('' if len(self.variant_info) == 1 else 's', ', '.join(self.variant_info), self.total_count[8],
         #             '' if self.total_count[1] == 0 else ' and geno fields of {:,} genotypes'.format(self.total_count[1])))
@@ -473,7 +473,7 @@ def setFieldValue(proj, table, items, build):
                     # add an description
             try:
                 proj.describeField(field, 'Evaluated from "{}" with type {} on {}'
-                    .format(desc_of_field[field.lower()], 
+                    .format(desc_of_field[field.lower()],
                         type_map[fldType], time.strftime('%b%d', time.localtime())))
             except Exception as e:
                 env.logger.warning('Failed to add a description to field {}: {}'
@@ -621,8 +621,8 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     # NOTE: this function could be implemented using one or more query more
     # or less in the form of
     #
-    # UPDATE variant SET something = something 
-    # FROM 
+    # UPDATE variant SET something = something
+    # FROM
     # (SELECT variant_id, avg(FIELD) FROM (
     #       SELECT FIELD FROM genotype_1 WHERE ...
     #       UNION SELECT FIELD FROM genotype_2 WHERE ...
@@ -647,7 +647,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     MAX = 3
     operationKeys = {'avg': MEAN, 'sum': SUM, 'min': MIN, 'max': MAX}
     possibleOperations = list(operationKeys.keys())
-    
+
     operations = []
     genotypeFields = []
     validGenotypeFields = []
@@ -656,7 +656,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     desc_of_field = {}
 
 
-    
+
     cur = proj.db.cursor()
     if IDs is None:
         cur.execute('SELECT sample_id from sample;')
@@ -671,8 +671,8 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         prog = ProgressBar('Counting variants', len(IDs))
     else:
         env.logger.info("Reading genotype info for processing....")
-    
-    
+
+
 
     #
     # Error checking with the user specified genotype fields
@@ -682,7 +682,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     genotypeFieldTypes = {}
     fieldInTable = defaultdict(list)
     store=GenoStore(proj)
-   
+
     for id in IDs:
         fields=["variant_id"]
         starttime=time.time()
@@ -691,7 +691,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             fieldInTable[field].append(id)
             if field not in genotypeFieldTypes:
                 genotypeFieldTypes[field] = 'INT'
-                # fieldType = proj.db.typeOfColumn('{}_genotype.genotype_{}'.format(proj.name, id), field) 
+                # fieldType = proj.db.typeOfColumn('{}_genotype.genotype_{}'.format(proj.name, id), field)
                 fieldType=store.get_typeOfColumn(id,field)
                 if fieldType.upper().startswith('FLOAT'):
                     genotypeFieldTypes[field] = 'FLOAT'
@@ -702,7 +702,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                     # further down in the code.
                     # raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
     validGenotypeIndices = []
-    
+
 
 
     for stat in from_stat:
@@ -741,7 +741,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
                 field=field.replace("_geno","")
             if operation not in possibleOperations:
                 raise ValueError('Unsupported operation {}. Supported operations include {}.'.format(operation, ', '.join(possibleOperations)))
-            
+
             if field.lower() in [x.lower() for x in list(genotypeFieldTypes.keys())] :
                 operations.append(operationKeys[operation])
                 genotypeFields.append(field)
@@ -763,8 +763,8 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             numFemales = len({x:y for x,y in list(ID_sex.items()) if y == 2})
             env.logger.info('{} males and {} females are identified'
                 .format(numMales, numFemales))
-    
-  
+
+
     coreDestinations = [alt, hom, het, other, GT, missing, wtGT, mutGT, maf]
     for index, field in enumerate(genotypeFields):
         if field.lower() not in [x.lower() for x in list(genotypeFieldTypes.keys())]:
@@ -772,7 +772,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         else:
             if len(fieldInTable[field.lower()]) < len(IDs):
                 env.logger.warning('Field {} exists in {} of {} selected samples'
-                    .format(field, len(fieldInTable[field.lower()]), len(IDs))) 
+                    .format(field, len(fieldInTable[field.lower()]), len(IDs)))
             validGenotypeIndices.append(index)
             validGenotypeFields.append(field)
 
@@ -783,8 +783,8 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         else:
             if len(fieldInTable['gt']) < len(IDs):
                 env.logger.warning('Genotype field GT exists in {} of {} selected samples'
-                    .format(len(fieldInTable[field.lower()]), len(IDs))) 
-  
+                    .format(len(fieldInTable[field.lower()]), len(IDs)))
+
     if all([x is None for x in coreDestinations]) and len(validGenotypeFields) == 0:
         env.logger.warning("No valid sample statistics operation has been specified.")
         return
@@ -795,10 +795,10 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     for name in queryDestinations:
         if name is not None:
             proj.checkFieldName(name, exclude='variant')
- 
- 
-    
-    prog_step = max(len(IDs) // 100, 1) 
+
+
+
+    prog_step = max(len(IDs) // 100, 1)
 
     sampleDict=dict()
     for id_idx, id in enumerate(IDs):
@@ -824,14 +824,14 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
     fieldsDefaultZero = [alt, hom, het, other, GT, missing, wtGT, mutGT, maf]
     for index in validGenotypeIndices:
         field = genotypeFields[index]
-        genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index].lower()) 
-        # genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index]) 
+        genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index].lower())
+        # genotypeFieldType = genotypeFieldTypes.get(genotypeFields[index])
         if genotypeFieldType == 'VARCHAR':
             raise ValueError('Genotype field {} is a VARCHAR which is not supported with sample_stat operations.'.format(field))
-        
+
         if operations[index] == MEAN:
             table_attributes.append((destinations[index], 'FLOAT'))
-        else:                
+        else:
             table_attributes.append((destinations[index], genotypeFieldType))
 
     for field, fldtype in table_attributes:
@@ -843,7 +843,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             where_clause = 'WHERE variant_id in (SELECT variant_id FROM {})'.format(variant_table)
         else:
             where_clause = ''
-        
+
         if field.lower() in headers:
             if proj.db.typeOfColumn('variant', field) != (fldtype + ' NULL'):
                 env.logger.warning('Type mismatch (existing: {}, new: {}) for column {}. Please remove this column and recalculate statistics if needed.'\
@@ -860,8 +860,8 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
 
         try:
             proj.describeField(field, 'Created from stat "{}" {} with type {} on {}'
-                .format(desc_of_field[field.lower()], 
-                    'for samples {}'.format(samples) if samples else '', 
+                .format(desc_of_field[field.lower()],
+                    'for samples {}'.format(samples) if samples else '',
                     fldtype, time.strftime('%b%d', time.localtime())))
         except Exception as e:
             env.logger.warning('Failed to add a description to field {}: {}'
@@ -975,7 +975,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
         try:
             for index in validGenotypeIndices:
                 # the first 4 indices hold the values for hom, het, double het, total genotype and total genotype in males
-                operationIndex = index + 5     
+                operationIndex = index + 5
                 operationCalculation = value[operationIndex]
                 # #temp fix
                 # if proj.store=="hdf5":
@@ -994,7 +994,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
             prog.update(count)
     #
     # missing should be handled differently because variants only stores variants that
-    # show up in at least one samples. If a variant does not exist in any of them, the 
+    # show up in at least one samples. If a variant does not exist in any of them, the
     # above queries will ignore them.
     if missing is not None:
         # first get all variants
@@ -1022,7 +1022,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
 def updateArguments(parser):
     parser.add_argument('table', help='''variants to be updated.''')
     files = parser.add_argument_group('Update from files')
-    files.add_argument('--from_file', nargs='+',
+    files.add_argument('--from_file', '--from-file', nargs='+',
         help='''A list of files that will be used to add or update existing fields of
             variants. The file should be delimiter separated with format described by
             parameter --format. Gzipped files are acceptable. If input files contains
@@ -1038,7 +1038,7 @@ def updateArguments(parser):
     files.add_argument('--format',
         help='''Format of the input text file. It can be one of the variant tools
             supported file types such as ANNOVAR_output (cf. 'vtools show formats'),
-            or a local format specification file (with extension .fmt). Some formats 
+            or a local format specification file (with extension .fmt). Some formats
             accept parameters (cf. 'vtools show format FMT') and allow you to update
             additional or alternative fields from the input file.''')
     files.add_argument('-j', '--jobs', metavar='N', default=1, type=int,
@@ -1047,7 +1047,7 @@ def updateArguments(parser):
             dedicated reader processes (jobs=2 or more) to process input files. Due
             to the overhead of inter-process communication, more jobs do not
             automatically lead to better performance.''')
-    files.add_argument('--sample_name', nargs='*', default=[],
+    files.add_argument('--sample_name', '--sample-name', nargs='*', default=[],
         help='''Name of the samples to be updated by the input files. If unspecified,
             headers of the genotype columns of the last comment line (line starts
             with #) of the input files will be used (and thus allow different sample
@@ -1071,7 +1071,7 @@ def updateArguments(parser):
     #field.add_argument('--build',
     #    help='''Reference genome to use when chr and pos is used in expression.''')
     stat = parser.add_argument_group('Set fields from sample statistics')
-    stat.add_argument('--from_stat', metavar='EXPR', nargs='*', default=[],
+    stat.add_argument('--from_stat', '--from-stat', metavar='EXPR', nargs='*', default=[],
         help='''One or more expressions such as meanQT=avg(QT) that aggregate
             genotype info (e.g. QT) of variants in all or selected samples to
             specified fields (e.g. meanQT). Functions sum, avg, max, and min
@@ -1110,7 +1110,7 @@ def update(args):
                 if (proj.store=="sqlite"):
                     proj.db.attach(proj.name + '_genotype')
                 updater = Updater(proj=proj, table=encodeTableName(args.table), files=args.from_file,
-                    build=args.build, format=args.format, jobs=args.jobs, 
+                    build=args.build, format=args.format, jobs=args.jobs,
                     sample_name=args.sample_name, fmt_args=args.unknown_args)
                 updater.update()
             if args.set:
