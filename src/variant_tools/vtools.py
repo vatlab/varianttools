@@ -233,10 +233,21 @@ def main():
     # command execute
     parser = subparsers.add_parser('execute',
                                    help='Execute a SQL query',
-                                   description='''Execute a pipeline.''')
+                                   description='''Execute a SQL query or pipeline.''')
     pipeline.executeArguments(parser)
     addCommonArgs(parser)
     parser.set_defaults(func=pipeline.execute)
+    #
+    # command simulate
+    # 
+    parser = subparsers.add_parser('simulate',
+        help='''Simulate sequencing data using specified simulation
+            models.''',
+        description='''Simulate case control or family-based samples using
+            specified simulation models.''')
+    pipeline.simulateArguments(parser)
+    addCommonArgs(parser)
+    parser.set_defaults(func=pipeline.simulate)
     #
     # getting args, some commands accept arbitrary arguments so we need to
     # separate them into argv

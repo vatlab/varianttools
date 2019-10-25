@@ -3104,7 +3104,7 @@ class Pipeline:
             raise ValueError('Pipeline {} is undefined in configuraiton file '
                              '{}. Available pipelines are: {}'.format(pname,
                                                                       self.pipeline.name, ', '.join(self.pipeline.pipelines.keys())))
-        
+
         #
         psteps = self.pipeline.pipelines[pname]
         if allowed_steps is not None:
