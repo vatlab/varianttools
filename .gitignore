@@ -18,10 +18,8 @@ test/ceu/
 test/sam1/
 build
 dist
-boost_*
 cgatools
 sqlite
-gsl
 libplinkio
 ucsc
 *.swp
