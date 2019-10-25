@@ -359,6 +359,7 @@ ext_modules+=cythonize([Extension('variant_tools.io_vcf_read',
     library_dirs = ["build"])])
 
 
+CURRENT_DIR = os.path.abspath(os.path.dirname(__file__))
 
 def get_long_description():
     with open(os.path.join(CURRENT_DIR, "README.md"), "r") as ld_file:
