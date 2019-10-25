@@ -25,6 +25,7 @@ You might need to install
 * `gsl`
 * `numpy`
 * `Cython`
+* A C++ compiler such as `gcc`
 
 and re-run the command if there is no binary (`wheel`) distribution for your platform.
 
