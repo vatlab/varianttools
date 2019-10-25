@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 #
-# $File: preprocessor.py $
-# $LastChangedDate: 2013-03-26 17:15:07 -0500 (Tue, 26 Mar 2013) $
-# $Rev: 1775 $
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org) and Gao Wang (wangow@gmail.com)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org) and Gao Wang (wangow@gmail.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,13 +19,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import sys, os
 import itertools as it
-from .utils import ProgressBar, RefGenome, env, openFile, DatabaseEngine, downloadFile
-from .plinkfile import PlinkFile
-
+import os
+import sys
 from collections import defaultdict
 from multiprocessing import Lock
+
+from .plinkfile import PlinkFile
+from .utils import (DatabaseEngine, ProgressBar, RefGenome, downloadFile, env,
+                    openFile)
 
 
 #

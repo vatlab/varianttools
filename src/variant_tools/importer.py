@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 #
-# $File: importer.py $
-# $LastChangedDate$
-# $Rev$
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,16 +21,17 @@
 #
 
 import os
-import sys
 import re
+import sys
 from itertools import repeat
-from .project import Project, fileFMT
-from .liftOver import LiftOverTool
-from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
-    openFile, env, RefGenome
 
 from .geno_store import GenoStore
+from .liftOver import LiftOverTool
+from .preprocessor import *
+from .project import Project, fileFMT
 from .text_reader import TextReader
+from .utils import (ProgressBar, RefGenome, delayedAction, env, getMaxUcscBin,
+                    lineCount, openFile)
 
 try:
     from variant_tools.cgatools import normalize_variant
@@ -44,8 +41,6 @@ except ImportError as e:
         'Please verify if you have installed variant tools successfully (using command '
         '"python setup.py install")'.format(e))
 
-# preprocessors
-from .preprocessor import *
 
 
 #

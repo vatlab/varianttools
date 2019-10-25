@@ -1,14 +1,10 @@
-#!/usr/bin/env python2.7
-#
-# $File: setup.py $
-# $LastChangedDate$
-# $Rev$
+#!/usr/bin/env python
 #
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,11 +19,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import os
+import subprocess
+import sys
 from distutils.ccompiler import new_compiler
-from setuptools import find_packages, setup, Extension
+
 import numpy as np
-import sys, os, subprocess
 from Cython.Build import cythonize
+from setuptools import Extension, find_packages, setup
+
 # use ccache to speed up build
 # try:
 #     if subprocess.call(['ccache'], stderr = open(os.devnull, "w")):

@@ -1,12 +1,8 @@
 #!/usr/bin/env python
 #
-# $File: simulation.py $
-# $LastChangedDate: 2014-01-14 10:38:56 -0600 (Tue, 14 Jan 2014) $
-# $Rev: 2505 $
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
 # Copyright (C) 2011 - 2014 Bo Peng (bpeng@mdanderson.org)
 #

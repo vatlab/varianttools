@@ -1,4 +1,23 @@
-# -*- coding: utf-8 -*-
+#
+# This file is part of variant_tools, a software application to annotate,
+# summarize, and filter variants for next-gen sequencing ananlysis.
+# Please visit https://github.com/vatlab/varianttools for details.
+#
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 """
 Extract data from VCF files.
 
@@ -6,34 +25,37 @@ This module contains Functions for extracting data from Variant Call Format (VCF
 into NumPy arrays, NumPy files, HDF5 files or Zarr array stores.
 
 """
-from __future__ import absolute_import, print_function, division
-import os
-import sys
-import re
 import array
-import time
-from heapq import heappush, heappop, heappushpop
-from multiprocessing import Process, Pipe, Value, Lock, Manager, Array
-from multiprocessing import Queue as mpQueue
+import glob
+import gzip
+import json
+import os
+import pickle
 import queue
+import re
+import subprocess
+import sys
+import time
+import warnings
+from collections import defaultdict, namedtuple
+from heapq import heappop, heappush, heappushpop
 from itertools import repeat
-from collections import defaultdict
-# from .project import Project, fileFMT
-# from .liftOver import LiftOverTool
-from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
-    openFile, DatabaseEngine, hasCommand, \
-    downloadFile, env, RefGenome
+from multiprocessing import Array, Lock, Manager, Pipe, Process
+from multiprocessing import Queue as mpQueue
+from multiprocessing import Value
+from shutil import copyfile
+from subprocess import call
 
 import numpy as np
 import tables as tb
-#import HDF5_storage as storage
-import glob
-from shutil import copyfile
-from .accessor import *
-from subprocess import call
 
-import json
-import pickle
+from variant_tools.io_vcf_read import FileInputStream, VCFChunkIterator
+
+from .accessor import *
+from .preprocessor import *
+from .utils import (DatabaseEngine, ProgressBar, RefGenome, delayedAction,
+                    downloadFile, env, getMaxUcscBin, hasCommand, lineCount,
+                    openFile)
 
 try:
     from variant_tools.cgatools import normalize_variant
@@ -43,15 +65,8 @@ except ImportError as e:
         'Please verify if you have installed variant tools successfully (using command '
         '"python setup.py install")'.format(e))
 
-# preprocessors
-from .preprocessor import *
 
-import gzip
-from collections import namedtuple
-import warnings
-import subprocess
 
-from variant_tools.io_vcf_read import VCFChunkIterator, FileInputStream
 # expose some names from cython extension
 # from variant_tools.io_vcf_read import (  # noqa: F401
 #     ANNTransformer, ANN_AA_LENGTH_FIELD, ANN_AA_POS_FIELD, ANN_ANNOTATION_FIELD,

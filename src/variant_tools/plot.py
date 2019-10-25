@@ -1,12 +1,8 @@
 #!/usr/bin/env python
 #
-# $File: plot.py $
-# $LastChangedDate: 2012-06-05 12:31:19 -0500 (Tue, 05 Jun 2012) $
-# $Rev: 1179 $
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
 # Copyright (C) 2012 Bo Peng and Gao Wang
 #
@@ -23,13 +19,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import sys
 import os
 import pickle
-from collections import OrderedDict
-from .utils import env, runCommand, mkdir_p, downloadFile, whereisRPackage
-from .rtester import Str4R
 import subprocess
+import sys
+from collections import OrderedDict
+
+from .rtester import Str4R
+from .utils import downloadFile, env, mkdir_p, runCommand, whereisRPackage
 
 
 def size(bytes):

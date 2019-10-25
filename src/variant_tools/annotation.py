@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 #
-# $File: annotation.py $
-# $LastChangedDate$
-# $Rev$
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,22 +20,22 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import sys
-import os
 import configparser
-import urllib.parse
-import tarfile
+import os
 import re
+import sys
+import tarfile
+import urllib.parse
 import zipfile
 
-from .project import AnnoDB, Project, Field, AnnoDBWriter
-from .utils import ProgressBar, downloadFile, lineCount, \
-    DatabaseEngine, delayedAction, decompressGzFile, \
-    compressFile, SQL_KEYWORDS, extractField, env, isAnnoDB, \
-    calculateMD5, ResourceManager, RefGenome
 from .importer import LineProcessor
-from .text_reader import TextReader
 from .preprocessor import *
+from .project import AnnoDB, AnnoDBWriter, Field, Project
+from .text_reader import TextReader
+from .utils import (SQL_KEYWORDS, DatabaseEngine, ProgressBar, RefGenome,
+                    ResourceManager, calculateMD5, compressFile,
+                    decompressGzFile, delayedAction, downloadFile, env,
+                    extractField, isAnnoDB, lineCount)
 
 
 class AnnoDBConfiger:

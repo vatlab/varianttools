@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 #
-# $File: association.py $
-# $LastChangedDate$
-# $Rev$
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org) and Gao Wang (wangow@gmail.com)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org) and Gao Wang (wangow@gmail.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,34 +19,38 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import sys, os, re, glob
-from multiprocessing import Process, Queue, Value, Array, Lock
-import time
-import random
+import argparse
+import glob
+import json
+import logging
 import math
-from .project import Project, Field, AnnoDB, AnnoDBWriter, MaintenanceProcess
-from .utils import ProgressBar, consolidateFieldName, DatabaseEngine, delayedAction, \
-     env, executeUntilSucceed, ShelfDB, safeMapFloat, PrettyPrinter, flatten, hasGenoInfo
+import os
+import pickle
+import random
+import re
+import sys
+import threading
+import time
+import uuid
+from collections import deque
+from multiprocessing import Array, Lock, Process, Queue, Value
 
-from .assoTests import AssoData
-from .tester import *
-from .rtester import RTest, SKAT
+import numpy as np
 import tables as tb
+import zmq
+from zmq.log.handlers import PUBHandler
+
 from variant_tools.vt_sqlite3 import OperationalError
 
-import argparse
-import numpy as np
-from .association_hdf5 import generateHDFbyGroup, getGenotype_HDF5, generateHDFbyGroup_update
-
-import pickle
-
-from collections import deque
-import zmq
-import json
-from zmq.log.handlers import PUBHandler
-import logging
-import uuid
-import threading
+from .association_hdf5 import (generateHDFbyGroup, generateHDFbyGroup_update,
+                               getGenotype_HDF5)
+from .assoTests import AssoData
+from .project import AnnoDB, AnnoDBWriter, Field, MaintenanceProcess, Project
+from .rtester import SKAT, RTest
+from .tester import *
+from .utils import (DatabaseEngine, PrettyPrinter, ProgressBar, ShelfDB,
+                    consolidateFieldName, delayedAction, env,
+                    executeUntilSucceed, flatten, hasGenoInfo, safeMapFloat)
 
 
 def associateArguments(parser):

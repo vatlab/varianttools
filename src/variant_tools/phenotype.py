@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 #
-# $File: phenotype.py $
-# $LastChangedDate$
-# $Rev$
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,23 +20,24 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import sys
-import threading
-import queue
-from multiprocessing import Process, Manager
-from multiprocessing import Queue as mpQueue
-
-import time
-import tempfile
 import csv
 import os
+import queue
+import sys
+import tempfile
+import threading
+import time
 from collections import defaultdict
-from .project import Project
-from .utils import DatabaseEngine, ProgressBar, typeOfValues, SQL_KEYWORDS, env, \
-    validFieldName
-from .geno_store import GenoStore, HDF5_Store
-import tables as tb
+from multiprocessing import Manager, Process
+from multiprocessing import Queue as mpQueue
+
 import numpy as np
+import tables as tb
+
+from .geno_store import GenoStore, HDF5_Store
+from .project import Project
+from .utils import (SQL_KEYWORDS, DatabaseEngine, ProgressBar, env,
+                    typeOfValues, validFieldName)
 
 
 class GenotypeStatStatus:

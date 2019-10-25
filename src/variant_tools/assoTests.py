@@ -5,6 +5,7 @@
 # the SWIG interface file instead.
 
 from sys import version_info as _swig_python_version_info
+
 if _swig_python_version_info >= (3, 0, 0):
     new_instancemethod = lambda func, inst, cls: _assoTests.SWIG_PyInstanceMethod_New(
         func)

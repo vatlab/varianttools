@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 #
-# $File: meta.py $
-# $LastChangedDate: 2013-03-12 15:23:44 -0500 (Tue, 12 Mar 2013) $
-# $Rev: 1736 $
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org) and Gao Wang (wangow@gmail.com)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org) and Gao Wang (wangow@gmail.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,17 +22,11 @@
 import os
 import time
 from math import sqrt
-from variant_tools.utils import openFile
-from variant_tools.project import AnnoDBWriter, Field
-from variant_tools.utils import env
-# if sys.version_info.major == 2:
-#     from variant_tools.assoTests_py2 import gsl_cdf_ugaussian_Pinv as qnorm
-#     from variant_tools.assoTests_py2 import gsl_cdf_ugaussian_P as pnorm
-# else:
-#     from variant_tools.assoTests_py3 import gsl_cdf_ugaussian_Pinv as qnorm
-#     from variant_tools.assoTests_py3 import gsl_cdf_ugaussian_P as pnorm
-from variant_tools.assoTests import gsl_cdf_ugaussian_Pinv as qnorm
+
 from variant_tools.assoTests import gsl_cdf_ugaussian_P as pnorm
+from variant_tools.assoTests import gsl_cdf_ugaussian_Pinv as qnorm
+from variant_tools.project import AnnoDBWriter, Field
+from variant_tools.utils import env, openFile
 
 
 class MetaAnalysis:

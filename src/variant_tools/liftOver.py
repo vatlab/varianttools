@@ -1,14 +1,11 @@
 #!/usr/bin/env python
-#
-# $File: liftOver.py $
-# $LastChangedDate$
-# $Rev$
+
 #
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,14 +21,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import sys
-import platform
 import os
+import platform
 import stat
 import subprocess
+import sys
 
 from .project import Project
-from .utils import ProgressBar, downloadFile, lineCount, getMaxUcscBin, delayedAction, env, OS_ENV
+from .utils import (OS_ENV, ProgressBar, delayedAction, downloadFile, env,
+                    getMaxUcscBin, lineCount)
 
 
 #

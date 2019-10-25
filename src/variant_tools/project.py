@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 #
-# $File: project.py $
-# $LastChangedDate$
-# $Rev$
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,37 +20,36 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
-import sys
-import glob
-import textwrap
-import shutil
 import argparse
-import threading
+import glob
+import os
 import queue
-import time
 import re
+import shutil
+import sys
 import tarfile
-import urllib.request
-import urllib.parse
+import textwrap
+import threading
+import time
 import urllib.error
-
-from .ucsctools import showTrack
-from .cgatools import fasta2crr
-from .geno_store import GenoStore, HDF5_Store
+import urllib.parse
+import urllib.request
+from collections import defaultdict, namedtuple
 from configparser import ConfigParser, RawConfigParser
 from io import StringIO
-
 from multiprocessing import Process
-from collections import namedtuple, defaultdict
-from ._version import VTOOLS_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CONTACT
-from .utils import (DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction,
-                    RefGenome, downloadFile, env, sizeExpr,
-                    getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName,
-                    PrettyPrinter, determineSexOfSamples, getVariantsOnChromosomeX,
-                    getVariantsOnChromosomeY, getTermWidth, matchName, ProgressFileObj,
-                    substituteVars, calculateMD5, dehtml, default_user_options, RuntimeFiles)
 
+from ._version import VTOOLS_CONTACT, VTOOLS_COPYRIGHT, VTOOLS_VERSION
+from .cgatools import fasta2crr
+from .geno_store import GenoStore, HDF5_Store
+from .ucsctools import showTrack
+from .utils import (SQL_KEYWORDS, DatabaseEngine, PrettyPrinter, ProgressBar,
+                    ProgressFileObj, RefGenome, ResourceManager, RuntimeFiles,
+                    calculateMD5, decodeTableName, default_user_options,
+                    dehtml, delayedAction, determineSexOfSamples, downloadFile,
+                    encodeTableName, env, getSnapshotInfo, getTermWidth,
+                    getVariantsOnChromosomeX, getVariantsOnChromosomeY,
+                    matchName, sizeExpr, substituteVars)
 
 try:
     from .cgatools import normalize_variant
@@ -68,7 +63,7 @@ except ImportError as e:
 Field = namedtuple('Field', ['name', 'index', 'adj', 'fmt', 'type', 'comment'])
 Column = namedtuple('Column', ['index', 'field', 'adj', 'comment'])
 #
-# see http://varianttools.sourceforge.net/Calling/New for details
+# see https://github.com/vatlab/varianttools/Calling/New for details
 #
 PipelineCommand = namedtuple('PipelineCommand', ['index', 'options', 'input',
                                                  'input_emitter', 'action', 'init_action_vars', 'pre_action_vars', 'post_action_vars', 'comment'])

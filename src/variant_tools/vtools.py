@@ -1,12 +1,8 @@
 #!/usr/bin/env python2.7
 #
-# $File: vtools $
-# $LastChangedDate$
-# $Rev$
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
 # Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
 #
@@ -24,35 +20,28 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import sys
-try:
-    import argparse
-except ImportError:
-    sys.exit(
-        'variant tools requires Python 2.7.2 or higher, or Python 3.2 '
-        'or higher. Please upgrade your version ({}) of Python and try again.'
-        .format(sys.version.split()[0]))
-
-from variant_tools.utils import env
+import argparse
 import subprocess
-# save the command line that has been processed by the shell.
-env.command_line = subprocess.list2cmdline(sys.argv[1:])
+import sys
 
-from variant_tools._version import VTOOLS_FULL_VERSION
-import variant_tools.project as project
-import variant_tools.importer as importer
-import variant_tools.update as update
-import variant_tools.phenotype as phenotype
 import variant_tools.annotation as annotation
-import variant_tools.variant as variant
 import variant_tools.compare as compare
 import variant_tools.exporter as exporter
+import variant_tools.importer as importer
+import variant_tools.phenotype as phenotype
 import variant_tools.pipeline as pipeline
+import variant_tools.project as project
+import variant_tools.update as update
+import variant_tools.variant as variant
+from variant_tools._version import VTOOLS_FULL_VERSION
+from variant_tools.utils import env
 
 if sys.platform != 'win32':
     import variant_tools.liftOver as liftOver
     import variant_tools.association as association
 
+# save the command line that has been processed by the shell.
+env.command_line = subprocess.list2cmdline(sys.argv[1:])
 
 def addCommonArgs(parser):
     parser.add_argument(

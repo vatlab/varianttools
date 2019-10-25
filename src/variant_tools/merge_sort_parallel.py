@@ -1,10 +1,34 @@
+#!/usr/bin/env python
+
+#
+# This file is part of variant_tools, a software application to annotate,
+# summarize, and filter variants for next-gen sequencing ananlysis.
+# Please visit https://github.com/vatlab/varianttools for details.
+#
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
 import math
 import multiprocessing
 import random
 import sys
 import time
-import tables as tb
+
 import numpy as np
+import tables as tb
 
 
 def merge(*args):
@@ -49,43 +73,42 @@ def merge_sort_parallel(data):
         data = pool.map(merge, data) + ([extra] if extra else [])
     return data[0]
 
+
 def index_HDF5_rowIDs(filePath):
-    file=tb.open_file(filePath,"a")
-    chrs=["X","Y"]
-    chrs.extend(range(1,23))
-    rowIDs=[]
+    file = tb.open_file(filePath, "a")
+    chrs = ["X", "Y"]
+    chrs.extend(range(1, 23))
+    rowIDs = []
     for chr in chrs:
         try:
-            node=file.get_node("/chr"+str(chr))
-            rownames=node.rownames[:].tolist()
-            for idx,rowname in enumerate(rownames):
-                rowIDs.append([rowname,idx])
+            node = file.get_node("/chr" + str(chr))
+            rownames = node.rownames[:].tolist()
+            for idx, rowname in enumerate(rownames):
+                rowIDs.append([rowname, idx])
         except tb.exceptions.NoSuchNodeError:
-            pass                              
+            pass
         except Exception as e:
             print(e)
             pass
     file.close()
 
-
     # for sort in merge_sort, merge_sort_parallel:
     start = time.time()
     rowIDs_index = merge_sort_parallel(rowIDs)
     end = time.time() - start
-        # print(sort.__name__, end)
+    # print(sort.__name__, end)
     return rowIDs_index
 
-def binarySearch (sortedIDs, start, end, id): 
-  
-    if end >= start: 
-        mid = start + int((end - start)/2)
-        if sortedIDs[mid][0] == id: 
+
+def binarySearch(sortedIDs, start, end, id):
+
+    if end >= start:
+        mid = start + int((end - start) / 2)
+        if sortedIDs[mid][0] == id:
             return mid
-        elif sortedIDs[mid][0] > id: 
-            return binarySearch(sortedIDs, start, mid-1, id) 
-        else: 
-            return binarySearch(sortedIDs, mid + 1, end, id) 
-    else: 
+        elif sortedIDs[mid][0] > id:
+            return binarySearch(sortedIDs, start, mid - 1, id)
+        else:
+            return binarySearch(sortedIDs, mid + 1, end, id)
+    else:
         return -1
-
-

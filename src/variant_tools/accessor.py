@@ -1,14 +1,9 @@
 #!/usr/bin/env python
-#
-# $File: accessor.py $
-# $LastChangedDate$
-# $Rev$
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,21 +18,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from scipy.sparse import csr_matrix
-
+import math
 import os
+import queue
+import sys
+
+from multiprocessing import Manager, Process
+
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
-import tables as tb
 import numpy as np
-import math
+import tables as tb
+from scipy.sparse import csr_matrix
 
-import sys
-from .utils import env, chunks_start_stop
-
-from multiprocessing import Process, Manager
-import queue
 from .merge_sort_parallel import binarySearch
+from .utils import chunks_start_stop, env
+
 
 
 class Engine_Storage(object):

@@ -1,12 +1,8 @@
 #!/usr/bin/env python
 #
-# $File: pipeline.py$
-# $LastChangedDate: 2013-04-23 11:58:41 -0500 (Tue, 23 Apr 2013) $
-# $Rev: 1855 $
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
 # Copyright (C) 2013 Bo Peng (bpeng@mdanderson.org)
 #
@@ -27,46 +23,43 @@
 This module implement Variant Pipeline Tools and VPT-provided
 pipeline actions.
 '''
-import os
-import sys
-import subprocess
-from multiprocessing import Process
-import threading
-import pipes
-import pprint
+import argparse
+import bz2
 import copy
+import csv
 #
 import glob
-import hashlib
-import shlex
-import argparse
-import logging
-import shutil
-import tempfile
-import tarfile
 import gzip
-import bz2
-import zipfile
-import time
-import re
-import csv
-import platform
+import hashlib
 import logging
+import os
+import pipes
+import platform
+import pprint
 import random
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+import threading
+import time
 import traceback
+import zipfile
+from collections import MutableMapping, namedtuple
+from itertools import combinations, tee
 from multiprocessing import Process
-from collections import namedtuple, MutableMapping
-from itertools import tee, combinations
-
-from .utils import env, ProgressBar, downloadFile, downloadURL, calculateMD5, delayedAction, \
-    existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName, \
-    FileInfo, convertDoubleQuote, openFile, encodeTableName, expandRegions, \
-    substituteVars, which, RuntimeFiles
 
 from .project import PipelineDescription, Project
-
 from .ucsctools import showTrack
-# for parallel execution of steps
+from .utils import (TEMP, FileInfo, ProgressBar, RuntimeFiles, calculateMD5,
+                    convertDoubleQuote, decompressGzFile, delayedAction,
+                    downloadFile, downloadURL, encodeTableName, env,
+                    existAndNewerThan, expandRegions, openFile, substituteVars,
+                    typeOfValues, validFieldName, which)
+
 try:
     import pysam
     hasPySam = True

@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 #
-# $File: variant.py $
-# $LastChangedDate: 2012-06-12 20:49:24 -0500 (Tue, 12 Jun 2012) $
-# $Rev: 1216 $
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,14 +20,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import sys
-import re
 import copy
+import re
+import sys
 from argparse import SUPPRESS
-from .project import Project
-from .utils import ProgressBar, env, encodeTableName, decodeTableName, matchName
 from collections import defaultdict
+
 from .geno_store import GenoStore
+from .project import Project
+from .utils import (ProgressBar, decodeTableName, encodeTableName, env,
+                    matchName)
 
 
 def compareArguments(parser):

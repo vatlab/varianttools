@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 #
-# $File: __init__.py $
-# $LastChangedDate$
-# $Rev$
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2020 - 2013 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,4 +27,4 @@ VTOOLS_VERSION='3.0.6'
 pyver = sys.version_info
 VTOOLS_FULL_VERSION='{} for Python {}.{}.{}'.format(VTOOLS_VERSION, pyver.major, pyver.minor, pyver.micro)
 VTOOLS_COPYRIGHT = '''variant tools {} : Copyright (c) 2011 - 2016 Bo Peng'''.format(VTOOLS_VERSION)
-VTOOLS_CONTACT = '''Please visit http://varianttools.sourceforge.net for more information.'''
+VTOOLS_CONTACT = '''Please visit https://github.com/vatlab/varianttools for more information.'''
