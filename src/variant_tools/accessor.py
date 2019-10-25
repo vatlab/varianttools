@@ -18,18 +18,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import math
 import os
-import queue
-import sys
-
-from multiprocessing import Manager, Process
 
 os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
 import numpy as np
 import tables as tb
-from scipy.sparse import csr_matrix
 
 from .merge_sort_parallel import binarySearch
 from .utils import chunks_start_stop, env
@@ -169,7 +163,6 @@ class HDF5Engine_storage(Base_Storage):
             check = np.where(rownames == res[0])
 
             if check[0].size != 0:
-                i = check[0][0]
                 group.rowmask[check] = True
 
     # def recover_variant(self,variant_id,chr,groupName=""):
@@ -226,7 +219,7 @@ class HDF5Engine_storage(Base_Storage):
                         GD = node.GD[startPos:endPos, :]
                         GD[GD == -1] = 0
                     if "HQ" in cond and "/chr" + str(chr) + "/HQ" in self.file:
-                        HG = node.HQ[startPos:endPos, :]
+                        HQ = node.HQ[startPos:endPos, :]
                         HQ[HQ == -1] = 0
                     if "AD" in cond and "/chr" + str(chr) + "/AD" in self.file:
                         AD = node.AD[startPos:endPos, :]
@@ -282,7 +275,6 @@ class HDF5Engine_storage(Base_Storage):
             chrs = ["X", "Y"]
             chrs.extend(range(1, 23))
             for chr in chrs:
-                genoNode = "/chr" + str(chr)
                 try:
                     self.file.remove_node("/chr" + str(chr) + "/" + item)
 
@@ -558,7 +550,7 @@ class HDF5Engine_access(Base_Access):
             num = 1000000
         for rownames, colnames, sub_all in self.get_all_genotype_genoinfo(
             [sampleID], [], [info]):
-            genotype = sub_all[0]
+            # genotype = sub_all[0]
             genoinfo = sub_all[1]
             if method == "avg":
                 localsum = np.nansum(genoinfo).item()
@@ -589,7 +581,7 @@ class HDF5Engine_access(Base_Access):
             # data=group.data[colPos]
             data = genoinfo[:, colPos]
             numNan = np.where(np.isnan(data))
-            numNone = np.where(data == -1)
+            # numNone = np.where(data == -1)
             # totalNum+=numVariants-len(numNan[0])-len(numNone[0])
             totalNum += numVariants - len(numNan[0])
             numCount[chr] = numVariants - len(numNan[0])
@@ -602,7 +594,7 @@ class HDF5Engine_access(Base_Access):
             [sampleID], genotypes):
             if cond is None:
                 numNan = np.where(np.isnan(genoinfo))
-                numNone = np.where(genoinfo == -1)
+                # numNone = np.where(genoinfo == -1)
                 totalNum += len(rownames) - len(numNan[0])
             else:
                 numNan = np.where(np.isnan(genoinfo))
@@ -820,7 +812,7 @@ class HDF5Engine_access(Base_Access):
                 for minPos, maxPos in chunkPos:
                     if "/chr" + str(
                             chr) + "/GT" in self.file and minPos != maxPos:
-                        genoinfo = node.GT[minPos:maxPos, colpos]
+                        # genoinfo = node.GT[minPos:maxPos, colpos]
                         sub_rownames, updated_colnames, sub_geno = self.filter_on_genotypes(
                             geno_cond, chr, node, "GT", minPos, maxPos, colpos,
                             [])
@@ -1001,7 +993,7 @@ class HDF5Engine_access(Base_Access):
                 GD = node.GD[startPos:endPos, :]
                 GD[GD == -1] = 0
             if "HQ" in cond and "/chr" + str(chr) + "/HQ" in self.file:
-                HG = node.HQ[startPos:endPos, :]
+                HQ = node.HQ[startPos:endPos, :]
                 HQ[HQ == -1] = 0
             if "AD" in cond and "/chr" + str(chr) + "/AD" in self.file:
                 AD = node.AD[startPos:endPos, :]

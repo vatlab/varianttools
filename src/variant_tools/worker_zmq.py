@@ -22,24 +22,20 @@
 
 import glob
 import json
-import logging
-import random
+import math
+import os
 import re
-import subprocess
 import sys
 import threading
 import time
-from multiprocessing.pool import ThreadPool
 
-import numpy as np
 import zmq
-from zmq.log.handlers import PUBHandler
 
-from variant_tools.accessor import *
+from variant_tools.accessor import Engine_Access
 from variant_tools.assoTests import AssoData
-from variant_tools.project import AnnoDBWriter
+from variant_tools.project import AnnoDBWriter, Field
 from variant_tools.tester import *
-from variant_tools.utils import (DatabaseEngine, PrettyPrinter,
+from variant_tools.utils import (DatabaseEngine, PrettyPrinter, env,
                                  executeUntilSucceed)
 
 
@@ -767,7 +763,7 @@ def worker(REQUEST_TIMEOUT, REQUEST_RETRIES):
                         result = worker.run()
                         result = json.dumps(result)
 
-                    except zmq.error.Again as e:
+                    except zmq.error.Again:
                         pass
 
                     try:
@@ -782,7 +778,7 @@ def worker(REQUEST_TIMEOUT, REQUEST_RETRIES):
                             while expect_thanks:
                                 socks = dict(poll.poll(REQUEST_TIMEOUT))
                                 if socks.get(client) == zmq.POLLIN:
-                                    reply = client.recv()
+                                    client.recv()
                                     expect_thanks = False
                                 else:
                                     msg = {

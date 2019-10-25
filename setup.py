@@ -28,26 +28,6 @@ import numpy as np
 from Cython.Build import cythonize
 from setuptools import Extension, find_packages, setup
 
-# use ccache to speed up build
-# try:
-#     if subprocess.call(['ccache'], stderr = open(os.devnull, "w")):
-#         os.environ['CC'] = 'ccache gcc'
-# except OSError:
-#     pass
-
-#
-# if building source package, we will need to have wrapper files for both
-# versions of Python
-#
-SDIST = 'sdist' in sys.argv
-
-try:
-    import argparse
-except ImportError:
-    sys.exit(
-        'variant tools requires Python 3.2 or higher. Please upgrade your version (%s) of Python and try again.'
-        % (sys.version.split()[0]))
-
 # do not import variant_tools because __init__ might not be imported properly
 # before installation
 with open('src/variant_tools/_version.py') as init:
@@ -209,7 +189,7 @@ if not os.path.isfile('src/swigpyrun.h'):
             shell=True)
         if ret != 0:
             sys.exit('Failed to generate swig runtime header file.')
-    except OSError as e:
+    except OSError:
         sys.exit(
             'Failed to generate wrapper file. Please install swig (www.swig.org).'
         )
@@ -307,7 +287,7 @@ for files, incs, macs, libname in [
             macros=macs)
         c.create_static_lib(objects, libname, output_dir='build')
     except Exception as e:
-        sys.exit("Failed to build embedded {} library: {}".format(libname, e))
+        sys.exit(f"Failed to build embedded {libname} library: {e}")
 
 ext_modules=[
         Extension('variant_tools._vt_sqlite3',

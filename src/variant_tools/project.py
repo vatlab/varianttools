@@ -41,7 +41,7 @@ from multiprocessing import Process
 
 from ._version import VTOOLS_CONTACT, VTOOLS_COPYRIGHT, VTOOLS_VERSION
 from .cgatools import fasta2crr
-from .geno_store import GenoStore, HDF5_Store
+from .geno_store import GenoStore
 from .ucsctools import showTrack
 from .utils import (SQL_KEYWORDS, DatabaseEngine, PrettyPrinter, ProgressBar,
                     ProgressFileObj, RefGenome, ResourceManager, RuntimeFiles,
@@ -2049,7 +2049,7 @@ class Project:
                 # res can be an unicode string and need to be converted to
                 # string
                 return str(res)
-        except Exception as e:
+        except Exception:
             # env.logger.debug(e)
             #env.logger.warning('Failed to retrieve value for project property {}'.format(key))
             self.saveProperty(key, default)
@@ -2067,7 +2067,7 @@ class Project:
             else:
                 cur.execute('INSERT INTO project VALUES ({0}, {0});'.format(
                     self.db.PH), (key, value))
-        except Exception as e:
+        except Exception:
             pass
         self.db.commit()
 
@@ -2076,7 +2076,7 @@ class Project:
         try:
             cur.execute('DELETE FROM project WHERE name={};'.format(
                 self.db.PH), (key,))
-        except Exception as e:
+        except Exception:
             pass
         self.db.commit()
 
@@ -2148,7 +2148,7 @@ class Project:
         try:
             cur.execute(
                 '''CREATE UNIQUE INDEX filename_index ON filename (filename ASC);''')
-        except Exception as e:
+        except Exception:
             # the index might already exists
             return
 
@@ -2574,9 +2574,9 @@ class Project:
                         # if two fields have the same name and different types, they will be merged silently.
                         new_fields.extend([fld for fld in fields if fld.split(None, 1)[
                                           0] not in [x.split(None, 1)[0] for x in new_fields]])
-                    except Exception as e:
+                    except Exception:
                         raise RuntimeError('Corrupted genotype database: Failed to '
-                                           'get structure of genotype table {}'.format(id))
+                                           'get structure of genotype table {}'.format(self.name))
                 #
                 query = 'CREATE TABLE {} ({})'.format(
                     new_table, ', '.join(new_fields))
@@ -3205,7 +3205,7 @@ class MaintenanceProcess(Process):
             missing_indexes = all_indexes - cur_indexes
             if len(missing_indexes) == 0:
                 return
-        except KeyboardInterrupt as e:
+        except KeyboardInterrupt:
             # interrupted just return, nothing harmful is done.
             db.close()
             return
@@ -3221,7 +3221,7 @@ class MaintenanceProcess(Process):
                 cur.execute(
                     'CREATE INDEX {0} ON {1} (variant_id)'.format(idx, idx[:-6]))
                 db.commit()
-        except KeyboardInterrupt as e:
+        except KeyboardInterrupt:
             # if keyboard interrupt, stop, but not immediately
             self.active_flag.value = 0
         finally:
@@ -4406,7 +4406,7 @@ def init(args):
         #
         if args.children:
             if args.store != 'sqlite':
-                raise NotImplemented(
+                raise NotImplementedError(
                     'Option --parent is not supported yet with non-sqlite storage model')
             # A default value 4 is given for args.jobs because more threads usually
             # do not improve effiency
@@ -4946,7 +4946,7 @@ def show(args):
                         dbName = dbName[:-3]
                     annoDB = [
                         x for x in proj.annoDB if x.linked_name.lower() == dbName][0]
-                except Exception as e:
+                except Exception:
                     raise IndexError('Database {} is not currently used in the project.'
                                      .format(args.items[0]))
                 annoDB.describe(args.verbosity == '2')
@@ -5456,7 +5456,7 @@ def admin(args):
                 try:
                     _user_options = __import__(
                         'user_options',  globals(), locals()).__dict__
-                except Exception as e:
+                except Exception:
                     _user_options = {}
                     print(
                         'Failed to load user settings from ~/.variant_tools/user_options.py')
@@ -5486,7 +5486,7 @@ def admin(args):
             try:
                 _user_options = __import__(
                     'user_options',  globals(), locals()).__dict__
-            except Exception as e:
+            except Exception:
                 _user_options = {}
                 print(
                     'Failed to load user settings from ~/.variant_tools/user_options.py')

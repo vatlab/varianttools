@@ -19,22 +19,23 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import sys
 import os
 import re
+import sys
 import time
 from collections import defaultdict
-from .project import Project, fileFMT
-from .liftOver import LiftOverTool
-from .utils import ProgressBar, lineCount, delayedAction, RefGenome,\
-    consolidateFieldName, env, encodeTableName, decodeTableName, \
-    determineSexOfSamples, getVariantsOnChromosomeX, getVariantsOnChromosomeY,\
-    getVariantsOnManifolds
+
+from .geno_store import GenoStore
 from .importer import LineProcessor, probeSampleName
+from .importer_allele_hdf5 import UpdateGenotypeInParallel
+from .liftOver import LiftOverTool
+from .project import Project, fileFMT
 from .text_reader import TextReader
-from .geno_store import *
-import sqlite3
-from .importer_allele_hdf5 import *
+from .utils import (ProgressBar, RefGenome, consolidateFieldName,
+                    decodeTableName, delayedAction, determineSexOfSamples,
+                    encodeTableName, env, getVariantsOnChromosomeX,
+                    getVariantsOnChromosomeY, getVariantsOnManifolds,
+                    lineCount)
 
 
 #
@@ -822,7 +823,7 @@ def calcSampleStat(proj, from_stat, samples, variant_table, genotypes):
 
     for id in IDs:
         fields = ["variant_id"]
-        starttime = time.time()
+        #starttime = time.time()
         fields.extend(store.geno_fields(id))
         for field in fields:
             fieldInTable[field].append(id)

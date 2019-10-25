@@ -21,19 +21,15 @@
 #
 
 import datetime
-import glob as glob
 import os
 import re
 import sys
-import time
 from argparse import SUPPRESS
-from multiprocessing import Lock, Pipe, Process
 
-from .exporter_reader import *
-from .preprocessor import *
+from .exporter_reader import VariantReader
+from .preprocessor import PlainFormatter, SequentialCollector
 from .project import Project, fileFMT
-from .utils import (DatabaseEngine, ProgressBar, consolidateFieldName,
-                    decodeTableName, delayedAction, encodeTableName, env,
+from .utils import (ProgressBar, decodeTableName, encodeTableName, env,
                     splitField)
 
 MAX_COLUMN = 62
@@ -195,7 +191,7 @@ class Exporter:
                     raise ValueError('Invalid filename specification "{}".'.format(item))
                 try:
                     eval('{}'.format('self.export{}(base)'.format(ext[1:].capitalize())))
-                except Exception as e:
+                except Exception:
                     raise ValueError('Additional export to file *{} is not supported'.format(ext))
         else:
             pass

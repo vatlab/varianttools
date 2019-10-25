@@ -112,7 +112,7 @@ if os.path.isfile(os.path.expanduser('~/.variant_tools/user_options.py')):
     sys.path.insert(0, os.path.expanduser('~/.variant_tools'))
     try:
         _user_options = __import__('user_options', globals(), locals()).__dict__
-    except Exception as e:
+    except Exception:
         print(
             'Failed to load user settings from ~/.variant_tools/user_options.py'
         )
@@ -871,7 +871,7 @@ def lineCount(filename, encoding='UTF-8'):
                 return len(gzip.open(filename, 'rb').readlines())
             # Python 2.7.4 and 3.3.1 have a regression bug that prevents us from opening
             # certain types of gzip file (http://bugs.python.org/issue17666).
-            except TypeError as e:
+            except TypeError:
                 raise RuntimeError(
                     'Failed to open gzipped file {} due to a bug '
                     'in Python 2.7.4 and 3.3.1. Please use a different version '
@@ -895,7 +895,7 @@ def lineCount(filename, encoding='UTF-8'):
             input.close()
         # Python 2.7.4 and 3.3.1 have a regression bug that prevents us from opening
         # certain types of gzip file (http://bugs.python.org/issue17666).
-        except TypeError as e:
+        except TypeError:
             raise RuntimeError(
                 'Failed to open gzipped file {} due to a bug '
                 'in Python 2.7.4 and 3.3.1. Please use a different version '
@@ -2440,7 +2440,7 @@ def decompressGzFile(filename, inplace=True, force=False, md5=None):
                             calculateMD5(new_filename, partial=True)))
         # Python 2.7.4 and 3.3.1 have a regression bug that prevents us from opening
         # certain types of gzip file (http://bugs.python.org/issue17666).
-        except TypeError as e:
+        except TypeError:
             raise RuntimeError(
                 'Failed to open gzipped file {} due to a bug '
                 'in Python 2.7.4 and 3.3.1. Please use a different '
@@ -2979,7 +2979,7 @@ def physicalMemory():
         try:
             res = subprocess.check_output('free').decode().split('\n')
             return int(res[1].split()[1])
-        except Exception as e:
+        except Exception:
             return None
 
 
@@ -3105,9 +3105,8 @@ class RefGenome:
                 return ref == self.getBase(chr, pos)
             else:
                 return ref == self.getSequence(chr, pos, pos + len(ref) - 1)
-        except Exception as e:
+        except Exception:
             return False
-            # raise ValueError('Failed to verify variant (chr={},pos={},ref={}): {}'.format(chr, pos, ref, e))
 
 
 #
@@ -3403,7 +3402,6 @@ class DatabaseEngine:
     def removeTable(self, table):
         '''Remove specified table'''
         cur = self.database.cursor()
-        sql = 'DROP TABLE {};'.format(table)
         cur.execute('DROP TABLE {};'.format(table))
         # FIXME: should we automatically do VACUUM, this can be slow when the table is deletec
         # but can help performance for the creation of new tables.
@@ -3491,7 +3489,7 @@ class DatabaseEngine:
                 cur.executemany(insert_query,
                                 [(bin, chr, start, end, rowid)
                                  for bin in range(sbin, ebin + 1)])
-            except Exception as e:
+            except Exception:
                 env.logger.warning(
                     'Failed to create bins for range {} - {}'.format(
                         start, end))
@@ -3816,7 +3814,7 @@ def consolidateFieldName(proj, table, clause_or_list, alt_build=False):
                     .format(proj.db.PH), (cond,))
                 res = cur.fetchone()
                 return res[0]
-            except Exception as e:
+            except Exception:
                 try:
                     cur.execute(
                         'SELECT sample_id FROM sample, filename '
@@ -4214,7 +4212,7 @@ class VariableSubstitutor:
             return str(var)
 
     def _substitute(self, text, PipelineVars, PipelineGlobals):
-        if float(PipelineVars['pipeline_format']) <= 1.0 is None:
+        if float(PipelineVars['pipeline_format']) <= 1.0:
             # for the first version of pipeline specification file, newlines are
             # replaced with ' '. The newer version (1.0+) keeps newline to faciliate the
             # inclusion of multi-line scripts etc.
@@ -4333,7 +4331,7 @@ def determineSexOfSamples(proj, sample_IDs=None):
             }
         else:
             return {x[0]: sex_dict[x[1]] for x in cur.fetchall()}
-    except KeyError as e:
+    except KeyError:
         raise ValueError(
             'Invalid or missing value detected for field {}. Allowed '
             'values are M/F, 1/2, Male/Female.'.format(sex_field))

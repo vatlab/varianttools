@@ -332,7 +332,7 @@ def plotAssociation(args):
         data.append(x.rstrip().split())
     env.logger.info("Processing {} of input data ...".format(
         size(len(data) + data_size)))
-    p = PlotAssociation(args, data)
+    _ = PlotAssociation(args, data)
 
     pinput = eval(args.method.upper() + '_FOO') + eval(
         'p.{}'.format(args.method if args.method == 'qq' else 'manhattan'))(

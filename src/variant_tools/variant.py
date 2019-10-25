@@ -23,9 +23,10 @@
 import sys
 import re
 from .project import Project
-from .utils import ProgressBar, consolidateFieldName, \
-    encodeTableName, env, validFieldName, PrettyPrinter, OperationalError,chunks
-from .geno_store import *
+from .utils import consolidateFieldName, \
+    encodeTableName, env, validFieldName, PrettyPrinter, OperationalError
+
+from .geno_store import GenoStore
 
 
 def outputArguments(parser):

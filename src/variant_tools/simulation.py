@@ -22,30 +22,31 @@
 Tools.
 '''
 
-import simuOpt
-simuOpt.setOptions(
-    alleleType='mutant', optimized=True, quiet=True, version='1.1.4')
+import datetime
+import os
+import random
+import time
+from collections import defaultdict
 
+import simuOpt
 import simuPOP as sim
 from simuPOP.sampling import drawRandomSample
 
-from .utils import env, expandRegions, ProgressBar, RefGenome, existAndNewerThan, \
-    calculateMD5, genesInRegions, codon_table, codon_table_reverse_complement, \
-    dissectGene, downloadFile, decompressGzFile
-
-import os
-import sys
-import math
-import time
-import datetime
-import random
-import tempfile
-from collections import defaultdict
-
 from .pipeline import PipelineAction
 from .project import Project
-
 from .ucsctools import tabixFetch
+from .utils import (ProgressBar, RefGenome, codon_table,
+                    codon_table_reverse_complement, decompressGzFile,
+                    dissectGene, downloadFile, env, expandRegions,
+                    genesInRegions)
+
+simuOpt.setOptions(
+    alleleType='mutant', optimized=True, quiet=True, version='1.1.4')
+
+
+
+
+
 
 
 def FineScaleRecombinator(regions=None, scale=1, defaultRate=1e-8, output=None):
@@ -317,7 +318,7 @@ class OutputPopulationStatistics(PipelineAction):
                 x for x in range(pop.chromBegin(ch), pop.chromEnd(ch))
                 if x in seg_sites
             ]
-            chName = pop.chromName(ch)
+            # chName = pop.chromName(ch)
             for idx, i in enumerate(seg_sites_ch):
                 for j in seg_sites_ch[idx + 1:]:
                     dist = int(pop.locusPos(j) - pop.locusPos(i))
@@ -481,7 +482,7 @@ class MutantInfo:
                     list(range(reg[1], reg[2] + 1)))
                 nLoci += len(all_loci[reg[0]])
             # find the number of loci on each chromosome
-            chroms = sorted(all_loci.keys())
+            # chroms = sorted(all_loci.keys())
             #
             ref = RefGenome(proj.build)
             genes = genesInRegions(regions, proj)
@@ -515,7 +516,7 @@ class MutantInfo:
                                 skip_codon = True
                                 continue
                         except:
-                            skip_condon = True
+                            skip_codon = True
                             continue
                         # information about the codon: p0, p1, p2, aa, strand
                         codon = ((ch, p), (ch, pos[idx + 1]), (ch,
@@ -907,7 +908,6 @@ class CreatePopulation(PipelineAction):
         chroms = list(lociPos.keys())
         chroms.sort()
         #
-        allele_map = {'0': 0, '1': 1, '2': 1, '.': 0}
         mutantCount = 0
         # create a dictionary of lociPos->index on each chromosome
         lociIndex = {}
@@ -951,8 +951,8 @@ class CreatePopulation(PipelineAction):
     def _importFromMS(self, lociPos):
         #
         with open(self.sourceFile, 'r') as ms:
-            cmd = ms.readline()
-            seeds = ms.readline()
+            _ = ms.readline()
+            _ = ms.readline()
             ms.readline()
             # current we do not handle multiple populations etc
             chroms = list(lociPos.keys())
@@ -1493,6 +1493,8 @@ class ExportPopulation(PipelineAction):
         if len(self.output) == 1:
             return
         # output phenotype
+        pop = sim.loadPopulation(ifiles[0])
+
         with open(self.output[1], 'w') as phe:
             fields = pop.infoFields()
             phe.write('sample_name\taff' + '\t'.join(fields) + '\n')
@@ -1554,15 +1556,16 @@ class ExportPopulation(PipelineAction):
         env.logger.info('Loading {}'.format(ifiles[0]))
         pop = sim.loadPopulation(ifiles[0])
         # if we need to output variant information
-        aaInfo = None
+        #aaInfo = None
         if self.var_info:
             if 'regions' not in pop.vars():
                 env.logger.warning(
                     'No mutation type can be obtained because population object does not have variable "regions".'
                 )
-            else:
+            #else:
                 # figure out regions of the population
-                aaInfo = MutantInfo(pop.dvars().regions)
+                #aaInfo = MutantInfo(pop.dvars().regions)
+                #pass
         # output genotype
         with Project(
                 mode=['ALLOW_NO_PROJ', 'READ_ONLY'],

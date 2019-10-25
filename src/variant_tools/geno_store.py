@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 #
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
 # Please visit https://github.com/vatlab/varianttools for details.
@@ -23,14 +22,16 @@
 
 import glob
 import os
+import queue
 import re
 import sys
 import time
-from datetime import datetime
 from multiprocessing import Lock, Manager, Process, Queue, Value
 
-from .accessor import *
-from .exporter_reader import *
+import numpy as np
+
+from .accessor import Engine_Access, Engine_Storage
+from .exporter_reader import MultiVariantReader
 from .importer_allele_hdf5 import (HDF5GenotypeImportWorker, manageHDF5,
                                    updateSample)
 from .text_reader import TextReader
@@ -939,7 +940,7 @@ class Sqlite_Store(Base_Store):
                         if rec[queryIndex] in [None, '', '.']:
                             continue
                         operation = operations[index]
-                        field = genotypeFields[index]
+                        #field = genotypeFields[index]
                         if operation == MEAN:
                             if variants[rec[0]][recIndex] is None:
                                 # we need to track the number of valid records
@@ -1620,7 +1621,7 @@ class HDF5_Store(Base_Store):
                               prog_step):
         # print(genotypes)
         sampleFileMap = self.get_HDF5_sampleMap()
-        fieldSelect = list(sampleDict.values())[0][1]
+        #fieldSelect = list(sampleDict.values())[0][1]
         variants = []
         if variant_table != 'variant':
             variants = self.get_selected_variants(variant_table)

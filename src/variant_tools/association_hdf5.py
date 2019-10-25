@@ -27,8 +27,6 @@ import time
 from multiprocessing import Manager, Process
 from multiprocessing import Queue as mpQueue
 
-import numpy as np
-
 from .accessor import Engine_Access, Engine_Storage
 from .utils import DatabaseEngine
 
@@ -104,7 +102,7 @@ class GroupHDFGenerator(Process):
                     cur.execute(
                         'SELECT DISTINCT(file_id) from sample where HDF5="{0}"'
                         .format(HDFfileName))
-                    file_id = cur.fetchall()
+                    _ = cur.fetchall()
                     for row in cur.execute(select_group):
                         geneSymbol = transformGeneName(row[0])
                         ids = row[1].split(",")
@@ -160,9 +158,8 @@ class GroupHDFGenerator(Process):
                     # storageEngine.close()
                 accessEngine.close()
                 storageEngine.close()
-                #
 
-            except KeyboardInterrupt as e:
+            except KeyboardInterrupt:
                 accessEngine.close()
                 storageEngine.close()
                 pass
@@ -176,7 +173,7 @@ def generateHDFbyGroup(testManager, njobs):
     groupGenerators = []
     fileQueue = mpQueue()
     taskQueue = queue.Queue()
-    start = time.time()
+
     groupGenerators = [None] * min(njobs, len(HDFfileNames))
 
     if len(testManager.sample_IDs) > 0:
@@ -273,7 +270,7 @@ class GroupHDFGenerator_memory(Process):
                     storageEngine.store(hdf5matrix, chr, key)
                 accessEngine.close()
                 storageEngine.close()
-            except KeyboardInterrupt as e:
+            except KeyboardInterrupt:
                 accessEngine.close()
                 storageEngine.close()
                 pass
@@ -332,7 +329,7 @@ class GroupHDFGenerator_append(Process):
                         pass
                 accessEngine.close()
                 storageEngine.close()
-            except KeyboardInterrupt as e:
+            except KeyboardInterrupt:
                 accessEngine.close()
                 storageEngine.close()
                 pass
@@ -368,7 +365,6 @@ def generateHDFbyGroup_update(testManager, njobs):
 
     fileQueue = mpQueue()
     taskQueue = queue.Queue()
-    start = time.time()
     groupGenerators = [None] * min(njobs, len(HDFfileNames))
     geneDict, geneSet = getGroupDict(testManager)
     for HDFfileName in HDFfileNames:

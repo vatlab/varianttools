@@ -115,7 +115,7 @@ class _GeneNameStandardizer:
                 'rfamAcc': 8,
                 'tRnaName': 9
             }[self.convertTo]
-        except KeyError as e:
+        except KeyError:
             raise ValueError(
                 'Incorrect conversion type {}. Allowed types for GeneNameStandardizer '
                 'are kgID, mRNA, spID, spDisplayID, geneSymbol, refseq, protAcc, description, rfamAcc, and tRnaName'
@@ -155,7 +155,7 @@ class _GeneNameStandardizer:
             #if item.upper() in self.nameMap:
             #    print item.upper(), '==> ', self.nameMap[item.upper()]
             return self.nameMap[item.upper()]
-        except Exception as e:
+        except Exception:
             return item
 
 
@@ -1444,7 +1444,7 @@ class PlinkBinaryToVariants:
             chrom = self.cmap[chrom]
         try:
             ref = self.hgref.getBase(chrom, pos)
-        except Exception as e:
+        except Exception:
             env.logger.warning(
                 'Cannot find genomic coordinate {0}:{1} in reference genome {2}. '
                 'Input variant is ignored'.format(chrom, pos, self.build))

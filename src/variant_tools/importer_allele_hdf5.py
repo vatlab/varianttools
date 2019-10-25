@@ -25,47 +25,24 @@ This module contains Functions for extracting data from Variant Call Format (VCF
 into NumPy arrays, NumPy files, HDF5 files or Zarr array stores.
 
 """
-import array
 import glob
 import gzip
-import json
 import os
-import pickle
 import queue
 import re
 import subprocess
-import sys
 import time
 import warnings
-from collections import defaultdict, namedtuple
-from heapq import heappop, heappush, heappushpop
-from itertools import repeat
-from multiprocessing import Array, Lock, Manager, Pipe, Process
-from multiprocessing import Queue as mpQueue
-from multiprocessing import Value
+from collections import namedtuple
+from multiprocessing import Process, Value
 from shutil import copyfile
-from subprocess import call
 
 import numpy as np
-import tables as tb
 
 from variant_tools.io_vcf_read import FileInputStream, VCFChunkIterator
 
-from .accessor import *
-from .preprocessor import *
-from .utils import (DatabaseEngine, ProgressBar, RefGenome, delayedAction,
-                    downloadFile, env, getMaxUcscBin, hasCommand, lineCount,
-                    openFile)
-
-try:
-    from variant_tools.cgatools import normalize_variant
-except ImportError as e:
-    sys.exit(
-        'Failed to import module ({})\n'
-        'Please verify if you have installed variant tools successfully (using command '
-        '"python setup.py install")'.format(e))
-
-
+from .accessor import Engine_Storage, Engine_Access
+from .utils import DatabaseEngine, ProgressBar, env
 
 # expose some names from cython extension
 # from variant_tools.io_vcf_read import (  # noqa: F401
@@ -259,7 +236,7 @@ def _hdf5_setup_datasets(chunk, root, chunk_length, chunk_width, compression,
                 dt = data.dtype
         else:
             dt = data.dtype
-        ds = root[group].create_dataset(
+        root[group].create_dataset(
             name,
             shape=shape,
             maxshape=maxshape,
@@ -1164,7 +1141,6 @@ class HDF5GenotypeImportWorker(Process):
         prev_chr = self.chunk["variants/CHROM"][0].replace("chr", "")
         prev_variant_id = -1
         for i in range(len(self.chunk["variants/ID"])):
-            infoDict = {}
             chr = self.chunk["variants/CHROM"][i].replace("chr", "")
             if chr != prev_chr:
                 self.writeIntoHDF(prev_chr)
@@ -1184,8 +1160,8 @@ class HDF5GenotypeImportWorker(Process):
 
                     else:
                         rec = [str(chr), str(pos), ref, alt]
-                        msg = normalize_variant(
-                            RefGenome(self.build).crr, rec, 0, 1, 2, 3)
+                        #msg = normalize_variant(
+                        #    RefGenome(self.build).crr, rec, 0, 1, 2, 3)
                         if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
                             variant_id = self.variantIndex[tuple(
                                 (rec[0], rec[2], rec[3]))][rec[1]][0]
@@ -1318,7 +1294,7 @@ class HDF5GenotypeSortWorker(Process):
         accessEngine = Engine_Access.choose_access_engine(self.originLocation)
         node = accessEngine.file.get_node("/chr" + str(chr))
         colnames = node.colnames[:].tolist()
-        shape = node.shape[:]
+        #shape = node.shape[:]
         colpos = list(map(lambda x: colnames.index(x), colnames))
         allgenoinfo = {}
         # if endPos>shape[0]:
@@ -1405,7 +1381,6 @@ class HDF5GenotypeSortWorker(Process):
         chunksize = len(self.chunk["variants/ID"])
 
         for i in range(len(self.chunk["variants/ID"])):
-            infoDict = {}
             chr = self.chunk["variants/CHROM"][i].replace("chr", "")
             if chr != prev_chr:
                 if self.estart.value != self.eend.value:
@@ -1464,8 +1439,8 @@ class HDF5GenotypeSortWorker(Process):
 
                     else:
                         rec = [str(chr), str(pos), ref, alt]
-                        msg = normalize_variant(
-                            RefGenome(self.build).crr, rec, 0, 1, 2, 3)
+                        #msg = normalize_variant(
+                        #    RefGenome(self.build).crr, rec, 0, 1, 2, 3)
                         if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
                             variant_id = self.variantIndex[tuple(
                                 (rec[0], rec[2], rec[3]))][rec[1]][0]
@@ -1485,7 +1460,6 @@ class HDF5GenotypeSortWorker(Process):
 def updateSample(cur, start_sample, end_sample, sample_ids, names, allNames,
                  HDF5fileName):
     firstID = 0
-    adjust = 0
     # if sample_ids[0]!=1 and start_sample!=0:
     #     firstID=sample_ids[0]
     #     start_sample=start_sample+1
@@ -1597,11 +1571,11 @@ def importGenotypesInParallel(importer, num_sample=0):
         taskQueue = queue.Queue()
         task = None
 
-        compression = 'gzip'
-        compression_opts = 1
-        shuffle = False
-        overwrite = False
-        vlen = True
+        #compression = 'gzip'
+        #compression_opts = 1
+        #shuffle = False
+        #overwrite = False
+        #vlen = True
         fields = [
             'variants/ID', 'variants/REF', 'variants/ALT', 'variants/POS',
             'variants/CHROM'
@@ -1622,9 +1596,9 @@ def importGenotypesInParallel(importer, num_sample=0):
         transformers = None
         buffer_size = DEFAULT_BUFFER_SIZE
         chunk_length = DEFAULT_CHUNK_LENGTH
-        chunk_width = DEFAULT_CHUNK_WIDTH
+        #chunk_width = DEFAULT_CHUNK_WIDTH
 
-        log = None
+        #log = None
 
         _, samples, headers, it = iter_vcf_chunks(
             input_filename,
@@ -1653,8 +1627,6 @@ def importGenotypesInParallel(importer, num_sample=0):
         estart = [Value('L', 0) for x in range(numTasks)]
         eend = [Value('L', READ_EXISTING_CHUNK_LENGTH) for x in range(numTasks)]
         efirst = [Value('b', True) for x in range(numTasks)]
-
-        start = time.time()
 
         for chunk, _, _, _ in it:
             start_sample = 0
@@ -1709,15 +1681,11 @@ def importGenotypesInParallel(importer, num_sample=0):
                         importers[i] = task
                         importers[i].start()
                         break
-            starttime = time.time()
             for worker in importers:
                 if worker is not None:
                     worker.join()
-            # print("jointime "+str(time.time()-starttime))
-            starttime = time.time()
             lines += chunk_length
             prog.update(lines)
-            start = time.time()
         for sortFile in glob.glob("tmp*_sort_genotypes.h5"):
             os.rename(sortFile, sortFile.replace("_sort", ""))
 
@@ -1773,13 +1741,12 @@ class HDF5GenotypeUpdateWorker(Process):
     def run(self):
         prev_chr = self.chunk["variants/CHROM"][0].replace("chr", "")
         for i in range(len(self.chunk["variants/ID"])):
-            infoDict = {}
             chr = self.chunk["variants/CHROM"][i].replace("chr", "")
             if chr != prev_chr:
                 self.writeIntoHDF(prev_chr)
                 prev_chr = chr
-            ref = self.chunk["variants/REF"][i]
-            pos = self.chunk["variants/POS"][i]
+            #ref = self.chunk["variants/REF"][i]
+            #pos = self.chunk["variants/POS"][i]
 
             for altIndex in range(len(self.chunk["variants/ALT"][i])):
                 alt = self.chunk["variants/ALT"][i][altIndex]
@@ -1800,7 +1767,7 @@ class HDF5GenotypeUpdateWorker(Process):
 def UpdateGenotypeInParallel(updater, input_filename, sample_ids, hdf5Files):
 
     jobs = updater.jobs
-    numTasks = jobs
+    #numTasks = jobs
     updaters = [None] * jobs
     taskQueue = queue.Queue()
     task = None
@@ -1824,9 +1791,9 @@ def UpdateGenotypeInParallel(updater, input_filename, sample_ids, hdf5Files):
     transformers = None
     buffer_size = DEFAULT_BUFFER_SIZE
     chunk_length = DEFAULT_CHUNK_LENGTH
-    chunk_width = DEFAULT_CHUNK_WIDTH
+    #chunk_width = DEFAULT_CHUNK_WIDTH
 
-    log = None
+    #log = None
     _, samples, headers, it = iter_vcf_chunks(
         input_filename,
         fields=fields,

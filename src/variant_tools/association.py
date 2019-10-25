@@ -19,34 +19,25 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import argparse
 import glob
 import json
-import logging
 import math
 import os
-import pickle
 import random
 import re
 import sys
 import threading
 import time
-import uuid
-from collections import deque
 from multiprocessing import Array, Lock, Process, Queue, Value
 
-import numpy as np
-import tables as tb
 import zmq
-from zmq.log.handlers import PUBHandler
 
 from variant_tools.vt_sqlite3 import OperationalError
 
-from .association_hdf5 import (generateHDFbyGroup, generateHDFbyGroup_update,
-                               getGenotype_HDF5)
+from .association_hdf5 import generateHDFbyGroup, getGenotype_HDF5
 from .assoTests import AssoData
 from .project import AnnoDB, AnnoDBWriter, Field, MaintenanceProcess, Project
-from .rtester import SKAT, RTest
+from .tester import ExternTest, NullTest
 from .tester import *
 from .utils import (DatabaseEngine, PrettyPrinter, ProgressBar, ShelfDB,
                     consolidateFieldName, delayedAction, env,
@@ -739,7 +730,7 @@ class GenotypeLoader(Process):
                     shelf.add('{},{}'.format(id, grp), val)
                 # report progress, and tells the master process who owns the data
                 self.cached_samples[id] = 1 + self.index
-        except KeyboardInterrupt as e:
+        except KeyboardInterrupt:
             # do not produce annoying traceback
             pass
         finally:
@@ -1285,7 +1276,7 @@ class AssoTestsWorker(Process):
                     result = test.calculate(env.association_timeout)
                     # env.logger.debug('Finished association test on {}'.format(repr(grpname)))
                     values.extend(result)
-            except KeyboardInterrupt as e:
+            except KeyboardInterrupt:
                 # die silently if stopped by Ctrl-C
                 break
             except Exception as e:
@@ -1372,7 +1363,7 @@ def runAssociation(args, asso, proj, results):
                     prog.update(done)
                     if done == len(asso.sample_IDs):
                         break
-            except KeyboardInterrupt as e:
+            except KeyboardInterrupt:
                 env.logger.error(
                     '\nLoading genotype stopped by keyboard interruption.')
                 proj.close()
@@ -1435,7 +1426,7 @@ def runAssociation(args, asso, proj, results):
                 count = results.completed()
                 prog.update(count, results.failed())
                 # env.logger.debug('Processed: {}/{}'.format(count, len(asso.groups)))
-        except KeyboardInterrupt as e:
+        except KeyboardInterrupt:
             env.logger.error('\nAssociation tests stopped by keyboard interruption ({}/{} completed).'.\
                               format(count, len(asso.groups)))
             results.done()
@@ -1524,7 +1515,7 @@ def send_next_work(sock, works):
 def send_thanks(sock):
     try:
         sock.send_string("done")  # Nothing more to say actually
-    except zmq.error.ZMQError as e:
+    except zmq.error.ZMQError:
         pass
 
 
@@ -1596,7 +1587,7 @@ def zmq_cluster_runAssociation(args, asso, proj, results, sock, hb_socket, poll,
                     try:
                         grps = send_next_work(sock, works)
                         tasks[grps] = j["pid"]
-                    except StopIteration as e:
+                    except StopIteration:
                         try:
                             if first:
                                 works = send_unfinished_works(unfinished_works)
@@ -1605,7 +1596,7 @@ def zmq_cluster_runAssociation(args, asso, proj, results, sock, hb_socket, poll,
                             sock.send_json(work)
                             grps = ','.join(elems[0] for elems in work["grps"])
                             tasks[grps] = j["pid"]
-                        except StopIteration as e:
+                        except StopIteration:
                             sock.send_json({"noMoreWork": "noMoreWork"})
 
                 elif j['msg'] == "result":

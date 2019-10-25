@@ -31,10 +31,8 @@ from collections import defaultdict
 from multiprocessing import Manager, Process
 from multiprocessing import Queue as mpQueue
 
-import numpy as np
-import tables as tb
 
-from .geno_store import GenoStore, HDF5_Store
+from .geno_store import GenoStore
 from .project import Project
 from .utils import (SQL_KEYWORDS, DatabaseEngine, ProgressBar, env,
                     typeOfValues, validFieldName)
@@ -116,7 +114,7 @@ class GenotypeStatCalculator(threading.Thread):
                 try:
                     cur.execute(query)
                     res = cur.fetchone()
-                except Exception as e:
+                except Exception:
                     # some field might not exist, so we will have to run one by one
                     for idx, (expr, where) in enumerate(self.stat):
                         query = 'SELECT {} FROM genotype_{} {};'\

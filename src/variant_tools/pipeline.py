@@ -23,18 +23,16 @@
 This module implement Variant Pipeline Tools and VPT-provided
 pipeline actions.
 '''
-import argparse
 import bz2
+import collections
 import copy
 import csv
-#
 import glob
 import gzip
 import hashlib
 import logging
 import os
 import pipes
-import platform
 import pprint
 import random
 import re
@@ -48,23 +46,16 @@ import threading
 import time
 import traceback
 import zipfile
-from collections import MutableMapping, namedtuple
+from collections import MutableMapping
 from itertools import combinations, tee
 from multiprocessing import Process
 
 from .project import PipelineDescription, Project
 from .ucsctools import showTrack
 from .utils import (TEMP, FileInfo, ProgressBar, RuntimeFiles, calculateMD5,
-                    convertDoubleQuote, decompressGzFile, delayedAction,
-                    downloadFile, downloadURL, encodeTableName, env,
-                    existAndNewerThan, expandRegions, openFile, substituteVars,
-                    typeOfValues, validFieldName, which)
-
-try:
-    import pysam
-    hasPySam = True
-except (ImportError, ValueError) as e:
-    hasPySam = False
+                    decompressGzFile, delayedAction, downloadFile, downloadURL,
+                    env, existAndNewerThan, substituteVars, typeOfValues,
+                    validFieldName, which)
 
 
 class NamedList:
@@ -854,7 +845,7 @@ SkiptableAction = PipelineAction
 try:
     from .simulation import *
     hasSimuPOP = True
-except ImportError as e:
+except ImportError:
     hasSimuPOP = False
 
 
@@ -928,7 +919,7 @@ class IfElse(PipelineAction):
         the second action, and so on. Return the output from the last
         action as the result of this ``SequentialAction``.
         '''
-        if self.cond in [false, 'False', '']:
+        if self.cond in [False, 'False', '']:
             if self.else_action is not None:
                 return self.else_condition(ifiles, pipeline)
         else:
@@ -1042,7 +1033,7 @@ class ImportModules(PipelineAction):
                     # try to download it from online
                     try:
                         pyfile = downloadFile('simulation/{}'.format(module))
-                    except Exception as e:
+                    except Exception:
                         try:
                             pyfile = downloadFile('pipeline/{}'.format(module))
                         except Exception as e:
@@ -1393,10 +1384,10 @@ class OutputText(PipelineAction):
             self.text = ''.join([str(x) + '\n' for x in text])
         else:
             self.text = text + '\n'
-        self.filename = filename
+        self.filename = output
         self.mode = mode
         PipelineAction.__init__(self, 'OutputText',
-                                filename if filename is not None else '')
+                                self.filename if self.filename is not None else '')
 
     def __call__(self, ifiles, pipeline=None):
         if self.filename is not None:
@@ -1531,7 +1522,6 @@ class SharedProcess:
 
     def __enter__(self):
         # wait for the availability of lock
-        start_time = time.time()
         prog_time = None
         while True:
             # there is a progress file
@@ -2040,7 +2030,7 @@ class ExecutePythonCode(PipelineAction):
                     # try to download it from online
                     try:
                         pyfile = downloadFile('simulation/{}'.format(module))
-                    except Exception as e:
+                    except Exception:
                         try:
                             pyfile = downloadFile('pipeline/{}'.format(module))
                         except Exception as e:
@@ -2986,7 +2976,7 @@ class RemoveIntermediateFiles(PipelineAction):
                 env.logger.info('Replace {0} with {0}.file_info'.format(f))
                 try:
                     os.remove(f)
-                except e:
+                except Exception:
                     env.logger.warning(
                         'Failed to remove intermediate file {}'.format(f))
         return ifiles
@@ -3022,8 +3012,8 @@ class LinkToDir(PipelineAction):
                 raise RuntimeError('Failed to create directory {}: {}'.format(
                     self.dest, e))
             if not os.path.isdir(self.dest):
-                raise RuntimeError('Failed to create directory {}: {}'.format(
-                    self.dest, e))
+                raise RuntimeError('Failed to create directory {}'.format(
+                    self.dest))
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
@@ -3236,6 +3226,7 @@ class DownloadResource(PipelineAction):
                     with open(manifest_file, 'w') as manifest:
                         for f in bundle.namelist():
                             manifest.write(f + '\n')
+                    del s
             #
             if filename.endswith('.md5') and os.path.isfile(filename[:-4]):
                 md5_files.append(
@@ -3706,7 +3697,7 @@ class Pipeline:
                     if 'blocking' in command.options:
                         self.runtime = RuntimeFiles('{}_{}'.format(
                             pname, command.index))
-                        with SharedProcess(self.runtime) as protection:
+                        with SharedProcess(self.runtime):
                             ofiles = action(ig, self)
                     else:
                         ofiles = action(ig, self)

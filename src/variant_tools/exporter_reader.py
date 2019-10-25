@@ -20,23 +20,21 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
-import sys
-import re
-import time
-import datetime
-from argparse import SUPPRESS
-from multiprocessing import Process, Pipe, Lock
-from .utils import ProgressBar, delayedAction, \
-    consolidateFieldName, DatabaseEngine, env, encodeTableName, decodeTableName, \
-    splitField
-
-from .preprocessor import *
-# from .geno_store import GenoStore
-from .accessor import *
 import glob as glob
+import os
+import re
+import sys
+import time
+from multiprocessing import Lock, Pipe, Process
 
+import numpy as np
+
+# from .geno_store import GenoStore
+from .accessor import Engine_Access
 from .merge_sort_parallel import index_HDF5_rowIDs
+from .preprocessor import *
+from .utils import (DatabaseEngine, ProgressBar, consolidateFieldName,
+                    delayedAction, env)
 
 MAX_COLUMN = 62
 def VariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
@@ -476,7 +474,6 @@ class VariantWorker_HDF5_multi(Process):
     def run(self):
         accessEngine=Engine_Access.choose_access_engine(self.fileName)
         sortedID=index_HDF5_rowIDs(self.fileName)
-        vardict={}
         genoinfo_fields=[field.replace("_geno","") for field in self.geno_fields]
         if "GT" in genoinfo_fields:
             genoinfo_fields.remove("GT")

@@ -29,7 +29,6 @@ import urllib.parse
 import zipfile
 
 from .importer import LineProcessor
-from .preprocessor import *
 from .project import AnnoDB, AnnoDBWriter, Field, Project
 from .text_reader import TextReader
 from .utils import (SQL_KEYWORDS, DatabaseEngine, ProgressBar, RefGenome,
@@ -500,7 +499,7 @@ class AnnoDBConfiger:
                             dbFile, inplace=False, md5=self.db_md5)
                     return AnnoDB(self.proj, dbFile, linked_by, anno_type,
                                   linked_fields, linked_name)
-                except RuntimeError as e:
+                except RuntimeError:
                     raise
                 except Exception as e:
                     env.logger.warning(

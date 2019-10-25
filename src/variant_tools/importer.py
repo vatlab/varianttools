@@ -27,7 +27,7 @@ from itertools import repeat
 
 from .geno_store import GenoStore
 from .liftOver import LiftOverTool
-from .preprocessor import *
+from .preprocessor import SequentialExtractor, IgnoredRecord
 from .project import Project, fileFMT
 from .text_reader import TextReader
 from .utils import (ProgressBar, RefGenome, delayedAction, env, getMaxUcscBin,
@@ -241,7 +241,7 @@ class LineProcessor:
             # we first trust that nothing can go wrong and use a quicker method
             records = [(tokens[col] if t else [tokens[x] for x in col]) if adj is None else \
                 (adj(tokens[col]) if t else adj([tokens[x] for x in col])) for col,t,adj in self.fields]
-        except IgnoredRecord as e:
+        except IgnoredRecord:
             return
         except Exception:
             # If anything wrong happends, process one by one to get a more proper error message (and None values)
