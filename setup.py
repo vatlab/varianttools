@@ -359,9 +359,17 @@ ext_modules+=cythonize([Extension('variant_tools.io_vcf_read',
     library_dirs = ["build"])])
 
 
+
+def get_long_description():
+    with open(os.path.join(CURRENT_DIR, "README.md"), "r") as ld_file:
+        return ld_file.read()
+
+
 setup(name = "variant_tools",
     version = VTOOLS_VERSION,
     description = "Variant tools: an integrated annotation and analysis package for next-generation sequencing data",
+    long_description=get_long_description(),
+    long_description_content_type="text/markdown",
     author = 'Bo Peng',
     url = 'http://varianttools.sourceforge.net',
     author_email = 'bpeng@mdanderson.org',
