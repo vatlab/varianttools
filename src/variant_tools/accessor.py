@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 from scipy.sparse import csr_matrix
+
+import os
+os.environ['NUMEXPR_MAX_THREADS'] = '8'
+
 import tables as tb
 import numpy as np
 import math
 
-import os
 import sys
 from .utils import env,chunks_start_stop
 
