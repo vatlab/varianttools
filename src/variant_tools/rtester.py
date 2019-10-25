@@ -72,7 +72,7 @@ def SeqStr(obj, method='c(', tail=')'):
     tp0 = type(obj0)
     simple_types = [str, bool, int, int, float, complex]
     num_types = [int, int, float, complex]
-    is_int = tp0 in (int, int) 
+    is_int = tp0 in (int, int)
     if tp0 not in simple_types and method == 'c(':
         method = 'list('
     else:
@@ -122,24 +122,24 @@ def Str4R(obj, method = 'c'):
             return str_func[tp](obj)
     return OtherStr(obj)
 
-import signal 
-class TimeoutException(Exception): 
-    pass 
+import signal
+class TimeoutException(Exception):
+    pass
 
 def timectrl(timeout_time, default):
     def timeout_function(f):
         def f2(*args):
             def timeout_handler(signum, frame):
                 raise TimeoutException()
- 
-            old_handler = signal.signal(signal.SIGALRM, timeout_handler) 
+
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
             signal.alarm(timeout_time) # triger alarm in timeout_time seconds
-            try: 
+            try:
                 retval = f(*args)
             except TimeoutException:
                 return default
             finally:
-                signal.signal(signal.SIGALRM, old_handler) 
+                signal.signal(signal.SIGALRM, old_handler)
             signal.alarm(0)
             return retval
         return f2
@@ -202,7 +202,7 @@ class RConfig:
                 elif i.lower() == 'string':
                     return "VARCHAR(255)"
                 else:
-                    raise 
+                    raise
             except:
                 raise ValueError("Unsupported type speficiation '{0}'. "
                                  "Should be one of 'integer', 'float' or 'string'".format(i))
@@ -268,7 +268,7 @@ class RConfig:
                     tp = [x.strip() for x in self.conf.get(section, "type").split(',')]
                     if len(tp) != p:
                         raise ValueError("length of 'type' does not equal specified "
-                                         "{0}".format(p))                        
+                                         "{0}".format(p))
                     else:
                         self.vars[section]['type'] = \
                           flatten([[typemapper(x.strip()) for i in range(n)] for x in tp])
@@ -336,7 +336,7 @@ class RTest(ExternTest):
         basename = self._determine_algorithm()
         # No pre-defined R script available. Have to look for it
         if basename is None:
-            # check filename 
+            # check filename
             basename, ext = os.path.splitext(self.script)
             if ext.upper() != '.R':
                 raise ValueError("Improper R program filename '{0}' (should be '{1}.R')".\
@@ -362,7 +362,7 @@ class RTest(ExternTest):
 
     def parseInput(self):
         '''input argument passed to the Rscript'''
-        foostatement = '' 
+        foostatement = ''
         start = None
         end = None
         for idx, item in enumerate(self.Rscript):
@@ -468,12 +468,12 @@ class RTest(ExternTest):
         # Variant information matrix
         if len(self.pydata['var_info']):
                 self.Rdata.append('''{0}@V = as.data.frame({1})'''.\
-                                    format(self.datvar, Str4R(list(zip(*self.pydata['var_info'])), method = 'cbind')))            
+                                    format(self.datvar, Str4R(list(zip(*self.pydata['var_info'])), method = 'cbind')))
                 self.Rdata.append('''rownames({0}@V) = {1}'''.\
-                                    format(self.datvar, Str4R([':'.join(x) for x in self.pydata['coordinate']])))                                    
+                                    format(self.datvar, Str4R([':'.join(x) for x in self.pydata['coordinate']])))
                 self.Rdata.append('''colnames({0}@V) = {1}'''.\
                                     format(self.datvar, Str4R(self.pydata['var_info_header'])))
-                                    
+
         # Genotype information matrix
         if len(self.pydata['geno_info']):
                 for idx, item in enumerate(self.pydata['geno_info_header']):
@@ -495,11 +495,11 @@ class RTest(ExternTest):
         # check if any return value needs to be collected
         script = '\n'
         if len(self.outvars) == 0:
-            return script 
+            return script
         output = list(self.outconf.keys())
         for item in output:
-            n = self.outconf[item]['n'] 
-            p = self.outconf[item]['p'] 
+            n = self.outconf[item]['n']
+            p = self.outconf[item]['p']
             script += '''
             # check if exist
             if (! "{0}" %in% names(result)) {{
@@ -550,7 +550,7 @@ class RTest(ExternTest):
             except:
                 i = float('nan')
             return i
-        # 
+        #
         def forceint(i):
             try:
                 i = int(i)
@@ -569,7 +569,7 @@ class RTest(ExternTest):
         @timectrl(tmout, 'time expired')
         def timed_command(cmd, instream = None, msg = ''):
             return runCommand(cmd, instream, msg)
-        # 
+        #
         self.loadData()
         # write data and R script to log file for this group
         if self.data_cache_counter < self.data_cache or self.data_cache < 0:
@@ -602,7 +602,7 @@ class RTest(ExternTest):
                               format(self.name, self.gname, e))
             res = [na_value]*len(self.outvars)
         return res
-    
+
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''R test''',
             prog='vtools associate --method ' + self.__class__.__name__)
@@ -612,8 +612,8 @@ class RTest(ExternTest):
             'documented at http://varianttools.sf.net/Association/RTest')
         parser.add_argument('--name', default='RTest',
             help='''Name of the test that will be appended to names of output fields.''')
-        parser.add_argument('--data_cache', metavar='N', type=int, default = 0,
-            help='''Name of R data sets to be written into cache folder, for debug purpose.''')        
+        parser.add_argument('--data_cache', '--data-cache', metavar='N', type=int, default = 0,
+            help='''Name of R data sets to be written into cache folder, for debug purpose.''')
         # incorporate args to this class
         args, unknown = parser.parse_known_args(method_args)
         # incorporate args to this class
@@ -625,7 +625,7 @@ class RTest(ExternTest):
     def _determine_params(self, params, option = 'replace'):
         if option == 'parse':
             # format input argument list to input argument string dictionary,
-            # e.g., ["--kernel", "linear"] --> {"kernel":"linear"}.   
+            # e.g., ["--kernel", "linear"] --> {"kernel":"linear"}.
             rparams = {}
             current_key = None
             for p in params:
@@ -639,11 +639,11 @@ class RTest(ExternTest):
                     current_key = None
         else:
             self.datvar = None
-            rparams = [] 
+            rparams = []
             defaults = []
             # input parameter is a string, from the original R function
             # e.g., kernel = 'linear', df = 2
-            # have to update information of input string and from self.params 
+            # have to update information of input string and from self.params
             params_list = [[j.strip() for j in x.split('=')] for x in self._param_split(params)]
             for idx, item in enumerate(params_list):
                 if len(item) == 1 and idx == 0:
@@ -680,7 +680,7 @@ class RTest(ExternTest):
             if self.datvar is None:
                 raise ValueError("[R script error] Invalid parameter specification: "
                                  "no variable name for data object is found in '{0}'".format(params))
-            # check if all self.params belong to default parameters 
+            # check if all self.params belong to default parameters
             for k in list(self.params.keys()):
                 if k is None:
                     raise ValueError("Broken input argument {0}".format(self.params[k]))
@@ -692,7 +692,7 @@ class RTest(ExternTest):
 
     def _determine_algorithm(self):
         return None
-    
+
     def _param_split(self, pm):
         # quotes match
         qmatch = True
@@ -728,8 +728,8 @@ class SKAT(RTest):
     def parseArgs(self, method_args):
         parser = argparse.ArgumentParser(description='''SNP-set (Sequence) Kernel Association Test (Wu et al 2011; Lee at all 2012).
             This test adapts the R package "SKAT" implemented & maintained by Dr. Seunggeun Lee, with a less
-            complete interface and collection of features. Please refer to the SKAT documentation in R 
-            http://cran.r-project.org/web/packages/SKAT/ 
+            complete interface and collection of features. Please refer to the SKAT documentation in R
+            http://cran.r-project.org/web/packages/SKAT/
             for details of usage. Installation of SKAT R package v0.82 or higher is required to use this test.''',
             prog='vtools associate --method ' + self.__class__.__name__)
         parser.add_argument('trait_type', type=str, choices = ['quantitative','disease'], default='quantitative',
@@ -744,31 +744,31 @@ class SKAT(RTest):
         parser.add_argument('-k','--kernel', type=str, choices = ["linear", "linear.weighted", "IBS", "IBS.weighted", "quadratic", "2wayIX"],
             default="linear.weighted",
             help='''A type of kernel. Default set to "linear.weighted". Please refer to SKAT documentation for details.''')
-        parser.add_argument('--beta_param', nargs=2, type=float, default = [1,25],
+        parser.add_argument('--beta_param', '--beta-param', nargs=2, type=float, default = [1,25],
             help='''Parameters for beta weights. It is only used with weighted kernels. Default set to (1,25).
                 Please refer to SKAT documentation for details.''')
-        parser.add_argument('--p_method', type=str, choices = ['davies','liu','liu.mod','optimal','optimal.adj'], default='davies',
+        parser.add_argument('--p_method', '--p-method', type=str, choices = ['davies','liu','liu.mod','optimal','optimal.adj'], default='davies',
             help='''A method to compute the p-value. The "optimal.adj" refers to the SKAT-O method. Default set to "davies". Please refer to SKAT documentation for details.''')
         parser.add_argument('-i','--impute', type=str, choices = ['fixed','random'], default='fixed',
             help='''A method to impute missing genotypes. Default set to "fixed". Please refer to SKAT documentation for details.''')
-        parser.add_argument('--logistic_weights', nargs=2, type=float, metavar='PARAM',
+        parser.add_argument('--logistic_weights', '--logistic-weights', nargs=2, type=float, metavar='PARAM',
             help='''This option, if specified, will get the logistic weights from genotype matrix Z and apply this weight to SKAT. It requires
                 two input parameters par1 and par2. To use the SKAT default setting, type `--logistic_weights 0.07 150'.
                 Please refer to SKAT documentation for details.''')
         parser.add_argument('-r','--corr', nargs='*', type=float, default=[0],
             help='''The pho parameter of SKAT test. Default is 0. Please refer to SKAT documentation for details.''')
-        parser.add_argument('--missing_cutoff', metavar='C', type=freq, default=0.15,
+        parser.add_argument('--missing_cutoff', '--missing-cutoff', metavar='C', type=freq, default=0.15,
             help='''a cutoff of the missing rates of SNPs. Any SNPs with missing
                 rates higher than cutoff will be excluded from the analysis. Default set to 0.15''')
         parser.add_argument('--resampling', metavar='N', type=int, default=0,
             help='''Number of resampling using bootstrap method. Set it to '0' if you do not want to apply resampling.''')
-        parser.add_argument('--small_sample', metavar='N', type=int, default=0, 
+        parser.add_argument('--small_sample', '--small-sample', metavar='N', type=int, default=0,
             help='''Apply small sample model "SKAT_Null_Model_MomentAdjust" for binary traits having sample size smaller than N. Please refer to SKAT documentation for details.''')
-        parser.add_argument('--resampling_kurtosis', metavar='N', type=int, default=0,
+        parser.add_argument('--resampling_kurtosis', '--resampling-kurtosis', metavar='N', type=int, default=0,
             help='''Number of resampling to estimate kurtosis, for small sample size adjustment.
-            Set it to '0' if you do not wnat to apply the adjustment. The SKAT default setting is 10000. Please 
+            Set it to '0' if you do not wnat to apply the adjustment. The SKAT default setting is 10000. Please
             refer to SKAT documentation for details.''')
-        parser.add_argument('--data_cache', metavar='N', type=int, default = 0,
+        parser.add_argument('--data_cache', '--data-cache', metavar='N', type=int, default = 0,
             help=argparse.SUPPRESS)
         # incorporate args to this class
         args = parser.parse_args(method_args)
@@ -892,4 +892,4 @@ class SKAT(RTest):
                 continue
         if skat_dir == 'NULL':
             skat_dir = self._install_skat(os.path.join(env.local_resource, 'Rlib'))
-        return skat_dir 
+        return skat_dir

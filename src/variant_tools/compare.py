@@ -35,34 +35,34 @@ from .geno_store import GenoStore
 
 def compareArguments(parser):
     parser.add_argument('tables', nargs='*',
-        help='''variant tables to compare. Wildcard characters * and ? can be 
+        help='''variant tables to compare. Wildcard characters * and ? can be
             used to specify multiple tables. A table name will be automatically
             repeated for the comparison of genotype of multiple samples if only
             one table is specified.''')
-    parser.add_argument('--union', metavar=('TABLE', 'DESC'), nargs='*', 
+    parser.add_argument('--union', metavar=('TABLE', 'DESC'), nargs='*',
         help='''Print the number (default) or save variants with TYPE in the
             TYPE of any of the tables (T1 | T2 | T3 ...) to TABLE if a name is
             specified. An optional message can be added to describe the table. ''')
-    parser.add_argument('--intersection', metavar=('TABLE', 'DESC'), nargs='*', 
+    parser.add_argument('--intersection', metavar=('TABLE', 'DESC'), nargs='*',
         help='''Print the number (default) or save variants with TYPE in the TYPE
             of all the tables (T1 & T2 & T3 ...) to TABLE if a name is specified.
             An optional message can be added to describe the table.''')
     parser.add_argument('--difference', metavar=('TABLE', 'DESC'), nargs='*',
         help='''Print the number (default) or save variants with TYPE in the TYPE
             of the first, but not in the TYPE of others (T1 - T2 - T3...) to TABLE
-            if a name is specified. An optional message can be added to describe 
+            if a name is specified. An optional message can be added to describe
             the table.''')
     parser.add_argument('--expression', metavar=('EXPR', 'DESC'), nargs='+',
         help='''Evaluate a set expression with table names representing variants
-            in these tables. Operators | (or), & (and), - (difference) and ^ 
+            in these tables. Operators | (or), & (and), - (difference) and ^
             (A or B but not both) are allowed. The results will be saved to table
             if the result is assigned to a name (e.g. --expression 'D=A-(B&C)').
-            The table names in the expression can be written as _1, _2 etc if 
+            The table names in the expression can be written as _1, _2 etc if
             tables are listed before the option, and be used to populate the
             list of tables if it was left unspecified.''')
     parser.add_argument('--mode', choices=['variant', 'site', 'genotype'],
         help='''Compare variants (chr, pos, ref, alt), site (chr, pos), or
-            genotype (chr, pos, ref, alt, GT for a specified sample) of 
+            genotype (chr, pos, ref, alt, GT for a specified sample) of
             variants. The results are variants from all input tables that match
             specified condition. The default comparison TYPE compares variants
             in input variant tables. For the comparison of sites, the position
@@ -71,9 +71,9 @@ def compareArguments(parser):
             of genotypes, the genotypes of specified samples for all variants
             (see option --samples) are collected and compared, and variants
             with genotype in resulting set of genotypes are returned. The results
-            of genotype comparisons are affected by runtime option 
+            of genotype comparisons are affected by runtime option
             treat_missing_as_wildtype because items with missing genotype (chr,
-            pos, ref, alt, NULL) are excluded if treat_missing_as_wildtype is 
+            pos, ref, alt, NULL) are excluded if treat_missing_as_wildtype is
             false (default), and are treated as (chr, pos, ref, alt, 0) otherwise.
             The default comparison type is variant, or genotype if option
             --samples is specified.''')
@@ -83,10 +83,10 @@ def compareArguments(parser):
             samples or if a sample does not have any genotype.''')
     parser.add_argument('-c', '--count', action='store_true',
         help=SUPPRESS)
-    parser.add_argument('--A_diff_B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
-    parser.add_argument('--B_diff_A', nargs='+', metavar= 'TABLE', help=SUPPRESS)
-    parser.add_argument('--A_and_B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
-    parser.add_argument('--A_or_B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
+    parser.add_argument('--A_diff_B', '--A-diff-B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
+    parser.add_argument('--B_diff_A', '--B-diff-A', nargs='+', metavar= 'TABLE', help=SUPPRESS)
+    parser.add_argument('--A_and_B', '--A-and-B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
+    parser.add_argument('--A_or_B', '--A-or-B', nargs='+', metavar= 'TABLE', help=SUPPRESS)
 
 
 def countVariantDifference(proj, args):
@@ -103,7 +103,7 @@ def countVariantDifference(proj, args):
     #
     env.logger.info('Number of variants in A but not B, B but not A, A and B, and A or B')
     print(('{}\t{}\t{}\t{}'.format(
-        len(variants[0] - variants[1]), 
+        len(variants[0] - variants[1]),
         len(variants[1] - variants[0]),
         len(variants[0] & variants[1]),
         len(variants[0] | variants[1])
@@ -137,7 +137,7 @@ def countSiteDifference(proj, args):
     site0 = set(sites[0].keys())
     site1 = set(sites[1].keys())
     site_counts = '{}\t{}\t{}\t{}'.format(
-        len(site0 - site1), 
+        len(site0 - site1),
         len(site1 - site0),
         len(site0 & site1),
         len(site0 | site1)
@@ -233,9 +233,9 @@ def compareTables(proj, args):
                 if args.difference is not None:
                     var_diff -= var
                 if args.union is not None:
-                    var_union |=  var 
+                    var_union |=  var
                 if args.intersection is not None:
-                    var_intersect &= var 
+                    var_intersect &= var
                 if args.expression is not None:
                     variants.append(var)
         # only the expressionc ase needs to retain all variables
@@ -412,7 +412,7 @@ def compareTables(proj, args):
             if count % 10000 == 0:
                 prog.update(count)
         proj.describeTable(encodeTableName(table), desc, True, True)
-        prog.done()       
+        prog.done()
         proj.db.commit()
     # count by default
     if args.difference is not None:
@@ -483,7 +483,7 @@ def compare(args):
                     tables.append(table)
             # set args.tables to its expanded version
             args.tables = tables
-            # 
+            #
             # if an expression is given but no table is specified
             # they will be extracted
             if args.expression:
@@ -542,7 +542,7 @@ def compare(args):
                 raise ValueError('Please specify samples to be compared for genotype comparison.')
             if len(args.tables) == 1:
                 raise ValueError('Please specify at least two tables to compare.')
-            # 
+            #
             if args.B_diff_A or args.A_diff_B or args.A_and_B or args.A_or_B:
                 raise ValueError('Options B_diff_A, A_diff_B, A_and_B and A_or_B are deprecated.')
             if args.intersection is not None or args.union is not None or \
@@ -557,5 +557,5 @@ def compare(args):
                     countGenotypeDifference(proj, args)
     except Exception as e:
         env.logger.error(e)
-        sys.exit(1) 
+        sys.exit(1)
 

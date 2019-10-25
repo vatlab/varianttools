@@ -52,10 +52,10 @@ class GenotypeStatStatus:
         self.lock.acquire()
         self.tasks[task] = value
         self.lock.release()
-    
+
     def get(self, task):
         return self.tasks[task]
-        
+
     def count(self):
         return len(self.tasks)
 
@@ -151,7 +151,7 @@ class GenotypeStatCalculator(threading.Thread):
             # set result
             self.status.set(ID, res)
             self.queue.task_done()
-        db.close() 
+        db.close()
 
 
 
@@ -183,7 +183,7 @@ class GenotypeStatCalculator_HDF5(Process):
         self.queue = idQueue
         self.status = status
         self.genotypes = genotypes
-       
+
         # threading.Thread.__init__(self, name='Calculate genotype statistics')
         Process.__init__(self, name='Calculate genotype statistics')
 
@@ -201,7 +201,7 @@ class GenotypeStatCalculator_HDF5(Process):
                 for idx, (expr, where) in enumerate(self.stat):
                     store=GenoStore(self.proj)
                     if expr=="count(*)":
-                        res[idx]=store.num_genotypes(ID,where,self.genotypes)  
+                        res[idx]=store.num_genotypes(ID,where,self.genotypes)
                     elif expr=="sum(abs(GT))":
                         res[idx]=store.sum_genotypes(ID,where,self.genotypes)
                     elif expr.startswith("avg") or expr.startswith("min") or expr.startswith("max"):
@@ -210,7 +210,7 @@ class GenotypeStatCalculator_HDF5(Process):
                 print(e)
                 env.logger.debug('Failed to evalulate {}: {}. Setting field to NULL.'.format(expr, e))
             self.status[ID]=res
-        # db.close()  
+        # db.close()
 
 
 
@@ -284,7 +284,7 @@ class Sample:
                 env.logger.warning('Sample name field {} does not have header "sample_name"'
                     .format(headers[sample_idx[-1]]))
             #
-            # determine phenotype fields 
+            # determine phenotype fields
             phenotype_idx = [idx for idx, fld in enumerate(headers)
                 if idx not in sample_idx and
                     (not allowed_fields or fld in allowed_fields)]
@@ -297,7 +297,7 @@ class Sample:
             for idx in phenotype_idx:
                 new_header = validFieldName(headers[idx],
                     reserved=['filename', 'sample_name', 'sample_id', 'file_id'])
-                if new_header != headers[idx]: 
+                if new_header != headers[idx]:
                     env.logger.warning('Phenotype "{}" is renamed to "{}".'
                         .format(headers[idx], new_header))
                 new_fields.append(new_header)
@@ -433,7 +433,7 @@ class Sample:
         #
         cur = self.db.cursor()
         for ID in IDs:
-            cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {2}'.format(field, 
+            cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {2}'.format(field,
                 None if expression == 'NULL' else expression, self.db.PH), (ID,))
             count[0] += 1
         env.logger.info('{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'.format(
@@ -577,10 +577,10 @@ class Sample:
             print((delimiter.join([na if x is None else str(x) for x in rec])))
 
 
- 
+
 def phenotypeArguments(parser):
     '''Action that can be performed by this script'''
-    parser.add_argument('-f', '--from_file', metavar='INPUT_FILE', nargs='*',
+    parser.add_argument('-f', '--from_file', '--from-file', metavar='INPUT_FILE', nargs='*',
         help='''Import phenotype from a tab or space delimited file, which can be
             standard input if a name - is specified. Samples are
             determined by sample names in the first column, or jointly by sample
@@ -589,7 +589,7 @@ def phenotypeArguments(parser):
             or by names provided from option --header. Non-alphanumeric
             characters in input filed names will be replaced by '_'. If
             multiple samples in a project share the same names, they will shared
-            the imported phenotypes. Optionally, a list of phenotypes (columns 
+            the imported phenotypes. Optionally, a list of phenotypes (columns
             of the file) can be specified after filename, in which case only the
             specified phenotypes will be imported. Parameter --samples could be
             used to limit the samples for which phenotypes are imported. Values
@@ -603,12 +603,12 @@ def phenotypeArguments(parser):
             high_qt and all_qt are obtained from sample statistics using parameter
             --from_stat). Parameter --samples could be used to limit the samples for
             which genotypes will be set.'''),
-    parser.add_argument('--from_stat', nargs='*', metavar='EXPRESSION', default=[],
-        help='''Set a phenotype to a summary statistics of a genotype field. For 
+    parser.add_argument('--from_stat', '--from-stat', nargs='*', metavar='EXPRESSION', default=[],
+        help='''Set a phenotype to a summary statistics of a genotype field. For
             example, "num=count(*)" sets phenotype num to be the number of genotypes
             of a sample, "GD=avg(DP)" sets phenotype DP to be the average depth (if
             DP is one of the genotype fields) of the sample. Multiple fields (e.g.
-            '--from_stat "num=count(*)" "GD=avg(DP)"') are also allowed. In addition to
+            '--from-stat "num=count(*)" "GD=avg(DP)"') are also allowed. In addition to
             standard SQL aggregation functions, variant tools supports special functions
             #(GT), #(wtGT), #(mutGT), #(alt), #(hom), #(het) and #(other), which
             counts the number of genotypes (the same as count(*)), wildtype genotypes,
@@ -621,7 +621,7 @@ def phenotypeArguments(parser):
             functions such as "DP/DP_all" and "avg(DP)" are also allowed'''),
     parser.add_argument('-j', '--jobs', metavar='N', default=4, type=int,
         help='''Allow at most N concurrent jobs to obtain sample statistics for
-            parameter --from_stat.''')
+            parameter --from-stat.''')
     parser.add_argument('-g', '--genotypes', nargs='*', metavar='COND', default=[],
         help='''Limit the operation to genotypes that match specified conditions.
             Use 'vtools show genotypes' to list usable fields for each sample.'''),
@@ -631,7 +631,7 @@ def phenotypeArguments(parser):
     grp = parser.add_argument_group('Input/Output options')
     grp.add_argument('--header', nargs='*',
         help='''A list of header names for input file if used with option
-            --from_file. Otherwise a complete header or a list of names that
+            --from-file. Otherwise a complete header or a list of names that
             will be joined by a delimiter (parameter --delimiter), for option
             --output. If a special name - is specified, the header will
             be read from the standard input, which is the preferred way to specify large

@@ -64,19 +64,19 @@ def associateArguments(parser):
         help='''Optional phenotypes that will be passed to statistical
             tests as covariates. Values of these phenotypes should be integer
             or float.''')
-    data.add_argument('--var_info', nargs='*', default=[],
+    data.add_argument('--var_info', '--var-info', nargs='*', default=[],
         help='''Optional variant information fields (e.g. minor allele frequency
             from 1000 genomes project) that will be passed to statistical tests.
             The fields could be any annotation fields of with integer or float
             values, including those from used annotation databases (use "vtools
             show fields" to see a list of usable fields). ''')
-    data.add_argument('--geno_info', nargs='*', default=[],
+    data.add_argument('--geno_info', '--geno-info', nargs='*', default=[],
         help='''Optional genotype fields (e.g. quality score of genotype calls,
             cf. "vtools show genotypes") that will be passed to statistical
             tests. Note that the fields should exist for all samples that are
             tested.''')
-    data.add_argument('--geno_name', default='GT',
-        help='''Field name of genotype, default to 'GT'. If another field name is specified, 
+    data.add_argument('--geno_name', '--geno-name', default='GT',
+        help='''Field name of genotype, default to 'GT'. If another field name is specified,
             for example if imputation scores are available as 'DS' (dosage), then
             the given field 'DS' will be used as genotype data for association analysis.''')
     tests = parser.add_argument_group('Association tests')
@@ -92,7 +92,7 @@ def associateArguments(parser):
             tests can be specified as mod_name.test_name where mod_name should
             be a Python module (system wide or in the current directory), and
             test_name should be a subclass of NullTest.''')
-    tests.add_argument('-g', '--group_by', nargs='*',
+    tests.add_argument('-g', '--group_by', '--group-by', nargs='*',
         help='''Group variants by fields. If specified, variants will be separated
             into groups and are tested one by one.''')
     filters = parser.add_argument_group('Select and filter samples and genotypes')
@@ -107,19 +107,19 @@ def associateArguments(parser):
         help='''Limiting genotypes to those matching conditions that
             use columns shown in command 'vtools show genotypes' (e.g. 'GQ>15').
             Genotypes failing such conditions will be regarded as missing genotypes.''')
-    filters.add_argument('--discard_samples', metavar='EXPR', nargs='*', default=[],
+    filters.add_argument('--discard_samples', '--discard-samples', metavar='EXPR', nargs='*', default=[],
         help='''Discard samples that match specified conditions within each test
             group (defined by parameter --group_by). Currently only expressions in
             the form of "%%(NA)>p" is providedted to remove samples that have more 100*p
             percent of missing values.''')
-    filters.add_argument('--discard_variants', metavar='EXPR', nargs='*', default=[],
+    filters.add_argument('--discard_variants', '--discard-variants', metavar='EXPR', nargs='*', default=[],
         help='''Discard variant sites based on specified conditions within each test
             group. Currently only expressions in the form of '%%(NA)>p' is provided to
             remove variant sites that have more than 100*p percent of missing genotypes.
             Note that this filter will be applied after "--discard_samples" is applied,
             if the latter also is specified.''' )
     output = parser.add_argument_group('Output of test statistics')
-    output.add_argument('--to_db', metavar='annoDB',
+    output.add_argument('--to_db', '--to-db', metavar='annoDB',
         help='''Name of a database to which results from association tests will
             be written. Groups with existing results in the database will be
             ignored unless parameter --force is used.''')
@@ -222,7 +222,7 @@ class AssociationTestManager:
         self.force=False
         self.group_names, self.group_types, self.groups = self.identifyGroups(group_by)
 
-     
+
 
     def getInfo(self, methods, var_info, geno_info):
         '''automatically update var_info or geno_info if input extern weights found in either'''
@@ -241,7 +241,7 @@ class AssociationTestManager:
                      flatten([['{}.{}'.format(db.name, x.name) for x in db.fields] for db in self.proj.annoDB])
             fields += [field for field in self.proj.db.getHeaders(self.table) \
                        if field not in ('variant_id', 'bin', 'alt_bin')]
-           
+
             for item in extern_weight:
                 if not item in geno_info + var_info:
                     # Is extern_weight in var_info?
@@ -253,7 +253,7 @@ class AssociationTestManager:
                         geno_info.append(item)
                         env.logger.warning('Cannot find external weight "{0}" as a variant or annotation '\
                                          'field. Treating it as genotype information field'.format(item))
-        return var_info, geno_info 
+        return var_info, geno_info
 
     def getMissingFilters(self, discard_samples, discard_variants):
         missing_ind_ge = 1.0
@@ -355,7 +355,7 @@ class AssociationTestManager:
         try:
             covar = [] if covar is None else covar
             cur = self.db.cursor()
-            # handles missing phenotype automatically, but we need to first 
+            # handles missing phenotype automatically, but we need to first
             # warn users what is happening
             #
             # we select samples with missing phenotype
@@ -443,7 +443,7 @@ class AssociationTestManager:
         #
         cur.execute('DROP TABLE IF EXISTS __asso_tmp;')
         cur.execute('DROP INDEX IF EXISTS __asso_tmp_index;')
-        
+
 
         cur.execute('SELECT value FROM project WHERE name="HDF5_table";')
         HDF5_table=cur.fetchone()
@@ -459,10 +459,10 @@ class AssociationTestManager:
         #  variant_id
         #  groups (e.g. chr, pos)
         #  variant_info
-        add_chrpos = True if (self.num_extern_tests > 0 and len([x for x in group_by if x in ['variant.chr', 'variant.pos', 'chr', 'pos']]) == 0) else False 
+        add_chrpos = True if (self.num_extern_tests > 0 and len([x for x in group_by if x in ['variant.chr', 'variant.pos', 'chr', 'pos']]) == 0) else False
         create_query = '''
             CREATE TABLE __asso_tmp (
-              variant_id INT NOT NULL, _ignored INT, 
+              variant_id INT NOT NULL, _ignored INT,
               {} {} {});
               '''.format(
               ','.join(['{} {}'.format(x,y) for x,y in zip(field_names, field_types)]),
@@ -579,7 +579,7 @@ class GenotypeLoader(Process):
                     # "Cannot connect to database" if there are multiple reading processes.
                     # We are trying five times if this happens before we terminate the process
                     select_genotype_query = '''\
-                    SELECT genotype_{0}.variant_id, {4} {1}, {2} FROM cache.__asso_tmp, genotype_{0} WHERE 
+                    SELECT genotype_{0}.variant_id, {4} {1}, {2} FROM cache.__asso_tmp, genotype_{0} WHERE
                     (cache.__asso_tmp.variant_id = genotype_{0}.variant_id{3}) ORDER BY {2}'''.\
                     format(id, ' '.join([', genotype_{0}.{1}'.format(id, x) for x in self.geno_info]),
                            ', '.join(['cache.__asso_tmp.{}'.format(x) for x in self.group_names]),
@@ -747,7 +747,7 @@ class AssoTestsWorker(Process):
         self.shelves = {}
         self.db = DatabaseEngine()
         if self.proj.store=="sqlite":
-            self.db.connect(param.proj.name + '_genotype.DB', readonly=True, lock=self.shelf_lock) 
+            self.db.connect(param.proj.name + '_genotype.DB', readonly=True, lock=self.shelf_lock)
             self.db.attach(param.proj.name + '.proj', '__fromVariant', lock=self.shelf_lock)
         elif self.proj.store=="hdf5":
             self.db.connect(param.proj.name + '.proj', lock=self.shelf_lock)
@@ -790,7 +790,7 @@ class AssoTestsWorker(Process):
             if key not in ['variant.chr', 'variant.pos']:
                 var_info[key] = [data[x][idx] if (type(data[x][idx]) in [int, float]) else float('NaN') for x in variant_id]
             else:
-                var_info[key] = [data[x][idx] for x in variant_id] 
+                var_info[key] = [data[x][idx] for x in variant_id]
         return var_info, variant_id
 
     def getGenotype(self, group):
@@ -834,13 +834,13 @@ class AssoTestsWorker(Process):
         #
         # filter samples/variants for missingness
         gname = ':'.join(list(map(str, group)))
-        
+
         return self.filterGenotype(genotype, geno_info, var_info, gname)
 
 
     def filterGenotype(self, genotype, geno_info, var_info, gname):
         '''
-        Filter genotypes for missing calls or lack of minor alleles. Not very efficient because 
+        Filter genotypes for missing calls or lack of minor alleles. Not very efficient because
         it copies genotype, var_info and geno_info skipping the loci to be removed.
             - genotype is a Individual_list * Variants_list matrix of genotype values
             - var_info is a dictionary with each key being information corresponding Variant_list
@@ -931,7 +931,7 @@ class AssoTestsWorker(Process):
         if recode_missing:
             if self.proj.store=="sqlite":
                 self.pydata['genotype'] = [[missing_code if math.isnan(e) else e for e in x] for idx, x in enumerate(geno) if which[idx]]
-            elif self.proj.store=="hdf5": 
+            elif self.proj.store=="hdf5":
                 self.pydata['genotype'] = [[missing_code if math.isnan(e) else e.astype(int).item() for e in x] for idx, x in enumerate(geno) if which[idx]]
         else:
             if self.proj.store=="sqlite":
@@ -963,12 +963,12 @@ class AssoTestsWorker(Process):
         # convert geno_info to 3 dimensions:
         # D1: samples
         # D2: variants
-        # D3: geno_info 
+        # D3: geno_info
         self.pydata['geno_info'] = list(zip(*self.pydata['geno_info']))
         self.pydata['geno_info'] = [list(zip(*item)) for item in self.pydata['geno_info']]
         unique_names = self.sample_names
         if len(self.sample_names) != len(set(self.sample_names)):
-            env.logger.warning("Duplicated sample names found. Using 'sample_ID.sample_name' as sample names") 
+            env.logger.warning("Duplicated sample names found. Using 'sample_ID.sample_name' as sample names")
             unique_names = ["{0}.{1}".format(i,s) for i,s in zip(self.sample_IDs, self.sample_names)]
         self.pydata['sample_name'] = [str(x) for idx, x in enumerate(unique_names) if which[idx]]
         self.pydata['phenotype_name'] = self.phenotype_names
@@ -985,7 +985,7 @@ class AssoTestsWorker(Process):
 
 
     def run(self):
-        # 
+        #
         # tell the master process that this worker is ready
         self.ready_flags[self.index] = 1
         # wait all processes to e ready
@@ -1019,7 +1019,7 @@ class AssoTestsWorker(Process):
                     genotype, which, var_info, geno_info = getGenotype_HDF5(self,grp,self.sample_IDs)
                 # if I throw an exception here, the program completes in 5 minutes, indicating
                 # the data collection part takes an insignificant part of the process.
-                # 
+                #
                 # set C++ data object
                 if (len(self.tests) - self.num_extern_tests) > 0:
                     self.setGenotype(which, genotype, geno_info, grpname)
@@ -1070,14 +1070,14 @@ def runAssociation(args,asso,proj,results):
         for id in asso.sample_IDs:
             sampleQueue.put(id)
         loaders = []
-        
-        # use SQLite DB 
+
+        # use SQLite DB
 
         if proj.store=="sqlite":
             if not os.path.isfile(asso.proj.name + '_genotype.DB') or os.stat(asso.proj.name + '_genotype.DB').st_size == 0:
                 env.logger.error("The genotype DB is not generated, please run vtools import without --HDF5 tag to generate sqlite genotype DB first.")
                 sys.exit()
-            
+
             for i in range(nLoaders):
                 loader = GenotypeLoader(asso, ready_flags, i, sampleQueue, cached_samples)
                 loader.start()
@@ -1118,17 +1118,17 @@ def runAssociation(args,asso,proj,results):
             prog.done()
             for loader in loaders:
                 loader.join()
-        
+
 
         # step 1.5, start a maintenance process to create indexes, if needed.
         maintenance_flag = Value('L', 1)
         if proj.store=="sqlite":
-            
+
             maintenance = MaintenanceProcess(proj, {'genotype_index': asso.sample_IDs}, maintenance_flag)
             maintenance.start()
 
 
-     
+
         # step 2: workers work on genotypes
         # the group queue is used to send groups
         grpQueue = Queue()
@@ -1138,10 +1138,10 @@ def runAssociation(args,asso,proj,results):
         ready_flags = Array('L', [0]*nJobs)
         shelf_lock = Lock()
 
-   
+
         for j in range(nJobs):
             # the dictionary has the number of temporary database for each sample
-            AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j, 
+            AssoTestsWorker(asso, grpQueue, resQueue, ready_flags, j,
                 {x:y-1 for x,y in enumerate(cached_samples) if y > 0},
                 results.fields, shelf_lock, args).start()
         # send jobs ...
@@ -1224,7 +1224,7 @@ def send_unfinished_works(works):
         yield work
 
 
-def send_next_work(sock, works):    
+def send_next_work(sock, works):
     work = next(works)
     sock.send_json(work)
     return ','.join(elems[0] for elems in work["grps"])
@@ -1238,7 +1238,7 @@ def send_thanks(sock):
 
 def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,context):
     try:
-       
+
         prog = ProgressBar('Testing for association', len(asso.groups))
         grps=[]
         old_db=asso.db
@@ -1252,12 +1252,12 @@ def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,contex
         asso.tests=""
         groupCount=0
 
-       
+
         j={}
         projName=asso.proj.name
         works = generate_works(asso,args)
         unfinished_works=[]
-      
+
         tasks={}
         nodes={}
         interval=time.time()
@@ -1266,10 +1266,10 @@ def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,contex
         while groupCount < len(asso.groups):
             poller = dict(poll.poll(2000))
             if poller.get(hb_socket) == zmq.POLLIN:
-                heartbeat=hb_socket.recv_json()       
+                heartbeat=hb_socket.recv_json()
                 hb_socket.send_json({"msg":"heartbeat"})
                 nodes[heartbeat["pid"]]=time.time()
-       
+
             for node,last_heartbeat in nodes.items():
                 if time.time()-last_heartbeat>5:
                     print(str(node)+" not responding")
@@ -1278,12 +1278,12 @@ def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,contex
                             deadnodes.append(node)
                             unfinished_groups=[[grp] for grp in grps_string.split(",")]
                             unfinished_works.append({"projName":projName,"param":json.dumps(asso.__dict__), "grps":unfinished_groups,
-            "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,"unknown_args":args.unknown_args},"path": os.getcwd()})       
-                
+            "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,"unknown_args":args.unknown_args},"path": os.getcwd()})
+
                     tasks.pop(grps_string,None)
             for node in deadnodes:
                 nodes.pop(node,None)
-       
+
             if poller.get(sock) == zmq.POLLIN:
                 j = sock.recv_json()
                 if j['msg'] == "available":
@@ -1298,20 +1298,20 @@ def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,contex
                             work=next(works)
                             sock.send_json(work)
                             grps=','.join(elems[0] for elems in work["grps"])
-                            tasks[grps]=j["pid"]  
+                            tasks[grps]=j["pid"]
                         except StopIteration as e:
                             sock.send_json({"noMoreWork":"noMoreWork"})
 
 
                 elif j['msg'] == "result":
-                    r = j['result']       
+                    r = j['result']
                     result=json.loads(r)
                     for rec in result:
                         results.record(rec)
                         count = results.completed()
                         prog.update(count, results.failed())
                         groupCount+=1
-           
+
                     send_thanks(sock)
                     tasks.pop(j['grps'],None)
                     interval=time.time()
@@ -1320,20 +1320,20 @@ def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,contex
                 if time.time()-interval>60:
                     print("No available worker. Not receiving any result from worker in 60 seconds.")
                     break
-        
-        # terminate 
+
+        # terminate
         for node in nodes.keys():
             poller = dict(poll.poll(2000))
             if poller.get(hb_socket) == zmq.POLLIN:
-                heartbeat=hb_socket.recv_json()       
+                heartbeat=hb_socket.recv_json()
                 hb_socket.send_json({"msg":"stop"})
             if poller.get(sock)==zmq.POLLIN:
                 j = sock.recv_json()
                 if j['msg'] == "available":
                     sock.send_json({"noMoreWork":"noMoreWork"})
-          
+
         results.done()
-        
+
         if groupCount == len(asso.groups):
             prog.done()
 
@@ -1342,7 +1342,7 @@ def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,contex
         asso.tests=old_test
         asso.proj.db=old_proj_db
         asso.proj.annoDB=old_proj_annoDB
-        
+
         # summary
         env.logger.info('Association tests on {} groups have completed. {} failed.'.\
                          format(results.completed(), results.failed()))
@@ -1350,7 +1350,7 @@ def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,contex
         if args.to_db:
             proj.useAnnoDB(AnnoDB(proj, args.to_db, ['chr', 'pos'] if not args.group_by else args.group_by))
     except Exception as e:
-      
+
         env.logger.error(e)
     finally:
         sock.close()
@@ -1382,30 +1382,30 @@ def associate(args):
         with Project(verbosity=args.verbosity) as proj:
             sock,hb_socket,poll,context,port_selected=[None]*5
 
-            #The main program has started but is not ready to send jobs to worker yet, sends a message "preprocessing" to let 
+            #The main program has started but is not ready to send jobs to worker yet, sends a message "preprocessing" to let
             #worker know that the main program is running.
 
-            if args.mpi:                
+            if args.mpi:
                 if os.environ.get("ZEROMQIP") is None:
                     os.environ["ZEROMQIP"]="127.0.0.1"
                 context = zmq.Context()
                 sock = context.socket(zmq.REP)
 
-                port_selected=sock.bind_to_random_port("tcp://"+os.environ["ZEROMQIP"])     
+                port_selected=sock.bind_to_random_port("tcp://"+os.environ["ZEROMQIP"])
                 with open(os.getcwd()+"/randomPort.txt","w") as outputFile:
                     outputFile.write(str(port_selected))
 
 
                 hb_socket=context.socket(zmq.REP)
-                port_selected=hb_socket.bind_to_random_port("tcp://"+os.environ["ZEROMQIP"])     
+                port_selected=hb_socket.bind_to_random_port("tcp://"+os.environ["ZEROMQIP"])
                 with open(os.getcwd()+"/randomPort_heartbeat.txt","w") as outputFile:
                     outputFile.write(str(port_selected))
 
                 poll = zmq.Poller()
                 poll.register(sock, zmq.POLLIN)
                 poll.register(hb_socket, zmq.POLLIN)
-                
-                
+
+
                 thread=threading.Thread(target=server_alive,args=(poll,sock,hb_socket))
                 thread.start()
 
@@ -1421,7 +1421,7 @@ def associate(args):
                 sys.exit(0)
             # define results here but it might fail if args.to_db is not writable
             results = ResultRecorder(asso, args.to_db, args.delimiter, args.force)
-           
+
             # determine if some results are already exist
             #
             # if write to a db and
@@ -1451,7 +1451,7 @@ def associate(args):
                 if len(HDFfileNames)==0:
                     env.logger.error("No HDF5 file found. Please run vtools import with --HDF5 tag first.")
                     sys.exit()
-            
+
                 HDFfileGroupNames=glob.glob("tmp*multi_genes.h5")
 
                 if args.force:
@@ -1475,7 +1475,7 @@ def associate(args):
                 nJobs = max(args.jobs, 1)
                 generateHDFbyGroup(asso,nJobs)
 
-                
+
                 # if len(HDFfileGroupNames)==0 or args.force:
                 #     nJobs = max(args.jobs, 1)
                 #     generateHDFbyGroup(asso,nJobs)
@@ -1485,9 +1485,9 @@ def associate(args):
             if args.mpi :
                 global preprocessing
                 preprocessing=False
-                thread.join()                
+                thread.join()
                 zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,context)
-               
+
             else :
                 runAssociation(args,asso,proj,results)
     except Exception as e:
