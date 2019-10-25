@@ -26,7 +26,7 @@
 
 import sys
 
-VTOOLS_VERSION='3.0.5'
+VTOOLS_VERSION='3.0.6'
 
 pyver = sys.version_info
 VTOOLS_FULL_VERSION='{} for Python {}.{}.{}'.format(VTOOLS_VERSION, pyver.major, pyver.minor, pyver.micro)
