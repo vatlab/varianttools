@@ -58,16 +58,16 @@ namespace cgatools { namespace util {
     {
         using boost::system::error_code;
         // changed by Bo Peng from get_system_category() to system_category() to support newer version of boost
-        using boost::system::system_category;
+        // using boost::system::system_category;
 
-        std::string buf = std::string(msg) + " for file '" + fn + "': ";
-    #if defined(CGA_USE_WIN_API)
+        std::string buf = std::string(msg) + " for file '" + fn; //  + "': ";
+    //#if defined(CGA_USE_WIN_API)
         // changed by Bo Peng from get_system_category() to system_category() to support newer version of boost
-        buf += error_code( ::GetLastError(), system_category() ).message();
-    #else
+        //buf += error_code( ::GetLastError(), system_category() ).message();
+    //#else
         // changed by Bo Peng from leaf() to filename() to support newer version of boost
-        buf += error_code( errno, system_category() ).message();
-    #endif
+        //buf += error_code( errno, system_category() ).message();
+    //#endif
         return buf;
     }
 
