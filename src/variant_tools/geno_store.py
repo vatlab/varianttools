@@ -151,7 +151,7 @@ class ImportStatus:
 #
 #
 # Write genotype to disk
-# 
+#
 #
 
 class BaseGenotypeWriter:
@@ -165,7 +165,7 @@ class BaseGenotypeWriter:
         cur.execute('''\
             CREATE TABLE IF NOT EXISTS {0} (
                 variant_id INT NOT NULL
-            '''.format(table) + 
+            '''.format(table) +
             (', GT INT' + ''.join([', {} {}'.format(f.name, f.type) for f in self.geno_info]) if genotype else '')
             + ');'
          )
@@ -181,7 +181,7 @@ class MultiGenotypeWriter(BaseGenotypeWriter):
         '''
         BaseGenotypeWriter.__init__(self, geno_info, genotype_status, sample_ids)
         # we save genotypes to many small files, with a minimal of 5 samples
-        # and a maximum of 10 
+        # and a maximum of 10
         nDBs = max(min(10, len(sample_ids) // 5), 1)
         #
         self.dispatcher = {}
@@ -219,7 +219,7 @@ class MultiGenotypeWriter(BaseGenotypeWriter):
     def write(self, id, rec):
         try:
             if len(self.cache[id]) == 1000:
-                # this will fail if id does not exist, so we do not need 
+                # this will fail if id does not exist, so we do not need
                 # extra test if id is valid
                 self.cur[self.dispatcher[id]].executemany(self.query.format(id),
                     self.cache[id])
@@ -230,7 +230,7 @@ class MultiGenotypeWriter(BaseGenotypeWriter):
         except KeyError:
             # if this is a new id
             self.cache[id] = [rec]
-    
+
     def commit_remaining(self):
         for id, val in self.cache.items():
             if len(val) > 0:
@@ -279,11 +279,11 @@ class InPlaceGenotypeWriter(BaseGenotypeWriter):
         # it writes to the disk using 'executemany', which will be faster than
         # calling 1000 'execute'.
         self.cache = {}
-   
+
     def write(self, id, rec):
         try:
             if len(self.cache[id]) == 1000:
-                # this will fail if id does not exist, so we do not need 
+                # this will fail if id does not exist, so we do not need
                 # extra test if id is valid
                 self.cur.executemany(self.query.format(id), self.cache[id])
                 self.cache[id] = [rec]
@@ -295,7 +295,7 @@ class InPlaceGenotypeWriter(BaseGenotypeWriter):
             self.cache[id] = [rec]
         if self.count % 1000 == 0:
             self.db.commit()
-    
+
     def commit_remaining(self):
         for id, val in self.cache.items():
             if len(val) > 0:
@@ -418,7 +418,7 @@ class GenotypeCopier(Process):
                 except:
                     pass
 
- 
+
 class DedupWorker(Process):
     def __init__(self, status):
         Process.__init__(self)
@@ -461,16 +461,16 @@ class DedupWorker(Process):
 #   A working process to import genotype from a file, or part of a file
 #   and write to a temporary genotype database.
 #
-# 
+#
 class GenotypeImportWorker(Process):
     '''This class starts a process, import genotype to a temporary genotype database.'''
-    def __init__(self, variantIndex, filelist, processor, encoding, header, 
-        genotype_field, genotype_info, ranges, geno_count, 
+    def __init__(self, variantIndex, filelist, processor, encoding, header,
+        genotype_field, genotype_info, ranges, geno_count,
         proc_index, status):
         '''
         variantIndex: a dictionary that returns ID for each variant.
         filelist: files from which variantIndex is created. If the passed filename
-            is not in this list, this worker will suicide so that it can be replaced 
+            is not in this list, this worker will suicide so that it can be replaced
             by a worker with more variants.
         encoding, genotypefield, genotype_info, ranges:  parameters to import data
         geno_count:  a shared variable to report number of genotype imported
@@ -493,7 +493,7 @@ class GenotypeImportWorker(Process):
         #
         self.status = status
 
-    def run(self): 
+    def run(self):
         env.logger.debug('Importer {} starts with variants from {} files'
             .format(self.proc_index, len(self.filelist)))
         while True:
@@ -507,7 +507,7 @@ class GenotypeImportWorker(Process):
                     break
             # get parameters
             self.input_filename, self.genotype_file, self.genotype_status, start_sample, end_sample, self.sample_ids = item
-            self.processor.reset(import_var_info=False, 
+            self.processor.reset(import_var_info=False,
                 import_sample_range=[0,0] if self.genotype_status == 1 else [start_sample, end_sample])
             self.count = [0, 0]
             # use the last value as start
@@ -532,7 +532,7 @@ class GenotypeImportWorker(Process):
             min(self.sample_ids), max(self.sample_ids)))
         reader = TextReader(self.processor, self.input_filename, None, False, 0,
             self.encoding, self.header, quiet=True)
-        self.writer = GenotypeWriter(self.genotype_file, self.genotype_info, 
+        self.writer = GenotypeWriter(self.genotype_file, self.genotype_info,
             self.genotype_status, self.sample_ids)
         fld_cols = None
         last_count = 0
@@ -543,7 +543,7 @@ class GenotypeImportWorker(Process):
                 env.logger.debug('Variant {} {} {} {} not found'
                     .format(rec[0], rec[1], rec[2], rec[3]))
                 continue
-            # if there is genotype 
+            # if there is genotype
             if self.genotype_status == 2:
                 if fld_cols is None:
                     col_rngs = [reader.columnRange[x] for x in range(self.ranges[2], self.ranges[4])]
@@ -630,7 +630,7 @@ class Sqlite_Store(Base_Store):
         return sampleGenotypeHeader[1:]  # the first field is variant id, second is GT
 
     def get_typeOfColumn(self,sample_id,field):
-        return self.db.typeOfColumn('genotype_{}'.format(sample_id), field) 
+        return self.db.typeOfColumn('genotype_{}'.format(sample_id), field)
 
 
     def remove_genofields(self,IDs,items):
@@ -659,7 +659,7 @@ class Sqlite_Store(Base_Store):
         self.db.attach(self.proj.name+".proj",self.proj.name)
         self.cur.execute('SELECT sample_id, sample_name FROM {}.sample;'.format(self.proj.name))
         samples = self.cur.fetchall()
-   
+
         for ID, name in samples:
             if not self.db.hasIndex('genotype_{0}_index'.format(ID)):
                 self.cur.execute('CREATE INDEX genotype_{0}_index ON genotype_{0} (variant_id ASC)'
@@ -668,7 +668,7 @@ class Sqlite_Store(Base_Store):
                 .format(ID, self.proj.name+"."+table))
 
             env.logger.info('{} genotypes are removed from sample {}'.format(self.cur.rowcount, name))
-        # remove the table itself 
+        # remove the table itself
         env.logger.info('Removing table {} itself'.format(decodeTableName(table)))
         self.db.removeTable(self.proj.name+"."+table)
         self.db.commit()
@@ -707,13 +707,13 @@ class Sqlite_Store(Base_Store):
         #elif len(IDs) == proj.db.numOfRows('sample'):
         #    env.logger.info('All {} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
         #    # we do not have to add anything to where_clause
-        elif len(IDs) < 50:  
+        elif len(IDs) < 50:
             # we allow 14 tables in other 'union' or from condition...
             env.logger.info('{} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
             where_clause += ' AND ({}.variant_id IN ({}))'.format(
-                encodeTableName(args.from_table), 
+                encodeTableName(args.from_table),
                 '\nUNION '.join(['SELECT variant_id FROM {}_genotype.genotype_{} {}'
-                    .format(proj.name, id, noWT_clause[id]) for id in IDs])) 
+                    .format(proj.name, id, noWT_clause[id]) for id in IDs]))
         else:
             # we have to create a temporary table and select variants sample by sample
             # this could be done in parallel if there are a large number of samples, but that needs a lot more
@@ -760,15 +760,15 @@ class Sqlite_Store(Base_Store):
             fieldSelect=sampleInfo[1]
             if not fieldSelect or all([x == 'NULL' for x in fieldSelect]):
                 continue
-        
+
             where_cond = []
             if genotypes is not None and len(genotypes) != 0:
                 where_cond.extend(genotypes)
             if variant_table != 'variant':
                 where_cond.append('variant_id in (SELECT variant_id FROM {})'.format(self.proj.name+"."+variant_table))
             whereClause = 'WHERE ' + ' AND '.join(['({})'.format(x) for x in where_cond]) if where_cond else ''
-            
-          
+
+
             query = 'SELECT variant_id {} FROM {}_genotype.genotype_{} {};'.format(' '.join([',' + x for x in fieldSelect]),
                     self.proj.name, id, whereClause)
             self.db.attach(self.proj.name+"_genotype.DB",self.proj.name+"_genotype")
@@ -778,10 +778,10 @@ class Sqlite_Store(Base_Store):
             result=self.cur.fetchall()
             self.db.commit()
             self.db.detach(self.proj.name+"_genotype")
-            self.db.detach(self.proj.name)  
+            self.db.detach(self.proj.name)
             id_idx+=1
 
-            for rec in result:  
+            for rec in result:
                 if rec[0] not in variants:
                     # the last item is for number of genotype for male individual
                     variants[rec[0]] = [0, 0, 0, 0, 0]
@@ -846,9 +846,9 @@ class Sqlite_Store(Base_Store):
 
 
 
-    
+
     def importGenotypes(self, importer):
-        '''import files in parallel, by importing variants and genotypes separately, and in their own processes. 
+        '''import files in parallel, by importing variants and genotypes separately, and in their own processes.
         More specifically, suppose that there are three files
 
         file1: variant1, sample1.1, sample1.2, sample1.3
@@ -859,14 +859,14 @@ class Sqlite_Store(Base_Store):
         sample1, sample2, sample3 are three groups of samples that are divided by the number of samples
         and number of processes (importer.jobs) (say, 3000 samples divided into three groups of 1000 samples).
 
-        Then, there are 
+        Then, there are
 
         A: 2 TextReader processes <--> main process read variant1, 2, 3 --> master variant table
         B: importer.jobs GenotypeImportWorker reads sample 1.1, 1.2, 1.3, 2.1 etc ... --> temporary genotype tables
            except for the first process, which writes to the main genotype table directly.
         C: 1 GenotypeCopier -> copy temporary genotype tables to the master genotype table
 
-        The processes are organized so that 
+        The processes are organized so that
         1. sample A.x if read after variant A is read
         2. genotypes are copied after temporary tables are completed
 
@@ -880,7 +880,7 @@ class Sqlite_Store(Base_Store):
         # import queue that accept jobs sample 1.1, 1.2, etc
         status = ImportStatus()
         # start copier
-        copier = GenotypeCopier('{}_genotype.DB'.format(self.proj.name), 
+        copier = GenotypeCopier('{}_genotype.DB'.format(self.proj.name),
             importer.genotype_info, sample_copy_count, status)
         copier.start()
         #
@@ -890,7 +890,7 @@ class Sqlite_Store(Base_Store):
             d.start()
             dedupier.append(d)
         #
-        # The logic of importer is complex here. Because an importer needs to know variantIndex to 
+        # The logic of importer is complex here. Because an importer needs to know variantIndex to
         # write genotype tables, and because importers starts after each file is read, an importer
         # created earlier (eg. from file 1) cannot be used to import genotype for file 2. This is
         # why we
@@ -909,7 +909,7 @@ class Sqlite_Store(Base_Store):
             env.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(importer.files)))
             importer.importVariant(input_filename)
             env.logger.info('{:,} new variants {}{}{} from {:,} lines are imported.'\
-                .format(importer.count[2], "(" if importer.count[2] else '', 
+                .format(importer.count[2], "(" if importer.count[2] else '',
                     ', '.join(['{:,} {}'.format(x, y) for x, y in \
                         zip(importer.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'unsupported']) if x > 0]),
                         ")" if importer.count[2] else '', importer.count[0]))
@@ -942,7 +942,7 @@ class Sqlite_Store(Base_Store):
             # k - k/3(m-1) -- workload of the second one
             # ...
             # 2k/3 -- workload of the last one
-            # 
+            #
             # k = 6n/(5m)
             # d=k/3(m-1)
             #
@@ -958,9 +958,9 @@ class Sqlite_Store(Base_Store):
             unallocated = max(0, len(sample_ids) - sum(workload))
             for i in range(unallocated):
                 workload[i % importer.jobs] += 1
-            # 
+            #
             env.logger.debug('Workload of processes: {}'.format(workload))
-       
+
             start_sample = 0
             for job in range(importer.jobs):
                 if workload[job] == 0:
@@ -977,18 +977,18 @@ class Sqlite_Store(Base_Store):
                         'database {}. Remove clean your cache directory'
                             .format(tmp_file))
                 # send a import job to the importer workers
-                status.add((input_filename, tmp_file, genotype_status, start_sample, end_sample, 
+                status.add((input_filename, tmp_file, genotype_status, start_sample, end_sample,
                     tuple(sample_ids[start_sample : end_sample])), num_of_lines)
                 # start an importer if needed
                 for i in range(importer.jobs):
                     if importers[i] is None or not importers[i].is_alive():
-                        importers[i] = GenotypeImportWorker(importer.variantIndex, importer.files[:count+1], 
+                        importers[i] = GenotypeImportWorker(importer.variantIndex, importer.files[:count+1],
                             importer.processor, importer.encoding, importer.header, importer.genotype_field, importer.genotype_info, importer.ranges,
                             genotype_import_count[i], i, status)
                         importers[i].start()
                         break
                 start_sample = end_sample
-        # 
+        #
         # monitor the import of genotypes
         prog = ProgressBar('Importing genotypes', status.total_genotype_count,
             initCount=sum([x.value for x in genotype_import_count]))
@@ -996,7 +996,7 @@ class Sqlite_Store(Base_Store):
             # each process update their passed shared value
             # the master process add them and get the total number of genotypes imported
             prog.update(sum([x.value for x in genotype_import_count]))
-            # 
+            #
             queued, importing = status.pendingImport()
             if queued + importing == 0:
                 # the importer will kill themselves after there is no pending job
@@ -1008,7 +1008,7 @@ class Sqlite_Store(Base_Store):
                 new_count = 0
                 for i in range(importer.jobs):
                     if importers[i] is None or not importers[i].is_alive():
-                        worker = GenotypeImportWorker(importer.variantIndex, 
+                        worker = GenotypeImportWorker(importer.variantIndex,
                             importer.files, importer.processor, importer.encoding, importer.header,
                             importer.genotype_field, importer.genotype_info, importer.ranges,
                             genotype_import_count[i], i, status)
@@ -1076,8 +1076,8 @@ class HDF5_Store(Base_Store):
         cur=self.proj.db.cursor()
         allNames=manageHDF5(cur)
         proj.saveProperty('store', proj.store)
-       
-        if (os.path.isfile('{}_genotype.DB'.format(self.proj.name)) and os.path.getsize('{}_genotype.DB'.format(self.proj.name))>0) or 'snapshot_genotype.DB' in all_files: 
+
+        if (os.path.isfile('{}_genotype.DB'.format(self.proj.name)) and os.path.getsize('{}_genotype.DB'.format(self.proj.name))>0) or 'snapshot_genotype.DB' in all_files:
             # if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
             #     os.remove('{}_genotype.DB'.format(self.proj.name))
             if 'snapshot_genotype.DB' in all_files:
@@ -1120,7 +1120,7 @@ class HDF5_Store(Base_Store):
                 IDs.sort()
                 if len(IDs)<100:
                     jobs=1
-           
+
                 reader = MultiVariantReader(self.proj, "variant", "chr,pos,ref", "",['chr', 'pos', 'ref', 'vcf_variant(chr,pos,ref,alt,".")'], validGenotypeFields, False, IDs, 4, True)
                 reader.start()
 
@@ -1128,7 +1128,7 @@ class HDF5_Store(Base_Store):
                 for geno_field in validGenotypeFields:
                     # geno_field=geno_field.replace("_geno","")
                     chunk["calldata/"+geno_field]=[]
-              
+
                 for idx, raw_rec in enumerate(reader.records()):
                     # print(idx,len(raw_rec),raw_rec[3])
                     chunk["variants/REF"].append(raw_rec[0])
@@ -1159,7 +1159,7 @@ class HDF5_Store(Base_Store):
                 task=None
                 taskQueue=queue.Queue()
                 workload = [int(float(len(IDs)) / jobs)] * jobs
-                
+
                 unallocated = max(0, len(IDs) - sum(workload))
                 for i in range(unallocated):
                     workload[i % jobs] += 1
@@ -1170,12 +1170,12 @@ class HDF5_Store(Base_Store):
                 #     start_sample =0
                 # else:
                 #     start_sample=IDs[0]-1
-        
+
                 for job in range(numTasks):
                     # readQueue[job].put(chunk)
                     if workload[job] == 0:
                         continue
-                    
+
                     end_sample = min(start_sample + workload[job], start_sample+len(IDs))
 
                     if end_sample <= start_sample:
@@ -1183,17 +1183,17 @@ class HDF5_Store(Base_Store):
                     HDFfile_Merge="tmp_"+str(start_sample+1)+"_"+str(end_sample)+"_genotypes.h5"
                     names=[key for key in allNames.keys()]
                     updateSample(cur,start_sample,end_sample,IDs,names,allNames,HDFfile_Merge)
-                    
-                    taskQueue.put(HDF5GenotypeImportWorker(chunk, variantIndex, start_sample, end_sample, 
+
+                    taskQueue.put(HDF5GenotypeImportWorker(chunk, variantIndex, start_sample, end_sample,
                         IDs,0, job, HDFfile_Merge,validGenotypeFields, self.proj.build))
-                    start_sample = end_sample 
+                    start_sample = end_sample
                 while taskQueue.qsize()>0:
-                    for i in range(jobs):    
-                        if importers[i] is None or not importers[i].is_alive():     
+                    for i in range(jobs):
+                        if importers[i] is None or not importers[i].is_alive():
                             task=taskQueue.get()
                             importers[i]=task
-                            importers[i].start()         
-                            break 
+                            importers[i].start()
+                            break
                 for worker in importers:
                     if worker is not None:
                         worker.join()
@@ -1229,7 +1229,7 @@ class HDF5_Store(Base_Store):
 
     def remove_variants_worker(self,storageEngine,variantIDs):
         storageEngine.remove_variants(variantIDs)
-     
+
 
     def remove_variants(self,variantIDs,table):
         HDFfileNames=glob.glob("tmp*_genotypes.h5")
@@ -1238,7 +1238,7 @@ class HDF5_Store(Base_Store):
         for HDFfileName in HDFfileNames:
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
             storageEngines.append(storageEngine)
-            p=Process(target=self.remove_variants_worker,args=(storageEngine,variantIDs)) 
+            p=Process(target=self.remove_variants_worker,args=(storageEngine,variantIDs))
             procs.append(p)
             p.start()
         for proc in procs:
@@ -1248,11 +1248,13 @@ class HDF5_Store(Base_Store):
         env.logger.info('Removing table {} itself'.format(decodeTableName(table)))
         self.proj.db.removeTable(table)
         self.proj.db.commit()
-            
+
 
     def remove_genotype_workder(self,storageEngine,cond):
-        storageEngine.remove_genotype(cond)
-        storageEngine.close()
+        try:
+            storageEngine.remove_genotype(cond)
+        finally:
+            storageEngine.close()
 
 
     def remove_genotype(self,cond):
@@ -1261,7 +1263,7 @@ class HDF5_Store(Base_Store):
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
             storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
             storageEngines.append(storageEngine)
-            p=Process(target=self.remove_genotype_workder,args=(storageEngine,cond)) 
+            p=Process(target=self.remove_genotype_workder,args=(storageEngine,cond))
             procs.append(p)
             p.start()
         for proc in procs:
@@ -1397,12 +1399,12 @@ class HDF5_Store(Base_Store):
                 accessEngine=Engine_Access.choose_access_engine(HDFfileName)
                 accessEngines.append(accessEngine)
                 if len(list(set(samples).intersection(samplesInfile)))>0:
-                    p=Process(target=self.get_noWT_variants_worker,args=(queue,accessEngine,list(set(samples).intersection(samplesInfile)))) 
+                    p=Process(target=self.get_noWT_variants_worker,args=(queue,accessEngine,list(set(samples).intersection(samplesInfile))))
                     procs.append(p)
                     p.start()
         for _ in procs:
             # result=queue.get()
-            # noWT=noWT.union(set(result))    
+            # noWT=noWT.union(set(result))
             for rownames,colnames,genoinfo in queue.get():
                 # deal with empty geno
                 if ((genoinfo==-1).sum())==len(rownames)*len(colnames):
@@ -1411,7 +1413,7 @@ class HDF5_Store(Base_Store):
                     genoinfo[genoinfo==-1]=0
                     rowsum=np.nansum(genoinfo,axis=1)
                     noWTvariants=rownames[np.where(rowsum>0)].tolist()
-                noWT=noWT.union(set(noWTvariants)) 
+                noWT=noWT.union(set(noWTvariants))
         for p in procs:
             p.join()
         for accessEngine in accessEngines:
@@ -1425,11 +1427,11 @@ class HDF5_Store(Base_Store):
             cur.execute('BEGIN TRANSACTION')
             for id in chunk:
                 # query = 'INSERT INTO {}({}) VALUES {};'.format(merged_table,
-                #         'variant_id', ",".join([ "("+str(id)+")" for id in variantIDs[:1]])) 
-                query = 'INSERT OR IGNORE INTO {}({}) VALUES {};'.format(merged_table,'variant_id', "("+str(id)+")" ) 
+                #         'variant_id', ",".join([ "("+str(id)+")" for id in variantIDs[:1]]))
+                query = 'INSERT OR IGNORE INTO {}({}) VALUES {};'.format(merged_table,'variant_id', "("+str(id)+")" )
                 cur.execute(query)
         where_clause += ' AND ({}.variant_id IN (SELECT variant_id FROM {}))'.format(
-                encodeTableName(args.from_table), merged_table)           
+                encodeTableName(args.from_table), merged_table)
         return where_clause
 
 
@@ -1445,12 +1447,12 @@ class HDF5_Store(Base_Store):
         variants=[]
         if variant_table != 'variant':
             variants=self.get_selected_variants(variant_table)
-    
+
         master={}
         queue=Queue()
         accessEngines=[]
         procs=[]
- 
+
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
 
             filename=HDFfileName.split("/")[-1]
@@ -1458,7 +1460,7 @@ class HDF5_Store(Base_Store):
                 samplesInfile=sampleFileMap[filename]
                 accessEngine=Engine_Access.choose_access_engine(HDFfileName)
                 accessEngines.append(accessEngine)
-                p=Process(target=self.get_genoType_genoInfo_worker,args=(queue,accessEngine,list(set(sampleDict.keys()).intersection(samplesInfile)),variants,validGenotypeFields,genotypes)) 
+                p=Process(target=self.get_genoType_genoInfo_worker,args=(queue,accessEngine,list(set(sampleDict.keys()).intersection(samplesInfile)),variants,validGenotypeFields,genotypes))
                 procs.append(p)
                 p.start()
 
@@ -1472,10 +1474,10 @@ class HDF5_Store(Base_Store):
                 for rownames,colnames,sub_all in queue.get():
                     numrow=len(rownames)
                     genotype=sub_all[0]
-                    variants=np.zeros(shape=(numrow,len(validGenotypeFields)+5),dtype=np.int64)   
-                    
+                    variants=np.zeros(shape=(numrow,len(validGenotypeFields)+5),dtype=np.int64)
+
                     variants[:,3]=np.nansum(~np.isnan(genotype),axis=1)
-                    
+
                     variants[:,0]=np.nansum(genotype==1,axis=1)
                     variants[:,1]=np.nansum(genotype==2,axis=1)
                     variants[:,2]=np.nansum(genotype==-1,axis=1)
@@ -1483,7 +1485,7 @@ class HDF5_Store(Base_Store):
                     for fieldpos,field in enumerate(validGenotypeFields):
                         genoinfo=sub_all[fieldpos+1]
                         operation=operations[fieldpos]
-                        if operation==0:                      
+                        if operation==0:
                             variants[:,5+fieldpos]=np.nansum(genoinfo,axis=1)
                         if operation==1:
                             variants[:,5+fieldpos]=np.nansum(genoinfo,axis=1)
@@ -1503,14 +1505,14 @@ class HDF5_Store(Base_Store):
                     master[key]=value
                 else:
                     master[key]= [sum(x) for x in zip(master[key], value)]
-                
+
                     if len(minPos)>0 or len(maxPos)>0:
                         for pos in minPos:
                             preValue=master[key][pos]-value[pos]
                             master[key][pos]=value[pos] if preValue>=value[pos] else preValue
                         for pos in maxPos:
                             preValue=master[key][pos]-value[pos]
-                            master[key][pos]=value[pos] if preValue<=value[pos] else preValue                 
+                            master[key][pos]=value[pos] if preValue<=value[pos] else preValue
         for p in procs:
             p.join()
         for accessEngine in accessEngines:
@@ -1534,7 +1536,7 @@ class HDF5_Store(Base_Store):
     #     variants=[]
     #     if variant_table != 'variant':
     #         variants=self.get_selected_variants(variant_table)
-    
+
     #     master={}
     #     queue=Queue()
     #     procs=[]
@@ -1543,7 +1545,7 @@ class HDF5_Store(Base_Store):
     #         if filename in sampleFileMap:
     #             samplesInfile=sampleFileMap[filename]
     #             accessEngine=Engine_Access.choose_access_engine(HDFfileName)
-    #             p=Process(target=self.get_genoType_genoInfo_worker,args=(queue,accessEngine,list(set(sampleDict.keys()).intersection(samplesInfile)),variants,genotypes,fieldSelect,validGenotypeFields,operations)) 
+    #             p=Process(target=self.get_genoType_genoInfo_worker,args=(queue,accessEngine,list(set(sampleDict.keys()).intersection(samplesInfile)),variants,genotypes,fieldSelect,validGenotypeFields,operations))
     #             procs.append(p)
     #             p.start()
 
@@ -1564,7 +1566,7 @@ class HDF5_Store(Base_Store):
     #                         master[key][pos]=value[pos] if preValue>=value[pos] else preValue
     #                     for pos in maxPos:
     #                         preValue=master[key][pos]-value[pos]
-    #                         master[key][pos]=value[pos] if preValue<=value[pos] else preValue                 
+    #                         master[key][pos]=value[pos] if preValue<=value[pos] else preValue
     #     for p in procs:
     #         p.join()
     #     return master
@@ -1621,7 +1623,7 @@ class HDF5_Store(Base_Store):
             invalidate=geno
         accessEngine.close()
         return len(invalidate)
-        
+
 
 
 

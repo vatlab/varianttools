@@ -38,12 +38,13 @@ from collections import defaultdict
 from .project import Project
 from .utils import DatabaseEngine, ProgressBar, typeOfValues, SQL_KEYWORDS, env, \
     validFieldName
-from .geno_store import GenoStore,HDF5_Store
+from .geno_store import GenoStore, HDF5_Store
 import tables as tb
 import numpy as np
 
 
 class GenotypeStatStatus:
+
     def __init__(self):
         self.tasks = {}
         self.lock = threading.Lock()
@@ -59,7 +60,9 @@ class GenotypeStatStatus:
     def count(self):
         return len(self.tasks)
 
+
 class GenotypeStatCalculator(threading.Thread):
+
     def __init__(self, dbName, stat, idQueue, status, genotypes):
         '''Use sql to process sample passed from queue, set results in status'''
         self.dbName = dbName
@@ -81,7 +84,9 @@ class GenotypeStatCalculator(threading.Thread):
             elif item == '#(mutGT)':
                 self.stat.append(('count(*)', 'GT!=0'))
             elif item.startswith('#'):
-                raise ValueError('{} is not a valid special function (only #(GT), #(wtGT), #(mutGT), #(alt), #(hom), #(het), and #(other) are allowed).'.format(item))
+                raise ValueError(
+                    '{} is not a valid special function (only #(GT), #(wtGT), #(mutGT), #(alt), #(hom), #(het), and #(other) are allowed).'
+                    .format(item))
             else:
                 self.stat.append((item, None))
         self.queue = idQueue
@@ -94,7 +99,7 @@ class GenotypeStatCalculator(threading.Thread):
         db.connect(self.dbName, readonly=True)
         # dbName can be a_1_genotype so we have to split from the end
         projName = self.dbName.rsplit('_', 1)[0]
-        db.attach(projName +'.proj', 'proj')
+        db.attach(projName + '.proj', 'proj')
         cur = db.cursor()
         while True:
             ID = self.queue.get()
@@ -127,11 +132,14 @@ class GenotypeStatCalculator(threading.Thread):
                             if v is not None:
                                 res[idx] = v[0]
                         except Exception as e:
-                            env.logger.debug('Failed to evalulate {}: {}. Setting field to NULL.'.format(expr, e))
+                            env.logger.debug(
+                                'Failed to evalulate {}: {}. Setting field to NULL.'
+                                .format(expr, e))
             else:
                 res = [None] * len(self.stat)
                 for idx, (expr, where) in enumerate(self.stat):
-                    where_clause = 'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else ''
+                    where_clause = 'WHERE {}'.format(
+                        self.genotypes) if self.genotypes.strip() else ''
                     if where:
                         if where_clause:
                             where_clause += ' AND ({})'.format(where)
@@ -146,7 +154,9 @@ class GenotypeStatCalculator(threading.Thread):
                         if v is not None:
                             res[idx] = v[0]
                     except Exception as e:
-                        env.logger.debug('Failed to evalulate {}: {}. Setting field to NULL.'.format(expr, e))
+                        env.logger.debug(
+                            'Failed to evalulate {}: {}. Setting field to NULL.'
+                            .format(expr, e))
             #
             # set result
             self.status.set(ID, res)
@@ -154,8 +164,8 @@ class GenotypeStatCalculator(threading.Thread):
         db.close()
 
 
-
 class GenotypeStatCalculator_HDF5(Process):
+
     def __init__(self, proj, stat, idQueue, status, genotypes):
         '''Use sql to process sample passed from queue, set results in status'''
         self.proj = proj
@@ -177,7 +187,9 @@ class GenotypeStatCalculator_HDF5(Process):
             elif item == '#(mutGT)':
                 self.stat.append(('count(*)', 'GT!=0'))
             elif item.startswith('#'):
-                raise ValueError('{} is not a valid special function (only #(GT), #(wtGT), #(mutGT), #(alt), #(hom), #(het), and #(other) are allowed).'.format(item))
+                raise ValueError(
+                    '{} is not a valid special function (only #(GT), #(wtGT), #(mutGT), #(alt), #(hom), #(het), and #(other) are allowed).'
+                    .format(item))
             else:
                 self.stat.append((item, None))
         self.queue = idQueue
@@ -199,28 +211,32 @@ class GenotypeStatCalculator_HDF5(Process):
             res = [None] * len(self.stat)
             try:
                 for idx, (expr, where) in enumerate(self.stat):
-                    store=GenoStore(self.proj)
-                    if expr=="count(*)":
-                        res[idx]=store.num_genotypes(ID,where,self.genotypes)
-                    elif expr=="sum(abs(GT))":
-                        res[idx]=store.sum_genotypes(ID,where,self.genotypes)
-                    elif expr.startswith("avg") or expr.startswith("min") or expr.startswith("max"):
-                        res[idx]=store.num_genoinfo(ID,expr,where)
+                    store = GenoStore(self.proj)
+                    if expr == "count(*)":
+                        res[idx] = store.num_genotypes(ID, where,
+                                                       self.genotypes)
+                    elif expr == "sum(abs(GT))":
+                        res[idx] = store.sum_genotypes(ID, where,
+                                                       self.genotypes)
+                    elif expr.startswith("avg") or expr.startswith(
+                            "min") or expr.startswith("max"):
+                        res[idx] = store.num_genoinfo(ID, expr, where)
             except Exception as e:
                 print(e)
-                env.logger.debug('Failed to evalulate {}: {}. Setting field to NULL.'.format(expr, e))
-            self.status[ID]=res
+                env.logger.debug(
+                    'Failed to evalulate {}: {}. Setting field to NULL.'.format(
+                        expr, e))
+            self.status[ID] = res
         # db.close()
 
 
-
-
 class Sample:
+
     def __init__(self, proj, jobs=4):
         self.proj = proj
         self.jobs = jobs
         self.db = proj.db
-        self.proj.db=proj.db
+        self.proj.db = proj.db
         self.proj.db.connect(self.proj.proj_file)
 
     def load(self, filename, header, allowed_fields, samples, na_str):
@@ -237,10 +253,13 @@ class Sample:
         #
         if header is not None:
             if len(header) == 0:
-                raise ValueError('A list of headers is required if parameter --header is specified')
+                raise ValueError(
+                    'A list of headers is required if parameter --header is specified'
+                )
             elif header == ['-']:
                 if from_stdin:
-                    raise ValueError('Cannot read header from standard input because '
+                    raise ValueError(
+                        'Cannot read header from standard input because '
                         'input file is also read from standard input')
                 env.logger.info('Reading header from standard input')
                 headers = sys.stdin.read().rstrip().split()
@@ -264,8 +283,9 @@ class Sample:
             if len(set(headers)) != len(headers):
                 for x in set(headers):
                     headers.remove(x)
-                raise ValueError('Duplicated header names in input file {}: {}'
-                    .format(filename, ', '.join(headers)))
+                raise ValueError(
+                    'Duplicated header names in input file {}: {}'.format(
+                        filename, ', '.join(headers)))
             # determine fields to identify sample
             sample_idx = []
             if 'filename' in headers:
@@ -281,13 +301,16 @@ class Sample:
                 sample_idx.append(0)
             #
             if headers[sample_idx[-1]] != 'sample_name':
-                env.logger.warning('Sample name field {} does not have header "sample_name"'
+                env.logger.warning(
+                    'Sample name field {} does not have header "sample_name"'
                     .format(headers[sample_idx[-1]]))
             #
             # determine phenotype fields
-            phenotype_idx = [idx for idx, fld in enumerate(headers)
+            phenotype_idx = [
+                idx for idx, fld in enumerate(headers)
                 if idx not in sample_idx and
-                    (not allowed_fields or fld in allowed_fields)]
+                (not allowed_fields or fld in allowed_fields)
+            ]
             #
             if not phenotype_idx:
                 env.logger.error('No phenotype field to be imported')
@@ -295,18 +318,23 @@ class Sample:
             #
             new_fields = []
             for idx in phenotype_idx:
-                new_header = validFieldName(headers[idx],
-                    reserved=['filename', 'sample_name', 'sample_id', 'file_id'])
+                new_header = validFieldName(
+                    headers[idx],
+                    reserved=[
+                        'filename', 'sample_name', 'sample_id', 'file_id'
+                    ])
                 if new_header != headers[idx]:
-                    env.logger.warning('Phenotype "{}" is renamed to "{}".'
-                        .format(headers[idx], new_header))
+                    env.logger.warning(
+                        'Phenotype "{}" is renamed to "{}".'.format(
+                            headers[idx], new_header))
                 new_fields.append(new_header)
             #
             records = {}
             nCol = len(headers)
             for fields in reader:
                 if len(fields) != nCol:
-                    env.logger.warning('Number of fields mismatch (expecting {}). Ignoring line "{}"'
+                    env.logger.warning(
+                        'Number of fields mismatch (expecting {}). Ignoring line "{}"'
                         .format(nCol, fields))
                     continue
                 # ignore empty line (line with empty sample name)
@@ -314,8 +342,8 @@ class Sample:
                     continue
                 key = tuple([fields[x] for x in sample_idx])
                 if key in records:
-                    raise ValueError('Duplicate sample name ({}).'
-                        .format(', '.join(key)))
+                    raise ValueError('Duplicate sample name ({}).'.format(
+                        ', '.join(key)))
                 records[key] = [fields[x] for x in phenotype_idx]
         # remove temporary file
         if from_stdin:
@@ -325,7 +353,8 @@ class Sample:
         cur = self.db.cursor()
         allowed_samples = self.proj.selectSampleByPhenotype(samples)
         if not allowed_samples:
-            raise ValueError('No sample is selected using condition "{}"'.format(samples))
+            raise ValueError(
+                'No sample is selected using condition "{}"'.format(samples))
         #
         # get existing fields
         cur_fields = self.db.getHeaders('sample')[3:]
@@ -335,11 +364,17 @@ class Sample:
             # if adding a new field
             if field.lower() not in [x.lower() for x in cur_fields]:
                 if field.upper() in SQL_KEYWORDS:
-                    raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(field))
+                    raise ValueError(
+                        "Phenotype name '{}' is not allowed because it is a reserved word."
+                        .format(field))
                 fldtype = typeOfValues([x[idx] for x in list(records.values())])
-                env.logger.info('Adding phenotype {} of type {}'.format(field, fldtype))
-                env.logger.debug('Executing ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
-                self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field, fldtype))
+                env.logger.info('Adding phenotype {} of type {}'.format(
+                    field, fldtype))
+                env.logger.debug(
+                    'Executing ALTER TABLE sample ADD {} {} NULL;'.format(
+                        field, fldtype))
+                self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(
+                    field, fldtype))
                 count[1] += 1  # new
             else:
                 fldtype = self.db.typeOfColumn('sample', field)
@@ -349,9 +384,12 @@ class Sample:
                 # by sample_name only
                 if len(key) == 1:
                     # get matching sample
-                    cur.execute('SELECT sample.sample_id FROM sample WHERE sample_name = {}'.format(self.db.PH), key)
-                else: # by filename and sample_name
-                    cur.execute('SELECT sample.sample_id FROM sample '
+                    cur.execute(
+                        'SELECT sample.sample_id FROM sample WHERE sample_name = {}'
+                        .format(self.db.PH), key)
+                else:  # by filename and sample_name
+                    cur.execute(
+                        'SELECT sample.sample_id FROM sample '
                         'LEFT JOIN filename ON sample.file_id = filename.file_id '
                         'WHERE filename.filename = {0} AND sample.sample_name = {0}'
                         .format(self.db.PH), key)
@@ -369,7 +407,8 @@ class Sample:
                         try:
                             int(rec[idx])
                         except:
-                            env.logger.warning('Value "{}" is treated as missing in phenotype {}'
+                            env.logger.warning(
+                                'Value "{}" is treated as missing in phenotype {}'
                                 .format(rec[idx], field))
                             null_count[field] += 1
                             rec[idx] = None
@@ -377,33 +416,43 @@ class Sample:
                         try:
                             float(rec[idx])
                         except:
-                            env.logger.warning('Value "{}" is treated as missing in phenotype {}'
+                            env.logger.warning(
+                                'Value "{}" is treated as missing in phenotype {}'
                                 .format(rec[idx], field))
                             null_count[field] += 1
                             rec[idx] = None
-                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(field, self.db.PH), [rec[idx], id])
-        for f,c in list(null_count.items()):
-            env.logger.warning('{} missing values are identified for phenotype {}'
-                .format(c, f))
+                    cur.execute(
+                        'UPDATE sample SET {0}={1} WHERE sample_id={1};'.format(
+                            field, self.db.PH), [rec[idx], id])
+        for f, c in list(null_count.items()):
+            env.logger.warning(
+                '{} missing values are identified for phenotype {}'.format(
+                    c, f))
         if invalid_sample_names:
-            env.logger.warning('Samples {} in input file does not match any sample.'
-                .format(', '.join(sorted(invalid_sample_names))))
-        env.logger.info('{} field ({} new, {} existing) phenotypes of {} samples are updated.'.format(
-            count[1]+count[2], count[1], count[2], int(count[0]/(count[1] + count[2])) if (count[1] + count[2]) else 0))
+            env.logger.warning(
+                'Samples {} in input file does not match any sample.'.format(
+                    ', '.join(sorted(invalid_sample_names))))
+        env.logger.info(
+            '{} field ({} new, {} existing) phenotypes of {} samples are updated.'
+            .format(
+                count[1] + count[2], count[1], count[2],
+                int(count[0] / (count[1] + count[2])) if
+                (count[1] + count[2]) else 0))
         self.db.commit()
 
     def setPhenotype(self, field, expression, samples):
         '''Add a field using expression calculated from sample variant table'''
         IDs = self.proj.selectSampleByPhenotype(samples)
         if not IDs:
-            raise ValueError('No sample is selected using condition "{}"'.format(samples))
+            raise ValueError(
+                'No sample is selected using condition "{}"'.format(samples))
         #
         count = [0, 0, 0]
         cur = self.db.cursor()
         cur.execute('SELECT {} FROM sample;'.format(expression))
         fldType = None
         for rec in cur:
-            if rec[0] is None: # missing
+            if rec[0] is None:  # missing
                 continue
             if fldType is None:
                 fldType = type(rec[0])
@@ -411,21 +460,26 @@ class Sample:
                 if type(rec[0]) is float and fldType is int:
                     fldType = float
                 else:
-                    raise ValueError('Inconsistent type returned from different samples')
+                    raise ValueError(
+                        'Inconsistent type returned from different samples')
         if expression != 'NULL' and fldType is None:
             raise ValueError('Cannot determine the type of the expression')
         # if adding a new field
         cur_fields = self.db.getHeaders('sample')[3:]
         if field.lower() not in [x.lower() for x in cur_fields]:
             if field.upper() in SQL_KEYWORDS:
-                raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(field))
+                raise ValueError(
+                    "Phenotype name '{}' is not allowed because it is a reserved word."
+                    .format(field))
             env.logger.info('Adding phenotype {}'.format(field))
-            self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(field,
-                {int: 'INT',
-                 float: 'FLOAT',
-                 str: 'VARCHAR(255)',
-                 str: 'VARCHAR(255)',
-                 None: 'FLOAT'}[fldType]))
+            self.db.execute('ALTER TABLE sample ADD {} {} NULL;'.format(
+                field, {
+                    int: 'INT',
+                    float: 'FLOAT',
+                    str: 'VARCHAR(255)',
+                    str: 'VARCHAR(255)',
+                    None: 'FLOAT'
+                }[fldType]))
             count[1] += 1  # new
         else:
             # FIXME: check the case for type mismatch
@@ -433,31 +487,37 @@ class Sample:
         #
         cur = self.db.cursor()
         for ID in IDs:
-            cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {2}'.format(field,
-                None if expression == 'NULL' else expression, self.db.PH), (ID,))
+            cur.execute(
+                'UPDATE sample SET {0}={1} WHERE sample_id = {2}'.format(
+                    field, None if expression == 'NULL' else expression,
+                    self.db.PH), (ID,))
             count[0] += 1
-        env.logger.info('{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'.format(
-            count[0], count[1]+count[2], count[1], count[2], len(IDs)))
+        env.logger.info(
+            '{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'
+            .format(count[0], count[1] + count[2], count[1], count[2],
+                    len(IDs)))
         self.db.commit()
 
     def fromSampleStat(self, stat, genotypes, samples):
         '''Add a field using expression calculated from sample variant table'''
         IDs = self.proj.selectSampleByPhenotype(samples)
         if not IDs:
-            raise ValueError('No sample is selected using condition "{}"'.format(samples))
+            raise ValueError(
+                'No sample is selected using condition "{}"'.format(samples))
         #
         # at least one, at most number of IDs
         nJobs = max(min(self.jobs, len(IDs)), 1)
         # start all workers
         idQueue = queue.Queue()
-        idmpQueue=mpQueue()
+        idmpQueue = mpQueue()
         status = GenotypeStatStatus()
-        mpStatus=Manager().dict()
+        mpStatus = Manager().dict()
 
-        if self.proj.store=="sqlite":
+        if self.proj.store == "sqlite":
             for j in range(nJobs):
                 GenotypeStatCalculator('{}_genotype.DB'.format(self.proj.name),
-                    stat, idQueue, status, genotypes).start()
+                                       stat, idQueue, status,
+                                       genotypes).start()
             for ID in IDs:
                 idQueue.put(ID)
             count = 0
@@ -482,7 +542,9 @@ class Sample:
             for field in [x[0] for x in stat]:
                 if field.lower() not in [x.lower() for x in cur_fields]:
                     if field.upper() in SQL_KEYWORDS:
-                        raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(field))
+                        raise ValueError(
+                            "Phenotype name '{}' is not allowed because it is a reserved word."
+                            .format(field))
                     new_field[field] = True
                 else:
                     new_field[field] = False
@@ -492,20 +554,25 @@ class Sample:
                 res = status.get(ID)
                 for idx, (field, expr) in enumerate(stat):
                     if new_field[field]:
-                        fldtype = typeOfValues([str(status.get(x)[idx]) for x in IDs])
+                        fldtype = typeOfValues(
+                            [str(status.get(x)[idx]) for x in IDs])
                         # determine the type of value
-                        self.db.execute('ALTER TABLE sample ADD {} {} NULL;'
-                            .format(field, fldtype))
-                        env.logger.debug('Adding phenotype {} of type {}'
-                            .format(field, fldtype))
+                        self.db.execute(
+                            'ALTER TABLE sample ADD {} {} NULL;'.format(
+                                field, fldtype))
+                        env.logger.debug(
+                            'Adding phenotype {} of type {}'.format(
+                                field, fldtype))
                         new_field[field] = False
                         count[1] += 1  # new
-                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[idx], ID])
+                    cur.execute(
+                        'UPDATE sample SET {0}={1} WHERE sample_id = {1}'
+                        .format(field, self.db.PH), [res[idx], ID])
                     count[0] += 1
-        elif self.proj.store=="hdf5":
+        elif self.proj.store == "hdf5":
             for j in range(nJobs):
-                GenotypeStatCalculator_HDF5(self.proj,
-                    stat, idmpQueue, mpStatus, genotypes).start()
+                GenotypeStatCalculator_HDF5(self.proj, stat, idmpQueue,
+                                            mpStatus, genotypes).start()
             for ID in IDs:
                 idmpQueue.put(ID)
             count = 0
@@ -530,7 +597,9 @@ class Sample:
             for field in [x[0] for x in stat]:
                 if field.lower() not in [x.lower() for x in cur_fields]:
                     if field.upper() in SQL_KEYWORDS:
-                        raise ValueError("Phenotype name '{}' is not allowed because it is a reserved word.".format(field))
+                        raise ValueError(
+                            "Phenotype name '{}' is not allowed because it is a reserved word."
+                            .format(field))
                     new_field[field] = True
                 else:
                     new_field[field] = False
@@ -540,26 +609,34 @@ class Sample:
                 res = mpStatus[ID]
                 for idx, (field, expr) in enumerate(stat):
                     if new_field[field]:
-                        fldtype = typeOfValues([str(mpStatus[x][idx]) for x in IDs])
+                        fldtype = typeOfValues(
+                            [str(mpStatus[x][idx]) for x in IDs])
                         # determine the type of value
-                        self.db.execute('ALTER TABLE sample ADD {} {} NULL;'
-                            .format(field, fldtype))
-                        env.logger.debug('Adding phenotype {} of type {}'
-                            .format(field, fldtype))
+                        self.db.execute(
+                            'ALTER TABLE sample ADD {} {} NULL;'.format(
+                                field, fldtype))
+                        env.logger.debug(
+                            'Adding phenotype {} of type {}'.format(
+                                field, fldtype))
                         new_field[field] = False
                         count[1] += 1  # new
-                    cur.execute('UPDATE sample SET {0}={1} WHERE sample_id = {1}'.format(field, self.db.PH), [res[idx], ID])
+                    cur.execute(
+                        'UPDATE sample SET {0}={1} WHERE sample_id = {1}'
+                        .format(field, self.db.PH), [res[idx], ID])
                     count[0] += 1
         # report result
-        env.logger.info('{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'.format(
-            count[0], count[1]+count[2], count[1], count[2], len(IDs)))
+        env.logger.info(
+            '{} values of {} phenotypes ({} new, {} existing) of {} samples are updated.'
+            .format(count[0], count[1] + count[2], count[1], count[2],
+                    len(IDs)))
         self.db.commit()
 
     def output(self, fields, header, delimiter, na, limit, samples):
         # output
         limit_clause = '' if limit < 0 else ' LIMIT 0,{}'.format(limit)
         query = 'SELECT {} FROM sample LEFT JOIN filename ON sample.file_id = filename.file_id {} {}'.format(
-            ','.join(fields), '' if not samples else 'WHERE ' + samples, limit_clause)
+            ','.join(fields), '' if not samples else 'WHERE ' + samples,
+            limit_clause)
         env.logger.debug(query)
         cur = self.db.cursor()
         cur.execute(query)
@@ -571,16 +648,22 @@ class Sample:
                 print((sys.stdin.read().rstrip()))
             else:
                 if len(header) != len(fields):
-                    env.logger.warning('User-provided header ({}) does not match number of fields ({})'.format(len(header), len(fields)))
+                    env.logger.warning(
+                        'User-provided header ({}) does not match number of fields ({})'
+                        .format(len(header), len(fields)))
                 print((delimiter.join(header)))
         for rec in cur:
             print((delimiter.join([na if x is None else str(x) for x in rec])))
 
 
-
 def phenotypeArguments(parser):
     '''Action that can be performed by this script'''
-    parser.add_argument('-f', '--from_file', '--from-file', metavar='INPUT_FILE', nargs='*',
+    parser.add_argument(
+        '-f',
+        '--from_file',
+        '--from-file',
+        metavar='INPUT_FILE',
+        nargs='*',
         help='''Import phenotype from a tab or space delimited file, which can be
             standard input if a name - is specified. Samples are
             determined by sample names in the first column, or jointly by sample
@@ -596,14 +679,23 @@ def phenotypeArguments(parser):
             that match value of parameter --na and cannot be converted to the
             probed type of phenotype (e.g. '' in a column of numbers) are recorded
             as missing values.'''),
-    parser.add_argument('--set', nargs='*', metavar='EXPRESSION', default=[],
+    parser.add_argument(
+        '--set',
+        nargs='*',
+        metavar='EXPRESSION',
+        default=[],
         help='''Set a phenotype to a constant (e.g. --set aff=1), or an expression
             using other existing phenotypes (e.g. --set ratio_qt=high_qt/all_qt (the ratio
             of the number of high quality variants to the number of all variants, where
             high_qt and all_qt are obtained from sample statistics using parameter
             --from_stat). Parameter --samples could be used to limit the samples for
             which genotypes will be set.'''),
-    parser.add_argument('--from_stat', '--from-stat', nargs='*', metavar='EXPRESSION', default=[],
+    parser.add_argument(
+        '--from_stat',
+        '--from-stat',
+        nargs='*',
+        metavar='EXPRESSION',
+        default=[],
         help='''Set a phenotype to a summary statistics of a genotype field. For
             example, "num=count(*)" sets phenotype num to be the number of genotypes
             of a sample, "GD=avg(DP)" sets phenotype DP to be the average depth (if
@@ -616,20 +708,43 @@ def phenotypeArguments(parser):
             genotypes with two different alternative alleles. Parameters --genotypes
             and --samples could be used to limit the genotypes to be considered and
             the samples for which genotypes will be set.'''),
-    parser.add_argument('--output', nargs='*', metavar='EXPRESSION', default=[],
+    parser.add_argument(
+        '--output',
+        nargs='*',
+        metavar='EXPRESSION',
+        default=[],
         help='''A list of phenotype to be outputted. SQL-compatible expressions or
             functions such as "DP/DP_all" and "avg(DP)" are also allowed'''),
-    parser.add_argument('-j', '--jobs', metavar='N', default=4, type=int,
+    parser.add_argument(
+        '-j',
+        '--jobs',
+        metavar='N',
+        default=4,
+        type=int,
         help='''Allow at most N concurrent jobs to obtain sample statistics for
             parameter --from-stat.''')
-    parser.add_argument('-g', '--genotypes', nargs='*', metavar='COND', default=[],
+    parser.add_argument(
+        '-g',
+        '--genotypes',
+        nargs='*',
+        metavar='COND',
+        default=[],
         help='''Limit the operation to genotypes that match specified conditions.
-            Use 'vtools show genotypes' to list usable fields for each sample.'''),
-    parser.add_argument('-s', '--samples', nargs='*', metavar='COND', default=[],
+            Use 'vtools show genotypes' to list usable fields for each sample.'''
+    ),
+    parser.add_argument(
+        '-s',
+        '--samples',
+        nargs='*',
+        metavar='COND',
+        default=[],
         help='''Update phenotype for samples that match specified conditions.
-            Use 'vtools show samples' to list usable fields in the sample table.''')
+            Use 'vtools show samples' to list usable fields in the sample table.'''
+    )
     grp = parser.add_argument_group('Input/Output options')
-    grp.add_argument('--header', nargs='*',
+    grp.add_argument(
+        '--header',
+        nargs='*',
         help='''A list of header names for input file if used with option
             --from-file. Otherwise a complete header or a list of names that
             will be joined by a delimiter (parameter --delimiter), for option
@@ -638,11 +753,19 @@ def phenotypeArguments(parser):
             multi-line headers (e.g. cat myheader | vtools export --header -). If this
             parameter is given without parameter, a default header will be derived from
             field names.'''),
-    grp.add_argument('-d', '--delimiter', default='\t',
-        help='''Delimiter, default to tab, a popular alternative is ',' for csv output''')
-    grp.add_argument('--na', default='NA',
-        help='Input or output string for missing value..')
-    grp.add_argument('-l', '--limit', default=-1, type=int,
+    grp.add_argument(
+        '-d',
+        '--delimiter',
+        default='\t',
+        help='''Delimiter, default to tab, a popular alternative is ',' for csv output'''
+    )
+    grp.add_argument(
+        '--na', default='NA', help='Input or output string for missing value..')
+    grp.add_argument(
+        '-l',
+        '--limit',
+        default=-1,
+        type=int,
         help='''Number of record to display. Default to all record.''')
 
 
@@ -653,31 +776,46 @@ def phenotype(args):
             if args.from_file:
                 filename = args.from_file[0]
                 fields = args.from_file[1:]
-                p.load(filename, args.header, fields, ' AND '.join(['({})'.format(x) for x in args.samples]), args.na)
+                p.load(filename, args.header, fields,
+                       ' AND '.join(['({})'.format(x) for x in args.samples]),
+                       args.na)
             if args.set:
                 for item in args.set:
                     try:
                         field, expr = [x.strip() for x in item.split('=', 1)]
                     except Exception as e:
-                        raise ValueError('Invalid parameter {}, which should have format field=expr_of_phenotype: {}'.format(item, e))
+                        raise ValueError(
+                            'Invalid parameter {}, which should have format field=expr_of_phenotype: {}'
+                            .format(item, e))
                     if field == "sample_name" or field == "filename":
-                        raise ValueError('Cannot alter phenotype field: {}'.format(field))
-                    p.setPhenotype(field, expr, ' AND '.join(['({})'.format(x) for x in args.samples]))
+                        raise ValueError(
+                            'Cannot alter phenotype field: {}'.format(field))
+                    p.setPhenotype(
+                        field, expr,
+                        ' AND '.join(['({})'.format(x) for x in args.samples]))
             if args.from_stat:
                 stat = []
                 for item in args.from_stat:
                     try:
                         field, expr = [x.strip() for x in item.split('=', 1)]
                     except Exception as e:
-                        raise ValueError('Invalid parameter {}, which should have format field=expr_of_field: {}'.format(item, e))
+                        raise ValueError(
+                            'Invalid parameter {}, which should have format field=expr_of_field: {}'
+                            .format(item, e))
                     stat.append((field, expr))
-                p.fromSampleStat(stat,
-                        ' AND '.join(['({})'.format(x) for x in args.genotypes]),
-                        ' AND '.join(['({})'.format(x) for x in args.samples]))
+                p.fromSampleStat(
+                    stat,
+                    ' AND '.join(['({})'.format(x) for x in args.genotypes]),
+                    ' AND '.join(['({})'.format(x) for x in args.samples]))
             if args.output:
-                p.output(args.output, args.header, args.delimiter, args.na, args.limit, ' AND '.join(['({})'.format(x) for x in args.samples]))
-            if not (args.from_file or args.set or args.from_stat or args.output):
-                raise ValueError('Please add "-h" after phenotype to get more help for this command')
+                p.output(args.output, args.header, args.delimiter, args.na,
+                         args.limit,
+                         ' AND '.join(['({})'.format(x) for x in args.samples]))
+            if not (args.from_file or args.set or args.from_stat or
+                    args.output):
+                raise ValueError(
+                    'Please add "-h" after phenotype to get more help for this command'
+                )
         proj.close()
     except Exception as e:
         env.logger.error(e)
