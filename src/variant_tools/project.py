@@ -4710,7 +4710,8 @@ def showArguments(parser):
     parser.add_argument('type', choices=['project', 'tables', 'table',
                                          'samples', 'phenotypes', 'genotypes', 'fields', 'annotations',
                                          'annotation', 'track', 'formats', 'format', 'tests', 'test',
-                                         'runtime_options', 'runtime_option', 'snapshot', 'snapshots'],
+                                         'runtime_options', 'runtime_option', 'snapshot', 'snapshots',
+                                         'pipeline', 'pipelines', 'simulations', 'simulation'],
                         nargs='?', default='project',
                         help='''Type of information to display, which can be 'project' for
             summary of a project, 'tables' for all variant tables (or all
@@ -4731,8 +4732,11 @@ def showArguments(parser):
             option OPT, 'snapshot' for a particular snapshot by name or
             filename, 'snapshots' for a list of publicly available snapshots,
             and snapshots of the current project saved by command
-            'vtools admin --save_snapshots'. The default parameter of
-            this command is 'project'.''')
+            'vtools admin --save_snapshots'. 'pipeline PIPELINE'
+            for details of a particular align and variant calling pipeline,
+            'pipelines' for a list of available pipelines, 'simulation MODEL' for
+            details of a simulation model, 'simulations' for a list of simulation
+            models, The default parameter of this command is 'project'.''')
     parser.add_argument('items', nargs='*',
                         help='''Items to display, which can be, for example, name of table for
             type 'table', conditions to select samples for type 'samples',
@@ -5193,6 +5197,68 @@ def show(args):
                 nAll = nLocal + idx
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
                     print((omitted.format(nAll - args.limit)))
+            elif args.type == 'simulations':
+                # it is very bad idea to use circular import, but I have no choice
+                if args.items:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show simulations"'.format(', '.join(args.items)))
+                res = ResourceManager()
+                res.getRemoteManifest()
+                res.selectFiles(resource_type='simulation')
+                nAll = len(res.manifest)
+                for idx, (simulation, prop) in enumerate(sorted(res.manifest.items())):
+                    if args.limit is not None and idx >= args.limit:
+                        break
+                    if simulation.endswith('.py'):
+                        continue
+                    if args.verbosity == '0':
+                        print(simulation[11:-9])
+                    else:
+                        text = '{:<23} {}'.format(simulation[11:-9], prop[3])
+                        print('\n'.join(textwrap.wrap(text, width=textWidth,
+                            subsequent_indent=' '*24)))
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
+                    print (omitted.format(nAll - args.limit))
+            elif args.type == 'simulation':
+                if len(args.items) == 0:
+                    raise ValueError('Please specify the name of a simulation model')
+                if len(args.items) > 1:
+                    raise ValueError('Please specify only one simulation model')
+                try:
+                    pipeline = PipelineDescription(args.items[0], pipeline_type='simulation')
+                except Exception as e:
+                    raise IndexError('Unrecognized simulation model {}: {}'
+                        .format(args.items[0], e))
+                pipeline.describe()
+            elif args.type == 'pipelines':
+                if args.items:
+                    raise ValueError('Invalid parameter "{}" for command "vtools show pipelines"'
+                        .format(', '.join(args.items)))
+                res = ResourceManager()
+                res.getRemoteManifest()
+                res.selectFiles(resource_type='pipeline')
+                nAll = len(res.manifest)
+                for idx, (pipeline, prop) in enumerate(sorted(res.manifest.items())):
+                    if args.limit is not None and idx >= args.limit:
+                        break
+                    if args.verbosity == '0':
+                        print(pipeline[9:-9])
+                    else:
+                        text = '{:<23} {}'.format(pipeline[9:-9], prop[3])
+                        print('\n'.join(textwrap.wrap(text, width=textWidth,
+                            subsequent_indent=' '*24)))
+                if args.limit is not None and args.limit >= 0 and args.limit < nAll:
+                    print (omitted.format(nAll - args.limit))
+            elif args.type == 'pipeline':
+                if not args.items:
+                    raise ValueError('Please specify a pipeline to display')
+                elif len(args.items) > 1:
+                    raise ValueError('Please specify only one pipeline to display')
+                try:
+                    pipeline = PipelineDescription(args.items[0])
+                except Exception as e:
+                    raise IndexError('Unrecognized pipeline {}: {}'
+                        .format(args.items[0], e))
+                pipeline.describe()
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
