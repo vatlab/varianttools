@@ -22,7 +22,6 @@
 import os
 import subprocess
 import sys
-from distutils.ccompiler import new_compiler
 
 import numpy as np
 from Cython.Build import cythonize
@@ -71,7 +70,7 @@ SQLITE_FILES = [
     ]
 ] + ['src/sqlite/sqlite3.c']
 
-LIB_PLINKIO = [
+PLINKIO_FILES = [
     'src/libplinkio/cplinkio.c',
     'src/libplinkio/snparray.c',
     'src/libplinkio/fam.c',
@@ -85,7 +84,7 @@ LIB_PLINKIO = [
     'src/libplinkio/libcsv.c',
 ]
 
-LIB_CGATOOLS = [
+CGATOOLS_FILES = [
     'src/cgatools/util/BaseUtil.cpp',
     'src/cgatools/util/Md5.cpp',
     'src/cgatools/util/DelimitedFile.cpp',
@@ -105,7 +104,7 @@ LIB_CGATOOLS = [
 ]
 
 # http://hgdownload.cse.ucsc.edu/admin/jksrc.zip
-LIB_UCSC_FILES = [
+UCSC_FILES = [
     'src/ucsc/lib/osunix.c',
     'src/ucsc/lib/asParse.c',
     'src/ucsc/lib/errabort.c',
@@ -177,7 +176,7 @@ LIB_UCSC_FILES = [
     'src/ucsc/samtools/bam_aux.c',
 ]
 
-LIB_STAT = ['src/variant_tools/fisher2.c']
+STAT_FILES = ['src/variant_tools/fisher2.c']
 #
 # During development, if an interface file needs to be re-generated, please
 # remove these files and they will be re-generated with SWIG
@@ -257,38 +256,6 @@ ENV_LIBRARY_DIRS = [
     x for x in os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep) if x
 ]
 
-# building other libraries
-for files, incs, macs, libname in [
-    (LIB_STAT, ['src'], [], 'stat'),
-    (LIB_UCSC_FILES, ['src/ucsc/inc', 'src/ucsc/tabix',
-                      'src/ucsc/samtools'], [('USE_TABIX', '1'),
-                                             ('_FILE_OFFSET_BITS', '64'),
-                                             ('USE_BAM', '1'),
-                                             ('_USE_KNETFILE', None),
-                                             ('BGZF_CACHE', None)], 'ucsc'),
-    (LIB_CGATOOLS, ['src', 'src/cgatools'], [('CGA_TOOLS_IS_PIPELINE', 0),
-                                             ('CGA_TOOLS_VERSION',
-                                              r'"1.6.0.43"')], 'cgatools')
-]:
-    c = new_compiler()
-    if os.path.isfile(
-            os.path.join(
-                'build',
-                c.static_lib_format % (libname, c.static_lib_extension))):
-        continue
-    try:
-        print('Building embedded library {}'.format(libname))
-        c = new_compiler()
-        objects = c.compile(
-            files,
-            include_dirs=incs + ENV_INCLUDE_DIRS,
-            output_dir='build',
-            extra_preargs=['-w', '-fPIC'],
-            macros=macs)
-        c.create_static_lib(objects, libname, output_dir='build')
-    except Exception as e:
-        sys.exit(f"Failed to build embedded {libname} library: {e}")
-
 ext_modules=[
         Extension('variant_tools._vt_sqlite3',
             # stop warning message for sqlite because it is written by us.
@@ -300,27 +267,27 @@ ext_modules=[
         Extension('variant_tools._ucsctools',
             # stop warning message ucsctools because it is written by us.
             extra_compile_args=['-w'],
-            sources = [UCSCTOOLS_WRAPPER_CPP_FILE],
+            sources = [UCSCTOOLS_WRAPPER_CPP_FILE] + UCSC_FILES,
             include_dirs = ['.', 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools']  + ENV_INCLUDE_DIRS,
             library_dirs = ["build"]  + ENV_LIBRARY_DIRS,
 
             define_macros =  [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
                 ('_USE_KNETFILE', None), ('BGZF_CACHE', None)],
-            libraries = libs + ['ucsc', 'z', 'bz2'],
+            libraries = libs + ['z', 'bz2'],
         ),
         Extension('variant_tools.cplinkio',
             # stop warning message ucsctools because it is written by us.
             extra_compile_args=['-w'],
-            sources = LIB_PLINKIO,
+            sources = PLINKIO_FILES,
             include_dirs = ['src/libplinkio']  + ENV_INCLUDE_DIRS,
         ),
         Extension('variant_tools._vt_sqlite3_ext',
             # stop warning message for sqlite because it is written by us.
-            sources = ['src/sqlite/vt_sqlite3_ext.cpp'],
+            sources = ['src/sqlite/vt_sqlite3_ext.cpp'] + CGATOOLS_FILES + STAT_FILES + UCSC_FILES,
             include_dirs = ["src/", 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools',
                 'src/sqlite', "src/variant_tools", "src/cgatools"] + ENV_INCLUDE_DIRS,
             library_dirs = ["build"] + ENV_LIBRARY_DIRS,
-            libraries = ['gsl', 'stat', 'ucsc', 'cgatools'] + \
+            libraries = ['gsl'] + \
                 ['boost_iostreams', 'boost_regex', 'boost_filesystem'] + \
                 ['z', 'bz2'],
             extra_compile_args = gccargs,
@@ -332,8 +299,8 @@ ext_modules=[
                 ('BGZF_CACHE', None)],
         ),
         Extension('variant_tools._cgatools',
-            sources = [CGATOOLS_WRAPPER_CPP_FILE],
-            libraries = ['cgatools'] + \
+            sources = [CGATOOLS_WRAPPER_CPP_FILE] + CGATOOLS_FILES,
+            libraries = \
                 ['boost_iostreams', 'boost_regex', 'boost_filesystem'] + \
                 ['z', 'bz2'] + ENV_INCLUDE_DIRS,
             define_macros = [('CGA_TOOLS_IS_PIPELINE', 0),
@@ -346,9 +313,9 @@ ext_modules=[
 
         ),
         Extension('variant_tools._assoTests',
-            sources = [ASSO_WRAPPER_CPP_FILE] + ASSOC_FILES,
+            sources = [ASSO_WRAPPER_CPP_FILE] + STAT_FILES + ASSOC_FILES,
             extra_compile_args = gccargs,
-            libraries = libs + ['gsl', 'stat', 'blas'],
+            libraries = libs + ['gsl', 'blas'],
             library_dirs = ["build"] + ENV_LIBRARY_DIRS,
             include_dirs = ["src", "src/variant_tools"] + ENV_INCLUDE_DIRS,
 
