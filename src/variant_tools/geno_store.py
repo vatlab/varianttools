@@ -1424,26 +1424,22 @@ class HDF5_Store(Base_Store):
         self.proj.db.removeTable(table)
         self.proj.db.commit()
 
-    def remove_genotype_workder(self, storageEngine, cond):
+    def remove_genotype_workder(self, HDFfileName, cond):
         try:
+            storageEngine = Engine_Storage.choose_storage_engine(HDFfileName)
             storageEngine.remove_genotype(cond)
         finally:
             storageEngine.close()
 
     def remove_genotype(self, cond):
-        storageEngines = []
         procs = []
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
-            storageEngine = Engine_Storage.choose_storage_engine(HDFfileName)
-            storageEngines.append(storageEngine)
             p = Process(
-                target=self.remove_genotype_workder, args=(storageEngine, cond))
+                target=self.remove_genotype_workder, args=(HDFfileName, cond))
             procs.append(p)
             p.start()
         for proc in procs:
             proc.join()
-        for storageEngine in storageEngines:
-            storageEngine.close()
 
     def remove_genofields(self, IDs, items):
         HDFfileNames = glob.glob("tmp*_genotypes.h5")
