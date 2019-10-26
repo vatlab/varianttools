@@ -237,7 +237,6 @@ class HDF5Engine_storage(Base_Storage):
                     Mask = np.ones(
                         shape=(endPos - startPos, shape[1]), dtype=np.int8)
                     # node.Mask[startPos:endPos,:]=np.where(eval(cond),np.nan,Mask)
-                    env.logger.error(str(np.where(eval(cond), -1.0, Mask)))
                     node.Mask[startPos:endPos, :] = np.where(
                         eval(cond), -1.0, Mask)
                     startPos = endPos
