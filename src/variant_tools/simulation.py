@@ -29,6 +29,9 @@ import time
 from collections import defaultdict
 
 import simuOpt
+simuOpt.setOptions(
+    alleleType='mutant', optimized=True, quiet=True, version='1.1.4')
+
 import simuPOP as sim
 from simuPOP.sampling import drawRandomSample
 
@@ -40,8 +43,6 @@ from .utils import (ProgressBar, RefGenome, codon_table,
                     dissectGene, downloadFile, env, expandRegions,
                     genesInRegions)
 
-simuOpt.setOptions(
-    alleleType='mutant', optimized=True, quiet=True, version='1.1.4')
 
 
 
