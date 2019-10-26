@@ -28,6 +28,7 @@ from itertools import repeat
 from .geno_store import GenoStore
 from .liftOver import LiftOverTool
 from .preprocessor import SequentialExtractor, IgnoredRecord
+from .preprocessor import *
 from .project import Project, fileFMT
 from .text_reader import TextReader
 from .utils import (ProgressBar, RefGenome, delayedAction, env, getMaxUcscBin,
