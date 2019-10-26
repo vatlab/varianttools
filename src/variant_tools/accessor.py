@@ -349,7 +349,7 @@ class Engine_Access(object):
     """
 
     @staticmethod
-    def choose_access_engine(dbPath):
+    def choose_access_engine(dbPath, read_only=False):
         """A function to choose which access engine to start
 
             Args:
@@ -357,7 +357,7 @@ class Engine_Access(object):
                 dbPath: the path to database file
         """
         if dbPath.split(".")[-1] == "h5":
-            return HDF5Engine_access(dbPath)
+            return HDF5Engine_access(dbPath, read_only=read_only)
 
 
 class Base_Access(object):
@@ -463,7 +463,7 @@ class HDF5Engine_access(Base_Access):
 
     """
 
-    def __init__(self, fileName):
+    def __init__(self, fileName, read_only=False):
         # print("HDF5 engine started")
         Base_Access.__init__(self, fileName)
         self.fileName = fileName
@@ -474,7 +474,7 @@ class HDF5Engine_access(Base_Access):
         self.data = None
         self.shape = None
         self.chr = None
-        self.file = tb.open_file(self.dbPath, "a")
+        self.file = tb.open_file(self.dbPath, "r" if read_only else "a")
 
     def __load_HDF5_by_chr(self, chr, groupName=""):
         """This function loads matrix, rownames and colnames of specified chromosome into memory

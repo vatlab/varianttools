@@ -1465,7 +1465,7 @@ class HDF5_Store(Base_Store):
         HDFfileName = self.get_sampleFileName(sampleID)
         num = 0
         if HDFfileName is not None:
-            accessEngine = Engine_Access.choose_access_engine(HDFfileName)
+            accessEngine = Engine_Access.choose_access_engine(HDFfileName, read_only=True)
             num = accessEngine.num_genotypes(sampleID, cond, genotypes)
             accessEngine.close()
         return num
@@ -1474,7 +1474,7 @@ class HDF5_Store(Base_Store):
         HDFfileName = self.get_sampleFileName(sampleID)
         num = 0
         if HDFfileName is not None:
-            accessEngine = Engine_Access.choose_access_engine(HDFfileName)
+            accessEngine = Engine_Access.choose_access_engine(HDFfileName, read_only=True)
             num = accessEngine.sum_genotypes(sampleID, cond, genotypes)
             accessEngine.close()
         return num
@@ -1483,7 +1483,7 @@ class HDF5_Store(Base_Store):
         HDFfileName = self.get_sampleFileName(sampleID)
         num = 0
         if HDFfileName is not None:
-            accessEngine = Engine_Access.choose_access_engine(HDFfileName)
+            accessEngine = Engine_Access.choose_access_engine(HDFfileName, read_only=True)
             num, _ = accessEngine.num_variants(sampleID)
             accessEngine.close()
         return num
