@@ -551,7 +551,7 @@ class AssociationTestManager:
         cur.execute('SELECT value FROM project WHERE name="HDF5_group";')
         HDF5_group = cur.fetchone()
         if HDF5_table != None and HDF5_group != None:
-            if HDF5_table[0][0] != self.table or HDF5_group[0][0] != group_by[0]:
+            if HDF5_table[0] != self.table or HDF5_group[0] != group_by[0]:
                 self.force = True
             cur.execute(
                 'UPDATE project SET value="{0}" WHERE name="HDF5_table"'.format(
