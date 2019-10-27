@@ -45,7 +45,7 @@ from .geno_store import GenoStore
 from .ucsctools import showTrack
 from .utils import (SQL_KEYWORDS, DatabaseEngine, PrettyPrinter, ProgressBar,
                     ProgressFileObj, RefGenome, ResourceManager, RuntimeFiles,
-                    calculateMD5, decodeTableName, default_user_options,
+                    calculateMD5, createUserConfigFile, decodeTableName, default_user_options,
                     dehtml, delayedAction, determineSexOfSamples, downloadFile,
                     encodeTableName, env, getSnapshotInfo, getTermWidth,
                     getVariantsOnChromosomeX, getVariantsOnChromosomeY,
@@ -1792,6 +1792,8 @@ class Project:
         self.db.commit()
         self.db.close()
         self.db.connect(self.proj_file)
+        # create a config file if not already exist
+        createUserConfigFile()
 
     def open(self, verify=True):
         '''Open an existing project'''

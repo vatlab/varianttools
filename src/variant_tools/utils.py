@@ -119,23 +119,9 @@ if os.path.isfile(os.path.expanduser('~/.variant_tools/user_options.py')):
     _user_options.update(
         {x: y for x, y, z in default_user_options if x not in _user_options})
 else:
-    if not os.path.isdir(os.path.expanduser('~/.variant_tools')):
-        os.mkdir(os.path.expanduser('~/.variant_tools'))
-    with open(os.path.expanduser('~/.variant_tools/user_options.py'),
-              'w') as uo:
-        uo.write('''#!/usr/bin/env python
-# User configuration file that overrides settings from site-wise installation of variant tools.
-# This file should be placed in $HOME/.variant_tools/user_options.py. Please
-# note that this is a Python file so the strings should be quoted.
-#
-''' + '\n'.join([
-            '#{}\n{}={}\n'.format(
-                z.replace('\n', '\n# '), x,
-                "'{}'".format(y) if isinstance(y, str) else str(y))
-            for x, y, z in default_user_options
-        ]))
     _user_options = {x: y for x, y, z in default_user_options}
-#
+
+
 # overriding site option with local setting
 for k, v in list(_user_options.items()):
     if not hasattr(site_options, k):
@@ -161,6 +147,26 @@ except ImportError as e:
         'Please verify if you have installed variant tools successfully (using command '
         '"python setup.py install")'.format(e))
 
+def createUserConfigFile():
+    config_dir = os.path.expanduser('~/.variant_tools')
+    config_file = os.path.join(config_dir, 'user_options.py')
+    if os.path.isfile(config_file):
+        return
+    if not os.path.isdir(config_dir):
+        os.mkdir(config_dir)
+
+    with open(config_file, 'w') as uo:
+        uo.write('''#!/usr/bin/env python
+# User configuration file that overrides settings from site-wise installation of variant tools.
+# This file should be placed in $HOME/.variant_tools/user_options.py. Please
+# note that this is a Python file so the strings should be quoted.
+#
+''' + '\n'.join([
+            '#{}\n{}={}\n'.format(
+                z.replace('\n', '\n# '), x,
+                "'{}'".format(y) if isinstance(y, str) else str(y))
+            for x, y, z in default_user_options
+        ]))
 
 class ColoredFormatter(logging.Formatter):
     ''' A logging formatter that uses color to differntiate logging messages
