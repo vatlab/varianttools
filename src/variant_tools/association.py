@@ -1765,21 +1765,21 @@ def associate(args):
                     if len(HDFfileGroupNames) > 0:
                         for HDFfileGroupName in HDFfileGroupNames:
                             os.remove(HDFfileGroupName)
-                        env.logger.warning(
-                            "HDF5 group files will be regenerated!")
+                        env.logger.debug(
+                            "HDF5 group files are regenerated!")
                 elif asso.force:
                     if len(HDFfileGroupNames) > 0:
                         for HDFfileGroupName in HDFfileGroupNames:
                             os.remove(HDFfileGroupName)
-                        env.logger.warning(
-                            "HDF5 group files will be regenerated!")
+                        env.logger.debug(
+                            "HDF5 group files are regenerated!")
 
                 else:
                     if len(HDFfileGroupNames) > 0:
-                        env.logger.warning(
+                        env.logger.debug(
                             "New entries will be added to HDF5 group files!")
                     else:
-                        env.logger.warning(
+                        env.logger.debug(
                             "HDF5 group files will be generated!")
 
                 nJobs = max(args.jobs, 1)
