@@ -123,7 +123,7 @@ class LiftOverTool:
                 except Exception as e:
                     env.logger.debug('Invalid record {}'.format(rec))
                     env.logger.debug(e)
-                if count % 10000:
+                if count % 10000 == 0:
                     prog.update(count)
         prog.done()
         return count
