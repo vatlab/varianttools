@@ -276,63 +276,63 @@ class GroupHDFGenerator_memory(Process):
                 pass
 
 
-class GroupHDFGenerator_append(Process):
-    """Assume variant IDs are not ordered by chromosome position. This class reads variants one by one and appends to the specified group in HDF5.
-    """
+# class GroupHDFGenerator_append(Process):
+#     """Assume variant IDs are not ordered by chromosome position. This class reads variants one by one and appends to the specified group in HDF5.
+#     """
 
-    def __init__(self, geneDict, geneSet, fileQueue, project, group_names, job):
-        Process.__init__(self)
-        self.geneDict = geneDict
-        self.geneSet = geneSet
-        self.fileQueue = fileQueue
-        self.proj = project
-        self.group_names = group_names
-        self.proc_index = job
+#     def __init__(self, geneDict, geneSet, fileQueue, project, group_names, job):
+#         Process.__init__(self)
+#         self.geneDict = geneDict
+#         self.geneSet = geneSet
+#         self.fileQueue = fileQueue
+#         self.proj = project
+#         self.group_names = group_names
+#         self.proc_index = job
 
-    def run(self):
+#     def run(self):
 
-        while True:
-            HDFfileName = self.fileQueue.get()
-            if HDFfileName is None:
-                break
+#         while True:
+#             HDFfileName = self.fileQueue.get()
+#             if HDFfileName is None:
+#                 break
 
-            accessEngine = Engine_Access.choose_access_engine(HDFfileName)
-            HDFfileGroupName = HDFfileName.replace(".h5", "_multi_genes.h5")
-            if (os.path.isfile(HDFfileGroupName)):
-                os.remove(HDFfileGroupName)
-            storageEngine = Engine_Storage.choose_storage_engine(
-                HDFfileGroupName)
-            chr = "22"
-            colnames = accessEngine.get_colnames(chr)
-            rownames = accessEngine.get_rownames(chr)
+#             accessEngine = Engine_Access.choose_access_engine(HDFfileName)
+#             HDFfileGroupName = HDFfileName.replace(".h5", "_multi_genes.h5")
+#             if (os.path.isfile(HDFfileGroupName)):
+#                 os.remove(HDFfileGroupName)
+#             storageEngine = Engine_Storage.choose_storage_engine(
+#                 HDFfileGroupName)
+#             chr = "22"
+#             colnames = accessEngine.get_colnames(chr)
+#             rownames = accessEngine.get_rownames(chr)
 
-            for geneName in self.geneSet:
-                hdf5matrix = HMatrix([], [], [0], (0, 0), [], colnames)
-                storageEngine.store(hdf5matrix, chr, geneName)
-            try:
+#             for geneName in self.geneSet:
+#                 hdf5matrix = HMatrix([], [], [0], (0, 0), [], colnames)
+#                 storageEngine.store(hdf5matrix, chr, geneName)
+#             try:
 
-                for idx, id in enumerate(rownames):
-                    try:
-                        geneNames = self.geneDict[id]
-                        for geneName in geneNames:
+#                 for idx, id in enumerate(rownames):
+#                     try:
+#                         geneNames = self.geneDict[id]
+#                         for geneName in geneNames:
 
-                            variant_ID, indices, data = accessEngine.get_geno_info_by_row_pos(
-                                idx, chr)
-                            indptr = None
-                            if len(indices) > 0:
-                                indptr = [len(indices)]
-                            shape = (1, len(colnames))
-                            hdf5matrix = HMatrix(data, indices, indptr, shape,
-                                                 [id], colnames)
-                            storageEngine.store(hdf5matrix, chr, geneName)
-                    except KeyError:
-                        pass
-                accessEngine.close()
-                storageEngine.close()
-            except KeyboardInterrupt:
-                accessEngine.close()
-                storageEngine.close()
-                pass
+#                             variant_ID, indices, data = accessEngine.get_geno_info_by_row_pos(
+#                                 idx, chr)
+#                             indptr = None
+#                             if len(indices) > 0:
+#                                 indptr = [len(indices)]
+#                             shape = (1, len(colnames))
+#                             hdf5matrix = HMatrix(data, indices, indptr, shape,
+#                                                  [id], colnames)
+#                             storageEngine.store(hdf5matrix, chr, geneName)
+#                     except KeyError:
+#                         pass
+#                 accessEngine.close()
+#                 storageEngine.close()
+#             except KeyboardInterrupt:
+#                 accessEngine.close()
+#                 storageEngine.close()
+#                 pass
 
 
 def getGroupDict(testManager):
@@ -359,33 +359,33 @@ def getGroupDict(testManager):
     return shareDict, geneSet
 
 
-def generateHDFbyGroup_update(testManager, njobs):
+# def generateHDFbyGroup_update(testManager, njobs):
 
-    HDFfileNames = glob.glob("tmp*_genotypes.h5")
+#     HDFfileNames = glob.glob("tmp*_genotypes.h5")
 
-    fileQueue = mpQueue()
-    taskQueue = queue.Queue()
-    groupGenerators = [None] * min(njobs, len(HDFfileNames))
-    geneDict, geneSet = getGroupDict(testManager)
-    for HDFfileName in HDFfileNames:
-        fileQueue.put(HDFfileName)
-    for i in range(len(HDFfileNames)):
-        # taskQueue.put(GroupHDFGenerator_memory(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i))
-        taskQueue.put(
-            GroupHDFGenerator_append(geneDict, geneSet, fileQueue,
-                                     testManager.proj, testManager.group_names,
-                                     i))
-    while taskQueue.qsize() > 0:
-        for i in range(njobs):
-            if groupGenerators[i] is None or not groupGenerators[i].is_alive():
-                task = taskQueue.get()
-                groupGenerators[i] = task
-                fileQueue.put(None)
-                task.start()
-                break
-    for groupHDFGenerator in groupGenerators:
-        groupHDFGenerator.join()
-    # print(("group time: ",time.time()-start))
+#     fileQueue = mpQueue()
+#     taskQueue = queue.Queue()
+#     groupGenerators = [None] * min(njobs, len(HDFfileNames))
+#     geneDict, geneSet = getGroupDict(testManager)
+#     for HDFfileName in HDFfileNames:
+#         fileQueue.put(HDFfileName)
+#     for i in range(len(HDFfileNames)):
+#         # taskQueue.put(GroupHDFGenerator_memory(geneDict,geneSet,fileQueue,testManager.proj,testManager.group_names,i))
+#         taskQueue.put(
+#             GroupHDFGenerator_append(geneDict, geneSet, fileQueue,
+#                                      testManager.proj, testManager.group_names,
+#                                      i))
+#     while taskQueue.qsize() > 0:
+#         for i in range(njobs):
+#             if groupGenerators[i] is None or not groupGenerators[i].is_alive():
+#                 task = taskQueue.get()
+#                 groupGenerators[i] = task
+#                 fileQueue.put(None)
+#                 task.start()
+#                 break
+#     for groupHDFGenerator in groupGenerators:
+#         groupHDFGenerator.join()
+#     # print(("group time: ",time.time()-start))
 
 
 def transformGeneName(geneSymbol):
