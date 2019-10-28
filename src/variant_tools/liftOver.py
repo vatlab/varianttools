@@ -214,7 +214,7 @@ class LiftOverTool:
                 cur.execute(query, (getMaxUcscBin(int(start), int(end)),
                                     chr[3:] if chr.startswith('chr') else chr,
                                     int(start) + 1, id))
-                if count % 10000:
+                if count % 10000 == 0:
                     self.db.commit()
                     prog.update(count)
         self.db.commit()
