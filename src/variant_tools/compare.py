@@ -185,7 +185,7 @@ def countSiteDifference(proj, args):
 def countGenotypeDifference(proj, args):
     cur = proj.db.cursor()
     geno = []
-    NULL_to_0 = env.treat_missing_as_wildtype
+    # NULL_to_0 = env.treat_missing_as_wildtype
     if len(args.tables) > 2:
         env.logger.warning(
             'Only the first two specified tables will be compared for option --count.'
@@ -373,7 +373,7 @@ def compareTables(proj, args):
                         var_expression |= var[k]
     else:
         # genotype
-        NULL_to_0 = env.treat_missing_as_wildtype
+        # NULL_to_0 = env.treat_missing_as_wildtype
         for idx, (table, sample, sample_ID) in enumerate(
                 zip(args.tables, args.samples, args.sample_IDs)):
             # read geno in tables[0]
