@@ -28,6 +28,7 @@ from argparse import SUPPRESS
 
 from .exporter_reader import VariantReader
 from .preprocessor import PlainFormatter, SequentialCollector
+from .preprocessor import *
 from .project import Project, fileFMT
 from .utils import (ProgressBar, decodeTableName, encodeTableName, env,
                     splitField)
