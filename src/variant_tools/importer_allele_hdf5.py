@@ -1501,6 +1501,7 @@ def importGenotypesInParallel(importer,num_sample=0):
             continue
         allNames=manageHDF5(cur,allNames)
         sample_ids=[int(allNames[name]) for name in names]
+
         if original_sample_ids[0]!=sample_ids[0]:
             remove_duplicate_samples(cur,original_sample_ids)
         workload=None
@@ -1588,9 +1589,7 @@ def importGenotypesInParallel(importer,num_sample=0):
         estart=[Value('L', 0) for x in range(numTasks)]
         eend=[Value('L', READ_EXISTING_CHUNK_LENGTH) for x in range(numTasks)]
         efirst=[Value('b',True) for x in range(numTasks)]
-      
-        start=time.time()
-
+   
         for chunk, _, _, _ in it:
             start_sample =0
             for job in range(numTasks):
@@ -1622,20 +1621,18 @@ def importGenotypesInParallel(importer,num_sample=0):
                 start_sample = end_sample 
             while taskQueue.qsize()>0:
                 for i in range(importer.jobs):    
-                    if importers[i] is None or not importers[i].is_alive():     
+                    if importers[i] is None or not importers[i].is_alive(): 
                         task=taskQueue.get()
                         importers[i]=task
                         importers[i].start()         
                         break 
-            starttime=time.time()   
+            # starttime=time.time()   
             for worker in importers:
                 if worker is not None:
                     worker.join()
             # print("jointime "+str(time.time()-starttime))
-            starttime=time.time()  
             lines+=chunk_length
             prog.update(lines)
-            start=time.time()
         for sortFile in glob.glob("tmp*_sort_genotypes.h5"):
             os.rename(sortFile,sortFile.replace("_sort",""))
 

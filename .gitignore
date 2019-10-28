@@ -1,3 +1,6 @@
+boost_1_49_0/
+src/boost_1_49_0/
+src/zeromq-4.0.3/
 test/.snapshot.info
 src/variant_tools/celery_main/
 src/variant_tools/io_vcf_read.c

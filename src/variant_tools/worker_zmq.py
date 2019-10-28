@@ -305,7 +305,7 @@ class AssoTestsWorker:
 
 
 
-    def getGenotype_HDF5(self,group, sample_IDs):
+    def getGenotype_HDF5(self,group):
         """This function gets genotype of variants in specified group.
         """
         where_clause = ' AND '.join(['{0}={1}'.format(x, self.db.PH) for x in self.group_names])
@@ -334,7 +334,8 @@ class AssoTestsWorker:
 
         files=sorted(files, key=lambda name: int(name.split("/")[-1].split("_")[1]))
 
-        for fileName in files:
+        sampleIDs=np.array(self.sample_IDs)
+        for fileName in files:   
             accessEngine=Engine_Access.choose_access_engine(fileName)
 
             if len(chrs)==1:
@@ -344,6 +345,8 @@ class AssoTestsWorker:
                 # for chr in chrs:
 
                 colnames=accessEngine.get_colnames(chr)
+                colnames=np.array(colnames.tolist())
+                colnames=np.intersect1d(sampleIDs,colnames)
                 snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
                 accessEngine.close()
                 for ID in colnames:
@@ -360,6 +363,9 @@ class AssoTestsWorker:
                         geno_info[key].append([x[idx+1] if (type(x[idx+1]) in [int, float]) else float('NaN') for x in gtmp])
             else:
                 colnames=accessEngine.get_colnames(chrs[0])
+                colnames=np.array(colnames.tolist())
+                colnames=np.intersect1d(sampleIDs,colnames)
+                    
 
                 for ID in colnames:
                     gtmp=[]
@@ -400,7 +406,7 @@ class AssoTestsWorker:
             self.pydata = {}
             values = list(grp)
 
-            try:
+            try:                
                 genotype, which, var_info, geno_info = self.getGenotype_HDF5(grp)
                 # if I throw an exception here, the program completes in 5 minutes, indicating
                 # the data collection part takes an insignificant part of the process.

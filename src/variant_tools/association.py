@@ -193,6 +193,7 @@ class AssociationTestManager:
                         raise ValueError("{0} cannot handle non-binary phenotype value(s) {1}".\
                                          format(test.__class__.__name__, '/'.join([str(x) for x in item])))
         # step 4-2: check if 'SSeq_common' is valid to use
+
         if 'SSeq_common' in [test.__class__.__name__ for test in self.tests] and group_by:
             raise ValueError("SSeq_common method cannot be used with --group_by/-g")
         #
@@ -221,6 +222,7 @@ class AssociationTestManager:
         # step 6: get groups
         self.force=False
         self.group_names, self.group_types, self.groups = self.identifyGroups(group_by)
+
 
 
 
@@ -387,12 +389,18 @@ class AssociationTestManager:
             sample_names = []
             phenotypes = [[] for x in pheno]
             covariates = [[] for x in covar]
+            nameDict={}
+            for index,value in enumerate(data):
+                if value[1] not in nameDict:
+                    nameDict[value[1]]=index
+            
             for i, j, p, c in data:
-                if j not in sample_names:
+                if j in nameDict:
                     sample_IDs.append(i)
                     sample_names.append(j)
                     [x.append(y) for x,y in zip(phenotypes, p)]
                     [x.append(y) for x,y in zip(covariates, c)]
+
             if len(sample_IDs) == 0:
                 raise ValueError('No sample is selected by condition: {}'.\
                                  format(' AND '.join(['({})'.format(x) for x in condition])))
@@ -445,15 +453,16 @@ class AssociationTestManager:
         cur.execute('DROP INDEX IF EXISTS __asso_tmp_index;')
 
 
-        cur.execute('SELECT value FROM project WHERE name="HDF5_table";')
-        HDF5_table=cur.fetchone()
-        cur.execute('SELECT value FROM project WHERE name="HDF5_group";')
-        HDF5_group=cur.fetchone()
-        if HDF5_table!=None and HDF5_group!=None:
-            if HDF5_table[0][0]!=self.table or HDF5_group[0][0]!=group_by[0]:
-                self.force=True
-            cur.execute('UPDATE project SET value="{0}" WHERE name="HDF5_table"'.format(self.table))
-            cur.execute('UPDATE project SET value="{0}" WHERE name="HDF5_group"'.format(group_by[0]))
+        # cur.execute('SELECT value FROM project WHERE name="HDF5_table";')
+        # HDF5_table=cur.fetchone()
+        # cur.execute('SELECT value FROM project WHERE name="HDF5_group";')
+        # HDF5_group=cur.fetchone()
+        # print(HDF5_table,HDF5_group)
+        # if HDF5_table!=None and HDF5_group!=None:
+        #     if HDF5_table[0][0]!=self.table or HDF5_group[0][0]!=group_by[0]:
+        #         self.force=True
+        #     cur.execute('UPDATE project SET value="{0}" WHERE name="HDF5_table"'.format(self.table))
+        #     cur.execute('UPDATE project SET value="{0}" WHERE name="HDF5_group"'.format(group_by[0]))
 
         # this table has
         #  variant_id
@@ -1067,13 +1076,14 @@ def runAssociation(args,asso,proj,results):
         # Tells the master process which samples are loaded, used by the progress bar.
         cached_samples = Array('L', max(asso.sample_IDs) + 1)
         #
-        for id in asso.sample_IDs:
-            sampleQueue.put(id)
+    
         loaders = []
 
         # use SQLite DB
 
         if proj.store=="sqlite":
+            for id in asso.sample_IDs:
+                sampleQueue.put(id)
             if not os.path.isfile(asso.proj.name + '_genotype.DB') or os.stat(asso.proj.name + '_genotype.DB').st_size == 0:
                 env.logger.error("The genotype DB is not generated, please run vtools import without --HDF5 tag to generate sqlite genotype DB first.")
                 sys.exit()
@@ -1205,10 +1215,11 @@ def generate_works(asso,args):
     grps=[]
     projName=asso.proj.name
     asso.proj=None
-
+    #groupSize could be adjusted based on the number of samples
+    groupSize=4
     for grp in asso.groups:
         grps.append(grp)
-        if count%10==0:
+        if count%groupSize==0:
             work={"projName":projName,"param":json.dumps(asso.__dict__), "grps":grps,
             "args":{"methods":args.methods,"covariates":args.covariates,"to_db":args.to_db,"delimiter":args.delimiter,"force":args.force,"unknown_args":args.unknown_args},"path": os.getcwd()}
             yield work
@@ -1317,8 +1328,9 @@ def zmq_cluster_runAssociation(args,asso,proj,results,sock,hb_socket,poll,contex
                     interval=time.time()
 
             else:
-                if time.time()-interval>60:
-                    print("No available worker. Not receiving any result from worker in 60 seconds.")
+                delay=1000
+                if time.time()-interval>delay:
+                    print("No available worker. Not receiving any result from worker in {} seconds.".format(delay))
                     break
 
         # terminate

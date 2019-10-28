@@ -88,6 +88,8 @@ class GroupHDFGenerator(Process):
 
 
                 else:
+                    
+                   
                     select_group="SELECT {0}, group_concat(variant_id) from (select {0},t.variant_id from __asso_tmp as t join variant as v on t.variant_id=v.variant_id  order by v.pos) group by {0}".\
                        format(self.group_names[0])
                     cur.execute('SELECT value FROM project WHERE name="multiVCF";')
@@ -96,22 +98,20 @@ class GroupHDFGenerator(Process):
                         multiVCF=0
                     else:
                         multiVCF=int(multiVCF[0][0])
-                    cur.execute('SELECT DISTINCT(file_id) from sample where HDF5="{0}"'.format(HDFfileName))
-                    file_id=cur.fetchall()
+     
                     for row in cur.execute(select_group):
                         geneSymbol=transformGeneName(row[0])
+                        
                         ids=row[1].split(",")
                         ids=[int(x) for x in ids]
                         # ids.sort()
                         chr= getChr(ids[0],db.cursor())
-                        if not storageEngine.checkGroup(chr,geneSymbol):
-                            # if int(multiVCF[0][0])==0 or (int(multiVCF[0][0])==1 and int(file_id[0][0])==1):
+                        if "_" not in chr and not storageEngine.checkGroup(chr,geneSymbol):
+             
                             varDict=getChrs(ids,db.cursor())
                             if multiVCF==0 and len(varDict.keys())==1:
                                 # updated_rownames,colnames,subMatrix=accessEngine.get_geno_by_variant_IDs(ids,chr)
-                            
                                 updated_rownames,colnames,subMatrix=accessEngine.get_genotype(ids,"",[chr])
-
                                 if subMatrix is not None:
                                     storageEngine.store(subMatrix,chr,geneSymbol+"/GT")
                                     storageEngine.store(updated_rownames,chr,geneSymbol+"/rownames")
@@ -138,6 +138,7 @@ class GroupHDFGenerator(Process):
                 accessEngine.close()
                 storageEngine.close()
                 # 
+        
 
             except KeyboardInterrupt as e:
                 accessEngine.close()
@@ -390,9 +391,7 @@ def getChrs(variantIDs,cur):
         varDict[rec[0]].append(rec[1])
     return varDict
 
-def intersection(lst1, lst2): 
-    lst3 = [value for value in lst1 if value in lst2] 
-    return lst3 
+
 
 
 def getGenotype_HDF5(worker, group, sample_IDs):
@@ -431,19 +430,20 @@ def getGenotype_HDF5(worker, group, sample_IDs):
             HDFfileNames.append(filename[0].replace(".h5","_multi_genes.h5"))
 
     HDFfileNames=sorted(HDFfileNames, key=lambda name: int(name.split("_")[1]))
+    sample_IDs=np.array(sample_IDs)
     for fileName in HDFfileNames:
         accessEngine=Engine_Access.choose_access_engine(fileName)
         colnames=accessEngine.get_colnames(chr)
-        colnames=intersection(sample_IDs,colnames.tolist())
 
+        colnames=np.array(colnames.tolist())
+        colnames=np.intersect1d(sample_IDs,colnames)
+        
         if len(chrs)==1:
             snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
             accessEngine.close()
-
             for ID in colnames:
                 data=snpdict[ID]
                 gtmp = [data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]]
-
                 # handle -1 coding (double heterozygotes)     
                 genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
                 #
