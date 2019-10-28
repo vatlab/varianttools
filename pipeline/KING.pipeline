@@ -115,7 +115,7 @@ action=RunCommand('vtools phenotype --from_file ${CACHE_DIR}/%(jobname)s-mds.vto
 comment=Import phenotype from global ancestry analysis
 
 [king_61]
-action=RunCommand('''vtools_report plot_pheno_fields %(jobname)s_MDS1 %(jobname)s_MDS2 %(reported_ancestry)s --samples ${SAMP} --dot %(jobname)s.mds.pdf --discrete_color Accent''',
+action=RunCommand('''vtools_report plot_pheno_fields PC1 PC2 %(reported_ancestry)s --samples ${SAMP} --dot %(jobname)s.mds.pdf --discrete_color Accent''',
   output='%(jobname)s.mds.pdf')
 comment=Save global ancestry inference result to plot
 
