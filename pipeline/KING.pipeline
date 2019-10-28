@@ -105,7 +105,7 @@ action=RunCommand('${KING} -b %(jobname)s.bed --kinship --related --degree 3 --p
 comment=Kinship inference
 
 [king_51]
-action=RunCommand('''cut -f 2,7-`echo $((7+%(num_comp)s-1))` -d " " %(jobname)s-pc.txt | ${SED} 1c"sample_name`seq 1 %(num_comp)s | awk -F, '{if (NF>20) NF=20; for (i=1; i<=NF; ++i) printf(",%%s", "%(jobname)s_MDS"$i)}'`" > %(jobname)s-mds.vtools.txt''',
+action=RunCommand('''cut -f 2,7-`echo $((7+%(num_comp)s-1))` -d " " %(jobname)s-pc.txt | ${SED} 1c"sample_name`seq 1 %(num_comp)s | awk '{if (NF>20) NF=20; for (i=1; i<=NF; ++i) printf(" %%s", "%(jobname)s_MDS"$i)}'`" > %(jobname)s-mds.vtools.txt''',
   working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s-mds.vtools.txt')
 comment=Extract MDS result for vtools phenotype import
 
