@@ -1,12 +1,8 @@
-#!/usr/bin/env python2.7
-#
-# $File: vtools_report $
-# $LastChangedDate$
-# $Rev$
+#!/usr/bin/env python
 #
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
 # Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
 #

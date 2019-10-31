@@ -6,7 +6,7 @@
 //
 // This file is part of variant_tools, a software application to annotate,
 // summarize, and filter variants for next-gen sequencing ananlysis.
-// Please visit http://varianttools.sourceforge.net for details.
+// Please visit https://github.com/vatlab/varianttools for details.
 //
 // Copyright (C) 2011 Gao Wang (wangow@gmail.com) and Bo Peng (bpeng@mdanderson.org)
 //

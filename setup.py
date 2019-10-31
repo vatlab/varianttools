@@ -1,14 +1,10 @@
-#!/usr/bin/env python2.7
-#
-# $File: setup.py $
-# $LastChangedDate$
-# $Rev$
+#!/usr/bin/env python
 #
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,28 +19,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from distutils.ccompiler import new_compiler
-from setuptools import find_packages, setup, Extension
+import os
+import subprocess
+import sys
+
 import numpy as np
-import sys, os, subprocess
 from Cython.Build import cythonize
-# use ccache to speed up build
-# try:
-#     if subprocess.call(['ccache'], stderr = open(os.devnull, "w")):
-#         os.environ['CC'] = 'ccache gcc'
-# except OSError:
-#     pass
-
-#
-# if building source package, we will need to have wrapper files for both
-# versions of Python
-#
-SDIST = 'sdist' in sys.argv
-
-try:
-    import argparse
-except ImportError:
-    sys.exit('variant tools requires Python 3.2 or higher. Please upgrade your version (%s) of Python and try again.' % (sys.version.split()[0]))
+from setuptools import Extension, find_packages, setup
 
 # do not import variant_tools because __init__ might not be imported properly
 # before installation
@@ -54,8 +35,10 @@ with open('src/variant_tools/_version.py') as init:
             VTOOLS_VERSION = line[15:].strip().strip('"').strip("'")
             break
 
-SWIG_OPTS = ['-c++', '-python', '-O', '-shadow', '-keyword', '-w-511', '-w-509',
-    '-outdir', 'src/variant_tools', '-py3']
+SWIG_OPTS = [
+    '-c++', '-python', '-O', '-shadow', '-keyword', '-w-511', '-w-509',
+    '-outdir', 'src/variant_tools', '-py3'
+]
 
 ASSO_WRAPPER_CPP_FILE = 'src/variant_tools/assoTests_wrap.cpp'
 ASSO_WRAPPER_PY_FILE = 'src/variant_tools/assoTests.py'
@@ -68,39 +51,26 @@ UCSCTOOLS_WRAPPER_PY_FILE = 'src/variant_tools/ucsctools.py'
 UCSCTOOLS_INTERFACE_FILE = 'src/variant_tools/ucsctools.i'
 SQLITE_PY_FILE = 'src/variant_tools/vt_sqlite3.py'
 
-
 ASSOC_HEADER = [
-    'src/variant_tools/assoTests.i',
-    'src/variant_tools/assoTests.h',
-    'src/variant_tools/assoData.h',
-    'src/variant_tools/action.h',
-    'src/variant_tools/utils.h',
-    'src/variant_tools/lm.h'
+    'src/variant_tools/assoTests.i', 'src/variant_tools/assoTests.h',
+    'src/variant_tools/assoData.h', 'src/variant_tools/action.h',
+    'src/variant_tools/utils.h', 'src/variant_tools/lm.h'
 ]
 
 ASSOC_FILES = [
-    'src/variant_tools/assoData.cpp',
-    'src/variant_tools/action.cpp',
-    'src/variant_tools/utils.cpp',
-    'src/variant_tools/lm.cpp'
+    'src/variant_tools/assoData.cpp', 'src/variant_tools/action.cpp',
+    'src/variant_tools/utils.cpp', 'src/variant_tools/lm.cpp'
 ]
 
 SQLITE_FOLDER = 'src/sqlite/py3'
-SQLITE_FILES = [os.path.join(SQLITE_FOLDER, x) for x in [
-        'cache.c',
-        'connection.c',
-        'cursor.c',
-        'microprotocols.c',
-        'module.c',
-        'prepare_protocol.c',
-        'row.c',
-        'statement.c',
-        'util.c'
+SQLITE_FILES = [
+    os.path.join(SQLITE_FOLDER, x) for x in [
+        'cache.c', 'connection.c', 'cursor.c', 'microprotocols.c', 'module.c',
+        'prepare_protocol.c', 'row.c', 'statement.c', 'util.c'
     ]
-] + [ 'src/sqlite/sqlite3.c' ]
+] + ['src/sqlite/sqlite3.c']
 
-
-LIB_PLINKIO = [
+PLINKIO_FILES = [
     'src/libplinkio/cplinkio.c',
     'src/libplinkio/snparray.c',
     'src/libplinkio/fam.c',
@@ -114,27 +84,27 @@ LIB_PLINKIO = [
     'src/libplinkio/libcsv.c',
 ]
 
-LIB_CGATOOLS = [
-   'src/cgatools/util/BaseUtil.cpp',
-   'src/cgatools/util/Md5.cpp',
-   'src/cgatools/util/DelimitedFile.cpp',
-   'src/cgatools/util/RangeSet.cpp',
-   'src/cgatools/util/DelimitedLineParser.cpp',
-   'src/cgatools/util/Streams.cpp',
-   'src/cgatools/util/Exception.cpp',
-   'src/cgatools/util/StringSet.cpp',
-   'src/cgatools/util/Files.cpp',
-   'src/cgatools/util/parse.cpp',
-   #'src/cgatools/util/GenericHistogram.cpp',
-   'src/cgatools/reference/ChromosomeIdField.cpp',
-   'src/cgatools/reference/CompactDnaSequence.cpp',
-   'src/cgatools/reference/CrrFile.cpp',
-   'src/cgatools/reference/CrrFileWriter.cpp',
-   'src/cgatools/reference/GeneDataStore.cpp'
+CGATOOLS_FILES = [
+    'src/cgatools/util/BaseUtil.cpp',
+    'src/cgatools/util/Md5.cpp',
+    'src/cgatools/util/DelimitedFile.cpp',
+    'src/cgatools/util/RangeSet.cpp',
+    'src/cgatools/util/DelimitedLineParser.cpp',
+    'src/cgatools/util/Streams.cpp',
+    'src/cgatools/util/Exception.cpp',
+    'src/cgatools/util/StringSet.cpp',
+    'src/cgatools/util/Files.cpp',
+    'src/cgatools/util/parse.cpp',
+    #'src/cgatools/util/GenericHistogram.cpp',
+    'src/cgatools/reference/ChromosomeIdField.cpp',
+    'src/cgatools/reference/CompactDnaSequence.cpp',
+    'src/cgatools/reference/CrrFile.cpp',
+    'src/cgatools/reference/CrrFileWriter.cpp',
+    'src/cgatools/reference/GeneDataStore.cpp'
 ]
 
 # http://hgdownload.cse.ucsc.edu/admin/jksrc.zip
-LIB_UCSC_FILES = [
+UCSC_FILES = [
     'src/ucsc/lib/osunix.c',
     'src/ucsc/lib/asParse.c',
     'src/ucsc/lib/errabort.c',
@@ -206,41 +176,62 @@ LIB_UCSC_FILES = [
     'src/ucsc/samtools/bam_aux.c',
 ]
 
-LIB_STAT = ['src/variant_tools/fisher2.c']
+STAT_FILES = ['src/variant_tools/fisher2.c']
 #
 # During development, if an interface file needs to be re-generated, please
 # remove these files and they will be re-generated with SWIG
 #
 if not os.path.isfile('src/swigpyrun.h'):
     try:
-       ret = subprocess.call(['swig -python -external-runtime src/swigpyrun.h -o build'], shell=True)
-       if ret != 0: sys.exit('Failed to generate swig runtime header file.')
-    except OSError as e:
-        sys.exit('Failed to generate wrapper file. Please install swig (www.swig.org).')
+        ret = subprocess.call(
+            ['swig -python -external-runtime src/swigpyrun.h -o build'],
+            shell=True)
+        if ret != 0:
+            sys.exit('Failed to generate swig runtime header file.')
+    except OSError:
+        sys.exit(
+            'Failed to generate wrapper file. Please install swig (www.swig.org).'
+        )
 #
 # generate wrapper files for both versions of python. This will make sure sdist gets
 # all files needed for the source package
 #
 # we re-generate wrapper files for all versions of python only for
 # source distribution
-if not os.path.isfile(ASSO_WRAPPER_PY_FILE) or not os.path.isfile(ASSO_WRAPPER_CPP_FILE):
+if not os.path.isfile(ASSO_WRAPPER_PY_FILE) or not os.path.isfile(
+        ASSO_WRAPPER_CPP_FILE):
     print('Generating {}'.format(ASSO_WRAPPER_CPP_FILE))
-    print('swig ' + ' '.join(SWIG_OPTS + ['-o', ASSO_WRAPPER_CPP_FILE, ASSO_INTERFACE_FILE]))
-    ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', ASSO_WRAPPER_CPP_FILE, ASSO_INTERFACE_FILE]), shell=True)
+    print('swig ' +
+          ' '.join(SWIG_OPTS +
+                   ['-o', ASSO_WRAPPER_CPP_FILE, ASSO_INTERFACE_FILE]))
+    ret = subprocess.call(
+        'swig ' + ' '.join(SWIG_OPTS +
+                           ['-o', ASSO_WRAPPER_CPP_FILE, ASSO_INTERFACE_FILE]),
+        shell=True)
     if ret != 0:
         sys.exit('Failed to generate wrapper file for association module.')
     os.rename('src/variant_tools/assoTests.py', ASSO_WRAPPER_PY_FILE)
 #
-if not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE) or not os.path.isfile(CGATOOLS_WRAPPER_CPP_FILE):
+if not os.path.isfile(CGATOOLS_WRAPPER_PY_FILE) or not os.path.isfile(
+        CGATOOLS_WRAPPER_CPP_FILE):
     print('Generating {}'.format(CGATOOLS_WRAPPER_CPP_FILE))
-    ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', CGATOOLS_WRAPPER_CPP_FILE, CGATOOLS_INTERFACE_FILE]), shell=True)
+    ret = subprocess.call(
+        'swig ' +
+        ' '.join(SWIG_OPTS +
+                 ['-o', CGATOOLS_WRAPPER_CPP_FILE, CGATOOLS_INTERFACE_FILE]),
+        shell=True)
     if ret != 0:
         sys.exit('Failed to generate wrapper file for cgatools.')
     os.rename('src/variant_tools/cgatools.py', CGATOOLS_WRAPPER_PY_FILE)
 #
-if not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE) or not os.path.isfile(UCSCTOOLS_WRAPPER_CPP_FILE):
+if not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE) or not os.path.isfile(
+        UCSCTOOLS_WRAPPER_CPP_FILE):
     print('Generating {}'.format(UCSCTOOLS_WRAPPER_CPP_FILE))
-    ret = subprocess.call('swig ' + ' '.join(SWIG_OPTS + ['-o', UCSCTOOLS_WRAPPER_CPP_FILE, UCSCTOOLS_INTERFACE_FILE]), shell=True)
+    ret = subprocess.call(
+        'swig ' +
+        ' '.join(SWIG_OPTS +
+                 ['-o', UCSCTOOLS_WRAPPER_CPP_FILE, UCSCTOOLS_INTERFACE_FILE]),
+        shell=True)
     if ret != 0:
         sys.exit('Failed to generate wrapper file for ucsctools.')
     os.rename('src/variant_tools/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE)
@@ -256,36 +247,14 @@ else:
     libs = []
     gccargs = ['-O3', '-Wno-unused-local-typedef', '-Wno-return-type']
 
-
-ENV_INCLUDE_DIRS = [os.path.join(os.environ['CONDA_PREFIX'], 'include')] if 'CONDA_PREFIX' in os.environ else []
-ENV_INCLUDE_DIRS += [x for x in os.environ.get('LD_INCLUDE_PATH', '').split(os.pathsep) if x]
-ENV_LIBRARY_DIRS = [x for x in os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep) if x]
-
-
-# building other libraries
-for files, incs, macs, libname in [
-    (LIB_STAT, ['src'], [], 'stat'),
-    (LIB_UCSC_FILES, ['src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools'],
-        [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
-         ('_USE_KNETFILE', None), ('BGZF_CACHE', None)],
-        'ucsc'),
-    (LIB_CGATOOLS, ['src', 'src/cgatools'],
-        [('CGA_TOOLS_IS_PIPELINE', 0), ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
-        'cgatools')]:
-    c = new_compiler()
-    if os.path.isfile(os.path.join('build', c.static_lib_format % (libname, c.static_lib_extension))):
-        continue
-    try:
-        print('Building embedded library {}'.format(libname))
-        c = new_compiler()
-        objects = c.compile(files,
-            include_dirs=incs  + ENV_INCLUDE_DIRS,
-            output_dir='build',
-            extra_preargs = ['-w', '-fPIC'],
-            macros = macs)
-        c.create_static_lib(objects, libname, output_dir='build')
-    except Exception as e:
-        sys.exit("Failed to build embedded {} library: {}".format(libname, e))
+ENV_INCLUDE_DIRS = [os.path.join(os.environ['CONDA_PREFIX'], 'include')
+                   ] if 'CONDA_PREFIX' in os.environ else []
+ENV_INCLUDE_DIRS += [
+    x for x in os.environ.get('LD_INCLUDE_PATH', '').split(os.pathsep) if x
+]
+ENV_LIBRARY_DIRS = [
+    x for x in os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep) if x
+]
 
 ext_modules=[
         Extension('variant_tools._vt_sqlite3',
@@ -298,27 +267,27 @@ ext_modules=[
         Extension('variant_tools._ucsctools',
             # stop warning message ucsctools because it is written by us.
             extra_compile_args=['-w'],
-            sources = [UCSCTOOLS_WRAPPER_CPP_FILE],
+            sources = [UCSCTOOLS_WRAPPER_CPP_FILE] + UCSC_FILES,
             include_dirs = ['.', 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools']  + ENV_INCLUDE_DIRS,
             library_dirs = ["build"]  + ENV_LIBRARY_DIRS,
 
             define_macros =  [('USE_TABIX', '1'), ('_FILE_OFFSET_BITS', '64'), ('USE_BAM', '1'),
                 ('_USE_KNETFILE', None), ('BGZF_CACHE', None)],
-            libraries = libs + ['ucsc', 'z', 'bz2'],
+            libraries = libs + ['z', 'bz2'],
         ),
         Extension('variant_tools.cplinkio',
             # stop warning message ucsctools because it is written by us.
             extra_compile_args=['-w'],
-            sources = LIB_PLINKIO,
+            sources = PLINKIO_FILES,
             include_dirs = ['src/libplinkio']  + ENV_INCLUDE_DIRS,
         ),
         Extension('variant_tools._vt_sqlite3_ext',
             # stop warning message for sqlite because it is written by us.
-            sources = ['src/sqlite/vt_sqlite3_ext.cpp'],
+            sources = ['src/sqlite/vt_sqlite3_ext.cpp'] + CGATOOLS_FILES + STAT_FILES + UCSC_FILES,
             include_dirs = ["src/", 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools',
                 'src/sqlite', "src/variant_tools", "src/cgatools"] + ENV_INCLUDE_DIRS,
             library_dirs = ["build"] + ENV_LIBRARY_DIRS,
-            libraries = ['gsl', 'stat', 'ucsc', 'cgatools'] + \
+            libraries = ['gsl'] + \
                 ['boost_iostreams', 'boost_regex', 'boost_filesystem'] + \
                 ['z', 'bz2'],
             extra_compile_args = gccargs,
@@ -330,8 +299,8 @@ ext_modules=[
                 ('BGZF_CACHE', None)],
         ),
         Extension('variant_tools._cgatools',
-            sources = [CGATOOLS_WRAPPER_CPP_FILE],
-            libraries = ['cgatools'] + \
+            sources = [CGATOOLS_WRAPPER_CPP_FILE] + CGATOOLS_FILES,
+            libraries = \
                 ['boost_iostreams', 'boost_regex', 'boost_filesystem'] + \
                 ['z', 'bz2'] + ENV_INCLUDE_DIRS,
             define_macros = [('CGA_TOOLS_IS_PIPELINE', 0),
@@ -344,71 +313,73 @@ ext_modules=[
 
         ),
         Extension('variant_tools._assoTests',
-            sources = [ASSO_WRAPPER_CPP_FILE] + ASSOC_FILES,
+            sources = [ASSO_WRAPPER_CPP_FILE] + STAT_FILES + ASSOC_FILES,
             extra_compile_args = gccargs,
-            libraries = libs + ['gsl', 'stat', 'blas'],
+            libraries = libs + ['gsl', 'blas'],
             library_dirs = ["build"] + ENV_LIBRARY_DIRS,
             include_dirs = ["src", "src/variant_tools"] + ENV_INCLUDE_DIRS,
 
         )
       ]
-ext_modules+=cythonize([Extension('variant_tools.io_vcf_read',
-    # sources=['/Users/jma7/Development/VAT/VariantTools/src/variant_tools/io_vcf_read.c'],
-    sources=['src/variant_tools/io_vcf_read.pyx'],
-    include_dirs=[np.get_include()],
-    library_dirs = ["build"])])
-
+ext_modules += cythonize([
+    Extension(
+        'variant_tools.io_vcf_read',
+        # sources=['/Users/jma7/Development/VAT/VariantTools/src/variant_tools/io_vcf_read.c'],
+        sources=['src/variant_tools/io_vcf_read.pyx'],
+        include_dirs=[np.get_include()],
+        library_dirs=["build"])
+])
 
 CURRENT_DIR = os.path.abspath(os.path.dirname(__file__))
+
 
 def get_long_description():
     with open(os.path.join(CURRENT_DIR, "README.md"), "r") as ld_file:
         return ld_file.read()
 
 
-setup(name = "variant_tools",
-    version = VTOOLS_VERSION,
-    description = "Variant tools: an integrated annotation and analysis package for next-generation sequencing data",
+setup(
+    name="variant_tools",
+    version=VTOOLS_VERSION,
+    description="Variant tools: an integrated annotation and analysis package for next-generation sequencing data",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
-    author = 'Bo Peng',
-    url = 'http://varianttools.sourceforge.net',
-    author_email = 'bpeng@mdanderson.org',
-    maintainer = 'Bo Peng',
-    maintainer_email = 'varianttools-devel@lists.sourceforge.net',
-    license = 'GPL3',
-    classifiers = [
-            'Development Status :: 5 - Production/Stable',
-            'Environment :: Console',
-            'Intended Audience :: Education',
-            'Intended Audience :: Science/Research',
-            'License :: OSI Approved :: GNU General Public License (GPL)',
-            'Natural Language :: English',
-            'Operating System :: POSIX :: Linux',
-            'Operating System :: MacOS :: MacOS X',
-            'Programming Language :: C++',
-            'Programming Language :: Python',
-            'Programming Language :: Python :: 3',
-            'Topic :: Scientific/Engineering :: Bio-Informatics',
-        ],
-    install_requires=[
-       'pyzmq',
-       'tables',
-       'numpy',
-       'Cython',
-       'scipy',
-       'pyzmq',
-       'pycurl',
-       'tables',
+    author='Bo Peng',
+    url='http://varianttools.sourceforge.net',
+    author_email='bpeng@mdanderson.org',
+    maintainer='Bo Peng',
+    maintainer_email='varianttools-devel@lists.sourceforge.net',
+    license='GPL3',
+    classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Environment :: Console',
+        'Intended Audience :: Education',
+        'Intended Audience :: Science/Research',
+        'License :: OSI Approved :: GNU General Public License (GPL)',
+        'Natural Language :: English',
+        'Operating System :: POSIX :: Linux',
+        'Operating System :: MacOS :: MacOS X',
+        'Programming Language :: C++',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 3',
+        'Topic :: Scientific/Engineering :: Bio-Informatics',
     ],
-    packages = find_packages('src'),
-    package_dir = {'': 'src'},
-    entry_points = '''
+    install_requires=[
+        'pyzmq',
+        'tables',
+        'numpy',
+        'Cython',
+        'scipy',
+        'pyzmq',
+        'pycurl',
+        'tables',
+    ],
+    packages=find_packages('src'),
+    package_dir={'': 'src'},
+    entry_points='''
 [console_scripts]
 vtools = variant_tools.vtools:main
 vtools_report = variant_tools.vtools_report:main
 worker_run=variant_tools.worker_zmq:main
 ''',
-    ext_modules = ext_modules
-)
-
+    ext_modules=ext_modules)

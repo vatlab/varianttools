@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 #
-# $File: exporter.py $
-# $LastChangedDate$
-# $Rev$
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,23 +20,21 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
-import sys
-import re
-import time
-import datetime
-from argparse import SUPPRESS
-from multiprocessing import Process, Pipe, Lock
-from .utils import ProgressBar, delayedAction, \
-    consolidateFieldName, DatabaseEngine, env, encodeTableName, decodeTableName, \
-    splitField
-
-from .preprocessor import *
-# from .geno_store import GenoStore
-from .accessor import *
 import glob as glob
+import os
+import re
+import sys
+import time
+from multiprocessing import Lock, Pipe, Process
 
+import numpy as np
+
+# from .geno_store import GenoStore
+from .accessor import Engine_Access
 from .merge_sort_parallel import index_HDF5_rowIDs
+from .preprocessor import *
+from .utils import (DatabaseEngine, ProgressBar, consolidateFieldName,
+                    delayedAction, env)
 
 MAX_COLUMN = 62
 def VariantReader(proj, table, export_by_fields, order_by_fields, var_fields, geno_fields,
@@ -166,7 +160,7 @@ class BaseVariantReader:
 
 
     def getVariantQuery(self):
-        
+
         select_clause, select_fields = consolidateFieldName(self.proj, self.table,
             ','.join(['variant_id', 'variant.ref', 'variant.alt'] + self.var_fields), self.export_alt_build)
         # FROM clause
@@ -275,7 +269,7 @@ class StandaloneVariantReader(BaseVariantReader):
                 if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id)):
                     cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
                 prog.update(idx)
-            prog.done()            
+            prog.done()
         self.var_fields = var_fields
         self.reader, w = Pipe(False)
         self.worker = VariantWorker(proj.name, proj.annoDB, self.getQuery(), w, None)
@@ -285,7 +279,7 @@ class StandaloneVariantReader(BaseVariantReader):
         # the first None, indicating ready to output
         with delayedAction(env.logger.info, 'Selecting genotypes...'):
             self.reader.recv()
-        
+
     def records(self):
         while True:
             rec = self.reader.recv()
@@ -304,19 +298,19 @@ class MultiVariantReader(BaseVariantReader):
         # the first job for variants
         r, w = Pipe(False)
         lock = Lock()
-        
+
         p = VariantWorker(proj.name, proj.annoDB, self.getVariantQuery(), w, lock)
         self.workers = [p]
         self.readers = [r]
         IDs = list(IDs)
-     
+
         # we may need more jobs due to the limit of max columns
         # but we will only have self.jobs active jobs
         jobs = min(1, jobs)
         self.jobs = max(jobs, len(IDs) // MAX_COLUMN + 2)
         block = len(IDs) // (self.jobs-1) + 1
-        
-      
+
+
         if self.proj.store=="sqlite" or transformToHDF5:
 
             if transformToHDF5:
@@ -331,17 +325,17 @@ class MultiVariantReader(BaseVariantReader):
                     if not self.proj.db.hasIndex('{0}_genotype.genotype_{1}_index'.format(self.proj.name, id)):
                         cur.execute('CREATE INDEX {0}_genotype.genotype_{1}_index ON genotype_{1} (variant_id ASC)'.format(self.proj.name, id))
                     prog.update(idx)
-                prog.done()            
+                prog.done()
             for i in range(self.jobs - 1):
                 r, w = Pipe(False)
                 subIDs = IDs[(block*i):(block *(i + 1))]
-             
+
                 p = VariantWorker(proj.name, proj.annoDB, self.getSampleQuery(subIDs), w, lock)
-                
+
                 self.workers.append(p)
                 self.readers.append(r)
         elif self.proj.store=="hdf5":
-            # store = GenoStore(proj)    
+            # store = GenoStore(proj)
             # sampleFileMap=store.get_HDF5_sampleMap()
             cur = self.proj.db.cursor()
             cur.execute('SELECT sample_id, HDF5 FROM sample')
@@ -351,10 +345,10 @@ class MultiVariantReader(BaseVariantReader):
                 if res[1] not in sampleFileMap:
                     sampleFileMap[res[1]]=[]
                 sampleFileMap[res[1]].append(res[0])
-            samplefiles=glob.glob("tmp*genotypes.h5")     
+            samplefiles=glob.glob("tmp*genotypes.h5")
             samplefiles.sort(key=lambda x:int(x.split("_")[1]))
             # self.jobs=len(samplefiles)+1
-            
+
             self.jobs=1
             cur.execute('SELECT value FROM project WHERE name="multiVCF";')
             multiVCF=cur.fetchall()
@@ -377,7 +371,7 @@ class MultiVariantReader(BaseVariantReader):
                         self.workers.append(p)
                         self.readers.append(r)
 
-       
+
 
 
     def start(self):
@@ -385,8 +379,8 @@ class MultiVariantReader(BaseVariantReader):
         status = [0] * len(self.readers)
         while True:
             for idx, (w,r) in enumerate(zip(self.workers, self.readers)):
-              
-                if status[idx] == 2: # completed 
+
+                if status[idx] == 2: # completed
                     continue
                 elif status[idx] == 1: # started?
                     if r.poll():
@@ -423,7 +417,7 @@ class MultiVariantReader(BaseVariantReader):
                             id = val[0]
                         elif id != val[0]:
                             raise ValueError('Read different IDs from multiple processes')
-                        rec.extend(val[1:])    
+                        rec.extend(val[1:])
                         if idx == last:
                             yield rec
                             rec = []
@@ -474,19 +468,18 @@ class VariantWorker_HDF5_multi(Process):
         self.fileName=HDFfileName
         self.samples=samples
         self.geno_fields=geno_fields
-        self.output = output   
+        self.output = output
         Process.__init__(self)
 
     def run(self):
         accessEngine=Engine_Access.choose_access_engine(self.fileName)
         sortedID=index_HDF5_rowIDs(self.fileName)
-        vardict={}
         genoinfo_fields=[field.replace("_geno","") for field in self.geno_fields]
         if "GT" in genoinfo_fields:
             genoinfo_fields.remove("GT")
         db = DatabaseEngine()
         db.connect(self.dbname + '.proj', readonly=True, lock=self.lock)
-       
+
         for anno in self.annoDB:
             db.attach(os.path.join(anno.dir, anno.filename), lock=self.lock)
         cur = db.cursor()
@@ -510,7 +503,7 @@ class VariantWorker_HDF5_multi(Process):
                     for col in range(numcol):
                         val[col*len(self.geno_fields)]=genoType[col]
                     if len(genoinfo_fields)>0:
-                        for pos,field in enumerate(genoinfo_fields):  
+                        for pos,field in enumerate(genoinfo_fields):
                             genoInfo=sub_all[pos+1][0]
                             for col in range(numcol):
                                 val[col*len(self.geno_fields)+pos+1]=genoInfo[col]
@@ -523,8 +516,8 @@ class VariantWorker_HDF5_multi(Process):
                 # self.output.send([rec[0]]+val.tolist())
         self.output.send(None)
         db.close()
-            
-    
+
+
 
 
 
@@ -535,7 +528,7 @@ class VariantWorker_HDF5(Process):
         self.fileName=HDFfileName
         self.samples=samples
         self.geno_fields=geno_fields
-        self.output = output   
+        self.output = output
         Process.__init__(self)
 
     def run(self):
@@ -545,7 +538,7 @@ class VariantWorker_HDF5(Process):
         if "GT" in genoinfo_fields:
             genoinfo_fields.remove("GT")
         for rownames,colnames,sub_all in accessEngine.get_all_genotype_genoinfo(self.samples,[],genoinfo_fields):
-            
+
             genoType=sub_all[0]
             numrow,numcol=genoType.shape[0],genoType.shape[1]
             if len(self.geno_fields)==0:
@@ -557,13 +550,13 @@ class VariantWorker_HDF5(Process):
                 for col in range(numcol):
                     info[:,col]=genoType[:,col]
                 if len(genoinfo_fields)>0:
-                    for pos,field in enumerate(genoinfo_fields):  
+                    for pos,field in enumerate(genoinfo_fields):
                         genoInfo=sub_all[pos+1]
                         for col in range(numcol):
                             info[:,col*len(self.geno_fields)+pos+1]=genoInfo[:,col]
-            vardict.update(dict(zip(rownames,info)))  
+            vardict.update(dict(zip(rownames,info)))
 
-        # result=accessEngine.get_genoType_forExport_from_HDF5(self.samples,self.geno_fields)  
+        # result=accessEngine.get_genoType_forExport_from_HDF5(self.samples,self.geno_fields)
         self.output.send(None)
         last_id = None
         for key,val in vardict.items():
@@ -572,7 +565,7 @@ class VariantWorker_HDF5(Process):
                 val=np.where(np.isnan(val), None, val)
                 self.output.send([key]+val.tolist())
         self.output.send(None)
-    
+
 
 
 
@@ -601,7 +594,7 @@ class VariantWorker(Process):
         for rec in cur:
             if rec[0] != last_id:
                 last_id = rec[0]
-             
+
                 self.output.send(rec)
 
         self.output.send(None)

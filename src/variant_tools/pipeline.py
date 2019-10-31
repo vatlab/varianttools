@@ -1,12 +1,8 @@
 #!/usr/bin/env python
 #
-# $File: pipeline.py$
-# $LastChangedDate: 2013-04-23 11:58:41 -0500 (Tue, 23 Apr 2013) $
-# $Rev: 1855 $
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
 # Copyright (C) 2013 Bo Peng (bpeng@mdanderson.org)
 #
@@ -23,56 +19,43 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
 '''
 This module implement Variant Pipeline Tools and VPT-provided
 pipeline actions.
 '''
+import bz2
+import collections
+import copy
+import csv
+import glob
+import gzip
+import hashlib
+import logging
 import os
-import sys
-import subprocess
-from multiprocessing import Process
-import threading
 import pipes
 import pprint
-import copy
-#
-import glob
-import hashlib
-import shlex
-import argparse
-import logging
-import shutil
-import tempfile
-import tarfile
-import gzip
-import bz2
-import zipfile
-import time
-import re
-import csv
-import platform
-import logging
 import random
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+import threading
+import time
 import traceback
+import zipfile
+from collections import MutableMapping
+from itertools import combinations, tee
 from multiprocessing import Process
-from collections import namedtuple, MutableMapping
-from itertools import tee, combinations
-
-from .utils import env, ProgressBar, downloadFile, downloadURL, calculateMD5, delayedAction, \
-    existAndNewerThan, TEMP, decompressGzFile, typeOfValues, validFieldName, \
-    FileInfo, convertDoubleQuote, openFile, encodeTableName, expandRegions, \
-    substituteVars, which, RuntimeFiles
 
 from .project import PipelineDescription, Project
-
 from .ucsctools import showTrack
-# for parallel execution of steps
-try:
-    import pysam
-    hasPySam = True
-except (ImportError, ValueError) as e:
-    hasPySam = False
+from .utils import (TEMP, FileInfo, ProgressBar, RuntimeFiles, calculateMD5,
+                    decompressGzFile, delayedAction, downloadFile, downloadURL,
+                    env, existAndNewerThan, substituteVars, typeOfValues,
+                    validFieldName, which)
 
 
 class NamedList:
@@ -150,11 +133,13 @@ class NamedList:
         #
         # comma separated named list
         matched = re.match(
-            '^([\w\d-]+:)*((([\w\d-]+,)+[\w\d-]+)|([^:]*)@([^:?]*)(\?([^:]*))*)(:([^:]+))*$', value_string)
+            '^([\w\d-]+:)*((([\w\d-]+,)+[\w\d-]+)|([^:]*)@([^:?]*)(\?([^:]*))*)(:([^:]+))*$',
+            value_string)
         if matched is None:
-            raise ValueError(('"{}" is not a valid named list / query string, which should be name (optional) + comma separated list or '
-                              'colname@filename with optional query string (?), with optional meta. Three parts should be separated by :.')
-                             .format(value_string))
+            raise ValueError((
+                '"{}" is not a valid named list / query string, which should be name (optional) + comma separated list or '
+                'colname@filename with optional query string (?), with optional meta. Three parts should be separated by :.'
+            ).format(value_string))
         name = matched.group(1)
         comma_list = matched.group(3)
         colname = matched.group(5)
@@ -168,9 +153,12 @@ class NamedList:
                 '[\d\w_]+\s*=\s*[^=,]*(,[\d\w_]+\s*=\s*[^=,]*)*$', meta)
             if not matched:
                 raise ValueError(
-                    'Meta information is not in the format of key=value: {}'.format(meta))
-            self.meta = {x.split('=')[0].strip(): x.split(
-                '=')[1].strip() for x in meta.split(',')}
+                    'Meta information is not in the format of key=value: {}'
+                    .format(meta))
+            self.meta = {
+                x.split('=')[0].strip(): x.split('=')[1].strip()
+                for x in meta.split(',')
+            }
         #
         if comma_list is not None:
             self.items = comma_list.split(',')
@@ -195,34 +183,41 @@ class NamedList:
             if query is not None:
                 if re.match('.*[\d\w_]+\s*=\s*[\d\w_]+.*', query):
                     raise ValueError(
-                        'Syntax "a=b" is not allowed. Please use "a==b" instead: {}'.format(query))
+                        'Syntax "a=b" is not allowed. Please use "a==b" instead: {}'
+                        .format(query))
                 try:
                     pre_filter = data.shape[0]
                     data = data.query(query)
                     if pre_filter != data.shape[0]:
-                        env.logger.info('{} out of {} records are removed by filter {}'.format(pre_filter - data.shape[0],
-                                                                                               pre_filter, query))
+                        env.logger.info(
+                            '{} out of {} records are removed by filter {}'
+                            .format(pre_filter - data.shape[0], pre_filter,
+                                    query))
                 except Exception as e:
-                    raise ValueError('Failed to apply query "{}" to data file {}: {}'
-                                     .format(query, filename, e))
+                    raise ValueError(
+                        'Failed to apply query "{}" to data file {}: {}'.format(
+                            query, filename, e))
             #
             values = None
             for col in re.split('([^\w\d_])', colname):
                 if re.match('[^\w\d_]', col):
                     if values is None:
                         raise ValueError(
-                            'Leading non-ascii word is not allowed. {}'.format(colname))
+                            'Leading non-ascii word is not allowed. {}'.format(
+                                colname))
                     else:
                         values = [x + col for x in values]
                     continue
                 if col not in data.columns:
-                    raise ValueError('File {} does not have column {}. Available columns are {}'
-                                     .format(filename, col, ', '.join(list(data.columns))))
+                    raise ValueError(
+                        'File {} does not have column {}. Available columns are {}'
+                        .format(filename, col, ', '.join(list(data.columns))))
                 if values is None:
                     values = list(data[col].fillna(''))
                 else:
-                    values = [x + y for x,
-                              y in zip(values, data[col].fillna(''))]
+                    values = [
+                        x + y for x, y in zip(values, data[col].fillna(''))
+                    ]
             #
             self.items = values
             if self.name == default_name:
@@ -266,8 +261,14 @@ class EmitInput:
     '''An input emitter that emits input files individually, in pairs, or
     altogether.'''
 
-    def __init__(self, group_by='all', select=True, skip=False, pass_unselected=True,
-                 labels=None, for_each=None, loop_labels=None):
+    def __init__(self,
+                 group_by='all',
+                 select=True,
+                 skip=False,
+                 pass_unselected=True,
+                 labels=None,
+                 for_each=None,
+                 loop_labels=None):
         '''Select input files of certain types, group them, and send input files
         to action. Selection criteria can be True (all input file types, default),
         'False' (select no input file, but an empty list will still be passed to
@@ -309,7 +310,8 @@ class EmitInput:
             self.for_each = for_each
         else:
             raise ValueError(
-                'Unacceptable value for parameter for_each: {}'.format(for_each))
+                'Unacceptable value for parameter for_each: {}'.format(
+                    for_each))
         #
         if loop_labels is None or not loop_labels:
             self.loop_labels = []
@@ -319,43 +321,53 @@ class EmitInput:
             self.loop_labels = loop_labels
         else:
             raise ValueError(
-                'Unacceptable value for parameter loop_labels: {}'.format(loop_labels))
+                'Unacceptable value for parameter loop_labels: {}'.format(
+                    loop_labels))
         #
         if type(select) == str:
-            if select not in ['fastq', 'bam', 'sam'] and not str(select).startswith('.'):
-                raise ValueError("Value to option select can only be True/False, "
-                                 "'fastq', or a file extension with leading '.': '{}' provided."
-                                 .format(select))
+            if select not in ['fastq', 'bam', 'sam'
+                             ] and not str(select).startswith('.'):
+                raise ValueError(
+                    "Value to option select can only be True/False, "
+                    "'fastq', or a file extension with leading '.': '{}' provided."
+                    .format(select))
             self.select = [select]
         elif select in [True, False]:
             self.select = select
         else:
             for s in select:
-                if s not in ['fastq', 'bam', 'sam'] and not str(s).startswith('.'):
-                    raise ValueError("Value to option select can only be True/False, "
-                                     "'fastq', or a file extension with leading '.': '{}' provided."
-                                     .format(s))
+                if s not in ['fastq', 'bam', 'sam'
+                            ] and not str(s).startswith('.'):
+                    raise ValueError(
+                        "Value to option select can only be True/False, "
+                        "'fastq', or a file extension with leading '.': '{}' provided."
+                        .format(s))
             self.select = select
         self.skip = skip
         self.pass_unselected = pass_unselected
 
     def _isFastq(self, filename):
         try:
-            if not os.path.isfile(filename) and not os.path.isfile(filename + '.file_info'):
+            if not os.path.isfile(filename) and not os.path.isfile(
+                    filename + '.file_info'):
                 raise RuntimeError('File not found')
             fl = FileInfo(filename).firstline()
             if fl is None:
-                env.logger.info('Cannot detect the type of file because the {} has been removed.'
-                                .format(filename))
-                return filename.lower().split('.')[-1] not in ['bam', 'sam', 'gz', 'zip']
+                env.logger.info(
+                    'Cannot detect the type of file because the {} has been removed.'
+                    .format(filename))
+                return filename.lower().split('.')[-1] not in [
+                    'bam', 'sam', 'gz', 'zip'
+                ]
             if not fl.startswith('@'):
                 return False
             if filename.endswith('.gz'):
-                env.logger.warning('{}: compressed fastq file might not be '
-                                   'acceptable to downstream analysis.'.format(filename))
+                env.logger.warning(
+                    '{}: compressed fastq file might not be '
+                    'acceptable to downstream analysis.'.format(filename))
         except Exception as e:
-            env.logger.debug(
-                'Input file {} is not in fastq format: {}'.format(filename, e))
+            env.logger.debug('Input file {} is not in fastq format: {}'.format(
+                filename, e))
             return False
         return True
 
@@ -382,89 +394,106 @@ class EmitInput:
             if read[:-1] in read_map:
                 if read.endswith('1'):
                     if read_map[read[:-1]][0] is not None:
-                        raise RuntimeError('Fastq file {} has the same first read as {}'
-                                           .format(filename, read_map[read[:-1]][0]))
+                        raise RuntimeError(
+                            'Fastq file {} has the same first read as {}'
+                            .format(filename, read_map[read[:-1]][0]))
                     else:
                         read_map[read[:-1]][0] = filename
                 elif read.endswith('2'):
                     if read_map[read[:-1]][1] is not None:
-                        raise RuntimeError('Fastq file {} has the same first read as {}'
-                                           .format(filename, read_map[read[:-1]][1]))
+                        raise RuntimeError(
+                            'Fastq file {} has the same first read as {}'
+                            .format(filename, read_map[read[:-1]][1]))
                     else:
                         read_map[read[:-1]][1] = filename
                 else:
-                    raise RuntimeError('Fastq file {} is not paired because its read name does '
-                                       'not end with 1 or 2'.format(filename))
+                    raise RuntimeError(
+                        'Fastq file {} is not paired because its read name does '
+                        'not end with 1 or 2'.format(filename))
             else:
                 if read.endswith('1'):
                     read_map[read[:-1]] = [filename, None]
                 elif read.endswith('2'):
                     read_map[read[:-1]] = [None, filename]
                 else:
-                    raise RuntimeError('Fastq file {} is not paired because its read name does '
-                                       'not end with 1 or 2'.format(filename))
+                    raise RuntimeError(
+                        'Fastq file {} is not paired because its read name does '
+                        'not end with 1 or 2'.format(filename))
         # now, let us go through files
         pairs = []
         for read, filenames in read_map.items():
             if filenames[0] is None:
-                raise RuntimeError('Fastq file {} is not paired (no matching read is found)'
-                                   .format(filenames[0]))
+                raise RuntimeError(
+                    'Fastq file {} is not paired (no matching read is found)'
+                    .format(filenames[0]))
             elif filenames[1] is None:
-                raise RuntimeError('Fastq file {} is not paired (no matching read is found)'
-                                   .format(filenames[1]))
+                raise RuntimeError(
+                    'Fastq file {} is not paired (no matching read is found)'
+                    .format(filenames[1]))
             else:
                 if not self._is_paired(filenames[0], filenames[1]):
-                    env.logger.warning('{} and {} contain paired reads but the filenames '
-                                       'do not follow illumina filename convention'
-                                       .format(filenames[0], filenames[1]))
+                    env.logger.warning(
+                        '{} and {} contain paired reads but the filenames '
+                        'do not follow illumina filename convention'.format(
+                            filenames[0], filenames[1]))
                 pairs.append(filenames)
         return sorted(pairs), unselected
 
     def _pairByFileName(self, selected, unselected):
-            #
-            # there is a possibility that one name differ at multiple parts
-            # with another name. e.g
-            #
-            #      A1_TAGCTT_L007_R1_001.fastq.gz
-            #
-            # differ with the following two names by a number
-            #
-            #      A1_TAGCTT_L007_R1_002.fastq.gz
-            #      A1_TAGCTT_L007_R2_001.fastq.gz
-            #
-            # the code below tries to find good pairs first, then use matched
-            # locations to pair others
+        #
+        # there is a possibility that one name differ at multiple parts
+        # with another name. e.g
+        #
+        #      A1_TAGCTT_L007_R1_001.fastq.gz
+        #
+        # differ with the following two names by a number
+        #
+        #      A1_TAGCTT_L007_R1_002.fastq.gz
+        #      A1_TAGCTT_L007_R2_001.fastq.gz
+        #
+        # the code below tries to find good pairs first, then use matched
+        # locations to pair others
         if not selected:
-            env.logger.warning('No file matching type "{}" is selected for pairing.'
-                               .format(self.select))
+            env.logger.warning(
+                'No file matching type "{}" is selected for pairing.'.format(
+                    self.select))
             return [], unselected
-        all_pairs = [[x, y]
-                     for x in selected for y in selected if self._is_paired(x, y)]
-        unpaired = [x for x in selected if not any(
-            [x in y for y in all_pairs])]
+        all_pairs = [
+            [x, y] for x in selected for y in selected if self._is_paired(x, y)
+        ]
+        unpaired = [x for x in selected if not any([x in y for y in all_pairs])]
         if unpaired:
             raise ValueError('Failed to pair input filenames: {} is not paired'
-                             'with any other names.'.format(', '.join(unpaired)))
-        uniquely_paired = [x for x in selected if sum(
-            [x in y for y in all_pairs]) == 1]
+                             'with any other names.'.format(
+                                 ', '.join(unpaired)))
+        uniquely_paired = [
+            x for x in selected if sum([x in y for y in all_pairs]) == 1
+        ]
         # if some filenames are uniquely paired, we can use them to identify
         # index locations.
         if uniquely_paired:
-            pairs = [x for x in all_pairs if x[0]
-                     in uniquely_paired or x[1] in uniquely_paired]
+            pairs = [
+                x for x in all_pairs
+                if x[0] in uniquely_paired or x[1] in uniquely_paired
+            ]
             if len(pairs) != all_pairs:
-                    # find the differentiating index of existing pairs
-                diff_at = set(
-                    [[i != j for i, j in zip(x[0], x[1])].index(True) for x in pairs])
+                # find the differentiating index of existing pairs
+                diff_at = set([[i != j
+                                for i, j in zip(x[0], x[1])].index(True)
+                               for x in pairs])
                 # use the diff_at locations to screen the rest of the pairs
-                pairs.extend(
-                    [x for x in all_pairs if x not in pairs and self._is_paired(x[0], x[1], diff_at)])
+                pairs.extend([
+                    x for x in all_pairs
+                    if x not in pairs and self._is_paired(x[0], x[1], diff_at)
+                ])
                 #
                 if len(pairs) * 2 != len(selected):
-                    unpaired = [x for x in selected if not any(
-                        [x in y for y in pairs])]
+                    unpaired = [
+                        x for x in selected if not any([x in y for y in pairs])
+                    ]
                     raise ValueError('Failed to pair input files because they '
-                                     'match multiple filenames: {}'.format(', '.join(unpaired)))
+                                     'match multiple filenames: {}'.format(
+                                         ', '.join(unpaired)))
             return sorted(pairs), unselected
         else:
             # all filenames match to multiple names, so we try to get all
@@ -472,35 +501,44 @@ class EmitInput:
             # perfectly. We start from the end because we assume that _1 _2
             # are close to the end of filenames.
             #
-            diff_at = set(
-                [[i != j for i, j in zip(x[0], x[1])].index(True) for x in all_pairs])
+            diff_at = set([[i != j
+                            for i, j in zip(x[0], x[1])].index(True)
+                           for x in all_pairs])
             acceptable_diff_at = []
             for d in diff_at:
                 # try to pair all names at this location.
-                pairs = [x for x in all_pairs if self._is_paired(
-                    x[0], x[1], [d])]
+                pairs = [
+                    x for x in all_pairs if self._is_paired(x[0], x[1], [d])
+                ]
                 if len(pairs) * 2 != len(selected):
                     continue
                 # all filename should appear once and only once
-                if not all([sum([x in y for y in pairs]) == 1 for x in selected]):
+                if not all(
+                    [sum([x in y for y in pairs]) == 1 for x in selected]):
                     continue
                 acceptable_diff_at.append(d)
             # fortunately, only one perfect pairing is found
             if len(acceptable_diff_at) == 1:
-                pairs = [x for x in all_pairs if self._is_paired(
-                    x[0], x[1], acceptable_diff_at)]
+                pairs = [
+                    x for x in all_pairs
+                    if self._is_paired(x[0], x[1], acceptable_diff_at)
+                ]
                 return sorted(pairs), unselected
             elif len(acceptable_diff_at) > 1:
-                env.logger.warning('There are {} ways to match all filenames '
-                                   'perfectly. The one using a latter differentiating index '
-                                   'is used.'.format(len(acceptable_diff_at)))
+                env.logger.warning(
+                    'There are {} ways to match all filenames '
+                    'perfectly. The one using a latter differentiating index '
+                    'is used.'.format(len(acceptable_diff_at)))
                 diff_at = sorted(list(acceptable_diff_at))[-1]
-                pairs = [x for x in all_pairs if self._is_paired(
-                    x[0], x[1], [diff_at])]
+                pairs = [
+                    x for x in all_pairs
+                    if self._is_paired(x[0], x[1], [diff_at])
+                ]
                 return sorted(pairs), unselected
             else:
-                raise ValueError('All filenames match multiple names but no differentiating '
-                                 'index can pair filenames perfectly.')
+                raise ValueError(
+                    'All filenames match multiple names but no differentiating '
+                    'index can pair filenames perfectly.')
 
     def get_groups(self, ifiles, pipeline=None):
         if self.skip:
@@ -513,7 +551,7 @@ class EmitInput:
                 match = True
             elif self.select is False:
                 pass
-            else:   # list of types
+            else:  # list of types
                 for t in self.select:
                     if t == 'fastq':
                         if self._isFastq(filename):
@@ -539,14 +577,16 @@ class EmitInput:
                     return self._pairByReadNames(selected, unselected)
                 except Exception as e:
                     # if failed to pair by read name, pair by filenames
-                    env.logger.warning('Failed to pair fastq files by read names. '
-                                       'Trying to pair files by filenames: {}'.format(e))
+                    env.logger.warning(
+                        'Failed to pair fastq files by read names. '
+                        'Trying to pair files by filenames: {}'.format(e))
             else:
                 # this should not happen becase we do not need to pair non-fastq files
                 # at this point, but I will leave the code here anyway.
-                env.logger.warning('It is unsafe to pair input files by names instead of '
-                                   'their content. Please add option select="fastq" if you need to '
-                                   'pair input fastq files')
+                env.logger.warning(
+                    'It is unsafe to pair input files by names instead of '
+                    'their content. Please add option select="fastq" if you need to '
+                    'pair input fastq files')
             return self._pairByFileName(selected, unselected)
         elif self.group_by == 'pairwise':
             f1, f2 = tee(selected)
@@ -562,27 +602,32 @@ class EmitInput:
             values = pipeline.VARS[wv]
             if not isinstance(values, list):
                 raise ValueError(
-                    'with_var variable {} is not a list ("{}")'.format(wv, values))
+                    'with_var variable {} is not a list ("{}")'.format(
+                        wv, values))
             if len(values) != len(ifiles):
-                raise ValueError('Length of variable {} (length {}) should match the number of input files (length {}).'
-                                 .format(wv, len(values), len(ifiles)))
+                raise ValueError(
+                    'Length of variable {} (length {}) should match the number of input files (length {}).'
+                    .format(wv, len(values), len(ifiles)))
             file_map = {x: y for x, y in zip(ifiles, values)}
             #env.logger.error('Paring {}'.format(file_map))
             for idx, val in enumerate(values):
-                set_vars[idx]['_' + wv] = [file_map[x]
-                                           for x in selected_groups[idx]]
+                set_vars[idx]['_' +
+                              wv] = [file_map[x] for x in selected_groups[idx]]
         for fe_all in self.for_each:
             loop_size = None
             for fe in fe_all.split(','):
                 values = pipeline.VARS[fe]
                 if not isinstance(values, list):
                     raise ValueError(
-                        'for_each variable {} is not a list ("{}")'.format(fe, values))
+                        'for_each variable {} is not a list ("{}")'.format(
+                            fe, values))
                 if loop_size is None:
                     loop_size = len(values)
                 elif loop_size != len(values):
-                    raise ValueError('Length of variable {} (length {}) should match the length of variable {} (length {}).'
-                                     .format(fe, len(values), fe_all.split(',')[0], loop_size))
+                    raise ValueError(
+                        'Length of variable {} (length {}) should match the length of variable {} (length {}).'
+                        .format(fe, len(values),
+                                fe_all.split(',')[0], loop_size))
             # expand
             selected_groups = selected_groups * loop_size
             tmp = []
@@ -657,7 +702,8 @@ class PipelineAction:
         the action is completed successfully, ``False`` for pending (signature will be written later,
         and raise an exception for errors. '''
         raise RuntimeError(
-            'Please define your own execute function in an derived class of PipelineAction.')
+            'Please define your own execute function in an derived class of PipelineAction.'
+        )
 
     def _write_info(self, pipeline=None):
         if not self.output:
@@ -667,10 +713,11 @@ class PipelineAction:
             for f in self.output:
                 if not os.path.isfile(f):
                     raise RuntimeError(
-                        'Output file {} does not exist after completion of the job.'.format(f))
+                        'Output file {} does not exist after completion of the job.'
+                        .format(f))
                 # for performance considerations, use partial MD5
-                exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
-                                                     calculateMD5(f, partial=True)))
+                exe_info.write('{}\t{}\t{}\n'.format(
+                    f, os.path.getsize(f), calculateMD5(f, partial=True)))
             # write standard output to exe_info
             exe_info.write('\n\nSTDOUT\n\n')
             if os.path.isfile(self.runtime.proc_out):
@@ -695,7 +742,8 @@ class PipelineAction:
         if pipeline_vars:
             files_and_dirs = []
             for key, item in pipeline_vars.items():
-                if isinstance(item, str) and (os.path.isfile(item) or os.path.isdir(item)):
+                if isinstance(item, str) and (os.path.isfile(item) or
+                                              os.path.isdir(item)):
                     files_and_dirs.append([key, item])
             # sort by length
             files_and_dirs = sorted(files_and_dirs, key=lambda x: -len(x[1]))
@@ -704,7 +752,9 @@ class PipelineAction:
             pieces = text.split()
             for key, item in files_and_dirs:
                 for idx, p in enumerate(pieces):
-                    if p.startswith(item) and (len(p) == len(item) or not (p[len(item)].isalpha() or p[len(item)].isdigit())):
+                    if p.startswith(item) and (len(p) == len(item) or
+                                               not (p[len(item)].isalpha() or
+                                                    p[len(item)].isdigit())):
                         pieces[idx] = '${{{}}}{}'.format(
                             key, pieces[idx][len(item):])
             text = ' '.join(pieces)
@@ -737,27 +787,31 @@ class PipelineAction:
                 if self._useVars(cmd, pipeline.VARS) == self._useVars('; '.join(self.cmd), pipeline.VARS) \
                     and existAndNewerThan(self.output, ifiles + pipeline.step_dependent_files,
                                           md5file=self.runtime.proc_info, pipeline=pipeline):
-                    env.logger.info('Reuse existing {}'.format(
-                        ', '.join(self.output)))
+                    env.logger.info('Reuse existing {}'.format(', '.join(
+                        self.output)))
                     self._bypass(ifiles, pipeline)
                     if self.output:
                         return self.output
                     else:
                         return ifiles
             # create directory if output directory does not exist
-            for d in [os.path.split(os.path.abspath(x))[0] for x in self.output]:
+            for d in [
+                    os.path.split(os.path.abspath(x))[0] for x in self.output
+            ]:
                 if not os.path.isdir(d):
                     try:
                         os.makedirs(d)
                     except Exception as e:
                         raise RuntimeError(
-                            'Failed to create directory {} for output file: {}'.format(d, e))
+                            'Failed to create directory {} for output file: {}'
+                            .format(d, e))
         # We cannot ignore this step, but do we have all the input files?
         # If not, we will have to rewind the execution
         for ifile in ifiles:
             if not os.path.isfile(ifile):
                 env.logger.warning(
-                    'Rewind execution because input file {} does not exist.'.format(ifile))
+                    'Rewind execution because input file {} does not exist.'
+                    .format(ifile))
                 raise RewindExecution(ifile)
         #
         if self.output:
@@ -767,14 +821,15 @@ class PipelineAction:
                     time.asctime(time.localtime())))
                 for f in ifiles + pipeline.step_dependent_files:
                     # for performance considerations, use partial MD5
-                    exe_info.write('{}\t{}\t{}\n'.format(f, os.path.getsize(f),
-                                                         calculateMD5(f, partial=True)))
+                    exe_info.write('{}\t{}\t{}\n'.format(
+                        f, os.path.getsize(f), calculateMD5(f, partial=True)))
         # now, run the job, write info if it is successfully finished.
         # Otherwise the job might be forked and it will record the signature by itself.
         ret = self._execute(ifiles, pipeline)
         if ret not in [True, False]:
             env.logger.warning(
-                'User defined execute function of a PipelineAction should return True or False')
+                'User defined execute function of a PipelineAction should return True or False'
+            )
         if ret:
             self._write_info(pipeline)
         #
@@ -790,7 +845,7 @@ SkiptableAction = PipelineAction
 try:
     from .simulation import *
     hasSimuPOP = True
-except ImportError as e:
+except ImportError:
     hasSimuPOP = False
 
 
@@ -864,7 +919,7 @@ class IfElse(PipelineAction):
         the second action, and so on. Return the output from the last
         action as the result of this ``SequentialAction``.
         '''
-        if self.cond in [false, 'False', '']:
+        if self.cond in [False, 'False', '']:
             if self.else_action is not None:
                 return self.else_condition(ifiles, pipeline)
         else:
@@ -902,13 +957,17 @@ class CheckVariantToolsVersion(PipelineAction):
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
-        vtools_version = [int(x) for x in re.sub(
-            '\D', ' ', pipeline.VARS['vtools_version']).split()]
+        vtools_version = [
+            int(x)
+            for x in re.sub('\D', ' ', pipeline.VARS['vtools_version']).split()
+        ]
         # e.g. minimal 2.2.0, vtools 2.1.1
-        if [int(x) for x in re.sub('\D', ' ', self.min_version).split()] > vtools_version:
-            raise RuntimeError('Version {} is required to execute this pipeline. '
-                               'Please upgrade your installation of variant tools (version {})'
-                               .format(self.min_version, pipeline.VARS['vtools_version']))
+        if [int(x) for x in re.sub('\D', ' ', self.min_version).split()
+           ] > vtools_version:
+            raise RuntimeError(
+                'Version {} is required to execute this pipeline. '
+                'Please upgrade your installation of variant tools (version {})'
+                .format(self.min_version, pipeline.VARS['vtools_version']))
         return ifiles
 
 
@@ -968,54 +1027,59 @@ class ImportModules(PipelineAction):
                 # if the .py file locates in the same directory as the pipeline file
                 elif pipeline is not None \
                         and os.path.isfile(os.path.join(os.path.split(pipeline.spec_file)[0], module)):
-                    pyfile = os.path.join(os.path.split(
-                        pipeline.spec_file)[0], module)
+                    pyfile = os.path.join(
+                        os.path.split(pipeline.spec_file)[0], module)
                 else:
                     # try to download it from online
                     try:
                         pyfile = downloadFile('simulation/{}'.format(module))
-                    except Exception as e:
+                    except Exception:
                         try:
                             pyfile = downloadFile('pipeline/{}'.format(module))
                         except Exception as e:
                             raise ValueError(
-                                'Failed to download required python module {}: {}'.format(module, e))
+                                'Failed to download required python module {}: {}'
+                                .format(module, e))
                 try:
-                    p, f = os.path.split(os.path.abspath(
-                        os.path.expanduser(pyfile)))
+                    p, f = os.path.split(
+                        os.path.abspath(os.path.expanduser(pyfile)))
                     sys.path.append(p)
-                    local_dict = __import__(
-                        f[:-3] if f.endswith('.py') else f, globals(), locals(), module.split('.', 1)[-1:])
-                    env.logger.info('{} symbols are imported form module {}'.format(
-                        len(local_dict.__dict__), module))
+                    local_dict = __import__(f[:-3] if f.endswith('.py') else f,
+                                            globals(), locals(),
+                                            module.split('.', 1)[-1:])
+                    env.logger.info(
+                        '{} symbols are imported form module {}'.format(
+                            len(local_dict.__dict__), module))
                     pipeline.GLOBALS.update(local_dict.__dict__)
                 except Exception as e:
-                    raise RuntimeError(
-                        'Failed to import module {}: {}'.format(module, e))
+                    raise RuntimeError('Failed to import module {}: {}'.format(
+                        module, e))
             # now a system module
             else:
                 try:
                     # allow loading from current directory
                     sys.path.append(os.getcwd())
-                    local_dict = __import__(
-                        module, globals(), locals(), module.split('.', 1)[-1:])
-                    env.logger.info('{} symbols are imported form module {}'.format(
-                        len(local_dict.__dict__), module))
+                    local_dict = __import__(module, globals(), locals(),
+                                            module.split('.', 1)[-1:])
+                    env.logger.info(
+                        '{} symbols are imported form module {}'.format(
+                            len(local_dict.__dict__), module))
                     pipeline.GLOBALS.update(local_dict.__dict__)
                 except ImportError as e:
-                    raise RuntimeError(
-                        'Failed to import module {}: {}'.format(module, e))
+                    raise RuntimeError('Failed to import module {}: {}'.format(
+                        module, e))
         # script
         if self.script:
             try:
                 local_dict = {}
                 exec(self.script, globals(), local_dict)
                 env.logger.info(
-                    '{} symbols are imported form inline script'.format(len(local_dict)))
+                    '{} symbols are imported form inline script'.format(
+                        len(local_dict)))
                 pipeline.GLOBALS.update(local_dict)
             except Exception as e:
-                raise RuntimeError(
-                    'Failed to execute script "{}": {}'.format(self.script, e))
+                raise RuntimeError('Failed to execute script "{}": {}'.format(
+                    self.script, e))
 
         return ifiles
 
@@ -1051,8 +1115,9 @@ class CheckCommands(PipelineAction):
     def __call__(self, ifiles, pipeline=None):
         for cmd in self.commands:
             if which(cmd) is None:
-                raise RuntimeError('Command {} does not exist. Please install it and try again.'
-                                   .format(cmd))
+                raise RuntimeError(
+                    'Command {} does not exist. Please install it and try again.'
+                    .format(cmd))
             else:
                 env.logger.info('Command {} is located.'.format(cmd))
         return ifiles
@@ -1106,20 +1171,26 @@ class CheckOutput(PipelineAction):
         try:
             # do not use subprocess.check_output because I need to get
             # output even when the command returns non-zero return code
-            p = subprocess.Popen(self.command, stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE, shell=True)
+            p = subprocess.Popen(
+                self.command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                shell=True)
             odata, edata = p.communicate()
             output = odata.decode() + edata.decode()
-            env.logger.trace('Output of command "{}" is "{}"'
-                             .format(self.command, output))
+            env.logger.trace('Output of command "{}" is "{}"'.format(
+                self.command, output))
         except Exception as e:
-            raise RuntimeError('Failed to execute command "{}": {}'
-                               .format(self.cmd, e))
+            raise RuntimeError('Failed to execute command "{}": {}'.format(
+                self.cmd, e))
         #
-        if all([re.search(x, output, re.MULTILINE) is None for x in self.patterns]):
+        if all(
+            [re.search(x, output, re.MULTILINE) is None for x in self.patterns
+            ]):
             msg = ('Output of command "{}" ("{}") does not ' +
-                   'match specified regular expression {}.').format(self.command,
-                                                                    ' '.join(output[:40].split()), ' or '.join(self.patterns))
+                   'match specified regular expression {}.').format(
+                       self.command, ' '.join(output[:40].split()),
+                       ' or '.join(self.patterns))
             if self.fail:
                 raise RuntimeError(msg)
             else:
@@ -1165,8 +1236,8 @@ class CheckFiles(PipelineAction):
             if os.path.isfile(os.path.expanduser(f)):
                 env.logger.info('{} is located.'.format(f))
             else:
-                raise RuntimeError(
-                    'Cannot locate {}: {}'.format(f, self.message))
+                raise RuntimeError('Cannot locate {}: {}'.format(
+                    f, self.message))
         return ifiles
 
 
@@ -1208,8 +1279,8 @@ class CheckDirs(PipelineAction):
             if os.path.isdir(d):
                 env.logger.info('Directory {} is located.'.format(d))
             else:
-                raise RuntimeError(
-                    'Cannot locate directory {}. {}'.format(d, self.message))
+                raise RuntimeError('Cannot locate directory {}. {}'.format(
+                    d, self.message))
         return ifiles
 
 
@@ -1313,10 +1384,10 @@ class OutputText(PipelineAction):
             self.text = ''.join([str(x) + '\n' for x in text])
         else:
             self.text = text + '\n'
-        self.filename = filename
+        self.filename = output
         self.mode = mode
-        PipelineAction.__init__(
-            self, 'OutputText', filename if filename is not None else '')
+        PipelineAction.__init__(self, 'OutputText',
+                                self.filename if self.filename is not None else '')
 
     def __call__(self, ifiles, pipeline=None):
         if self.filename is not None:
@@ -1383,8 +1454,8 @@ class FieldsFromTextFile(PipelineAction):
                         fo.write('type={}\n\n'.format(
                             typeOfValues(values[idx])))
         except Exception as e:
-            raise RuntimeError(
-                'Failed to guess fields from {}: {}'.format(ifiles[0], e))
+            raise RuntimeError('Failed to guess fields from {}: {}'.format(
+                ifiles[0], e))
         #
         return True
 
@@ -1416,10 +1487,16 @@ class NullAction(PipelineAction):
 
 
 class MonitorThread(threading.Thread):
-    def __init__(self, group=None, target=None, name=None,
-                 args=(), kwargs={}, Verbose=None):
-        threading.Thread.__init__(
-            self, group, target, name, args, kwargs, Verbose)
+
+    def __init__(self,
+                 group=None,
+                 target=None,
+                 name=None,
+                 args=(),
+                 kwargs={},
+                 Verbose=None):
+        threading.Thread.__init__(self, group, target, name, args, kwargs,
+                                  Verbose)
         self._return = None
 
     def run(self):
@@ -1433,6 +1510,7 @@ class MonitorThread(threading.Thread):
 
 
 class SharedProcess:
+
     def __init__(self, runtime):
         self.runtime = runtime
 
@@ -1444,7 +1522,6 @@ class SharedProcess:
 
     def __enter__(self):
         # wait for the availability of lock
-        start_time = time.time()
         prog_time = None
         while True:
             # there is a progress file
@@ -1517,7 +1594,13 @@ class RunCommand(PipelineAction):
 
     """
 
-    def __init__(self, cmd='', output=[], working_dir=None, submitter=None, wait=True, max_jobs=None):
+    def __init__(self,
+                 cmd='',
+                 output=[],
+                 working_dir=None,
+                 submitter=None,
+                 wait=True,
+                 max_jobs=None):
         '''This action accepts one (a string) or more command (a list of strings)
         and executes them in a shell environment, possibly as a separate job.
 
@@ -1587,24 +1670,29 @@ class RunCommand(PipelineAction):
         if self.runtime.proc_lck:
             env.lock(self.runtime.proc_lck, str(os.getpid()))
         for cur_cmd in self.cmd:
-            if self.working_dir is not None and not os.path.isdir(self.working_dir):
+            if self.working_dir is not None and not os.path.isdir(
+                    self.working_dir):
                 os.makedirs(self.working_dir)
-            env.logger.info('Running ``{}``{}'.format(cur_cmd,
-                                                      ' under {}'.format(self.working_dir) if self.working_dir else ''))
-            ret = subprocess.call(cur_cmd, shell=True,
-                                  stdout=None if self.runtime.proc_out is None else open(
-                                      self.runtime.proc_out, 'w'),
-                                  stderr=None if self.runtime.proc_err is None else open(
-                                      self.runtime.proc_err, 'w'),
-                                  cwd=self.working_dir)
+            env.logger.info('Running ``{}``{}'.format(
+                cur_cmd, ' under {}'.format(self.working_dir)
+                if self.working_dir else ''))
+            ret = subprocess.call(
+                cur_cmd,
+                shell=True,
+                stdout=None if self.runtime.proc_out is None else open(
+                    self.runtime.proc_out, 'w'),
+                stderr=None if self.runtime.proc_err is None else open(
+                    self.runtime.proc_err, 'w'),
+                cwd=self.working_dir)
             if ret < 0:
                 if self.output:
                     try:
                         env.unlock(self.runtime.proc_lck, str(os.getpid()))
                     except:
                         pass
-                raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
-                                   .format(cur_cmd, -ret, self._elapsed_time()))
+                raise RuntimeError(
+                    "Command '{}' was terminated by signal {} after executing {}"
+                    .format(cur_cmd, -ret, self._elapsed_time()))
             elif ret > 0:
                 if self.output:
                     with open(self.runtime.proc_err) as err:
@@ -1614,8 +1702,9 @@ class RunCommand(PipelineAction):
                         env.unlock(self.runtime.proc_lck, str(os.getpid()))
                     except:
                         pass
-                raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
-                                   .format(cur_cmd, self._elapsed_time(), ret))
+                raise RuntimeError(
+                    "Execution of command '{}' failed after {} (return code {})."
+                    .format(cur_cmd, self._elapsed_time(), ret))
 
     def _monitor(self):
         start_time = time.time()
@@ -1631,45 +1720,56 @@ class RunCommand(PipelineAction):
             if prog_time is None:
                 # if the job has not been started for 10 minutes, quite
                 if time.time() - start_time > 600:
-                    return('Background job has not been started after 10 minutes.')
+                    return (
+                        'Background job has not been started after 10 minutes.')
             else:
                 if time.time() - prog_time > 60:
-                    return('Background job has not updated it progress for 1 minutes.')
+                    return (
+                        'Background job has not updated it progress for 1 minutes.'
+                    )
             #
             if os.path.isfile(self.runtime.proc_done):
                 break
             else:
                 if self.wait is False:
-                    return('Do not wait for the completion of submitted job (wait=False).')
-                if self.wait is not True and isinstance(self.wait, int) and prog_time is not None and time.time() - prog_time > self.wait:
-                    return('Quitted after waiting {} seconds.'.format(self.wait))
+                    return (
+                        'Do not wait for the completion of submitted job (wait=False).'
+                    )
+                if self.wait is not True and isinstance(
+                        self.wait, int) and prog_time is not None and time.time(
+                        ) - prog_time > self.wait:
+                    return ('Quitted after waiting {} seconds.'.format(
+                        self.wait))
                 time.sleep(10)
         try:
             env.unlock(self.runtime.proc_lck, str(os.getpid()))
         except:
-            env.logger.warning(
-                'Failed to remove lock for file {}'.format(self.output[0]))
+            env.logger.warning('Failed to remove lock for file {}'.format(
+                self.output[0]))
             pass
         try:
             with open(self.runtime.proc_done) as done:
                 ret = int(done.read().strip())
         except Exception as e:
-            return('Failed to retrive return information for forked process from {}. {}'
-                   .format(self.runtime.proc_done, e))
+            return (
+                'Failed to retrive return information for forked process from {}. {}'
+                .format(self.runtime.proc_done, e))
         #
         if ret < 0:
-            return("Command '{}' was terminated by signal {} after executing {}"
-                   .format('; '.join(self.cmd), -ret, self._elapsed_time()))
+            return (
+                "Command '{}' was terminated by signal {} after executing {}"
+                .format('; '.join(self.cmd), -ret, self._elapsed_time()))
         elif ret > 0:
             if self.output:
                 with open(self.runtime.proc_err) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
-            return("Execution of command '{}' failed after {} (return code {})."
-                   .format('; '.join(self.cmd), self._elapsed_time(), ret))
+            return (
+                "Execution of command '{}' failed after {} (return code {})."
+                .format('; '.join(self.cmd), self._elapsed_time(), ret))
         # remove the .done file
         if not self.output[0] in self.pipeline.THREADS:
-            return('Output is not waited by any threads')
+            return ('Output is not waited by any threads')
         # DO NOT POP FROM ANOTHER THREAD, this will cause race condition
         # (unless we use thread safe dictionry). In this case, we only need
         # to monitor the status of threads from the master threads.
@@ -1678,7 +1778,7 @@ class RunCommand(PipelineAction):
         # the thread will end here
         env.logger.trace('Thread for output {} ends.'.format(self.output[0]))
         self.runtime.clear(['done'])
-        return('')
+        return ('')
 
     def _submit_command(self):
         '''Submit a job and wait for its completion.'''
@@ -1695,26 +1795,27 @@ class RunCommand(PipelineAction):
             old_script = None
         # create a batch file for execution
         with open(self.runtime.proc_cmd, 'w') as sh_file:
-            sh_file.write(
-                '#PBS -o {}\n'.format(os.path.abspath(self.runtime.proc_out)))
-            sh_file.write(
-                '#PBS -e {}\n'.format(os.path.abspath(self.runtime.proc_err)))
-            sh_file.write(
-                '#PBS -N {}\n'.format(os.path.basename(self.output[0])))
+            sh_file.write('#PBS -o {}\n'.format(
+                os.path.abspath(self.runtime.proc_out)))
+            sh_file.write('#PBS -e {}\n'.format(
+                os.path.abspath(self.runtime.proc_err)))
+            sh_file.write('#PBS -N {}\n'.format(
+                os.path.basename(self.output[0])))
             # sh_file.write('#PBS -N {}.{}_{}\n'.format(self.runtime.proc_err))
             sh_file.write('#PBS -V\n')
             # we try to reproduce the environment as much as possible becaus ehte
             # script might be executed in a different environment
             for k, v in os.environ.items():
-                if any([k.startswith(x) for x in ('SSH', 'PBS', '_')]) or not k.replace('_', '').isalpha():
+                if any([k.startswith(x) for x in ('SSH', 'PBS', '_')
+                       ]) or not k.replace('_', '').isalpha():
                     continue
-                sh_file.write('export {}="{}"\n'.format(
-                    k, v.replace('\n', '\\n')))
+                sh_file.write('export {}="{}"\n'.format(k,
+                                                        v.replace('\n', '\\n')))
             #
             sh_file.write('\ncd {}\n'.format(os.path.abspath(os.getcwd())))
             if self.working_dir is not None:
-                sh_file.write(
-                    '[ -d {0} ] || mkdir -p {0}\ncd {0}\n'.format(os.path.abspath(self.working_dir)))
+                sh_file.write('[ -d {0} ] || mkdir -p {0}\ncd {0}\n'.format(
+                    os.path.abspath(self.working_dir)))
             #
             sh_file.write('''
 progress() {{
@@ -1730,42 +1831,50 @@ MYSELF=$!
 '''.format(self.runtime.proc_prog))
             sh_file.write('\n'.join(self.cmd))
             #
-            sh_file.write('\n\nCMD_RET=$?\nif [ $CMD_RET == 0 ]; then vtools admin --record_exe_info {} {}; fi\n'
-                          .format(os.getpid(), ' '.join(self.output)))
+            sh_file.write(
+                '\n\nCMD_RET=$?\nif [ $CMD_RET == 0 ]; then vtools admin --record_exe_info {} {}; fi\n'
+                .format(os.getpid(), ' '.join(self.output)))
             # a signal to show the successful completion of the job
-            sh_file.write('\nrm -f {}\nkill $MYSELF >/dev/null 2>&1\necho $CMD_RET > {}\n'
-                          .format(self.runtime.proc_prog, self.runtime.proc_done))
+            sh_file.write(
+                '\nrm -f {}\nkill $MYSELF >/dev/null 2>&1\necho $CMD_RET > {}\n'
+                .format(self.runtime.proc_prog, self.runtime.proc_done))
         #
         if old_script is not None:
             # with open(self.runtime.proc_cmd) as new_cmd:
             #     if old_script == new_cmd.read():
             #         env.logger.debug('Identical script {}'.format(self.runtime.proc_cmd))
             # if there is no change in command
-            other_prog = glob.glob(os.path.abspath(
-                self.output[0]) + '.working_*')
+            other_prog = glob.glob(
+                os.path.abspath(self.output[0]) + '.working_*')
             if other_prog:
                 for op in other_prog:
                     # if the working file is less than 2 minutes old, ...
                     if time.time() - os.path.getmtime(op) < 120:
                         env.logger.info(
-                            'Another process appears to be working on {}, checking ...'.format(self.output[0]))
+                            'Another process appears to be working on {}, checking ...'
+                            .format(self.output[0]))
                         last_time = os.path.getmtime(op)
                         time.sleep(60)
                         # if the working file does not change after 60 seconds
                         if os.path.getmtime(op) != last_time:
                             raise RuntimeError(
-                                'Failed to submit job because a job is currently running or has been failed within 2 minutes. Status file is {} (pid is {})'.format(op, os.getpid()))
+                                'Failed to submit job because a job is currently running or has been failed within 2 minutes. Status file is {} (pid is {})'
+                                .format(op, os.getpid()))
         # try to submit command
         if '{}' in self.submitter:
             submit_cmd = self.submitter.replace('{}', self.runtime.proc_cmd)
         else:
             submit_cmd = self.submitter
         #
-        env.logger.info('Running job {} with command "{}" from directory {}'.format(
-            self.runtime.proc_cmd, submit_cmd, os.getcwd()))
-        ret = subprocess.call(submit_cmd, shell=True,
-                              stdout=open(self.runtime.proc_out, 'w'), stderr=open(self.runtime.proc_err, 'w'),
-                              cwd=self.working_dir)
+        env.logger.info(
+            'Running job {} with command "{}" from directory {}'.format(
+                self.runtime.proc_cmd, submit_cmd, os.getcwd()))
+        ret = subprocess.call(
+            submit_cmd,
+            shell=True,
+            stdout=open(self.runtime.proc_out, 'w'),
+            stderr=open(self.runtime.proc_err, 'w'),
+            cwd=self.working_dir)
         if ret != 0:
             try:
                 env.unlock(self.runtime.proc_out, str(os.getpid()))
@@ -1773,23 +1882,26 @@ MYSELF=$!
                 pass
         #
         if ret < 0:
-            raise RuntimeError("Failed to submit job {} due to signal {} (submitter='{}')" .format(
-                self.runtime.proc_cmd, -ret, self.submitter))
+            raise RuntimeError(
+                "Failed to submit job {} due to signal {} (submitter='{}')"
+                .format(self.runtime.proc_cmd, -ret, self.submitter))
         elif ret > 0:
             if os.path.isfile(self.runtime.proc_err):
                 with open(self.runtime.proc_err) as err:
                     msg = err.read()
             else:
                 msg = ''
-            raise RuntimeError("Failed to submit job {} using submiter '{}': {}".format(
-                self.runtime.proc_cmd, self.submitter, msg))
+            raise RuntimeError(
+                "Failed to submit job {} using submiter '{}': {}".format(
+                    self.runtime.proc_cmd, self.submitter, msg))
         else:
             t = MonitorThread(target=self._monitor)
             t.daemon = True
             t.start()
             if self.output[0] in self.pipeline.THREADS:
                 raise RuntimeError(
-                    'Two spawned jobs have the same self.output[0] file {}'.format(self.output[0]))
+                    'Two spawned jobs have the same self.output[0] file {}'
+                    .format(self.output[0]))
             self.pipeline.THREADS[self.output[0]] = t
 
     def _execute(self, ifiles, pipeline=None):
@@ -1867,7 +1979,9 @@ class ExecutePythonCode(PipelineAction):
         self.export = export
         #
         PipelineAction.__init__(
-            self, cmd='python -e {} {}'.format(m.hexdigest(), kwargs), output=output)
+            self,
+            cmd='python -e {} {}'.format(m.hexdigest(), kwargs),
+            output=output)
 
     def _execute(self, ifiles, pipeline=None):
         if self.export is not None:
@@ -1876,13 +1990,15 @@ class ExecutePythonCode(PipelineAction):
                 exported_script.write(
                     '#\n#Script exported by action ExecutePythonCode\n')
                 # modules?
-                exported_script.write(
-                    ''.join(['import {}\n'.format(x) for x in ('sys', 'os', 're', 'glob')]))
+                exported_script.write(''.join([
+                    'import {}\n'.format(x) for x in ('sys', 'os', 're', 'glob')
+                ]))
                 exported_script.write(
                     '\nfrom variant_tools.pipeline import *\n')
                 for module in self.modules:
-                    exported_script.write('import {}\n'.format(os.path.basename(module)[
-                                          :-3] if module.endswith('.py') else module))
+                    exported_script.write('import {}\n'.format(
+                        os.path.basename(module)[:-3] if module
+                        .endswith('.py') else module))
                 #
                 # pipeline variables
                 exported_script.write('pvars=')
@@ -1898,8 +2014,8 @@ class ExecutePythonCode(PipelineAction):
                 #
                 # script
                 exported_script.write(self.script)
-            env.logger.info(
-                'Python code exported to ``{}``'.format(self.export))
+            env.logger.info('Python code exported to ``{}``'.format(
+                self.export))
         for module in self.modules:
             # this is a path to a .py file
             if module.endswith('.py'):
@@ -1908,43 +2024,47 @@ class ExecutePythonCode(PipelineAction):
                 # if the .py file locates in the same directory as the pipeline file
                 elif pipeline is not None \
                         and os.path.isfile(os.path.join(os.path.split(pipeline.spec_file)[0], module)):
-                    pyfile = os.path.join(os.path.split(
-                        pipeline.spec_file)[0], module)
+                    pyfile = os.path.join(
+                        os.path.split(pipeline.spec_file)[0], module)
                 else:
                     # try to download it from online
                     try:
                         pyfile = downloadFile('simulation/{}'.format(module))
-                    except Exception as e:
+                    except Exception:
                         try:
                             pyfile = downloadFile('pipeline/{}'.format(module))
                         except Exception as e:
                             raise ValueError(
-                                'Failed to download required python module {}: {}'.format(module, e))
+                                'Failed to download required python module {}: {}'
+                                .format(module, e))
                 try:
-                    p, f = os.path.split(os.path.abspath(
-                        os.path.expanduser(pyfile)))
+                    p, f = os.path.split(
+                        os.path.abspath(os.path.expanduser(pyfile)))
                     sys.path.append(p)
-                    local_dict = __import__(
-                        f[:-3] if f.endswith('.py') else f, globals(), locals(), module.split('.', 1)[-1:])
-                    env.logger.info('{} symbols are imported form module {}'.format(
-                        len(local_dict.__dict__), module))
+                    local_dict = __import__(f[:-3] if f.endswith('.py') else f,
+                                            globals(), locals(),
+                                            module.split('.', 1)[-1:])
+                    env.logger.info(
+                        '{} symbols are imported form module {}'.format(
+                            len(local_dict.__dict__), module))
                     pipeline.GLOBALS.update(local_dict.__dict__)
                 except Exception as e:
-                    raise RuntimeError(
-                        'Failed to import module {}: {}'.format(module, e))
+                    raise RuntimeError('Failed to import module {}: {}'.format(
+                        module, e))
             # now a system module
             else:
                 try:
                     # allow loading from current directory
                     sys.path.append(os.getcwd())
-                    local_dict = __import__(
-                        module, globals(), locals(), module.split('.', 1)[-1:])
-                    env.logger.info('{} symbols are imported form module {}'.format(
-                        len(local_dict.__dict__), module))
+                    local_dict = __import__(module, globals(), locals(),
+                                            module.split('.', 1)[-1:])
+                    env.logger.info(
+                        '{} symbols are imported form module {}'.format(
+                            len(local_dict.__dict__), module))
                     pipeline.GLOBALS.update(local_dict.__dict__)
                 except ImportError as e:
-                    raise RuntimeError(
-                        'Failed to import module {}: {}'.format(module, e))
+                    raise RuntimeError('Failed to import module {}: {}'.format(
+                        module, e))
         env.logger.info('Executing Python script:\n{}'.format(self.script))
         try:
             globals().update(pipeline.GLOBALS)
@@ -1978,8 +2098,16 @@ class ExecuteScript(PipelineAction):
 
     """
 
-    def __init__(self, script='', interpreter='', args='', output=[], working_dir=None,
-                 export=None, submitter=None, suffix=None, wait=True):
+    def __init__(self,
+                 script='',
+                 interpreter='',
+                 args='',
+                 output=[],
+                 working_dir=None,
+                 export=None,
+                 submitter=None,
+                 suffix=None,
+                 wait=True):
         '''This action accepts one or a list of strings, write them to a temporary file
         and executes them by a interpreter, possibly as a separate job.
 
@@ -2071,15 +2199,16 @@ class ExecuteScript(PipelineAction):
             with open(export, 'w') as exported_script:
                 exported_script.write(self.script)
                 env.logger.info('Script exported to ``{}``'.format(export))
-        PipelineAction.__init__(self, cmd='{} {}'.format(
-            interpreter, m.hexdigest()), output=output)
+        PipelineAction.__init__(
+            self, cmd='{} {}'.format(interpreter, m.hexdigest()), output=output)
 
     def __del__(self):
         try:
             os.remove(self.script_file)
         except Exception as e:
             env.logger.debug(
-                'Failed to remove temporary script file {}: {}'.format(self.script_file, e))
+                'Failed to remove temporary script file {}: {}'.format(
+                    self.script_file, e))
 
     def _elapsed_time(self):
         '''Return the elapsed time in human readable format since start time'''
@@ -2100,20 +2229,23 @@ class ExecuteScript(PipelineAction):
                 (self.args if isinstance(self.args, str)
                  else ' '.join(pipes.quote(x) for x in self.args))
         env.logger.info('Running ``{}``'.format(cmd))
-        ret = subprocess.call(cmd, shell=True,
-                              stdout=None if self.runtime.proc_out is None else open(
-                                  self.runtime.proc_out, 'w'),
-                              stderr=None if self.runtime.proc_err is None else open(
-                                  self.runtime.proc_err, 'w'),
-                              cwd=self.working_dir)
+        ret = subprocess.call(
+            cmd,
+            shell=True,
+            stdout=None if self.runtime.proc_out is None else open(
+                self.runtime.proc_out, 'w'),
+            stderr=None if self.runtime.proc_err is None else open(
+                self.runtime.proc_err, 'w'),
+            cwd=self.working_dir)
         if ret < 0:
             if self.output:
                 try:
                     env.unlock(self.runtime.proc_lck, str(os.getpid()))
                 except:
                     pass
-            raise RuntimeError("Command '{}' was terminated by signal {} after executing {}"
-                               .format(cmd, -ret, self._elapsed_time()))
+            raise RuntimeError(
+                "Command '{}' was terminated by signal {} after executing {}"
+                .format(cmd, -ret, self._elapsed_time()))
         elif ret > 0:
             if self.output:
                 with open(self.runtime.proc_err) as err:
@@ -2123,8 +2255,9 @@ class ExecuteScript(PipelineAction):
                     env.unlock(self.runtime.proc_lck, str(os.getpid()))
                 except:
                     pass
-            raise RuntimeError("Execution of command '{}' failed after {} (return code {})."
-                               .format(cmd, self._elapsed_time(), ret))
+            raise RuntimeError(
+                "Execution of command '{}' failed after {} (return code {})."
+                .format(cmd, self._elapsed_time(), ret))
         else:
             # write standard out to terminal
             if self.runtime.proc_out:
@@ -2150,50 +2283,58 @@ class ExecuteScript(PipelineAction):
             if prog_time is None:
                 # if the job has not been started for 10 minutes, quite
                 if time.time() - start_time > 600:
-                    return('Background job has not been started after 10 minutes.')
+                    return (
+                        'Background job has not been started after 10 minutes.')
             else:
                 if time.time() - prog_time > 60:
-                    return('Background job has not updated it progress for 1 minutes.')
+                    return (
+                        'Background job has not updated it progress for 1 minutes.'
+                    )
             if os.path.isfile(self.runtime.proc_done):
                 break
             else:
                 if self.wait is False:
                     return
-                if self.wait is not True and isinstance(self.wait, int) and prog_time is not None and time.time() - prog_time > self.wait:
-                    return('Quitted after waiting {} seconds.'.format(self.wait))
+                if self.wait is not True and isinstance(
+                        self.wait, int) and prog_time is not None and time.time(
+                        ) - prog_time > self.wait:
+                    return ('Quitted after waiting {} seconds.'.format(
+                        self.wait))
                 time.sleep(10)
         try:
             env.unlock(self.runtime.proc_lck, str(os.getpid()))
         except:
-            env.logger.warning(
-                'Failed to remove lock for file {}'.format(self.output[0]))
+            env.logger.warning('Failed to remove lock for file {}'.format(
+                self.output[0]))
             pass
         with open(self.runtime.proc_done) as done:
             ret = int(done.read().strip())
         #
         if ret < 0:
-            return("Command '{}' was terminated by signal {} after executing {}"
-                   .format('; '.join(self.cmd), -ret, self._elapsed_time()))
+            return (
+                "Command '{}' was terminated by signal {} after executing {}"
+                .format('; '.join(self.cmd), -ret, self._elapsed_time()))
         elif ret > 0:
             if self.output:
                 with open(self.runtime.proc_err) as err:
                     for line in err.read().split('\n')[-50:]:
                         env.logger.error(line)
-            return("Execution of command '{}' failed after {} (return code {})."
-                   .format('; '.join(self.cmd), self._elapsed_time(), ret))
+            return (
+                "Execution of command '{}' failed after {} (return code {})."
+                .format('; '.join(self.cmd), self._elapsed_time(), ret))
         # remove the .done file
         if not self.output[0] in self.pipeline.THREADS:
-            return('Output is not waited by any threads')
+            return ('Output is not waited by any threads')
         # DO NOT POP FROM ANOTHER THREAD, this will cause race condition
         # (unless we use thread safe dictionry). In this case, we only need
         # to monitor the status of threads from the master threads.
         #    self.pipeline.THREADS.pop(self.output[0])
         #
         # the thread will end here
-        env.logger.info(
-            '{} has been successfully generated.'.format(self.output[0]))
+        env.logger.info('{} has been successfully generated.'.format(
+            self.output[0]))
         self.runtime.clear(['done'])
-        return('')
+        return ('')
 
     def _submit_command(self):
         '''Submit a job and wait for its completion.'''
@@ -2211,26 +2352,29 @@ class ExecuteScript(PipelineAction):
             old_script = None
         # create a batch file for execution
         with open(self.runtime.proc_cmd, 'w') as sh_file:
-            sh_file.write(
-                '#PBS -o {}\n'.format(os.path.abspath(self.runtime.proc_out)))
-            sh_file.write(
-                '#PBS -e {}\n'.format(os.path.abspath(self.runtime.proc_err)))
-            sh_file.write(
-                '#PBS -N {}\n'.format(os.path.basename(self.output[0])))
+            sh_file.write('#PBS -o {}\n'.format(
+                os.path.abspath(self.runtime.proc_out)))
+            sh_file.write('#PBS -e {}\n'.format(
+                os.path.abspath(self.runtime.proc_err)))
+            sh_file.write('#PBS -N {}\n'.format(
+                os.path.basename(self.output[0])))
             # sh_file.write('#PBS -N {}.{}_{}\n'.format(self.runtime.proc_err))
             sh_file.write('#PBS -V\n')
             # we try to reproduce the environment as much as possible becaus ehte
             # script might be executed in a different environment
             for k, v in os.environ.items():
-                if any([k.startswith(x) for x in ('SSH', 'PBS', '_')]) or not k.replace('_', '').isalpha():
+                if any([k.startswith(x) for x in ('SSH', 'PBS', '_')
+                       ]) or not k.replace('_', '').isalpha():
                     continue
-                sh_file.write('export {}="{}"\n'.format(
-                    k, v.replace('\n', '\\n')))
+                sh_file.write('export {}="{}"\n'.format(k,
+                                                        v.replace('\n', '\\n')))
             #
             sh_file.write('\ncd {}\n'.format(os.path.abspath(os.getcwd())))
             if self.working_dir is not None:
-                sh_file.write(
-                    '[ -d {0} ] || mkdir -p {0}\ncd {0}\n'.format(os.path.abspath(self.working_dir)))
+                sh_file.write('[ -d {0} ] || mkdir -p {0}\ncd {0}\n'.format(
+                    os.path.abspath(self.working_dir)))
+
+
 #
             sh_file.write('''
 progress() {{
@@ -2247,17 +2391,24 @@ MYSELF=$!
 
             # interpreter
             if '{}' in self.interpreter:
-                sh_file.write(self.interpreter.replace('{}', pipes.quote(self.script_file)) +
-                              (self.args if isinstance(self.args, str) else ' '.join(pipes.quote(x) for x in self.args)) + '\n')
+                sh_file.write(
+                    self.interpreter.replace('{}', pipes.quote(
+                        self.script_file)) +
+                    (self.args if isinstance(self.args, str) else ' '.join(
+                        pipes.quote(x) for x in self.args)) + '\n')
             else:
-                sh_file.write(self.interpreter + ' ' + pipes.quote(self.script_file) +
-                              (self.args if isinstance(self.args, str) else ' '.join(pipes.quote(x) for x in self.args)) + '\n')
+                sh_file.write(
+                    self.interpreter + ' ' + pipes.quote(self.script_file) +
+                    (self.args if isinstance(self.args, str) else ' '.join(
+                        pipes.quote(x) for x in self.args)) + '\n')
             #
-            sh_file.write('\n\nCMD_RET=$?\nif [ $CMD_RET == 0 ]; then vtools admin --record_exe_info {} {}; fi\n'
-                          .format(os.getpid(), ' '.join(self.output)))
+            sh_file.write(
+                '\n\nCMD_RET=$?\nif [ $CMD_RET == 0 ]; then vtools admin --record_exe_info {} {}; fi\n'
+                .format(os.getpid(), ' '.join(self.output)))
             # a signal to show the successful completion of the job
-            sh_file.write('\nrm -f {}\nkill $MYSELF >/dev/null 2>&1\necho $CMD_RET > {}\n'
-                          .format(self.runtime.proc_prog, self.runtime.proc_done))
+            sh_file.write(
+                '\nrm -f {}\nkill $MYSELF >/dev/null 2>&1\necho $CMD_RET > {}\n'
+                .format(self.runtime.proc_prog, self.runtime.proc_done))
         #
         # try to submit command
         if '{}' in self.submitter:
@@ -2268,25 +2419,31 @@ MYSELF=$!
         if old_script is not None:
             # with open(self.runtime.proc_cmd) as new_cmd:
             #     if old_script == new_cmd.read():
-                    # if there is no change in command
-            other_prog = glob.glob(os.path.abspath(
-                self.output[0]) + '.working_*')
+            # if there is no change in command
+            other_prog = glob.glob(
+                os.path.abspath(self.output[0]) + '.working_*')
             if other_prog:
                 for op in other_prog:
                     if time.time() - os.path.getmtime(op) < 120:
                         env.logger.info(
-                            'Another process appears to be working on {}, checking ...'.format(self.output[0]))
+                            'Another process appears to be working on {}, checking ...'
+                            .format(self.output[0]))
                         last_time = os.path.getmtime(op)
                         time.sleep(60)
                         # if the working file does not change after 60 seconds
                         if os.path.getmtime(op) != last_time:
                             raise RuntimeError(
-                                'Failed to submit job because a job is currently running or has been failed within 2 minutes. Status file is {} (pid is {})'.format(op, os.getpid()))
-        env.logger.info('Running job {} with command "{}" from directory {}'.format(
-            self.runtime.proc_cmd, submit_cmd, os.getcwd()))
-        ret = subprocess.call(submit_cmd, shell=True,
-                              stdout=open(self.runtime.proc_out, 'w'), stderr=open(self.runtime.proc_err, 'w'),
-                              cwd=self.working_dir)
+                                'Failed to submit job because a job is currently running or has been failed within 2 minutes. Status file is {} (pid is {})'
+                                .format(op, os.getpid()))
+        env.logger.info(
+            'Running job {} with command "{}" from directory {}'.format(
+                self.runtime.proc_cmd, submit_cmd, os.getcwd()))
+        ret = subprocess.call(
+            submit_cmd,
+            shell=True,
+            stdout=open(self.runtime.proc_out, 'w'),
+            stderr=open(self.runtime.proc_err, 'w'),
+            cwd=self.working_dir)
         if ret != 0:
             try:
                 env.unlock(self.runtime.proc_out, str(os.getpid()))
@@ -2294,23 +2451,26 @@ MYSELF=$!
                 pass
         #
         if ret < 0:
-            raise RuntimeError("Failed to submit job {} due to signal {} (submitter='{}')" .format(
-                self.runtime.proc_cmd, -ret, self.submitter))
+            raise RuntimeError(
+                "Failed to submit job {} due to signal {} (submitter='{}')"
+                .format(self.runtime.proc_cmd, -ret, self.submitter))
         elif ret > 0:
             if os.path.isfile(self.runtime.proc_err):
                 with open(self.runtime.proc_err) as err:
                     msg = err.read()
             else:
                 msg = ''
-            raise RuntimeError("Failed to submit job {} using submiter '{}': {}".format(
-                self.runtime.proc_cmd, self.submitter, msg))
+            raise RuntimeError(
+                "Failed to submit job {} using submiter '{}': {}".format(
+                    self.runtime.proc_cmd, self.submitter, msg))
         else:
             t = MonitorThread(target=self._monitor)
             t.daemon = True
             t.start()
             if self.output[0] in self.pipeline.THREADS:
                 raise RuntimeError(
-                    'Two spawned jobs have the same self.output[0] file {}'.format(self.output[0]))
+                    'Two spawned jobs have the same self.output[0] file {}'
+                    .format(self.output[0]))
             self.pipeline.THREADS[self.output[0]] = t
 
     def _execute(self, ifiles, pipeline=None):
@@ -2337,10 +2497,25 @@ class ExecuteRScript(ExecuteScript):
     check action ExecuteScript for more details.
     '''
 
-    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None, wait=True):
-        ExecuteScript.__init__(self, script=script, interpreter='Rscript', args=args,
-                               output=output, export=export, working_dir=working_dir, submitter=submitter,
-                               suffix='.R', wait=wait)
+    def __init__(self,
+                 script='',
+                 args='',
+                 output=[],
+                 export=None,
+                 working_dir=None,
+                 submitter=None,
+                 wait=True):
+        ExecuteScript.__init__(
+            self,
+            script=script,
+            interpreter='Rscript',
+            args=args,
+            output=output,
+            export=export,
+            working_dir=working_dir,
+            submitter=submitter,
+            suffix='.R',
+            wait=wait)
 
 
 class ExecuteShellScript(ExecuteScript):
@@ -2348,10 +2523,25 @@ class ExecuteShellScript(ExecuteScript):
     check action ExecuteScript for more details.
     '''
 
-    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None, wait=True):
-        ExecuteScript.__init__(self, script=script, interpreter='bash', args=args,
-                               output=output, export=export, working_dir=working_dir, submitter=submitter,
-                               suffix='.sh', wait=wait)
+    def __init__(self,
+                 script='',
+                 args='',
+                 output=[],
+                 export=None,
+                 working_dir=None,
+                 submitter=None,
+                 wait=True):
+        ExecuteScript.__init__(
+            self,
+            script=script,
+            interpreter='bash',
+            args=args,
+            output=output,
+            export=export,
+            working_dir=working_dir,
+            submitter=submitter,
+            suffix='.sh',
+            wait=wait)
 
 
 class ExecuteCShellScript(ExecuteScript):
@@ -2359,10 +2549,25 @@ class ExecuteCShellScript(ExecuteScript):
     check action ExecuteScript for more details.
     '''
 
-    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None, wait=True):
-        ExecuteScript.__init__(self, script=script, interpreter='tcsh', args=args,
-                               output=output, export=export, working_dir=working_dir, submitter=submitter,
-                               suffix='.csh', wait=wait)
+    def __init__(self,
+                 script='',
+                 args='',
+                 output=[],
+                 export=None,
+                 working_dir=None,
+                 submitter=None,
+                 wait=True):
+        ExecuteScript.__init__(
+            self,
+            script=script,
+            interpreter='tcsh',
+            args=args,
+            output=output,
+            export=export,
+            working_dir=working_dir,
+            submitter=submitter,
+            suffix='.csh',
+            wait=wait)
 
 
 class ExecutePythonScript(ExecuteScript):
@@ -2370,10 +2575,25 @@ class ExecutePythonScript(ExecuteScript):
     check action ExecuteScript for more details.
     '''
 
-    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None, wait=True):
-        ExecuteScript.__init__(self, script=script, interpreter='python', args=args,
-                               output=output, export=export, working_dir=working_dir, submitter=submitter,
-                               suffix='.py', wait=wait)
+    def __init__(self,
+                 script='',
+                 args='',
+                 output=[],
+                 export=None,
+                 working_dir=None,
+                 submitter=None,
+                 wait=True):
+        ExecuteScript.__init__(
+            self,
+            script=script,
+            interpreter='python',
+            args=args,
+            output=output,
+            export=export,
+            working_dir=working_dir,
+            submitter=submitter,
+            suffix='.py',
+            wait=wait)
 
 
 class ExecutePython3Script(ExecuteScript):
@@ -2381,10 +2601,25 @@ class ExecutePython3Script(ExecuteScript):
     check action ExecuteScript for more details.
     '''
 
-    def __init__(self, script='', args='', output=[], export=None, working_dir=None, submitter=None, wait=True):
-        ExecuteScript.__init__(self, script=script, interpreter='python3', args=args,
-                               output=output, export=export, working_dir=working_dir, submitter=submitter,
-                               suffix='.py', wait=wait)
+    def __init__(self,
+                 script='',
+                 args='',
+                 output=[],
+                 export=None,
+                 working_dir=None,
+                 submitter=None,
+                 wait=True):
+        ExecuteScript.__init__(
+            self,
+            script=script,
+            interpreter='python3',
+            args=args,
+            output=output,
+            export=export,
+            working_dir=working_dir,
+            submitter=submitter,
+            suffix='.py',
+            wait=wait)
 
 
 class ExecutePerlScript(ExecuteScript):
@@ -2392,10 +2627,25 @@ class ExecutePerlScript(ExecuteScript):
     check action ExecuteScript for more details.
     '''
 
-    def __init__(self, script='', args='',  output=[], export=None, working_dir=None, submitter=None, wait=True):
-        ExecuteScript.__init__(self, script=script, interpreter='perl', args=args,
-                               output=output, export=export, working_dir=working_dir, submitter=submitter,
-                               suffix='.perl', wait=wait)
+    def __init__(self,
+                 script='',
+                 args='',
+                 output=[],
+                 export=None,
+                 working_dir=None,
+                 submitter=None,
+                 wait=True):
+        ExecuteScript.__init__(
+            self,
+            script=script,
+            interpreter='perl',
+            args=args,
+            output=output,
+            export=export,
+            working_dir=working_dir,
+            submitter=submitter,
+            suffix='.perl',
+            wait=wait)
 
 
 class ExecuteRubyScript(ExecuteScript):
@@ -2403,10 +2653,25 @@ class ExecuteRubyScript(ExecuteScript):
     check action ExecuteScript for more details.
     '''
 
-    def __init__(self, script='', args='',  output=[], export=None, working_dir=None, submitter=None, wait=True):
-        ExecuteScript.__init__(self, script=script, interpreter='ruby', args=args,
-                               output=output, export=export, working_dir=working_dir, submitter=submitter,
-                               suffix='.rb', wait=wait)
+    def __init__(self,
+                 script='',
+                 args='',
+                 output=[],
+                 export=None,
+                 working_dir=None,
+                 submitter=None,
+                 wait=True):
+        ExecuteScript.__init__(
+            self,
+            script=script,
+            interpreter='ruby',
+            args=args,
+            output=output,
+            export=export,
+            working_dir=working_dir,
+            submitter=submitter,
+            suffix='.rb',
+            wait=wait)
 
 
 class CheckRLibraries(ExecuteRScript):
@@ -2474,7 +2739,8 @@ class CheckRLibraries(ExecuteRScript):
                 lib, status = line.split()
                 if status.strip() == "MISSING":
                     env.logger.error(
-                        'R Library {} is not available and cannot be installed.'.format(lib))
+                        'R Library {} is not available and cannot be installed.'
+                        .format(lib))
                     count += 1
                 elif status.strip() == 'AVAILABLE':
                     env.logger.info('R library {} is available'.format(lib))
@@ -2524,22 +2790,26 @@ class DecompressFiles(PipelineAction):
         Uncompressed files will be returned untouched. If the destination files exist
         and newer, this function will return immediately.'''
         mode = None
-        if filename.lower().endswith('.tar.gz') or filename.lower().endswith('.tar.bz2'):
+        if filename.lower().endswith('.tar.gz') or filename.lower().endswith(
+                '.tar.bz2'):
             mode = 'r:gz'
-        elif filename.lower().endswith('.tbz2') or filename.lower().endswith('.tgz'):
+        elif filename.lower().endswith('.tbz2') or filename.lower().endswith(
+                '.tgz'):
             mode = 'r:bz2'
         elif filename.lower().endswith('.tar'):
             mode = 'r'
         elif filename.lower().endswith('.gz'):
-            dest_file = os.path.join(
-                self.dest_dir, os.path.basename(filename)[:-3])
+            dest_file = os.path.join(self.dest_dir,
+                                     os.path.basename(filename)[:-3])
             if existAndNewerThan(ofiles=dest_file, ifiles=filename):
                 env.logger.info(
                     'Using existing decompressed file {}'.format(dest_file))
             else:
-                env.logger.info(
-                    'Decompressing {} to {}'.format(filename, dest_file))
-                with gzip.open(filename, 'rb') as gzinput, open(TEMP(dest_file), 'wb') as output:
+                env.logger.info('Decompressing {} to {}'.format(
+                    filename, dest_file))
+                with gzip.open(filename,
+                               'rb') as gzinput, open(TEMP(dest_file),
+                                                      'wb') as output:
                     content = gzinput.read(10000000)
                     while content:
                         output.write(content)
@@ -2549,15 +2819,17 @@ class DecompressFiles(PipelineAction):
                 os.rename(TEMP(dest_file), dest_file)
             return [dest_file]
         elif filename.lower().endswith('.bz2'):
-            dest_file = os.path.join(
-                self.dest_dir, os.path.basename(filename)[:-4])
+            dest_file = os.path.join(self.dest_dir,
+                                     os.path.basename(filename)[:-4])
             if existAndNewerThan(ofiles=dest_file, ifiles=filename):
                 env.logger.warning(
                     'Using existing decompressed file {}'.format(dest_file))
             else:
-                env.logger.info(
-                    'Decompressing {} to {}'.format(filename, dest_file))
-                with bz2.BZ2File(filename, 'rb') as bzinput, open(TEMP(dest_file), 'wb') as output:
+                env.logger.info('Decompressing {} to {}'.format(
+                    filename, dest_file))
+                with bz2.BZ2File(filename,
+                                 'rb') as bzinput, open(TEMP(dest_file),
+                                                        'wb') as output:
                     content = bzinput.read(10000000)
                     while content:
                         output.write(content)
@@ -2571,12 +2843,14 @@ class DecompressFiles(PipelineAction):
             bundle.extractall(self.dest_dir)
             env.logger.info('Decompressing {} to {}'.format(
                 filename, self.dest_dir))
-            return [os.path.join(self.dest_dir, name) for name in bundle.namelist()]
+            return [
+                os.path.join(self.dest_dir, name) for name in bundle.namelist()
+            ]
         #
         # if it is a tar file
         if mode is not None:
-            env.logger.info('Extracting fastq sequences from tar file {}'
-                            .format(filename))
+            env.logger.info(
+                'Extracting fastq sequences from tar file {}'.format(filename))
             #
             # MOTE: open a compressed tar file can take a long time because it needs to scan
             # the whole file to determine its content. I am therefore creating a manifest
@@ -2588,12 +2862,12 @@ class DecompressFiles(PipelineAction):
             if existAndNewerThan(ofiles=manifest, ifiles=filename):
                 all_extracted = True
                 for f in [x.strip() for x in open(manifest).readlines()]:
-                    dest_file = os.path.join(
-                        self.dest_dir, os.path.basename(f))
+                    dest_file = os.path.join(self.dest_dir, os.path.basename(f))
                     if existAndNewerThan(ofiles=dest_file, ifiles=filename):
                         dest_files.append(dest_file)
                         env.logger.info(
-                            'Using existing extracted file {}'.format(dest_file))
+                            'Using existing extracted file {}'.format(
+                                dest_file))
                     else:
                         all_extracted = False
             #
@@ -2617,19 +2891,19 @@ class DecompressFiles(PipelineAction):
                         manifest.write(f + '\n')
                 for f in files:
                     # if there is directory structure within tar file, decompress all to the current directory
-                    dest_file = os.path.join(
-                        self.dest_dir, os.path.basename(f))
+                    dest_file = os.path.join(self.dest_dir, os.path.basename(f))
                     dest_files.append(dest_file)
                     if existAndNewerThan(ofiles=dest_file, ifiles=filename):
                         env.logger.info(
-                            'Using existing extracted file {}'.format(dest_file))
+                            'Using existing extracted file {}'.format(
+                                dest_file))
                     else:
-                        env.logger.info(
-                            'Extracting {} to {}'.format(f, dest_file))
+                        env.logger.info('Extracting {} to {}'.format(
+                            f, dest_file))
                         tar.extract(f, os.path.join(self.dest_dir, 'tmp'))
                         # move to the top directory with the right name only after the file has been properly extracted
-                        shutil.move(os.path.join(
-                            self.dest_dir, 'tmp', f), dest_file)
+                        shutil.move(
+                            os.path.join(self.dest_dir, 'tmp', f), dest_file)
                 # set dest_files to the same modification time. This is used to
                 # mark the right time when the files are created and avoid the use
                 # of archieved but should-not-be-used files that might be generated later
@@ -2687,21 +2961,22 @@ class RemoveIntermediateFiles(PipelineAction):
                 yield f
 
     def __call__(self, ifiles, pipeline=None):
-        env.logger.trace('Remove intermediate files {}'.format(
-            ' '.join(self.files_to_remove)))
+        env.logger.trace('Remove intermediate files {}'.format(' '.join(
+            self.files_to_remove)))
         for f in self._getFiles():
             if not os.path.isfile(f):
                 if os.path.isfile(f + '.file_info'):
                     env.logger.info('Keeping existing {}.file_info.'.format(f))
                 else:
-                    raise RuntimeError('Failed to create {}.file_info: Missing input file.'
-                                       .format(f))
+                    raise RuntimeError(
+                        'Failed to create {}.file_info: Missing input file.'
+                        .format(f))
             else:
                 FileInfo(f).save()
                 env.logger.info('Replace {0} with {0}.file_info'.format(f))
                 try:
                     os.remove(f)
-                except e:
+                except Exception:
                     env.logger.warning(
                         'Failed to remove intermediate file {}'.format(f))
         return ifiles
@@ -2734,11 +3009,11 @@ class LinkToDir(PipelineAction):
             try:
                 os.makedirs(self.dest)
             except Exception as e:
-                raise RuntimeError(
-                    'Failed to create directory {}: {}'.format(self.dest, e))
+                raise RuntimeError('Failed to create directory {}: {}'.format(
+                    self.dest, e))
             if not os.path.isdir(self.dest):
-                raise RuntimeError(
-                    'Failed to create directory {}: {}'.format(self.dest, e))
+                raise RuntimeError('Failed to create directory {}'.format(
+                    self.dest))
         PipelineAction.__init__(self)
 
     def __call__(self, ifiles, pipeline=None):
@@ -2747,40 +3022,48 @@ class LinkToDir(PipelineAction):
             path, basename = os.path.split(filename)
             if not os.path.isfile(filename):
                 if os.path.isfile(filename + '.file_info'):
-                    dest_file = os.path.join(
-                        self.dest, basename) + '.file_info'
+                    dest_file = os.path.join(self.dest, basename) + '.file_info'
                     if os.path.isfile(dest_file):
-                        if not os.path.samefile(filename + '.file_info', dest_file):
+                        if not os.path.samefile(filename + '.file_info',
+                                                dest_file):
                             os.remove(dest_file)
-                            env.logger.info(
-                                'Linking {} to {}'.format(filename, self.dest))
-                            os.link(filename + '.file_info',
-                                    os.path.join(self.dest, basename) + '.file_info')
+                            env.logger.info('Linking {} to {}'.format(
+                                filename, self.dest))
+                            os.link(
+                                filename + '.file_info',
+                                os.path.join(self.dest, basename) +
+                                '.file_info')
                         else:
-                            env.logger.trace('Reusing existing linked file_info file: {}'
-                                             .format(os.path.join(self.dest, basename) + '.file_info'))
+                            env.logger.trace(
+                                'Reusing existing linked file_info file: {}'
+                                .format(
+                                    os.path.join(self.dest, basename) +
+                                    '.file_info'))
                     else:
-                        env.logger.info(
-                            'Linking {} to {}'.format(filename, self.dest))
-                        os.link(filename + '.file_info',
-                                os.path.join(self.dest, basename) + '.file_info')
+                        env.logger.info('Linking {} to {}'.format(
+                            filename, self.dest))
+                        os.link(
+                            filename + '.file_info',
+                            os.path.join(self.dest, basename) + '.file_info')
                 else:
-                    raise RuntimeError('Failed to link {} to directory {}: file does not exist'
-                                       .format(filename, self.dest))
+                    raise RuntimeError(
+                        'Failed to link {} to directory {}: file does not exist'
+                        .format(filename, self.dest))
             else:
                 dest_file = os.path.join(self.dest, basename)
                 if os.path.isfile(dest_file):
                     if not os.path.samefile(filename, dest_file):
                         os.remove(dest_file)
-                        env.logger.info(
-                            'Linking {} to {}'.format(filename, self.dest))
+                        env.logger.info('Linking {} to {}'.format(
+                            filename, self.dest))
                         os.link(filename, dest_file)
                     else:
                         env.logger.trace(
-                            'Reusing existing linked file: {}'.format(dest_file))
+                            'Reusing existing linked file: {}'.format(
+                                dest_file))
                 else:
-                    env.logger.info(
-                        'Linking {} to {}'.format(filename, self.dest))
+                    env.logger.info('Linking {} to {}'.format(
+                        filename, self.dest))
                     os.link(filename, dest_file)
             ofiles.append(os.path.join(self.dest, basename))
         return ofiles
@@ -2829,11 +3112,14 @@ class DownloadResource(PipelineAction):
             if not os.path.isdir(self.pipeline_resource):
                 os.makedirs(self.pipeline_resource)
         except:
-            raise RuntimeError('Failed to create pipeline resource directory '
-                               .format(self.pipeline_resource))
+            raise RuntimeError(
+                'Failed to create pipeline resource directory '.format(
+                    self.pipeline_resource))
         self.decompress = decompress
-        PipelineAction.__init__(self, cmd='Download Resource {} to {}'.format(resource, dest_dir),
-                                output=output)
+        PipelineAction.__init__(
+            self,
+            cmd='Download Resource {} to {}'.format(resource, dest_dir),
+            output=output)
 
     def __call__(self, ifiles, pipeline=None):
         saved_dir = os.getcwd()
@@ -2850,21 +3136,23 @@ class DownloadResource(PipelineAction):
             mismatched_files = []
             for filename, s in md5_files:
                 try:
-                    downloaded_md5 = open(
-                        filename + '.md5').readline().split()[0]
+                    downloaded_md5 = open(filename +
+                                          '.md5').readline().split()[0]
                     calculated_md5 = calculateMD5(filename, partial=False)
                     if downloaded_md5 != calculated_md5:
                         mismatched_files.append(filename)
                 except Exception as e:
-                    env.logger.warning('Failed to verify md5 signature of {}: {}'
-                                       .format(filename[:-4], e))
+                    env.logger.warning(
+                        'Failed to verify md5 signature of {}: {}'.format(
+                            filename[:-4], e))
                 prog.update(prog.count + s)
             prog.done()
             if mismatched_files:
                 env.logger.warning('md5 signature of {} mismatch. '
-                                   'Please remove {} and try again.'
-                                   .format(', '.join(mismatched_files),
-                                           'this file' if len(mismatched_files) == 1 else 'these files'))
+                                   'Please remove {} and try again.'.format(
+                                       ', '.join(mismatched_files),
+                                       'this file' if len(mismatched_files) == 1
+                                       else 'these files'))
 
     def _downloadFiles(self, ifiles):
         '''Download resource'''
@@ -2878,13 +3166,18 @@ class DownloadResource(PipelineAction):
                 if os.path.isfile(dest_file):
                     skipped.append(filename)
                 else:
-                    downloadURL(URL, dest_file, False,
-                                message='{}/{} {}'.format(cnt + 1, len(self.resource), filename))
+                    downloadURL(
+                        URL,
+                        dest_file,
+                        False,
+                        message='{}/{} {}'.format(cnt + 1, len(self.resource),
+                                                  filename))
             except KeyboardInterrupt as e:
                 raise e
             except Exception as e:
-                raise RuntimeError('Failed to download {}: {} {}'
-                                   .format(filename, type(e).__name__, e))
+                raise RuntimeError('Failed to download {}: {} {}'.format(
+                    filename,
+                    type(e).__name__, e))
             #
             if filename.endswith('.tar.gz'):
                 manifest_file = RuntimeFiles(filename).manifest
@@ -2898,13 +3191,12 @@ class DownloadResource(PipelineAction):
                                 break
                 if decompress:
                     with tarfile.open(filename, 'r:gz') as tar:
-                        s = delayedAction(
-                            env.logger.info, 'Extracting {}'.format(filename))
+                        s = delayedAction(env.logger.info,
+                                          'Extracting {}'.format(filename))
                         tar.extractall(self.pipeline_resource)
                         del s
                         # only extract files
-                        files = [x.name for x in tar.getmembers()
-                                 if x.isfile()]
+                        files = [x.name for x in tar.getmembers() if x.isfile()]
                         # save content to a manifest
                         with open(manifest_file, 'w') as manifest:
                             for f in files:
@@ -2934,13 +3226,15 @@ class DownloadResource(PipelineAction):
                     with open(manifest_file, 'w') as manifest:
                         for f in bundle.namelist():
                             manifest.write(f + '\n')
+                    del s
             #
             if filename.endswith('.md5') and os.path.isfile(filename[:-4]):
                 md5_files.append(
-                    [filename[:-4], os.path.getsize(filename[:-4])])
+                    [filename[:-4],
+                     os.path.getsize(filename[:-4])])
         if skipped:
-            env.logger.info('Using {} existing resource files under {}.'
-                            .format(', '.join(skipped), self.pipeline_resource))
+            env.logger.info('Using {} existing resource files under {}.'.format(
+                ', '.join(skipped), self.pipeline_resource))
         return ifiles, md5_files
 
 
@@ -2966,22 +3260,27 @@ class _CaseInsensitiveDict(MutableMapping):
             value = str(value)
             env.logger.warning(
                 'Pipeline variable {} is converted to "{}"'.format(key, value))
-        if isinstance(value, (list, tuple)) and not all([isinstance(x, str) for x in value]):
+        if isinstance(
+                value,
+            (list, tuple)) and not all([isinstance(x, str) for x in value]):
             raise ValueError(
-                'Only string or list of strings are allowed for pipeline variables: {} for key {}'.format(value, key))
+                'Only string or list of strings are allowed for pipeline variables: {} for key {}'
+                .format(value, key))
         self._store[key.upper()] = (key, value)
         if isinstance(value, str) or len(value) <= 2 or len(str(value)) < 50:
             # if not inputXXX, outputXXX ... (these variables are not recommended to use)
             if re.match('^(input|INPUT|output|OUTPUT)\d+$', key) is None:
-                env.logger.debug('Pipeline variable ``{}`` is {} to ``{}``'.format(
-                    key, reset, str(value)))
+                env.logger.debug(
+                    'Pipeline variable ``{}`` is {} to ``{}``'.format(
+                        key, reset, str(value)))
         else:  # should be a list or tuple
             val = str(value).split(' ')[0] + \
                 ' ...] ({} items)'.format(len(value))
             # if not inputXXX, outputXXX ... (these variables are not recommended to use)
             if re.match('^(input|INPUT|output|OUTPUT)\d+$', key) is None:
                 env.logger.debug(
-                    'Pipeline variable ``{}`` is {} to ``{}``'.format(key, reset, val))
+                    'Pipeline variable ``{}`` is {} to ``{}``'.format(
+                        key, reset, val))
 
     def __contains__(self, key):
         return key.upper() in self._store
@@ -3013,10 +3312,7 @@ class _CaseInsensitiveDict(MutableMapping):
     def upper_items(self):
         """Like iteritems(), but with all uppercase keys."""
         return (
-            (upperkey, keyval[1])
-            for (upperkey, keyval)
-            in self._store.items()
-        )
+            (upperkey, keyval[1]) for (upperkey, keyval) in self._store.items())
 
     def __eq__(self, other):
         if isinstance(other, collections.Mapping):
@@ -3041,7 +3337,12 @@ class Pipeline:
     dictionary. Note that VARS is a case-insensitive dictionary but it is generally
     recommended to use CAPTICAL names for pipeline variables. '''
 
-    def __init__(self, name, extra_args=[], pipeline_type='pipeline', verbosity=None, jobs=1):
+    def __init__(self,
+                 name,
+                 extra_args=[],
+                 pipeline_type='pipeline',
+                 verbosity=None,
+                 jobs=1):
         self.pipeline = PipelineDescription(name, extra_args, pipeline_type)
         self.spec_file = self.pipeline.spec_file
         self.verbosity = verbosity
@@ -3079,8 +3380,9 @@ class Pipeline:
         for idx in range(len(psteps)):
             if not all_steps[int(psteps[idx].index)]:
                 psteps[idx].options.append('skip')
-        env.logger.warning('Steps {} are skipped due to restriction {}'
-                           .format(','.join([str(x) for x in all_steps.keys() if not all_steps[x]]), allowed_steps))
+        env.logger.warning('Steps {} are skipped due to restriction {}'.format(
+            ','.join([str(x) for x in all_steps.keys() if not all_steps[x]]),
+            allowed_steps))
 
     def execute(self, pname, **kwargs):
         allowed_steps = None
@@ -3095,15 +3397,18 @@ class Pipeline:
             elif 'default' in self.pipeline.pipelines:
                 pname = 'default'
             else:
-                raise ValueError('Name of pipeline should be specified because '
-                                 '{}.pipeline defines more than one pipelines without a default one. '
-                                 'Available pipelines are: {}.'.format(self.pipeline.name,
-                                                                       ', '.join(self.pipeline.pipelines.keys())))
+                raise ValueError(
+                    'Name of pipeline should be specified because '
+                    '{}.pipeline defines more than one pipelines without a default one. '
+                    'Available pipelines are: {}.'.format(
+                        self.pipeline.name,
+                        ', '.join(self.pipeline.pipelines.keys())))
         elif pname not in self.pipeline.pipelines.keys():
 
             raise ValueError('Pipeline {} is undefined in configuraiton file '
-                             '{}. Available pipelines are: {}'.format(pname,
-                                                                      self.pipeline.name, ', '.join(self.pipeline.pipelines.keys())))
+                             '{}. Available pipelines are: {}'.format(
+                                 pname, self.pipeline.name,
+                                 ', '.join(self.pipeline.pipelines.keys())))
 
         #
         psteps = self.pipeline.pipelines[pname]
@@ -3111,7 +3416,9 @@ class Pipeline:
             self.limit_steps(psteps, allowed_steps)
         #
         # the project will be opened when needed
-        with Project(mode=['ALLOW_NO_PROJ', 'READ_ONLY'], verbosity=self.verbosity) as proj:
+        with Project(
+                mode=['ALLOW_NO_PROJ', 'READ_ONLY'],
+                verbosity=self.verbosity) as proj:
             self.VARS = _CaseInsensitiveDict(
                 home=os.path.expanduser('~'),
                 temp_dir=env.temp_dir,
@@ -3133,14 +3440,16 @@ class Pipeline:
                 if not self.pipeline.commandline_opts['cmd_input']:
                     self.pipeline.commandline_opts['cmd_input'] = []
                 else:
-                    self.pipeline.commandline_opts['cmd_input'] = self.pipeline.commandline_opts['cmd_input'].split(
-                        ',')
+                    self.pipeline.commandline_opts[
+                        'cmd_input'] = self.pipeline.commandline_opts[
+                            'cmd_input'].split(',')
             if 'cmd_output' in self.pipeline.commandline_opts:
                 if not self.pipeline.commandline_opts['cmd_output']:
                     self.pipeline.commandline_opts['cmd_output'] = []
                 else:
-                    self.pipeline.commandline_opts['cmd_output'] = self.pipeline.commandline_opts['cmd_output'].split(
-                        ',')
+                    self.pipeline.commandline_opts[
+                        'cmd_output'] = self.pipeline.commandline_opts[
+                            'cmd_output'].split(',')
         self.VARS.update(self.pipeline.commandline_opts)
         self.VARS.update({k: str(v) for k, v in kwargs.items()})
         if 'cmd_input' not in self.VARS:
@@ -3168,24 +3477,22 @@ class Pipeline:
                     'Changing working directory to {}'.format(val))
                 os.chdir(val)
             if key == 'cache_dir' and val != env.cache_dir:
-                env.logger.warning(
-                    'Changing cache directory to {}'.format(val))
+                env.logger.warning('Changing cache directory to {}'.format(val))
                 env.cache_dir = val
         #
         if 'logfile' in self.VARS:
-            env.logger.info(
-                'Logging information is saved to {}'.format(self.VARS['logfile']))
+            env.logger.info('Logging information is saved to {}'.format(
+                self.VARS['logfile']))
             if '/' in self.VARS['logfile']:
                 d = os.path.split(self.VARS['logfile'])[0]
                 if not os.path.isdir(d):
                     env.logger.info(
                         'Making directory {} for output file'.format(d))
                     os.makedirs(d)
-            ch = logging.FileHandler(
-                self.VARS['logfile'].lstrip('>'), mode='a')
+            ch = logging.FileHandler(self.VARS['logfile'].lstrip('>'), mode='a')
             ch.setLevel(logging.DEBUG)
-            ch.setFormatter(logging.Formatter(
-                '%(asctime)s: %(levelname)s: %(message)s'))
+            ch.setFormatter(
+                logging.Formatter('%(asctime)s: %(levelname)s: %(message)s'))
             env.logger.addHandler(ch)
         #
         ifiles = self.VARS['cmd_input']
@@ -3197,16 +3504,16 @@ class Pipeline:
             command = psteps[step_index]
             if 'skip' in command.options:
                 step_index += 1
-                env.logger.info('Step {}.{}_{} is skipped'
-                                .format(self.pipeline.name, pname, command.index))
+                env.logger.info('Step {}.{}_{} is skipped'.format(
+                    self.pipeline.name, pname, command.index))
                 if step_index == len(psteps):
                     break
                 step_output = []
                 continue
             self.VARS['pipeline_step'] = command.index
-            env.logger.info('Executing ``{}.{}_{}``: {}'
-                            .format(self.pipeline.name, pname, command.index,
-                                    ' '.join(command.comment.split())))
+            env.logger.info('Executing ``{}.{}_{}``: {}'.format(
+                self.pipeline.name, pname, command.index,
+                ' '.join(command.comment.split())))
             # init
             for key, val in command.init_action_vars:
                 self.VARS[key] = substituteVars(
@@ -3220,8 +3527,8 @@ class Pipeline:
                 step_input = ifiles
                 step_named_input = [['', ifiles]]
             else:
-                command_input_line = substituteVars(
-                    command.input, self.VARS, self.GLOBALS)
+                command_input_line = substituteVars(command.input, self.VARS,
+                                                    self.GLOBALS)
                 if ':' in command_input_line:
                     input_line, emitter_part = command_input_line.split(':', 1)
                 else:
@@ -3241,11 +3548,14 @@ class Pipeline:
                         if piece.endswith('='):
                             step_named_input.append([piece[:-1].strip(), []])
                         else:
-                            expanded_files = sum(
-                                [glob.glob(os.path.expanduser(x)) for x in shlex.split(piece)], [])
+                            expanded_files = sum([
+                                glob.glob(os.path.expanduser(x))
+                                for x in shlex.split(piece)
+                            ], [])
                             if not expanded_files:
                                 raise ValueError(
-                                    '{} does not expand to any valid file.'.format(piece))
+                                    '{} does not expand to any valid file.'
+                                    .format(piece))
                             if not step_named_input:
                                 step_named_input.append(['', expanded_files])
                             else:
@@ -3260,13 +3570,15 @@ class Pipeline:
                         # remove ${INPUT} because it is determined by the emitter
                         if 'input' in self.VARS:
                             self.VARS.pop('input')
-                        emitter = eval('EmitInput({})'.format(
-                            substituteVars(
-                                emitter_part, self.VARS, self.GLOBALS)
-                        ), globals(), self.GLOBALS)
+                        emitter = eval(
+                            'EmitInput({})'.format(
+                                substituteVars(emitter_part,
+                                               self.VARS, self.GLOBALS)),
+                            globals(), self.GLOBALS)
                     except Exception as e:
                         raise ValueError(
-                            'Failed to interpret input emit options "{}"'.format(e))
+                            'Failed to interpret input emit options "{}"'
+                            .format(e))
             #
             #
             self.VARS['input{}'.format(command.index)] = step_input
@@ -3278,8 +3590,8 @@ class Pipeline:
                     self.VARS['input_{}'.format(n)] = f
                     self.step_dependent_files.extend(f)
             if self.step_dependent_files:
-                env.logger.debug('Step dependent files are {}'.format(
-                    ', '.join(self.step_dependent_files)))
+                env.logger.debug('Step dependent files are {}'.format(', '.join(
+                    self.step_dependent_files)))
             #
             saved_dir = os.getcwd()
             for opt in command.options:
@@ -3295,12 +3607,13 @@ class Pipeline:
                     if not os.path.isdir(working_dir):
                         raise ValueError(
                             'Invalid working directory: {}'.format(working_dir))
-                    env.logger.info('Use working directory ``{}`` for {}_{}'.format(
-                        working_dir, pname, command.index))
+                    env.logger.info(
+                        'Use working directory ``{}`` for {}_{}'.format(
+                            working_dir, pname, command.index))
                     os.chdir(working_dir)
             #
-            env.logger.trace('INPUT of step {}_{}: {}'
-                             .format(pname, command.index, step_input))
+            env.logger.trace('INPUT of step {}_{}: {}'.format(
+                pname, command.index, step_input))
             #
             # now, group input files
             if not command.input_emitter:
@@ -3309,14 +3622,16 @@ class Pipeline:
             else:
                 if emitter is not None:
                     raise ValueError(
-                        'Cannot define input emitter in both input and input_emitter')
+                        'Cannot define input emitter in both input and input_emitter'
+                    )
                 try:
                     # ${CMD_INPUT} etc can be used.
-                    emitter = eval(substituteVars(
-                        command.input_emitter, self.VARS, self.GLOBALS), globals(), self.GLOBALS)
+                    emitter = eval(
+                        substituteVars(command.input_emitter, self.VARS,
+                                       self.GLOBALS), globals(), self.GLOBALS)
                 except Exception as e:
-                    raise RuntimeError('Failed to group input files: {}'
-                                       .format(e))
+                    raise RuntimeError(
+                        'Failed to group input files: {}'.format(e))
             # pass Pipeline itself to emitter
             igroups, ivars, step_output = emitter(step_input, self)
             try:
@@ -3325,7 +3640,8 @@ class Pipeline:
                         self.VARS['input'] = ig
                     if not ig and float(self.pipeline.pipeline_format) <= 1.0:
                         env.logger.trace(
-                            'Step skipped due to no input file (for pipeline format < 1.0 only)')
+                            'Step skipped due to no input file (for pipeline format < 1.0 only)'
+                        )
                         continue
                     for key, val in iv.items():
                         self.VARS[key] = substituteVars(
@@ -3335,12 +3651,12 @@ class Pipeline:
                     for key, val in command.pre_action_vars:
                         self.VARS[key] = substituteVars(
                             val, self.VARS, self.GLOBALS, asString=False)
-                    action = substituteVars(
-                        command.action, self.VARS, self.GLOBALS)
-                    env.logger.trace('Emitted input of step {}_{}: {}'
-                                     .format(pname, command.index, ig))
-                    env.logger.trace('Action of step {}_{}: {}'
-                                     .format(pname, command.index, action))
+                    action = substituteVars(command.action, self.VARS,
+                                            self.GLOBALS)
+                    env.logger.trace('Emitted input of step {}_{}: {}'.format(
+                        pname, command.index, ig))
+                    env.logger.trace('Action of step {}_{}: {}'.format(
+                        pname, command.index, action))
                     # check if the input file is ready. This is used for
                     # parallel execution of the pipeline while the input file
                     # might be worked on by another job
@@ -3348,19 +3664,23 @@ class Pipeline:
                         # is ifile in any of the output files?
                         if ifile in self.THREADS:
                             # wait for the thread to complete
-                            env.logger.info('Waiting for the input file {} to be available.'
-                                            .format(ifile))
+                            env.logger.info(
+                                'Waiting for the input file {} to be available.'
+                                .format(ifile))
                             # while self.THREADS[ifile].isAlive():
                             ret = self.THREADS[ifile].join()
                             # thread closed, remove from self.THREADS
                             self.THREADS.pop(ifile)
                             if ret:
                                 raise RuntimeError(
-                                    'Failed to generate {}: {}'.format(ifile, ret))
-                        if not (os.path.isfile(ifile) or os.path.isfile(ifile + '.file_info')):
+                                    'Failed to generate {}: {}'.format(
+                                        ifile, ret))
+                        if not (os.path.isfile(ifile) or
+                                os.path.isfile(ifile + '.file_info')):
                             #raise RewindExecution(ifile)
                             raise RuntimeError(
-                                'Non-existent input file {} due to ongoing or failed background job'.format(ifile))
+                                'Non-existent input file {} due to ongoing or failed background job'
+                                .format(ifile))
                     #
                     if not action.strip():
                         action = 'NullAction()'
@@ -3369,14 +3689,15 @@ class Pipeline:
                         action = SequentialActions(action)
                     if not issubclass(action.__class__, PipelineAction):
                         env.logger.warning(
-                            'Pipeline action {} is not a subclass of PipelineAction'.format(action.__class__))
+                            'Pipeline action {} is not a subclass of PipelineAction'
+                            .format(action.__class__))
                     # pass the Pipeline object itself to action
                     # this allows the action to have access to pipeline variables
                     # and other options
                     if 'blocking' in command.options:
-                        self.runtime = RuntimeFiles(
-                            '{}_{}'.format(pname, command.index))
-                        with SharedProcess(self.runtime) as protection:
+                        self.runtime = RuntimeFiles('{}_{}'.format(
+                            pname, command.index))
+                        with SharedProcess(self.runtime):
                             ofiles = action(ig, self)
                     else:
                         ofiles = action(ig, self)
@@ -3393,13 +3714,16 @@ class Pipeline:
                         env.logger.debug('Setting variable {} to {}'.format(
                             matched.group(1), step_output))
                         self.VARS[matched.group(1)] = step_output
-                env.logger.trace('OUTPUT of step {}_{}: {}'
-                                 .format(pname, command.index, step_output))
+                env.logger.trace('OUTPUT of step {}_{}: {}'.format(
+                    pname, command.index, step_output))
                 for f in step_output:
-                    if not (os.path.isfile(f) or os.path.isfile(f + '.file_info') or f in self.THREADS):
-                        raise RuntimeError('Output file {} does not exist after '
-                                           'completion of step {}_{} (working directory: {})'
-                                           .format(f, pname, command.index, os.getcwd()))
+                    if not (os.path.isfile(f) or
+                            os.path.isfile(f + '.file_info') or
+                            f in self.THREADS):
+                        raise RuntimeError(
+                            'Output file {} does not exist after '
+                            'completion of step {}_{} (working directory: {})'
+                            .format(f, pname, command.index, os.getcwd()))
                 for key, val in command.post_action_vars:
                     self.VARS[key] = substituteVars(
                         val, self.VARS, self.GLOBALS, asString=False)
@@ -3411,20 +3735,24 @@ class Pipeline:
                 # this step is successful, go to next
                 os.chdir(saved_dir)
                 step_index += 1
-                env.logger.debug('Step {}.{}_{} is executed successfully.'
-                                 .format(self.pipeline.name, pname, command.index))
+                env.logger.debug(
+                    'Step {}.{}_{} is executed successfully.'.format(
+                        self.pipeline.name, pname, command.index))
                 if step_index == len(psteps):
                     break
             except RewindExecution:
                 rewind_count += 1
                 if rewind_count >= 3:
-                    raise RuntimeError('Failed to execute pipeline {}.{}: excessive '
-                                       'rewind during execution.'.format(self.pipeline.name, pname))
+                    raise RuntimeError(
+                        'Failed to execute pipeline {}.{}: excessive '
+                        'rewind during execution.'.format(
+                            self.pipeline.name, pname))
                 # unfortunately, an input file has been removed (replaced by .file_info) but
                 # a later steps need it. We will have to figure out how to create this
                 # file by looking backward ...
                 to_be_regenerated = [
-                    x for x in step_input if not os.path.isfile(x)]
+                    x for x in step_input if not os.path.isfile(x)
+                ]
                 # we need to check if this file is actually generated at all before
                 # otherwise a misspecified input file would cause the whole pipline
                 # to start from step 1 again and again
@@ -3437,14 +3765,15 @@ class Pipeline:
                 #
                 for x in to_be_regenerated:
                     if x not in all_input_and_output_files:
-                        raise RuntimeError('Specified input file "{}" does not exist and is not '
-                                           'generated by any previous step.'.format(x))
+                        raise RuntimeError(
+                            'Specified input file "{}" does not exist and is not '
+                            'generated by any previous step.'.format(x))
                     # remove all fony files so that they will be re-generated
                     if os.path.isfile(x + '.file_info'):
                         os.remove(x + '.file_info')
                 remaining = [x for x in to_be_regenerated]
-                env.logger.debug(
-                    'Missing input file {}'.format(', '.join(remaining)))
+                env.logger.debug('Missing input file {}'.format(
+                    ', '.join(remaining)))
                 while step_index > 0:
                     step_index -= 1
                     command = psteps[step_index]
@@ -3455,28 +3784,37 @@ class Pipeline:
                                 'Remove file info {}'.format(x + '.file_info'))
                             os.remove(x + '.file_info')
                     # if any of the input file does not exist, go back further
-                    if not all([os.path.isfile(x) for x in self.VARS['input{}'.format(command.index)]]):
-                        env.logger.debug('Not all input files are available: {}'.format(
-                            ', '.join(self.VARS['input{}'.format(command.index)])))
+                    if not all([
+                            os.path.isfile(x)
+                            for x in self.VARS['input{}'.format(command.index)]
+                    ]):
+                        env.logger.debug(
+                            'Not all input files are available: {}'.format(
+                                ', '.join(self.VARS['input{}'.format(
+                                    command.index)])))
                         continue
                     # check if a real file can be generated at this step
                     remaining = [
-                        x for x in remaining if x not in self.VARS['output{}'.format(command.index)]]
+                        x for x in remaining
+                        if x not in self.VARS['output{}'.format(command.index)]
+                    ]
                     if not remaining:
                         break
                 if step_index > 1:
-                    ifiles = self.VARS['output{}'.format(
-                        psteps[step_index - 1].index)]
+                    ifiles = self.VARS['output{}'.format(psteps[step_index -
+                                                                1].index)]
                 else:
                     ifiles = self.VARS['cmd_input']
-                env.logger.warning('Rewinding to ``{}.{}_{}``: input files {} need to be re-generated.'
-                                   .format(self.pipeline.name, pname, command.index, ', '.join(to_be_regenerated)))
+                env.logger.warning(
+                    'Rewinding to ``{}.{}_{}``: input files {} need to be re-generated.'
+                    .format(self.pipeline.name, pname, command.index,
+                            ', '.join(to_be_regenerated)))
                 os.chdir(saved_dir)
             except Exception as e:
-                env.logger.debug('Failed to execute step {}.{}_{}.'
-                                 .format(self.pipeline.name, pname, command.index))
-                raise RuntimeError('Failed to execute step {}_{}: {}'
-                                   .format(pname, command.index, e))
+                env.logger.debug('Failed to execute step {}.{}_{}.'.format(
+                    self.pipeline.name, pname, command.index))
+                raise RuntimeError('Failed to execute step {}_{}: {}'.format(
+                    pname, command.index, e))
             #
             # clear variables that are local to step
             for n, f in step_named_input:
@@ -3491,13 +3829,16 @@ class Pipeline:
                     v.join(5)
                 # thread closed, remove from self.THREADS
                 self.THREADS.pop(ifile)
-        env.logger.info('Execution of pipeline {}.{} is successful with output {}'
-                        .format(self.pipeline.name, pname, ', '.join(step_output)))
+        env.logger.info(
+            'Execution of pipeline {}.{} is successful with output {}'.format(
+                self.pipeline.name, pname, ', '.join(step_output)))
 
 
 def executeArguments(parser):
-    parser.add_argument('specfile', metavar='SPECFILE',
-                        help='''Name of a pipeline configuration file, which can be a
+    parser.add_argument(
+        'specfile',
+        metavar='SPECFILE',
+        help='''Name of a pipeline configuration file, which can be a
             path to a .pipeline file (with or without extension) or one
             of the online pipelines listed by command "vtools show pipelines".
             For backward compatibility, if no input and output files are
@@ -3505,8 +3846,11 @@ def executeArguments(parser):
             is treated as a SQL query that will be executed against the project
             database, with project genotype database attached as "genotype" and
             annotation databases attached by their names.''')
-    parser.add_argument('pipelines', nargs='*', metavar='PIPELINES',
-                        help='''Name of one or more pipelines defined in SPECFILE, which can be
+    parser.add_argument(
+        'pipelines',
+        nargs='*',
+        metavar='PIPELINES',
+        help='''Name of one or more pipelines defined in SPECFILE, which can be
             ignored if the SPECFILE only defines one pipeline. One or more steps
             can be specified in the form of 'pipeline:5' (step_5 only),
             'pipeline:-5' (up to step 5), 'pipeline:5-' (from step 5),
@@ -3517,13 +3861,20 @@ def executeArguments(parser):
             SPECFILE" for details of available pipelines in SPECFILE, including
             pipeline-specific parameters that could be used to change the default
             behavior of the pipelines.''')
-    parser.add_argument('-j', '--jobs', default=1, type=int,
-                        help='''Execute the pipeline in parallel model if a number other than
+    parser.add_argument(
+        '-j',
+        '--jobs',
+        default=1,
+        type=int,
+        help='''Execute the pipeline in parallel model if a number other than
             1 is specified. In this mode, the RunCommand action will create
             a shell script and submit the job using a command specified by
             option ``submitter``,  if this parameter is defined.''')
-    parser.add_argument('-d', '--delimiter', default='\t',
-                        help='''Delimiter used to output results of a SQL query.''')
+    parser.add_argument(
+        '-d',
+        '--delimiter',
+        default='\t',
+        help='''Delimiter used to output results of a SQL query.''')
 
 
 def execute(args):
@@ -3532,7 +3883,7 @@ def execute(args):
     def executeQuery():
         with Project(verbosity=args.verbosity) as proj:
             # if there is no output,
-            if proj.store=="sqlite":
+            if proj.store == "sqlite":
                 proj.db.attach('{}_genotype'.format(proj.name), 'genotype')
                 # for backward compatibility
                 proj.db.attach('{}_genotype'.format(proj.name))
@@ -3548,23 +3899,28 @@ def execute(args):
             try:
                 cur.execute(query)
             except Exception as e:
-                raise RuntimeError('Failed to execute SQL query "{}": {}'
-                                   .format(query, e))
+                raise RuntimeError(
+                    'Failed to execute SQL query "{}": {}'.format(query, e))
             proj.db.commit()
             sep = args.delimiter
             for rec in cur:
                 print(sep.join(['{}'.format(x) for x in rec]))
+
     #
 
     def executePipeline():
-        pipeline = Pipeline(args.specfile, extra_args=args.unknown_args, verbosity=args.verbosity,
-                            jobs=args.jobs)
+        pipeline = Pipeline(
+            args.specfile,
+            extra_args=args.unknown_args,
+            verbosity=args.verbosity,
+            jobs=args.jobs)
         # unspecified
         if not args.pipelines:
             pipeline.execute(None)
         else:
             for name in args.pipelines:
                 pipeline.execute(name)
+
     #
     try:
         env.verbosity = args.verbosity
@@ -3580,8 +3936,8 @@ def execute(args):
                 # try to execute as a SQL query
                 executeQuery()
             except (RuntimeError, ValueError) as e:
-                env.logger.debug('Failed to execute {} as SQL query: {}'
-                                 .format(' '.join(args.pipelines), e))
+                env.logger.debug('Failed to execute {} as SQL query: {}'.format(
+                    ' '.join(args.pipelines), e))
                 executePipeline()
     except Exception as e:
         env.unlock_all()
@@ -3595,25 +3951,40 @@ def execute(args):
 # to simulate data.
 #
 def simulateArguments(parser):
-    parser.add_argument('specfile', metavar='SPECFILE',
-                        help='''Name of a model specification file, which can be the name of an
+    parser.add_argument(
+        'specfile',
+        metavar='SPECFILE',
+        help='''Name of a model specification file, which can be the name of an
             online specification file, or path to a local .pipeline file. Please
             use command "vtools show simulations" to get a list all available
             simulation models.''')
-    parser.add_argument('models', nargs='*', metavar='MODELS',
-                        help='''Name of one or more simulation models defined in SPECFILE, which
+    parser.add_argument(
+        'models',
+        nargs='*',
+        metavar='MODELS',
+        help='''Name of one or more simulation models defined in SPECFILE, which
             can be ignored if the SPECFILE only defines one simulation model.
             Please use command "vtools show simulation SPECFILE" for details
             of available models in SPECFILE, including model-specific parameters
-            that could be used to change the default behavior of these models.''')
-    parser.add_argument('--seed', type=int,
-                        help='''Random seed for the simulation. A random seed will be used by
+            that could be used to change the default behavior of these models.'''
+    )
+    parser.add_argument(
+        '--seed',
+        type=int,
+        help='''Random seed for the simulation. A random seed will be used by
             default but a specific seed could be used to reproduce a previously
             executed simulation.''')
-    parser.add_argument('--replicates', default=1, type=int,
-                        help='''Number of consecutive replications to simulate''')
-    parser.add_argument('-j', '--jobs', default=1, type=int,
-                        help='''Maximum number of concurrent jobs to execute, for steps
+    parser.add_argument(
+        '--replicates',
+        default=1,
+        type=int,
+        help='''Number of consecutive replications to simulate''')
+    parser.add_argument(
+        '-j',
+        '--jobs',
+        default=1,
+        type=int,
+        help='''Maximum number of concurrent jobs to execute, for steps
             of a pipeline that allows multi-processing.''')
 
 
@@ -3631,15 +4002,16 @@ def simulate_replicate(args, rep):
         # set random seed of simulators
         random.seed(args.seed + rep)
         if not args.models:
-            cfg_file = '{}/{}_{}.cfg'.format(env.cache_dir,
-                                             model_name, args.seed + rep)
+            cfg_file = '{}/{}_{}.cfg'.format(env.cache_dir, model_name,
+                                             args.seed + rep)
         else:
-            cfg_file = '{}/{}_{}_{}.cfg'.format(
-                env.cache_dir, model_name, '_'.join(args.models), args.seed + rep)
+            cfg_file = '{}/{}_{}_{}.cfg'.format(env.cache_dir, model_name,
+                                                '_'.join(args.models),
+                                                args.seed + rep)
         #
         with open(cfg_file, 'w') as cfg:
-            cfg.write('model={} {}\n'.format(
-                args.specfile, ' '.join(args.models)))
+            cfg.write('model={} {}\n'.format(args.specfile,
+                                             ' '.join(args.models)))
             cfg.write('seed={}\n'.format(args.seed + rep))
             if '--seed' in sys.argv:
                 # skip the seed option so to stop pipeline from distinguishing the two commands
@@ -3653,8 +4025,12 @@ def simulate_replicate(args, rep):
         env.logger.info('Starting simulation ``{}``'.format(cfg_file))
         opt = args.unknown_args
         opt.extend(['--input'] + [cfg_file])
-        pipeline = Pipeline(args.specfile, extra_args=opt,
-                            pipeline_type='simulation', verbosity=args.verbosity, jobs=args.jobs)
+        pipeline = Pipeline(
+            args.specfile,
+            extra_args=opt,
+            pipeline_type='simulation',
+            verbosity=args.verbosity,
+            jobs=args.jobs)
         # using a pool of simulators
         if not args.models:
             pipeline.execute(None, seed=args.seed + rep)
@@ -3663,7 +4039,8 @@ def simulate_replicate(args, rep):
                 pipeline.execute(name, seed=args.seed + rep)
     except Exception as e:
         env.logger.error(
-            'Failed to simulate replicate {} of model {}: {}'.format(rep, model_name, e))
+            'Failed to simulate replicate {} of model {}: {}'.format(
+                rep, model_name, e))
         sys.exit(1)
 
 
@@ -3685,6 +4062,7 @@ def simulate(args):
     except Exception as e:
         env.logger.error(e)
         sys.exit(1)
+
 
 if __name__ == '__main__':
     pass

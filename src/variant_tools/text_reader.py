@@ -1,15 +1,10 @@
-
 #!/usr/bin/env python
-#
-# $File: importer.py $
-# $LastChangedDate$
-# $Rev$
 #
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,12 +20,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 ##
 
-
 from heapq import heappush, heappop, heappushpop
 from multiprocessing import Process, Pipe
-from .utils import  openFile, env
+from .utils import openFile, env
 
-def TextReader(processor, input, varIdx, getNew, jobs, encoding, header, quiet=False):
+
+def TextReader(processor,
+               input,
+               varIdx,
+               getNew,
+               jobs,
+               encoding,
+               header,
+               quiet=False):
     '''
     input: input file
     varIdx: variant index, if specified, only matching variants will be returned
@@ -41,17 +43,28 @@ def TextReader(processor, input, varIdx, getNew, jobs, encoding, header, quiet=F
     encoding: file encoding
     '''
     if jobs == 0:
-        return EmbeddedTextReader(processor, input, varIdx, getNew, encoding, header, quiet)
+        return EmbeddedTextReader(processor, input, varIdx, getNew, encoding,
+                                  header, quiet)
     elif jobs == 1:
-        return StandaloneTextReader(processor, input, varIdx, getNew, encoding, header, quiet)
+        return StandaloneTextReader(processor, input, varIdx, getNew, encoding,
+                                    header, quiet)
     else:
-        return MultiTextReader(processor, input, varIdx, getNew, jobs, encoding, header, quiet)
+        return MultiTextReader(processor, input, varIdx, getNew, jobs, encoding,
+                               header, quiet)
+
 
 class EmbeddedTextReader:
     #
     # This reader read the file from the main process. No separate process is spawned.
     #
-    def __init__(self, processor, input, varIdx, getNew, encoding, header, quiet=False):
+    def __init__(self,
+                 processor,
+                 input,
+                 varIdx,
+                 getNew,
+                 encoding,
+                 header,
+                 quiet=False):
         self.num_records = 0
         self.unprocessable_lines = 0
         self.processor = processor
@@ -86,7 +99,7 @@ class EmbeddedTextReader:
                                 in_header = False
                         if in_header:
                             continue
-                    for bins,rec in self.processor.process(line):
+                    for bins, rec in self.processor.process(line):
                         if first:
                             self.columnRange = self.processor.columnRange
                             first = False
@@ -95,16 +108,20 @@ class EmbeddedTextReader:
                             var_key = (rec[0], rec[2], rec[3])
                             if self.getNew:
                                 # only need new variant, so continue if variant in varIdx.
-                                if var_key in self.varIdx and rec[1] in self.varIdx[var_key]:
+                                if var_key in self.varIdx and rec[
+                                        1] in self.varIdx[var_key]:
                                     continue
                             else:
                                 # only need existing variant, continue if variant not in varIdx
-                                if var_key not in self.varIdx or rec[1] not in self.varIdx[var_key]:
+                                if var_key not in self.varIdx or rec[
+                                        1] not in self.varIdx[var_key]:
                                     continue
                         yield (line_no, bins, rec)
                 except Exception as e:
                     if not self.quiet:
-                        env.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
+                        env.logger.debug(
+                            'Failed to process line "{}...": {}'.format(
+                                line[:20].strip(), e))
                     self.unprocessable_lines += 1
 
 
@@ -114,8 +131,18 @@ class ReaderWorker(Process):
     to process input line. If multiple works are started,
     they read lines while skipping lines (e.g. 1, 3, 5, 7, ...)
     '''
-    def __init__(self, processor, input, varIdx, getNew, output, step, index,
-        encoding, header, quiet=False):
+
+    def __init__(self,
+                 processor,
+                 input,
+                 varIdx,
+                 getNew,
+                 output,
+                 step,
+                 index,
+                 encoding,
+                 header,
+                 quiet=False):
         '''
         processor:  line processor
         input:      input filename
@@ -166,7 +193,7 @@ class ReaderWorker(Process):
                                 in_header = False
                         if in_header:
                             continue
-                    for bins,rec in self.processor.process(line):
+                    for bins, rec in self.processor.process(line):
                         if first:
                             self.output.send(self.processor.columnRange)
                             first = False
@@ -175,16 +202,20 @@ class ReaderWorker(Process):
                             var_key = (rec[0], rec[2], rec[3])
                             if self.getNew:
                                 # only need new variant, so continue if variant in varIdx.
-                                if var_key in self.varIdx and rec[1] in self.varIdx[var_key]:
+                                if var_key in self.varIdx and rec[
+                                        1] in self.varIdx[var_key]:
                                     continue
                             else:
                                 # only need existing variant, continue if variant not in varIdx
-                                if var_key not in self.varIdx or rec[1] not in self.varIdx[var_key]:
+                                if var_key not in self.varIdx or rec[
+                                        1] not in self.varIdx[var_key]:
                                     continue
                         self.output.send((line_no, bins, rec))
                 except Exception as e:
                     if not self.quiet:
-                        env.logger.debug('Failed to process line "{}...": {}'.format(line[:20].strip(), e))
+                        env.logger.debug(
+                            'Failed to process line "{}...": {}'.format(
+                                line[:20].strip(), e))
                     unprocessable_lines += 1
         # if still first (this thread has not read anything), still send the columnRange stuff
         if first:
@@ -200,13 +231,21 @@ class StandaloneTextReader:
     ''' This processor fire up 1 worker to read an input file
     and gather their outputs
     '''
-    def __init__(self, processor, input, varIdx, getNew, encoding, header, quiet=False):
+
+    def __init__(self,
+                 processor,
+                 input,
+                 varIdx,
+                 getNew,
+                 encoding,
+                 header,
+                 quiet=False):
         self.num_records = 0
         self.unprocessable_lines = 0
         #
         self.reader, w = Pipe(False)
         self.worker = ReaderWorker(processor, input, varIdx, getNew, w, 1, 0,
-            encoding, header, quiet)
+                                   encoding, header, quiet)
         self.worker.start()
         # the send value is columnRange
         self.columnRange = self.reader.recv()
@@ -221,12 +260,21 @@ class StandaloneTextReader:
                 yield val
         self.worker.join()
 
+
 class MultiTextReader:
     '''This processor fire up num workers to read an input file
     and gather their outputs
     '''
-    def __init__(self, processor, input, varIdx, getNew, jobs, encoding,
-        header, quiet=False):
+
+    def __init__(self,
+                 processor,
+                 input,
+                 varIdx,
+                 getNew,
+                 jobs,
+                 encoding,
+                 header,
+                 quiet=False):
         self.readers = []
         self.workers = []
         self.num_records = 0
@@ -234,7 +282,7 @@ class MultiTextReader:
         for i in range(jobs):
             r, w = Pipe(False)
             p = ReaderWorker(processor, input, varIdx, getNew, w, jobs, i,
-                encoding, header, quiet)
+                             encoding, header, quiet)
             self.readers.append(r)
             self.workers.append(p)
             p.start()
@@ -277,4 +325,3 @@ class MultiTextReader:
                     break
         for p in self.workers:
             p.join()
-

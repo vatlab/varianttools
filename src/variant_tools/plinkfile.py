@@ -30,9 +30,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from . import cplinkio 
+from . import cplinkio
 
-class PlinkFile: 
+
+class PlinkFile:
     ##
     # Opens the plink file at the given path.
     #
@@ -43,16 +44,16 @@ class PlinkFile:
     #
     def __init__(self, path):
         self.path = path
-        self.handle = cplinkio.open( path )
-        self.loci = cplinkio.get_loci( self.handle )
-        self.samples = cplinkio.get_samples( self.handle )
+        self.handle = cplinkio.open(path)
+        self.loci = cplinkio.get_loci(self.handle)
+        self.samples = cplinkio.get_samples(self.handle)
 
     ##
     # Returns an iterator from the beginning of
     # the file.
     #
     def __iter__(self):
-        cplinkio.reset_row( self.handle )
+        cplinkio.reset_row(self.handle)
 
         return self
 
@@ -81,13 +82,13 @@ class PlinkFile:
     # from a single locus, false otherwise.
     #
     def one_locus_per_row(self):
-        return cplinkio.one_locus_per_row( self.handle )
+        return cplinkio.one_locus_per_row(self.handle)
 
     ##
     # Goes to next row.
     #
     def __next__(self):
-        row = cplinkio.next_row( self.handle )
+        row = cplinkio.next_row(self.handle)
         if not row:
             raise StopIteration
         return row
@@ -97,17 +98,26 @@ class PlinkFile:
     #
     def close(self):
         if self.handle:
-            cplinkio.close( self.handle )
+            cplinkio.close(self.handle)
             self.handle = None
 
     ##
     # Transposes the file.
     #
     def transpose(self, new_path):
-        return cplinkio.transpose( self.path, new_path )
+        return cplinkio.transpose(self.path, new_path)
+
 
 class Sample:
-    def __init__(self, fid, iid, father_iid, mother_iid, sex, affection, phenotype = 0.0):
+
+    def __init__(self,
+                 fid,
+                 iid,
+                 father_iid,
+                 mother_iid,
+                 sex,
+                 affection,
+                 phenotype=0.0):
         ##
         # Family id.
         #
@@ -144,10 +154,14 @@ class Sample:
         self.phenotype = phenotype
 
     def __str__(self):
-        return "{0} {1} {2} {3}".format( self.fid, self.iid, self.sex, self.affection )
+        return "{0} {1} {2} {3}".format(self.fid, self.iid, self.sex,
+                                        self.affection)
+
 
 class Locus:
-    def __init__(self, chromosome, name, position, bp_position, allele1, allele2):
+
+    def __init__(self, chromosome, name, position, bp_position, allele1,
+                 allele2):
         ##
         # Chromosome number starting from 1
         #
@@ -180,7 +194,8 @@ class Locus:
         self.allele2 = allele2
 
     def __str__(self):
-        return "{0} {1}".format( self.chromosome, self.name )
+        return "{0} {1}".format(self.chromosome, self.name)
+
 
 ##
 # Opens the plink file at the given path.
@@ -191,4 +206,4 @@ class Locus:
 #             /plink/myfile
 #
 def open(path):
-    return PlinkFile( path )
+    return PlinkFile(path)

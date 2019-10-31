@@ -43,11 +43,11 @@ reported_ancestry_comment=Field name for self-reported ancestry.
   ancestry group.
 
 king_path=
-king_path_comment=Path to a directory that contains the "king" program, 
+king_path_comment=Path to a directory that contains the "king" program (version 2.2+), 
   if it is not in the default $PATH.
 
 plink_path=
-plink_path_comment=Path to a directory that contains the "plink" program, 
+plink_path_comment=Path to a directory that contains the "plink" program (version 1.9+), 
   if it is not in the default $PATH.
   
 num_comp=5
@@ -95,8 +95,8 @@ action=RunCommand('${PLINK} --tped %(jobname)s.tped --tfam %(jobname)s.tfam --ex
 comment=LD pruning from pre-calculated list 
 
 [king_41]
-action=RunCommand('${KING} -b %(jobname)s.bed --mds --ibs --prefix %(jobname)s-',
-  working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s-pc.ped')
+action=RunCommand('${KING} -b %(jobname)s.bed --mds --prefix %(jobname)s-',
+  working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s-pc.txt')
 comment=Global ancestry inference
 
 [king_42]
@@ -105,7 +105,7 @@ action=RunCommand('${KING} -b %(jobname)s.bed --kinship --related --degree 3 --p
 comment=Kinship inference
 
 [king_51]
-action=RunCommand('''cut  -f 2,7-`echo $((7+%(num_comp)s-1))` -d " " %(jobname)s-pc.ped | ${SED} -e "s/ /,/g" | ${SED} 1i"sample_name`seq -s, 1 %(num_comp)s | awk -F, '{if (NF>20) NF=20; for (i=1; i<=NF; ++i) printf(",%%s", "%(jobname)s_MDS"$i)}'`" > %(jobname)s-mds.vtools.txt''',
+action=RunCommand('''cut -f 2,7-`echo $((7+%(num_comp)s-1))` -d " " %(jobname)s-pc.txt | ${SED} 1c"sample_name`seq 1 %(num_comp)s | awk '{if (NF>20) NF=20; for (i=1; i<=NF; ++i) printf(" %%s", "%(jobname)s_MDS"$i)}'`" > %(jobname)s-mds.vtools.txt''',
   working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s-mds.vtools.txt')
 comment=Extract MDS result for vtools phenotype import
 
