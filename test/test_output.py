@@ -35,7 +35,7 @@ class TestOutput(ProcessTestCase):
         'Create a project'
         ProcessTestCase.setUp(self)
         self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18')
-     
+
     def testOutputContents(self):
         'Test command vtools output'
         self.assertFail('vtools output')
@@ -69,15 +69,15 @@ class TestOutput(ProcessTestCase):
         self.assertEqual(len(out0), 1446)
         self.assertEqual(len(out1), 1446)
         self.assertEqual(len(out2), 2873)
-     
+
 
     def testOutputExpression(self):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools update variant --from_stat "num=#(alt)" "hom=#(hom)" "het=#(het)" "other=#(other)"')
         self.assertFail('vtools output variant sum(num)')
         self.assertSucc('vtools output variant alt "sum(num)" --group_by alt')
-        self.assertSucc('vtools output variant alt "sum(num)" --group_by alt --header alt sum') 
-        self.assertSucc('vtools output variant alt "sum(num)" --group_by alt --delimiter ","')  
+        self.assertSucc('vtools output variant alt "sum(num)" --group_by alt --header alt sum')
+        self.assertSucc('vtools output variant alt "sum(num)" --group_by alt --delimiter ","')
         self.assertOutput('vtools output variant "sum(num)" -v0', '6383')
         self.assertFail('vtools output variant count(1)')
         self.assertOutput('vtools output variant "count(1)"', '1734')
@@ -88,7 +88,7 @@ class TestOutput(ProcessTestCase):
         self.assertSucc('vtools output variant chr pos ref alt num --header sum_of_num --order_by num')
         self.assertOutput('vtools output variant num --order_by num',
             ['110', '110', '110', '113', '114', '119', '119', '120', '120', '120'], partial=-10)
-        
+
 
 if __name__ == '__main__':
     unittest.main()

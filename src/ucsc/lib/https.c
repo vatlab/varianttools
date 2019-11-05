@@ -15,12 +15,12 @@
 
 
 static pthread_mutex_t *mutexes = NULL;
- 
+
 static unsigned long openssl_id_callback(void)
 {
 return ((unsigned long)pthread_self());
 }
- 
+
 static void openssl_locking_callback(int mode, int n, const char * file, int line)
 {
 if (mode & CRYPTO_LOCK)
@@ -28,7 +28,7 @@ if (mode & CRYPTO_LOCK)
 else
     pthread_mutex_unlock(&mutexes[n]);
 }
- 
+
 void openssl_pthread_setup(void)
 {
 int i;
@@ -39,7 +39,7 @@ for (i = 0;  i < numLocks;  i++)
 CRYPTO_set_id_callback(openssl_id_callback);
 CRYPTO_set_locking_callback(openssl_locking_callback);
 }
- 
+
 
 struct netConnectHttpsParams
 /* params to pass to thread */
@@ -106,7 +106,7 @@ int err;
 struct timeval tv;
 
 
-/* TODO checking certificates 
+/* TODO checking certificates
 
 char *certFile = NULL;
 char *certPath = NULL;
@@ -126,7 +126,7 @@ if (certFile || certPath)
 sbio = BIO_new_ssl_connect(ctx);
 
 BIO_get_ssl(sbio, &ssl);
-if(!ssl) 
+if(!ssl)
     {
     xerr("Can't locate SSL pointer");
     goto cleanup;
@@ -141,38 +141,38 @@ BIO_set_conn_hostname(sbio, hostnameProto);
 
 BIO_set_nbio(sbio, 1);     /* non-blocking mode */
 
-while (1) 
+while (1)
     {
-    if (BIO_do_connect(sbio) == 1) 
+    if (BIO_do_connect(sbio) == 1)
 	{
 	break;  /* Connected */
 	}
-    if (! BIO_should_retry(sbio)) 
+    if (! BIO_should_retry(sbio))
 	{
 	xerr("BIO_do_connect() failed");
-	char s[256];	
+	char s[256];
 	safef(s, sizeof s, "SSL error: %s", ERR_reason_error_string(ERR_get_error()));
 	xerr(s);
 	goto cleanup;
 	}
 
     fd = BIO_get_fd(sbio, NULL);
-    if (fd == -1) 
+    if (fd == -1)
 	{
 	xerr("unable to get BIO descriptor");
 	goto cleanup;
 	}
     FD_ZERO(&readfds);
     FD_ZERO(&writefds);
-    if (BIO_should_read(sbio)) 
+    if (BIO_should_read(sbio))
 	{
 	FD_SET(fd, &readfds);
 	}
-    else if (BIO_should_write(sbio)) 
+    else if (BIO_should_write(sbio))
 	{
 	FD_SET(fd, &writefds);
 	}
-    else 
+    else
 	{  /* BIO_should_io_special() */
 	FD_SET(fd, &readfds);
 	FD_SET(fd, &writefds);
@@ -181,15 +181,15 @@ while (1)
     tv.tv_usec = (long) (((DEFAULTCONNECTTIMEOUTMSEC/1000)-tv.tv_sec)*1000000);
 
     err = select(fd + 1, &readfds, &writefds, NULL, &tv);
-    if (err < 0) 
+    if (err < 0)
 	{
 	xerr("select() error");
 	goto cleanup;
 	}
 
-    if (err == 0) 
+    if (err == 0)
 	{
-	char s[256];	
+	char s[256];
 	safef(s, sizeof s, "connection timeout to %s", params->hostName);
 	xerr(s);
 	goto cleanup;
@@ -197,7 +197,7 @@ while (1)
     }
 
 
-/* TODO checking certificates 
+/* TODO checking certificates
 
 if (certFile || certPath)
     if (!check_cert(ssl, host))
@@ -205,7 +205,7 @@ if (certFile || certPath)
 
 */
 
-/* we need to wait on both the user's socket and the BIO SSL socket 
+/* we need to wait on both the user's socket and the BIO SSL socket
  * to see if we need to ferry data from one to the other */
 
 
@@ -215,13 +215,13 @@ int srd = 0;
 int swt = 0;
 int brd = 0;
 int bwt = 0;
-while (1) 
+while (1)
     {
 
-    // Do NOT move this outside the while loop. 
+    // Do NOT move this outside the while loop.
     /* Get underlying file descriptor, needed for select call */
     fd = BIO_get_fd(sbio, NULL);
-    if (fd == -1) 
+    if (fd == -1)
 	{
 	xerr("BIO doesn't seem to be initialized in https, unable to get descriptor.");
 	goto cleanup;
@@ -244,19 +244,19 @@ while (1)
     err = select(max(fd,params->sv[1]) + 1, &readfds, &writefds, NULL, &tv);
 
     /* Evaluate select() return code */
-    if (err < 0) 
+    if (err < 0)
 	{
 	xerr("error during select()");
 	goto cleanup;
 	}
-    else if (err == 0) 
+    else if (err == 0)
 	{
 	/* Timed out - just quit */
 	xerr("https timeout expired");
 	goto cleanup;
 	}
 
-    else 
+    else
 	{
 	if (FD_ISSET(params->sv[1], &readfds))
 	    {
@@ -268,7 +268,7 @@ while (1)
 		    xerrno("error reading https socket");
 		goto cleanup;
 		}
-	    if (srd == 0) 
+	    if (srd == 0)
 		break;  // user closed socket, we are done
 	    }
 

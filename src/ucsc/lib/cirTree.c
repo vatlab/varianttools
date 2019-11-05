@@ -3,9 +3,9 @@
  * makes use of this module and the bPlusTree module - rather than this module directly.
  * This module works with chromosomes mapped to small integers rather than chromosomes
  * as strings, saving space and speeding things up in the process, but requiring the
- * separate bPlusTree to map the names to IDs. 
+ * separate bPlusTree to map the names to IDs.
  *   This module implements a one dimensional R-tree index treating the chromosome ID
- * as the most significant part of a two-part key, and the base position as the least 
+ * as the most significant part of a two-part key, and the base position as the least
  * significant part of the key. */
 
 #include "common.h"
@@ -80,7 +80,7 @@ if (curLevel == destLevel)
     for (i=countOne; i<blockSize; ++i)
 	repeatCharOut(f, 0, indexSlotSize);
     }
-else 
+else
     {
     /* Otherwise recurse on children. */
     for (el = tree->children; el != NULL; el = el->next)
@@ -90,7 +90,7 @@ else
 return offset;
 }
 
-static void writeIndexLevel(int blockSize, int childNodeSize, 
+static void writeIndexLevel(int blockSize, int childNodeSize,
 	struct rTree *tree, bits64 offsetOfFirstChild, int level, FILE *f)
 /* Write out a non-leaf level nodes at given level. */
 {
@@ -293,7 +293,7 @@ return tree;
 }
 
 static void writeTreeToOpenFile(struct rTree *tree, int blockSize, int levelCount, FILE *f)
-/* Write out tree to a file that is open already - writing out index nodes from 
+/* Write out tree to a file that is open already - writing out index nodes from
  * highest to lowest level, and then leaf nodes. */
 {
 /* Calculate sizes of each level. */
@@ -336,11 +336,11 @@ writeLeaves(blockSize, leafNodeSize(blockSize), tree, leafLevel, f);
 }
 
 void cirTreeFileBulkIndexToOpenFile(
-	void *itemArray, int itemSize, bits64 itemCount, 
+	void *itemArray, int itemSize, bits64 itemCount,
 	bits32 blockSize, bits32 itemsPerSlot,
 	void *context,
 	struct cirTreeRange (*fetchKey)(const void *va, void *context),
-	bits64 (*fetchOffset)(const void *va, void *context), 
+	bits64 (*fetchOffset)(const void *va, void *context),
 	bits64 endFileOffset, FILE *f)
 /* Create a r tree index from a sorted array, writing output starting at current position
  * of an already open file.  See rTreeFileCreate for explanation of parameters. */
@@ -469,7 +469,7 @@ else
     }
 }
 
-static inline boolean cirTreeOverlaps(int qChrom, int qStart, int qEnd, 
+static inline boolean cirTreeOverlaps(int qChrom, int qStart, int qEnd,
 	int rStartChrom, int rStartBase, int rEndChrom, int rEndBase)
 {
 return cmpTwoBits32(qChrom, qStart, rEndChrom, rEndBase) > 0 &&
@@ -535,7 +535,7 @@ else
     /* Recurse into child nodes that we overlap. */
     for (i=0; i<childCount; ++i)
 	{
-	if (cirTreeOverlaps(chromIx, start, end, startChromIx[i], startBase[i], 
+	if (cirTreeOverlaps(chromIx, start, end, startChromIx[i], startBase[i],
 		endChromIx[i], endBase[i]))
 	    {
 	    rFindOverlappingBlocks(crt, level+1, offset[i], chromIx, start, end, retList);
@@ -544,7 +544,7 @@ else
     }
 }
 
-struct fileOffsetSize *cirTreeFindOverlappingBlocks(struct cirTreeFile *crt, 
+struct fileOffsetSize *cirTreeFindOverlappingBlocks(struct cirTreeFile *crt,
 	bits32 chromIx, bits32 start, bits32 end)
 /* Return list of file blocks that between them contain all items that overlap
  * start/end on chromIx.  Also there will be likely some non-overlapping items
@@ -555,4 +555,3 @@ rFindOverlappingBlocks(crt, 0, crt->rootOffset, chromIx, start, end, &blockList)
 slReverse(&blockList);
 return blockList;
 }
-

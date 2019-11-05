@@ -1,4 +1,4 @@
-/* "Web Server" for command line execution. 
+/* "Web Server" for command line execution.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -37,8 +37,8 @@ static double _speed()
 {
 return 1.0;
 }
-    
-    
+
+
 struct webServerSpecific wssCommandLine =
     {
     "commandLine",

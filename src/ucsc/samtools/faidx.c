@@ -398,7 +398,7 @@ int faidx_main(int argc, char *argv[])
 	return 0;
 }
 
-int faidx_fetch_nseq(const faidx_t *fai) 
+int faidx_fetch_nseq(const faidx_t *fai)
 {
 	return fai->n;
 }
@@ -421,7 +421,7 @@ char *faidx_fetch_seq(const faidx_t *fai, char *c_name, int p_beg_i, int p_end_i
     if(p_end_i < 0) p_end_i = 0;
     else if(val.len <= p_end_i) p_end_i = val.len - 1;
 
-    // Now retrieve the sequence 
+    // Now retrieve the sequence
 	l = 0;
 	seq = (char*)malloc(p_end_i - p_beg_i + 2);
 	razf_seek(fai->rz, val.offset + p_beg_i / val.line_blen * val.line_len + p_beg_i % val.line_blen, SEEK_SET);

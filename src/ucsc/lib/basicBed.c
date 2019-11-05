@@ -44,7 +44,7 @@ return ret;
 }
 
 struct bed *bedCommaIn(char **pS, struct bed *ret)
-/* Create a bed out of a comma separated string. 
+/* Create a bed out of a comma separated string.
  * This will fill in ret if non-null, otherwise will
  * return a new bed */
 {
@@ -89,7 +89,7 @@ for (el = *pList; el != NULL; el = next)
 *pList = NULL;
 }
 
-void bedOutput(struct bed *el, FILE *f, char sep, char lastSep) 
+void bedOutput(struct bed *el, FILE *f, char sep, char lastSep)
 /* Print out bed.  Separate fields with sep. Follow last field with lastSep. */
 {
 if (sep == ',') fputc('"',f);
@@ -401,7 +401,7 @@ if (wordCount > 14)
 return bed;
 }
 
-struct bed *bedLoadNAllChrom(char *fileName, int numFields, char* chrom) 
+struct bed *bedLoadNAllChrom(char *fileName, int numFields, char* chrom)
 /* Load bed entries from a tab-separated file that have the given chrom.
  * Dispose of this with bedFreeList(). */
 {
@@ -422,7 +422,7 @@ slReverse(&list);
 return list;
 }
 
-struct bed *bedLoadNAll(char *fileName, int numFields) 
+struct bed *bedLoadNAll(char *fileName, int numFields)
 /* Load all bed from a tab-separated file.
  * Dispose of this with bedFreeList(). */
 {
@@ -449,10 +449,10 @@ slReverse(&list);
 return list;
 }
 
-void bedLoadAllReturnFieldCountAndRgb(char *fileName, struct bed **retList, int *retFieldCount, 
+void bedLoadAllReturnFieldCountAndRgb(char *fileName, struct bed **retList, int *retFieldCount,
     boolean *retRgb)
 /* Load bed of unknown size and return number of fields as well as list of bed items.
- * Ensures that all lines in bed file have same field count.  Also returns whether 
+ * Ensures that all lines in bed file have same field count.  Also returns whether
  * column 9 is being used as RGB or not. */
 {
 struct bed *list = NULL;
@@ -465,7 +465,7 @@ while (lineFileNextReal(lf, &line))
     {
     int numFields = chopByWhite(line, row, ArraySize(row));
     if (numFields < 4)
-	errAbort("file %s doesn't appear to be in bed format. At least 4 fields required, got %d", 
+	errAbort("file %s doesn't appear to be in bed format. At least 4 fields required, got %d",
 		fileName, numFields);
     if (fieldCount == 0)
 	{
@@ -696,7 +696,7 @@ struct bed *bed;
 int i, blockCount, *chromStarts, chromStart;
 
 /* A tiny bit of error checking on the psl. */
-if (psl->qStart >= psl->qEnd || psl->qEnd > psl->qSize 
+if (psl->qStart >= psl->qEnd || psl->qEnd > psl->qSize
     || psl->tStart >= psl->tEnd || psl->tEnd > psl->tSize)
     {
     errAbort("mangled psl format for %s", psl->qName);
@@ -801,17 +801,17 @@ newBed->itemRgb = bed->itemRgb;
 newBed->blockCount = bed->blockCount;
 if (bed->blockCount > 0)
     {
-    newBed->blockSizes = lmCloneMem(lm, bed->blockSizes, 
+    newBed->blockSizes = lmCloneMem(lm, bed->blockSizes,
     	sizeof(bed->blockSizes[0]) * bed->blockCount);
-    newBed->chromStarts = lmCloneMem(lm, bed->chromStarts, 
+    newBed->chromStarts = lmCloneMem(lm, bed->chromStarts,
     	sizeof(bed->chromStarts[0]) * bed->blockCount);
     }
 newBed->expCount = bed->expCount;
 if (bed->expCount > 0)
     {
-    newBed->expIds = lmCloneMem(lm, bed->expIds, 
+    newBed->expIds = lmCloneMem(lm, bed->expIds,
     	sizeof(bed->expIds[0]) * bed->expCount);
-    newBed->expScores = lmCloneMem(lm, bed->expScores, 
+    newBed->expScores = lmCloneMem(lm, bed->expScores,
     	sizeof(bed->expScores[0]) * bed->expCount);
     }
 return(newBed);
@@ -970,7 +970,7 @@ struct hash *readBedToBinKeeper(char *sizeFileName, char *bedFileName, int wordC
  * See also bedsIntoKeeperHash, which takes the beds read into a list already, but
  * dispenses with the need for the sizeFile. */
 {
-struct binKeeper *bk; 
+struct binKeeper *bk;
 struct bed *bed;
 struct lineFile *lf = lineFileOpen(sizeFileName, TRUE);
 struct lineFile *bf = lineFileOpen(bedFileName , TRUE);
@@ -1088,7 +1088,7 @@ if (a->strand[0] != b->strand[0])
     return 0;
 if (!sameString(a->chrom, b->chrom))
     return 0;
-int outerOverlap = rangeIntersection(a->chromStart, a->chromEnd, 
+int outerOverlap = rangeIntersection(a->chromStart, a->chromEnd,
 	b->chromStart, b->chromEnd);
 if (outerOverlap <= 0)
     return 0;
@@ -1131,7 +1131,7 @@ return  (oldSize == newSize && oldSize == overlap);
 
 boolean bedCompatibleExtension(struct bed *oldBed, struct bed *newBed)
 /* Return TRUE if newBed is a compatible extension of oldBed, meaning
- * all internal exons and all introns of old bed are contained, in the 
+ * all internal exons and all introns of old bed are contained, in the
  * same order in the new bed. */
 {
 /* New bed must have at least as many exons as old bed... */
@@ -1290,14 +1290,14 @@ return outList;
 }
 
 char *bedAsDef(int bedFieldCount, int totalFieldCount)
-/* Return an autoSql definition for a bed of given number of fields. 
+/* Return an autoSql definition for a bed of given number of fields.
  * Normally totalFieldCount is equal to bedFieldCount.  If there are extra
  * fields they are just given the names field16, field17, etc and type string. */
 {
 if (bedFieldCount < 3 || bedFieldCount > 15)
     errAbort("bedFieldCount is %d, but must be between %d and %d in bedAsDef", bedFieldCount, 3, 15);
 struct dyString *dy = dyStringNew(0);
-dyStringAppend(dy, 
+dyStringAppend(dy,
     "table bed\n"
     "\"Browser Extensible Data\"\n"
     "   (\n"
@@ -1447,7 +1447,7 @@ if (bedFieldCount > 8)
 	    lineFileAbort(lf, "Expecting color to consist of r,g,b values from 0 to 255. Got [%s]", saveColorString);
 	freeMem(saveColorString);
 	}
-    else 
+    else
 	{
 	lineFileAllInts(lf, row, 8, &bed->itemRgb, FALSE, 4, "integer", FALSE);
 	}
@@ -1605,7 +1605,7 @@ if (as)
 		}
 	    }
 	asCol = asCol->next;
-	}    
+	}
     /* Validate bed-plus fields */
     asCol = slElementFromIx(as->columnList, bedFieldCount);
     for (i=bedFieldCount; i<fieldCount; ++i)
@@ -1709,4 +1709,3 @@ for (bed = bedList; bed != NULL; bed = bed->next)
     sum += bed->chromEnd - bed->chromStart;
 return sum;
 }
-

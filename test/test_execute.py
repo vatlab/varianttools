@@ -49,7 +49,7 @@ class TestExecute(ProcessTestCase):
         self.assertSucc('vtools execute \'delete FROM variant where chr=1\' -v2')
         self.assertSucc('vtools execute \'delete FROM variant where ref="T"\' -v2')
         self.assertSucc('vtools execute \'delete FROM sample where aff=2\' -v2')
-    
+
     def testExeAnno(self):
         self.runCmd('vtools init test -f')
         if os.environ.get("LOCALRESOURCE") is not None:

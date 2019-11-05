@@ -735,7 +735,7 @@ switch (sigNum)
     if (dumpStackOnSignal)
         dumpStack("Stack for signal %s\n", sig);
 
-if (sigNum == SIGTERM || sigNum == SIGHUP) 
+if (sigNum == SIGTERM || sigNum == SIGHUP)
     exit(1);   // so that atexit cleanup get called
 
 raise(SIGKILL);
@@ -2225,4 +2225,3 @@ if (tags != NULL)
     freez(pTags);
     }
 }
-

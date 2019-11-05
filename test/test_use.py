@@ -116,7 +116,7 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools update variant --set count1=knownGene.exonCount')
         def_out = self.runCmd('vtools execute "select pos, ref, alt, count1 from variant where count1 is not null"', ret='list')
         self.assertEqual(range_out, def_out)
-        
+
 
     def testUseRange_2(self):
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
@@ -136,13 +136,13 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
         range_out3=len(self.runCmd('vtools execute "select pos, ref, alt, gene_name from variant where gene_name = \'VAMP3\'"', ret='list'))
         self.assertNotEqual(range_out2, range_out3)
-       
+
 
     def testUseField_1(self):
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields region')
         #under the option of field in --anno_type, the variable for linked_fields have be in the annotation database that you want to use
-        #and --linked_by field in the variant or annotation(already imported) table. 
+        #and --linked_by field in the variant or annotation(already imported) table.
         #without --linked_by or use the fields that are not in annotation, you will get an error.
         self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields pos')
         self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields pos --linked_by genes')
@@ -155,7 +155,7 @@ class TestUse(ProcessTestCase):
         #nothing was outputed
         self.assertFail('vtools use gwasCatalog --anno_type field --linked_fields chr position --linked_by chr')
         self.assertSucc('vtools use gwasCatalog --anno_type field --linked_fields chr position --linked_by chr pos')
-    
+
     def testUseField_2(self):
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         #import the first annotation database
@@ -165,7 +165,7 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
         self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
         self.assertSucc('vtools select variant "gwasCatalog.genes == \'VAMP3\'" -o variant.chr variant.pos variant.ref variant.alt gwasCatalog.trait gwasCatalog.name gwasCatalog.position gwasCatalog.pValue gwasCatalog.journal gwasCatalog.title gwasCatalog.genes')
-        #For comparison, if we choise "name" in the linked_fields,nothing will be outputed.  
+        #For comparison, if we choise "name" in the linked_fields,nothing will be outputed.
         self.runCmd('vtools init test -f')
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
         self.runCmd('vtools use cytoBand')
@@ -174,8 +174,8 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
         self.assertSucc('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"')
         self.assertOutput('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', 'output/use_field.txt')
-        
-        
+
+
     # def testUseVariant(self):
     #     self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
     #     #this is the default method. the linked_fields have to be in the order in the test below.
@@ -208,8 +208,8 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools update variant --set gene_name=1')
         self.assertSucc('vtools update variant --set gene_name=gwasCatalog.genes')
         self.assertOutput('vtools execute "select pos, ref, alt, gene_name from variant where gene_name is not null"', 'output/use_position.txt')
-    
-    
+
+
     def testUseAs(self):
         '''Testing the --as option of command vtools use'''
         self.runCmd('vtools import vcf/SAMP4_complex_variants.vcf --build hg19')
@@ -222,6 +222,6 @@ class TestUse(ProcessTestCase):
         self.assertSucc('vtools output variant chr pos e.chr e1.chr')
         self.assertSucc('vtools select variant "e.chr is not Null" "e1.chr is not Null" --output chr pos e.chr e1.chr')
 
-        
+
 if __name__ == '__main__':
     unittest.main()

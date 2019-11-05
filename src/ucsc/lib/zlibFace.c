@@ -45,7 +45,7 @@ size_t zCompress(
 uLongf compSize = compBufSize;
 int err = compress((Bytef*)compBuf, &compSize, (Bytef*)uncompressed, (uLong)uncompressedSize);
 if (err != 0)
-    errAbort("Couldn't zCompress %lld bytes: %s", 
+    errAbort("Couldn't zCompress %lld bytes: %s",
     	(long long)uncompressedSize, zlibErrorMessage(err));
 return compSize;
 }
@@ -66,7 +66,7 @@ size_t zUncompress(
 uLongf uncSize = uncompBufSize;
 int err = uncompress(uncompBuf,  &uncSize, compressed, compressedSize);
 if (err != 0)
-    errAbort("Couldn't zUncompress %lld bytes: %s", 
+    errAbort("Couldn't zUncompress %lld bytes: %s",
     	(long long)compressedSize, zlibErrorMessage(err));
 return uncSize;
 }

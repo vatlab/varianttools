@@ -2313,7 +2313,7 @@ class Project:
 
 
     def createIndexOnSampleTable(self):
-        try:   
+        try:
             if not self.db.hasIndex('idx_sample_name'):
                 self.db.execute(
                     '''CREATE UNIQUE INDEX idx_sample_name ON sample (sample_name);''')

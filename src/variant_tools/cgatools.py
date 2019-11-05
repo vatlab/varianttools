@@ -322,5 +322,3 @@ left_trim = _cgatools.left_trim
 def normalize_variant(crr: 'CrrFile', rec: 'PyObject *', chr_idx: 'size_t', pos_idx: 'size_t', ref_idx: 'size_t', alt_idx: 'size_t') -> "std::string":
     return _cgatools.normalize_variant(crr, rec, chr_idx, pos_idx, ref_idx, alt_idx)
 normalize_variant = _cgatools.normalize_variant
-
-

@@ -375,7 +375,7 @@ class Sample:
                 fldtype = self.db.typeOfColumn('sample', field)
                 count[2] += 1  # updated
             null_count = defaultdict(int)
-         
+
             id_records={}
             for key,rec in records.items():
                 # by sample_name only
@@ -396,7 +396,7 @@ class Sample:
                     continue
                 for id in ids:
                     id_records[id]=rec
- 
+
            #
             #CHANGE: for deal with large sample list
             # for id in [x for x in ids if x in allowed_samples]:

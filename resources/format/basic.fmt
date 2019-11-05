@@ -5,7 +5,7 @@
 # a description of the format of this file.
 
 [format description]
-description=A basic variant import/export format that import variants 
+description=A basic variant import/export format that import variants
     with four tab-delimited columns (chr, pos, ref, alt), and export
 	variants, optional variant info fields and genotypes.
 variant=chr,pos,ref,alt
@@ -90,5 +90,3 @@ comment=Output variant info fields as one column
 [col_6]
 field=GT
 comment=genotype in numeric style
-
-

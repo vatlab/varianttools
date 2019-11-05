@@ -64,5 +64,3 @@ index=1,%(pos_idx)s
 type=VARCHAR(255)
 adj=FieldFromDB("%(db_file)s", "%(alt_field)s", "%(chr_field)s,%(pos_field)s")
 comment=Alternative allele obtained from another database
-
-

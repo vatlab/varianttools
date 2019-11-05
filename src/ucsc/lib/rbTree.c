@@ -1,4 +1,4 @@
-/* rbTree - rbTreeRed-rbTreeBlack Tree - a type of binary tree which 
+/* rbTree - rbTreeRed-rbTreeBlack Tree - a type of binary tree which
  * automatically keeps relatively balanced during
  * inserts and deletions.
  *   original author: Shane Saunders
@@ -11,7 +11,7 @@
 
 
 
-static struct rbTreeNode *restructure(struct rbTree *t, int tos, 
+static struct rbTreeNode *restructure(struct rbTree *t, int tos,
 	struct rbTreeNode *x, struct rbTreeNode *y, struct rbTreeNode *z)
 /* General restructuring function - checks for all
  * restructuring cases.  Call when insert has messed up tree.
@@ -19,16 +19,16 @@ static struct rbTreeNode *restructure(struct rbTree *t, int tos,
 {
 struct rbTreeNode *parent, *midNode;
 
-if(y == x->left) 
+if(y == x->left)
     {
-    if(z == y->left) 
+    if(z == y->left)
         {  /* in-order:  z, y, x */
 	midNode = y;
 	y->left = z;
 	x->left = y->right;
 	y->right = x;
 	}
-    else 
+    else
         {  /* in-order:  y, z, x */
 	midNode = z;
 	y->right = z->left;
@@ -37,9 +37,9 @@ if(y == x->left)
 	z->right = x;
 	}
     }
-else 
+else
     {
-    if(z == y->left) 
+    if(z == y->left)
 	{  /* in-order:  x, z, y */
 	midNode = z;
 	x->right = z->left;
@@ -47,7 +47,7 @@ else
 	y->left = z->right;
 	z->right = y;
 	}
-    else 
+    else
 	{  /* in-order:  x, y, z */
 	midNode = y;
 	x->right = y->left;
@@ -55,24 +55,24 @@ else
 	y->right = z;
 	}
     }
-if(tos != 0) 
+if(tos != 0)
     {
     parent = t->stack[tos-1];
-    if(x == parent->left) 
+    if(x == parent->left)
 	parent->left = midNode;
-    else 
+    else
 	parent->right = midNode;
     }
-else 
+else
     t->root = midNode;
 
 return midNode;
 }
 
-struct rbTree *rbTreeNewDetailed(int (*compare)(void *, void *), struct lm *lm, 
+struct rbTree *rbTreeNewDetailed(int (*compare)(void *, void *), struct lm *lm,
 	struct rbTreeNode *stack[128])
 /* Allocate rbTree on an existing local memory & stack.  This is for cases
- * where you want a lot of trees, and don't want the overhead for each one. 
+ * where you want a lot of trees, and don't want the overhead for each one.
  * Note, to clean these up, just do freez(&rbTree) rather than rbFreeTree(&rbTree). */
 {
 struct rbTree *t;
@@ -80,7 +80,7 @@ AllocVar(t);
 t->root = NULL;
 t->compare = compare;
 t->lm = lm;
-t->stack = stack;	
+t->stack = stack;
 t->n = 0;
 return t;
 }
@@ -100,7 +100,7 @@ struct rbTree *rbTreeNew(int (*compare)(void *, void *))
  * 128 is good for up to 2^64 items in stack, which
  * should keep us for the next couple of decades... */
 struct lm *lm = lmInit(0);
-struct rbTreeNode **stack = lmAlloc(lm, 128 * sizeof(stack[0]));	
+struct rbTreeNode **stack = lmAlloc(lm, 128 * sizeof(stack[0]));
 return rbTreeNewDetailed(compare, lm, stack);
 }
 
@@ -142,8 +142,8 @@ rbTreeColor col;
 struct rbTreeNode **stack = NULL;
 int tos;
 
-tos = 0;    
-if((p = t->root) != NULL) 
+tos = 0;
+if((p = t->root) != NULL)
     {
     compare = t->compare;
     stack = t->stack;
@@ -151,38 +151,38 @@ if((p = t->root) != NULL)
     /* Repeatedly explore either the left branch or the right branch
      * depending on the value of the key, until an empty branch is chosen.
      */
-    for(;;) 
+    for(;;)
         {
 	stack[tos++] = p;
 	cmpResult = compare(item, p->item);
-	if(cmpResult < 0) 
+	if(cmpResult < 0)
 	    {
 	    p = p->left;
-	    if(!p) 
+	    if(!p)
 	        {
 		p = stack[--tos];
 		attachX = &p->left;
 		break;
 		}
 	    }
-	else if(cmpResult > 0) 
+	else if(cmpResult > 0)
 	    {
 	    p = p->right;
-	    if(!p) 
+	    if(!p)
 	        {
 		p = stack[--tos];
 		attachX = &p->right;
 		break;
 		}
 	    }
-	else 
+	else
 	    {
 	    return p->item;
 	    }
 	}
     col = rbTreeRed;
     }
-else 
+else
     {
     attachX = &t->root;
     col = rbTreeBlack;
@@ -202,20 +202,20 @@ t->n++;
 /* Restructuring or recolouring will be needed if node x and its parent, p,
  * are both red.
  */
-if(tos > 0) 
+if(tos > 0)
     {
-    while(p->color == rbTreeRed) 
+    while(p->color == rbTreeRed)
 	{  /* Double red problem. */
 
 	/* Obtain a pointer to p's parent, m, and sibling, q. */
 	m = stack[--tos];
 	q = p == m->left ? m->right : m->left;
-	
+
 	/* Determine whether restructuring or recolouring is needed. */
-	if(!q || q->color == rbTreeBlack) 
+	if(!q || q->color == rbTreeBlack)
 	    {
 	    /* Sibling is black.  ==>  Perform restructuring. */
-	    
+
 	    /* Restructure according to the left to right order, of nodes
 	     * m, p, and x.
 	     */
@@ -227,13 +227,13 @@ if(tos > 0)
 	    break;
 	    }
 	/* else just need to flip color */
-	
+
 	/* Sibling is also red.  ==>  Perform recolouring. */
 	p->color = rbTreeBlack;
 	q->color = rbTreeBlack;
 
 	if(tos == 0) break;  /* The root node always remains black. */
-	    
+
 	m->color = rbTreeRed;
 
 	/* Continue, checking colouring higher up. */
@@ -255,17 +255,17 @@ void *rbTreeFind(struct rbTree *t, void *item)
 struct rbTreeNode *p, *nextP;
 int (*compare)(void *, void *) = t->compare;
 int cmpResult;
-    
+
 /* Repeatedly explore either the left or right branch, depending on the
  * value of the key, until the correct item is found.  */
 for (p = t->root; p != NULL; p = nextP)
     {
     cmpResult = compare(item, p->item);
-    if(cmpResult < 0) 
+    if(cmpResult < 0)
 	nextP = p->left;
-    else if(cmpResult > 0) 
+    else if(cmpResult > 0)
 	nextP = p->right;
-    else 
+    else
 	return p->item;
     }
 return NULL;
@@ -289,50 +289,50 @@ int i, tos;
 
 
 /* Attempt to locate the item to be deleted. */
-if((p = t->root)) 
+if((p = t->root))
     {
     compare = t->compare;
     stack = t->stack;
     tos = 0;
-    
-    for(;;) 
+
+    for(;;)
 	{
 	stack[tos++] = p;
 	cmpResult = compare(item, p->item);
-	if(cmpResult < 0) 
+	if(cmpResult < 0)
 	    p = p->left;
-	else if(cmpResult > 0) 
+	else if(cmpResult > 0)
 	    p = p->right;
-	else 
+	else
 	    /* Item found. */
 	    break;
 	if(!p) return NULL;
 	}
     }
-else 
+else
     return NULL;
 
 /* p points to the node to be deleted, and is currently on the top of the
  * stack.
  */
-if(!p->left) 
+if(!p->left)
     {
     tos--;  /* Adjust tos to remove p. */
     /* Right child replaces p. */
-    if(tos == 0) 
+    if(tos == 0)
 	{
 	r = t->root = p->right;
 	x = y = NULL;
 	}
-    else 
+    else
 	{
 	x = stack[--tos];
-	if(p == x->left) 
+	if(p == x->left)
 	    {
 	    r = x->left = p->right;
 	    y = x->right;
 	    }
-	else 
+	else
 	    {
 	    r = x->right = p->right;
 	    y = x->left;
@@ -340,24 +340,24 @@ if(!p->left)
 	}
     removeCol = p->color;
     }
-else if(!p->right) 
+else if(!p->right)
     {
     tos--;  /* Adjust tos to remove p. */
     /* Left child replaces p. */
-    if(tos == 0) 
+    if(tos == 0)
 	{
 	r = t->root = p->left;
 	x = y = NULL;
 	}
-    else 
+    else
 	{
 	x = stack[--tos];
-	if(p == x->left) 
+	if(p == x->left)
 	    {
 	    r = x->left = p->left;
 	    y = x->right;
 	    }
-	else 
+	else
 	    {
 	    r = x->right = p->left;
 	    y = x->left;
@@ -365,14 +365,14 @@ else if(!p->right)
 	}
     removeCol = p->color;
     }
-else 
+else
     {
     /* Save p's stack position. */
     i = tos-1;
-    
+
     /* Minimum child, m, in the right subtree replaces p. */
     m = p->right;
-    do 
+    do
 	{
 	stack[tos++] = m;
 	m = m->left;
@@ -380,36 +380,36 @@ else
     m = stack[--tos];
 
     /* Update either the left or right child pointers of p's parent. */
-    if(i == 0) 
+    if(i == 0)
 	{
 	t->root = m;
 	}
-    else 
+    else
 	{
 	x = stack[i-1];  /* p's parent. */
-	if(p == x->left) 
+	if(p == x->left)
 	    {
 	    x->left = m;
 	    }
-	else 
+	else
 	    {
 	    x->right = m;
 	    }
 	}
-    
+
     /* Update the tree part m is removed from, and assign m the child
      * pointers of p (only if m is not the right child of p).
      */
     stack[i] = m;  /* Node m replaces node p on the stack. */
     x = stack[--tos];
     r = m->right;
-    if(tos != i) 
+    if(tos != i)
 	{  /* x is equal to the parent of m. */
 	y = x->right;
 	x->left = r;
 	m->right = p->right;
 	}
-    else 
+    else
 	{ /* m was the right child of p, and x is equal to m. */
 	y = p->left;
 	}
@@ -440,11 +440,11 @@ t->n--;
  * pointers) must remain the same for all paths.  Restructuring or
  * recolouring of nodes may be necessary to enforce this.
  */
-if(removeCol == rbTreeBlack) 
+if(removeCol == rbTreeBlack)
     {
     /* Removal of a black node requires some adjustment. */
-    
-    if(!r || r->color == rbTreeBlack) 
+
+    if(!r || r->color == rbTreeBlack)
 	{
 	/* A black node replaced the deleted black node.  Note that
 	 * external nodes (NULL child pointers) are always black, so
@@ -461,7 +461,7 @@ if(removeCol == rbTreeBlack)
 	 * nearby nodes is needed in order to eliminate the double-black
 	 * problem.  NOTE:  x points to the parent of r.
 	 */
-	if(x) for(;;) 
+	if(x) for(;;)
 	    {
 
 	    /* There are three adjustment cases:
@@ -469,30 +469,30 @@ if(removeCol == rbTreeBlack)
 	     *  2.  r's sibling, y, is black and has two black children.
 	     *  3.  r's sibling, y, is red.
 	     */
-	    if(y->color == rbTreeBlack) 
+	    if(y->color == rbTreeBlack)
 		{
 
 		/* Note the conditional evaluation for assigning z. */
 		if(((z = y->left) && z->color == rbTreeRed) ||
-		   ((z = y->right) && z->color == rbTreeRed)) 
-		       {		    
+		   ((z = y->right) && z->color == rbTreeRed))
+		       {
 		    /* Case 1:  perform a restructuring of nodes x, y, and
 		     * z.
 		     */
-		    
+
 		    b = restructure(t, tos, x, y, z);
 		    b->color = x->color;
 		    b->left->color = b->right->color = rbTreeBlack;
-		    
+
 		    break;
 		    }
-		else 
+		else
 		    {
 		    /* Case 2:  recolour node y red. */
-		    
+
 		    y->color = rbTreeRed;
-		    
-		    if(x->color == rbTreeRed) 
+
+		    if(x->color == rbTreeRed)
 			{
 			x->color = rbTreeBlack;
 			break;
@@ -501,29 +501,29 @@ if(removeCol == rbTreeBlack)
 
 		    if(tos == 0) break;  /* Root level reached. */
 		    /* else */
-		    
+
 		    r = x;
 		    x = stack[--tos];  /* x <- parent of x. */
 		    y = x->left == r ? x->right : x->left;
 		    }
 		}
-	    else 
+	    else
 		{
 		/* Case 3:  Restructure nodes x, y, and z, where:
 		 *  - If node y is the left child of x, then z is the left
 		 *    child of y.  Otherwise z is the right child of y.
 		 */
-		if(x->left == y) 
+		if(x->left == y)
 		    {
 		    newY = y->right;
 		    z = y->left;
 		    }
-		else 
+		else
 		    {
 		    newY = y->left;
 		    z = y->right;
 		    }
-		
+
 		restructure(t, tos, x, y, z);
 		y->color = rbTreeBlack;
 		x->color = rbTreeRed;
@@ -540,25 +540,25 @@ if(removeCol == rbTreeBlack)
 		 * the double-black problem does not reappear.
 		 */
 		y = newY;
-		
+
 		/* Note the conditional evaluation for assigning z. */
 		if(((z = y->left) && z->color == rbTreeRed) ||
-		   ((z = y->right) && z->color == rbTreeRed)) 
-		   {		    
+		   ((z = y->right) && z->color == rbTreeRed))
+		   {
 		    /* Case 1:  perform a restructuring of nodes x, y, and
 		     * z.
 		     */
-		    
+
 		    b = restructure(t, tos, x, y, z);
 		    b->color = rbTreeRed;  /* Since node x was red. */
 		    b->left->color = b->right->color = rbTreeBlack;
 		    }
-		else 
+		else
 		    {
 		    /* Case 2:  recolour node y red. */
 
 		    /* Note that node y is black and node x is red. */
-		    
+
 		    y->color = rbTreeRed;
 		    x->color = rbTreeBlack;
 		    }
@@ -567,7 +567,7 @@ if(removeCol == rbTreeBlack)
 		}
 	    }
 	}
-    else 
+    else
 	{
 	/* A red node replaced the deleted black node. */
 
@@ -597,7 +597,7 @@ rTreeDump(n->right);
 --dumpLevel;
 }
 
-void rbTreeDump(struct rbTree *tree, FILE *f, 
+void rbTreeDump(struct rbTree *tree, FILE *f,
 	void (*dumpItem)(void *item, FILE *f))
 /* Dump out rb tree to file, mostly for debugging. */
 {
@@ -681,7 +681,7 @@ if (n != NULL)
     }
 }
 
-void rbTreeTraverseWithContext(struct rbTree *tree, 
+void rbTreeTraverseWithContext(struct rbTree *tree,
 	void (*doItem)(void *item, void *context), void *context)
 /* Traverse tree calling doItem on every item with context pointer passed through to doItem.
  * This often avoids having to declare global or static variables for the doItem callback to use. */
@@ -733,7 +733,7 @@ int rbTreeCmpString(void *a, void *b)
 return strcmp(a, b);
 }
 
-int rbTreeCmpWord(void *a, void *b)	
+int rbTreeCmpWord(void *a, void *b)
 /* Set up rbTree so as to work on case-insensitive strings. */
 {
 return differentWord(a,b);

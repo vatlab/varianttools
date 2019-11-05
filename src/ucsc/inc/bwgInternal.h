@@ -6,7 +6,7 @@
 #ifndef BIGWIGFILE_H
 #define BIGWIGFILE_H
 
-enum bwgSectionType 
+enum bwgSectionType
 /* Code to indicate section type. */
     {
     bwgTypeBedGraph=1,
@@ -106,11 +106,11 @@ struct bwgSection *bwgParseWig(
 int bwgAverageResolution(struct bwgSection *sectionList);
 /* Return the average resolution seen in sectionList. */
 
-struct bbiSummary *bwgReduceSectionList(struct bwgSection *sectionList, 
+struct bbiSummary *bwgReduceSectionList(struct bwgSection *sectionList,
 	struct bbiChromInfo *chromInfoArray, int reduction);
 /* Return summary of section list reduced by given amount. */
 
-void bwgCreate(struct bwgSection *sectionList, struct hash *chromSizeHash, 
+void bwgCreate(struct bwgSection *sectionList, struct hash *chromSizeHash,
 	int blockSize, int itemsPerSlot, boolean doCompress, char *fileName);
 /* Create a bigWig file out of a sorted sectionList.  A lower level routine
  * than the one above. */

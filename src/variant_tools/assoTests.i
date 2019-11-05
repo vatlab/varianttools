@@ -50,7 +50,7 @@ int gsl_initialize()
     gsl_set_error_handler(&my_error_handler);
     return 1;
 }
-%} 
+%}
 
 %init
 %{
@@ -98,11 +98,11 @@ int gsl_initialize()
 namespace std
 {
     %template(vectors)    vector<string>;
-    %template(vectorf)    vector<double>; 
-    %template(vectori)    vector<int>; 
+    %template(vectorf)    vector<double>;
+    %template(vectori)    vector<int>;
     %template(matrixi)    vector<vector<int> >;
     %template(matrixf)    vector<vector<double> >;
-    %template(vectora)    vector<vtools::BaseAction * >; 
+    %template(vectora)    vector<vtools::BaseAction * >;
 }
 
 %ignore vtools::PyAction::PyAction(const PyAction & rhs);
@@ -122,11 +122,11 @@ namespace std
 %include "assoTests.h"
 
 // gsl functions
-extern double gsl_cdf_gaussian_P(double x, double sigma); 
-extern double gsl_cdf_gaussian_Q(double x, double sigma); 
-extern double gsl_cdf_gaussian_Pinv(double P, double sigma); 
-extern double gsl_cdf_gaussian_Qinv(double Q, double sigma); 
-extern double gsl_cdf_ugaussian_P(double x); 
-extern double gsl_cdf_ugaussian_Q(double x); 
-extern double gsl_cdf_ugaussian_Pinv(double P); 
-extern double gsl_cdf_ugaussian_Qinv(double Q); 
+extern double gsl_cdf_gaussian_P(double x, double sigma);
+extern double gsl_cdf_gaussian_Q(double x, double sigma);
+extern double gsl_cdf_gaussian_Pinv(double P, double sigma);
+extern double gsl_cdf_gaussian_Qinv(double Q, double sigma);
+extern double gsl_cdf_ugaussian_P(double x);
+extern double gsl_cdf_ugaussian_Q(double x);
+extern double gsl_cdf_ugaussian_Pinv(double P);
+extern double gsl_cdf_ugaussian_Qinv(double Q);

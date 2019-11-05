@@ -140,5 +140,3 @@ showTrack = _ucsctools.showTrack
 def tabixFetch(*args, **kwargs) -> "bool":
     return _ucsctools.tabixFetch(*args, **kwargs)
 tabixFetch = _ucsctools.tabixFetch
-
-

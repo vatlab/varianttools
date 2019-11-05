@@ -13,7 +13,7 @@ pos=pos
 pos_comment=Field for position. To export indel, set it to 'pos-length(upstream)'
 
 ref=ref
-ref_comment=Field for reference allele. 
+ref_comment=Field for reference allele.
 
 alt=alt
 alt_comment=Field for alternative allele.

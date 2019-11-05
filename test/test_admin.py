@@ -35,14 +35,14 @@ class TestAdmin(ProcessTestCase):
 
     def testMergeSamples(self):
         # Test command vtools admin --merge_samples'
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         # this should actually be hg19, but we use it anyway for testing.
         self.runCmd('vtools import vcf/SAMP1.vcf  --build hg18')
         self.assertProj(numOfVariants=577, numOfSamples= 61)
         self.runCmd('vtools admin --rename_samples \'filename like "%SAMP1%"\' NA06985')
         self.assertProj(numOfSamples= 61)
         if self.storeMode=="sqlite":
-            self.runCmd('vtools admin --merge_samples')         
+            self.runCmd('vtools admin --merge_samples')
             self.assertProj(numOfVariants=577, numOfSamples= 60)
 
     @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
@@ -51,13 +51,13 @@ class TestAdmin(ProcessTestCase):
         self.assertSucc('vtools import vcf/SAMP2.vcf --build hg19')
         self.assertSucc('vtools import vcf/SAMP1.vcf')
         self.assertSucc('vtools admin --rename_samples \'filename like "%2%"\' SAMP1')
-        #the reason is that the two samepls have some identical variants. 
+        #the reason is that the two samepls have some identical variants.
         # If you want to merge them, the samples should have different unique variant information.
         self.assertFail('vtools admin --merge_samples')
 
     def testRenameSamples(self):
         'Test command vtools admin --rename_samples'
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.assertFail('vtools admin --rename_samples 1')
         # all samples are assigned name NA
         self.assertSucc('''vtools admin --rename_samples "sample_name like 'NA1'" NA ''')
@@ -96,6 +96,6 @@ class TestAdmin(ProcessTestCase):
         self.assertTrue(os.path.isfile('a.tar.gz'))
         self.assertSucc('vtools admin --load_snapshot a.tar.gz')
         os.remove('a.tar.gz')
-        
+
 if __name__ == '__main__':
     unittest.main()

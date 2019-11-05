@@ -38,7 +38,7 @@ class TestShow(ProcessTestCase):
         self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools use ann/testNSFP.ann')
-        
+
     def testShow(self):
         'Test command vtools show'
         self.assertSucc('vtools show -h')

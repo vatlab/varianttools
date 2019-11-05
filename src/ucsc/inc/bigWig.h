@@ -1,5 +1,5 @@
 /* bigWig - interface to binary file with wiggle-style values (that is a bunch of
- * small non-overlapping regions each associated with a floating point value. 
+ * small non-overlapping regions each associated with a floating point value.
  *
  * There are several ways to use this module.   To create a new bigWig file use the
  * bigWigCreate function, which takes as input an ascii file in fixedStep, variableStep
@@ -35,7 +35,7 @@ void bigWigFileCreate(
 	boolean clipDontDie,	/* If TRUE then clip items off end of chrom rather than dying. */
 	boolean compress,	/* If TRUE then compress data. */
 	char *outName);
-/* Convert ascii format wig file (in fixedStep, variableStep or bedGraph format) 
+/* Convert ascii format wig file (in fixedStep, variableStep or bedGraph format)
  * to binary big wig format. */
 
 struct bbiFile *bigWigFileOpen(char *fileName);
@@ -49,7 +49,7 @@ struct bbiInterval *bigWigIntervalQuery(struct bbiFile *bwf, char *chrom, bits32
 
 int bigWigIntervalDump(struct bbiFile *bwf, char *chrom, bits32 start, bits32 end, int maxCount,
 	FILE *out);
-/* Print out info on bigWig parts that intersect chrom:start-end.   Set maxCount to 0 if you 
+/* Print out info on bigWig parts that intersect chrom:start-end.   Set maxCount to 0 if you
  * don't care how many are printed.  Returns number printed. */
 
 boolean bigWigSummaryArray(struct bbiFile *bwf, char *chrom, bits32 start, bits32 end,
@@ -82,7 +82,7 @@ boolean bigWigFileCheckSigs(char *fileName);
  *          {
  *          if (bigWigValsOnChromFetchData(chromVals, chrom->name, bigWig))
  *              // do stuff using the valBuf, or covBuf fields which have
- *              // the big wig data unpacked into them. Can use chromSize and chrom too 
+ *              // the big wig data unpacked into them. Can use chromSize and chrom too
  *          }
  *       bigWigValsOnChromFree(&chromVals);  */
 
@@ -104,9 +104,8 @@ struct bigWigValsOnChrom *bigWigValsOnChromNew();
 void bigWigValsOnChromFree(struct bigWigValsOnChrom **pChromVals);
 /* Free up bigWigValsOnChrom */
 
-boolean bigWigValsOnChromFetchData(struct bigWigValsOnChrom *chromVals, char *chrom, 
+boolean bigWigValsOnChromFetchData(struct bigWigValsOnChrom *chromVals, char *chrom,
 	struct bbiFile *bigWig);
 /* Fetch data for chromosome from bigWig. Returns FALSE if not data on that chrom. */
 
 #endif /* BIGWIG_H */
-

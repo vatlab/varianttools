@@ -1,4 +1,4 @@
-/* bits - handle operations on arrays of bits. 
+/* bits - handle operations on arrays of bits.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -415,4 +415,3 @@ for ( ;ix < len && bitString[ix] != '\0'; ix++)
     }
 return bits;
 }
-

@@ -1,4 +1,4 @@
-/* bptFile - B+ Trees.  These are a method of indexing data similar to binary trees, but 
+/* bptFile - B+ Trees.  These are a method of indexing data similar to binary trees, but
  * with many children rather than just two at each node. They work well when stored on disk,
  * since typically only two or three disk accesses are needed to locate any particular
  * piece of data.  This implementation is *just* for disk based storage.  For memory
@@ -18,7 +18,7 @@
  * dynamic updates - it just creates a b+ tree from a sorted list.
  *
  * Each node can be one of two types - index or leaf.  The index nodes contain pointers
- * to child nodes.  The leaf nodes contain the actual data. 
+ * to child nodes.  The leaf nodes contain the actual data.
  *
  * The layout of the file header is:
  *       <magic number>  4 bytes - The value bptSig (0x78CA8C91)
@@ -29,7 +29,7 @@
  *       <reserved2>     4 bytes - Always 0 for now
  *       <reserved3>     4 bytes - Always 0 for now
  * The magic number may be byte-swapped, in which case all numbers in the file
- * need to be byte-swapped. 
+ * need to be byte-swapped.
  *
  * The nodes start with a header:
  *       <is leaf>       1 byte  - 1 for leaf nodes, 0 for index nodes.
@@ -75,7 +75,7 @@ void bptFileDetach(struct bptFile **pBpt);
 /* Detach and free up bptFile opened with bptFileAttach. */
 
 boolean bptFileFind(struct bptFile *bpt, void *key, int keySize, void *val, int valSize);
-/* Find value associated with key.  Return TRUE if it's found. 
+/* Find value associated with key.  Return TRUE if it's found.
  *  Parameters:
  *     bpt - file handle returned by bptFileOpen
  *     key - pointer to key string
@@ -85,7 +85,7 @@ boolean bptFileFind(struct bptFile *bpt, void *key, int keySize, void *val, int 
  */
 
 struct slRef *bptFileFindMultiple(struct bptFile *bpt, void *key, int keySize, int valSize);
-/* Find all values associated with key.  Store this in ->val item of returned list. 
+/* Find all values associated with key.  Store this in ->val item of returned list.
  * Do a slRefFreeListAndVals() on list when done. */
 
 void bptFileTraverse(struct bptFile *bpt, void *context,
@@ -94,8 +94,8 @@ void bptFileTraverse(struct bptFile *bpt, void *context,
  * leaf item. */
 
 void bptKeyAtPos(struct bptFile *bpt, bits64 itemPos, void *result);
-/* Fill in result with the key at given itemPos.  For first piece of data itemPos is 0 
- * and for last piece is bpt->itemCount - 1.  Result must be at least bpt->keySize.  
+/* Fill in result with the key at given itemPos.  For first piece of data itemPos is 0
+ * and for last piece is bpt->itemCount - 1.  Result must be at least bpt->keySize.
  * If result is a string it won't be zero terminated
  * by this routine.  Use bptStringKeyAtPos instead. */
 
@@ -108,7 +108,7 @@ void bptFileCreate(
 	int itemSize, 		/* Size of each element in array. */
 	bits64 itemCount, 	/* Number of elements in array. */
 	bits32 blockSize,	/* B+ tree block size - # of children for each node. */
-	void (*fetchKey)(const void *va, char *keyBuf),  /* Given item, copy key to keyBuf */ 
+	void (*fetchKey)(const void *va, char *keyBuf),  /* Given item, copy key to keyBuf */
 	bits32 keySize,					 /* Size of key */
 	void* (*fetchVal)(const void *va), 		 /* Given item, return pointer to value */
 	bits32 valSize, 				 /* Size of value */

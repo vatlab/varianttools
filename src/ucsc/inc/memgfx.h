@@ -165,7 +165,7 @@ void _mgPutDotMultiply(struct memGfx *mg, int x, int y,Color color);
 
 INLINE void mgPutDot(struct memGfx *mg, int x, int y,Color color)
 {
-if ((x)>=(mg)->clipMinX && (x) < (mg)->clipMaxX && (y)>=(mg)->clipMinY  && (y) < (mg)->clipMaxY) 
+if ((x)>=(mg)->clipMinX && (x) < (mg)->clipMaxX && (y)>=(mg)->clipMinY  && (y) < (mg)->clipMaxY)
     {
         switch(mg->writeMode)
         {
@@ -220,22 +220,22 @@ boolean mgSaveToPng(FILE *png_file, struct memGfx *mg, boolean useTransparency);
  * are made transparent. */
 
 typedef void (*TextBlit)(int bitWidth, int bitHeight, int bitX, int bitY,
-	unsigned char *bitData, int bitDataRowBytes, 
-	struct memGfx *dest, int destX, int destY, 
+	unsigned char *bitData, int bitDataRowBytes,
+	struct memGfx *dest, int destX, int destY,
 	Color color, Color backgroundColor);
 /* This defines the type of a function that takes a rectangular
  * area of a bitplane and expands it into a rectangular area
  * of a full color screen. */
 
 void mgTextBlit(int bitWidth, int bitHeight, int bitX, int bitY,
-	unsigned char *bitData, int bitDataRowBytes, 
-	struct memGfx *dest, int destX, int destY, 
+	unsigned char *bitData, int bitDataRowBytes,
+	struct memGfx *dest, int destX, int destY,
 	Color color, Color backgroundColor);
 /* This function leaves the background as it was. */
 
 void mgTextBlitSolid(int bitWidth, int bitHeight, int bitX, int bitY,
-	unsigned char *bitData, int bitDataRowBytes, 
-	struct memGfx *dest, int destX, int destY, 
+	unsigned char *bitData, int bitDataRowBytes,
+	struct memGfx *dest, int destX, int destY,
 	Color color, Color backgroundColor);
 /* This function sets the background to the background color. */
 
@@ -293,15 +293,15 @@ MgFont *mgTimes34Font();
 /* free Meslo font */
 MgFont *mgMenloMediumFont();
 
-void mgText(struct memGfx *mg, int x, int y, Color color, 
+void mgText(struct memGfx *mg, int x, int y, Color color,
 	MgFont *font, char *text);
 /* Draw a line of text with upper left corner x,y. */
 
-void mgTextCentered(struct memGfx *mg, int x, int y, int width, int height, 
+void mgTextCentered(struct memGfx *mg, int x, int y, int width, int height,
 	Color color, MgFont *font, char *text);
 /* Draw a line of text centered in box defined by x/y/width/height */
 
-void mgTextRight(struct memGfx *mg, int x, int y, int width, int height, 
+void mgTextRight(struct memGfx *mg, int x, int y, int width, int height,
 	Color color, MgFont *font, char *text);
 /* Draw a line of text right justified in box defined by x/y/width/height */
 
@@ -335,7 +335,7 @@ MgFont *mgFontForSize(char *textSize);
  * The textSize should be 6,8,10,12,14,18,24 or 34.  For backwards compatibility
  * textSizes of "tiny" "small", "medium", "large" and "huge" are also ok. */
 
-void mgFillUnder(struct memGfx *mg, int x1, int y1, int x2, int y2, 
+void mgFillUnder(struct memGfx *mg, int x1, int y1, int x2, int y2,
 	int bottom, Color color);
 /* Draw a 4 sided filled figure that has line x1/y1 to x2/y2 at
  * it's top, a horizontal line at bottom at it's bottom,  and
@@ -345,7 +345,7 @@ void mgFillUnder(struct memGfx *mg, int x1, int y1, int x2, int y2,
 struct memGfx *mgRotate90(struct memGfx *in);
 /* Create a copy of input that is rotated 90 degrees clockwise. */
 
-void mgCircle(struct memGfx *mg, int xCen, int yCen, int rad, 
+void mgCircle(struct memGfx *mg, int xCen, int yCen, int rad,
 	Color color, boolean filled);
 /* Draw a circle using a stepping algorithm.  Doesn't correct
  * for non-square pixels. */
@@ -355,7 +355,7 @@ void mgDrawPoly(struct memGfx *mg, struct gfxPoly *poly, Color color,
 /* Draw polygon, possibly filled in color. */
 
 struct hslColor mgRgbToHsl(struct rgbColor rgb);
-/* Convert RGB to HSL colorspace (see http://en.wikipedia.org/wiki/HSL_and_HSV) 
+/* Convert RGB to HSL colorspace (see http://en.wikipedia.org/wiki/HSL_and_HSV)
  * In HSL, Hue is the color in the range [0,360) with 0=red 120=green 240=blue,
  * Saturation goes from a shade of grey (0) to fully saturated color (1000), and
  * Lightness goes from black (0) through the hue (500) to white (1000). */
@@ -376,19 +376,19 @@ struct rgbColor mgHsvToRgb(struct hsvColor hsv);
 
 struct rgbColor mgRgbTransformHsl(struct rgbColor in, double h, double s, double l);
 /* Transform rgb 'in' value using
- *   hue shift 'h' (0..360 degrees), 
- *   saturation scale 's', and 
+ *   hue shift 'h' (0..360 degrees),
+ *   saturation scale 's', and
  *   lightness scale 'l'
- * Returns the transformed rgb value 
+ * Returns the transformed rgb value
  * Use H=0, S=L=1 for identity transformation
  */
 
 struct rgbColor mgRgbTransformHsv(struct rgbColor in, double h, double s, double v);
 /* Transform rgb 'in' value using
- *   hue shift 'h' (0..360 degrees), 
- *   saturation scale 's', and 
+ *   hue shift 'h' (0..360 degrees),
+ *   saturation scale 's', and
  *   value scale 'v'
- * Returns the transformed rgb value 
+ * Returns the transformed rgb value
  * Use H=0, S=V=1 for identity transformation
  */
 

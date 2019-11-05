@@ -1,4 +1,4 @@
-/* Net.h some stuff to wrap around net communications. 
+/* Net.h some stuff to wrap around net communications.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -27,7 +27,7 @@ int netAcceptingSocket(int port, int queueSize);
 /* Create a socket for to accept connections. */
 
 int netAcceptingSocketFrom(int port, int queueSize, char *host);
-/* Create a socket that can accept connections from a 
+/* Create a socket that can accept connections from a
  * IP address on the current machine if the current machine
  * has multiple IP addresses. */
 
@@ -124,7 +124,7 @@ void netParseUrl(char *url, struct netParsedUrl *parsed);
 /* Parse a URL into components.   A full URL is made up as so:
  *   http://user:password@hostName:port/file;byterange=0-499
  * User and password may be cgi-encoded.
- * This is set up so that the http:// and the port are optional. 
+ * This is set up so that the http:// and the port are optional.
  */
 
 char *urlFromNetParsedUrl(struct netParsedUrl *npu);
@@ -144,7 +144,7 @@ int netUrlMustOpenPastHeader(char *url);
 
 int netUrlOpenSockets(char *url, int *retCtrlSocket);
 /* Return socket descriptor (low-level file handle) for read()ing url data,
- * or -1 if error. 
+ * or -1 if error.
  * If retCtrlSocket is non-NULL and url is FTP, set *retCtrlSocket
  * to the FTP control socket which is left open for a persistent connection.
  * close(result) (and close(*retCtrlSocket) if applicable) when done. */
@@ -160,11 +160,11 @@ int netUrlHeadExt(char *url, char *method, struct hash *hash);
 int netUrlHead(char *url, struct hash *hash);
 /* Go get head and return status.  Return negative number if
  * can't get head. If hash is non-null, fill it with header
- * lines with upper cased keywords for case-insensitive lookup, 
+ * lines with upper cased keywords for case-insensitive lookup,
  * including hopefully CONTENT-TYPE: . */
 
 long long netUrlSizeByRangeResponse(char *url);
-/* Use byteRange as a work-around alternate method to get file size (content-length).  
+/* Use byteRange as a work-around alternate method to get file size (content-length).
  * Return negative number if can't get. */
 
 struct lineFile *netLineFileOpen(char *url);
@@ -210,19 +210,19 @@ int netHttpConnect(char *url, char *method, char *protocol, char *agent, char *o
  * and password too.  Typically the "method" will be "GET" or "POST"
  * and the agent will be the name of your program or
  * library. optionalHeader may be NULL or contain additional header
- * lines such as cookie info. 
+ * lines such as cookie info.
  * Proxy support via hg.conf httpProxy or env var http_proxy
  * Return data socket, or -1 if error.*/
 
 int netHttpGetMultiple(char *url, struct slName *queries, void *userData,
 		       void (*responseCB)(void *userData, char *req,
 					  char *hdr, struct dyString *body));
-/* Given an URL which is the base of all requests to be made, and a 
- * linked list of queries to be appended to that base and sent in as 
- * requests, send the requests as a batch and read the HTTP response 
- * headers and bodies.  If not all the requests get responses (i.e. if 
- * the server is ignoring Keep-Alive or is imposing a limit), try again 
- * until we can't connect or until all requests have been served. 
+/* Given an URL which is the base of all requests to be made, and a
+ * linked list of queries to be appended to that base and sent in as
+ * requests, send the requests as a batch and read the HTTP response
+ * headers and bodies.  If not all the requests get responses (i.e. if
+ * the server is ignoring Keep-Alive or is imposing a limit), try again
+ * until we can't connect or until all requests have been served.
  * For each HTTP response, do a callback. */
 
 
@@ -259,4 +259,3 @@ boolean netGetFtpInfo(char *url, long long *retSize, time_t *retTime);
 boolean hasProtocol(char *urlOrPath);
 /* Return TRUE if it looks like it has http://, ftp:// etc. */
 #endif /* NET_H */
-

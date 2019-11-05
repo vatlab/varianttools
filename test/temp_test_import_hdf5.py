@@ -28,7 +28,7 @@ import os
 import glob
 import unittest
 import subprocess
-from testUtils import ProcessTestCase 
+from testUtils import ProcessTestCase
 import tables as tb
 import sys
 from variant_tools.accessor import *
@@ -62,7 +62,7 @@ class TestImportHDF5(ProcessTestCase):
     #     self.assertOutput('vtools output variant chr pos ref alt -d"\t"', 'output/import_txt_1.txt')
     #     # test downloading fmt file from the website
     #     self.assertFail('vtools import --build hg18 --format non_existing_fmt txt/input.tsv')
-    
+
     # def testGenotypes(self):
     #     'Test the import of genotypes'
     #     self.assertSucc('vtools import --format fmt/genotypes.fmt txt/genotypes.txt --build hg18')
@@ -99,7 +99,7 @@ class TestImportHDF5(ProcessTestCase):
     #     self.assertSucc('vtools import --build hg18 --format ../format/ANNOVAR_exonic_variant_function txt/annovar.txt.exonic_variant_function --var_info function --force' )
     #     self.assertSucc('vtools select variant "function is not NULL" -t function')
     #     self.assertProj(numOfVariants={'function': 78})
-        
+
     # def testCASAVA18_SNP(self):
     #     'Testing the CASAVA SNP input format'
     #     self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_snps txt/CASAVA18_SNP.txt')
@@ -118,20 +118,20 @@ class TestImportHDF5(ProcessTestCase):
     #     self.assertProj(numOfColumns={'genotype_1': 5})
     #     # only 1 sample here. Set num=1
     #     self.assertProj(genotype={1: ['1']*10 + ['2'] + ['1']*10})
-        
+
     # def testCASAVA18_INDEL(self):
     #     'Testing the CASAVA INDEL input format'
     #     self.assertSucc('vtools import --build hg18 --format ../format/CASAVA18_indels txt/CASAVA18_INDEL.txt')
     #     # (25 new, 7 insertions, 18 deletions)
     #     self.assertProj(numOfSamples= 1, numOfVariants=25, sampleNames=['max_gtype'],
     #         genotype={1: '1111111111111111121111211'})
-        
+
     # def testPileup_INDEL(self):
     #     # this file has one genotype but we do not provide a sample name. Named as "None" when no sample name is specified anywhere
     #     self.assertSucc('vtools import --build hg18 --format ../format/pileup_indel txt/pileup.indel')
     #     self.assertProj(numOfSamples= 1, numOfVariants=30, sampleNames=[''],
     #         genotype={1: '212111111111121111121121111111'})
-    
+
     # def testImportEmpty(self):
     #     'Test import file without variant'
     #     self.assertSucc('vtools import vcf/EMPTY.vcf --build hg19')
@@ -155,7 +155,7 @@ class TestImportHDF5(ProcessTestCase):
                 self.assertTrue(len(hdf5.get_rownames("/chrY"))==103)
             if fileName=="tmp_2_2_genotypes.h5":
                 self.assertTrue(len(hdf5.get_rownames("/chrY"))==102)
-            
+
         # geno is empty, i.e, no sample is imported
         self.assertSucc('vtools import vcf/CEU.vcf.gz --geno --HDF5')
         self.assertProj(numOfSamples= 2, numOfVariants=698)
@@ -184,7 +184,7 @@ class TestImportHDF5(ProcessTestCase):
         self.assertProj(numOfSamples= 0, numOfVariants=134)
         self.assertSucc('vtools import vcf/SAMP4_complex_variants.vcf --geno_info --HDF5')
         self.assertProj(numOfSamples= 0, numOfVariants=11877)
-        
+
     # def testMPImport(self):
     #     'Test multi-processing import'
     #     self.runCmd('vtools init test -f')
@@ -218,7 +218,7 @@ class TestImportHDF5(ProcessTestCase):
     #     self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_variant.txt', partial=-3)
     #     self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(20)],
     #             'output/import_mpi_genotype.txt')
-    
+
     # def testMPImportMultiFiles(self):
     #     self.runCmd('vtools init test -f')
     #     self.assertSucc('vtools import vcf/V1.vcf vcf/V2.vcf vcf/V3.vcf --build hg18 -j1')
@@ -238,7 +238,7 @@ class TestImportHDF5(ProcessTestCase):
     #     self.assertOutput('vtools show table variant -l -1', 'output/import_mpi_multi_variant.txt', partial=-3)
     #     self.assertOutput(["vtools execute 'select * from genotype.genotype_{}'".format(i+1) for i in range(3)],
     #             'output/import_mpi_multi_genotype.txt')
- 
+
     # def testMixedBuild(self):
     #     'Test importing vcf files with different reference genomes'
     #     self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18')
@@ -264,10 +264,10 @@ class TestImportHDF5(ProcessTestCase):
     #     self.assertSucc('vtools import vcf/SAMP2.vcf --build hg18')
     #     # 19 out of 121 records failed to map.
     #     self.assertProj(numOfSamples= 3, numOfVariants=98 + 289 + 121)
-    #     self.assertOutput('vtools output variant alt_bin alt_chr alt_pos bin chr pos -d "\t"', 'output/import_mixed_build.txt', 
+    #     self.assertOutput('vtools output variant alt_bin alt_chr alt_pos bin chr pos -d "\t"', 'output/import_mixed_build.txt',
     #         # compare common variants (without NA) and in sorted order
     #         lambda x: sorted([i for i in x if 'NA' not in i]))
-    
+
     # def testImportMyVCF(self):
     #     'Test a customized vcf import'
     #     self.assertSucc('vtools import --format fmt/missing_gen vcf/missing_gen.vcf --build hg19')
@@ -278,7 +278,7 @@ class TestImportHDF5(ProcessTestCase):
     #     # test importing self-defined genotypes with VcfGenotype(default=('0',))
     #     # code missing genotypes as None and wild-type as '0'
     #     self.assertProj(genotype={1: ['-1', '-1'], 2: ['0', '2'], 3: ['0', '-1', '-1'], 4: ['0', '-1', '-1']},
-    #         genoInfo={(1, 'GT'): ['-1', '-1'], (1, 'GQ'): ['3', '3'], (1, 'GD'): ['1', '1'], 
+    #         genoInfo={(1, 'GT'): ['-1', '-1'], (1, 'GQ'): ['3', '3'], (1, 'GD'): ['1', '1'],
     #             (1, 'PL_1'): ['None', 'None'], (1, 'PL_2'): ['None', 'None'], (1, 'PL3_1'): ['0', '3']})
 
     # def testInsertDelete(self):
@@ -286,9 +286,9 @@ class TestImportHDF5(ProcessTestCase):
     #     self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
     #     self.assertOutput('''vtools select variant 'ref="-"' --output chr pos ref alt''', 'output/import_vcf_ref.txt')
     #     self.assertProj(numOfVariants=134)
-    #     self.assertOutput('''vtools select variant 'ref="-"' --count''', '73\n') 
+    #     self.assertOutput('''vtools select variant 'ref="-"' --count''', '73\n')
     #     self.assertOutput('''vtools select variant 'alt="-"' --output chr pos ref alt''', 'output/import_vcf_alt.txt')
-    #     self.assertOutput('''vtools select variant 'alt="-"' --count''', '53\n') 
+    #     self.assertOutput('''vtools select variant 'alt="-"' --count''', '53\n')
 
     # def testSampleName_single(self):
     #     'Testing the import of sample names'
@@ -304,12 +304,12 @@ class TestImportHDF5(ProcessTestCase):
     #     #sample name was not given in file, then there is no information about sample name and genotypes except you assign one for it.
     #     self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19')
     #     self.assertProj(numOfSamples= 0, numOfVariants=134)
-    
+
     # def testNo_SampleName_assign(self):
     #     #Assign a sample name if the sample name is not in file
     #     self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg19 --sample_name vcf_test3')
     #     self.assertProj(numOfSamples= 1, numOfVariants=134, sampleNames=['vcf_test3'])
-        
+
     # def testSampleName_single_assign(self):
     #     #Testing one sample per file with the --sample_name option
     #     self.assertSucc('vtools import vcf/SAMP1.vcf --build hg18 --sample_name samp_vcf1')
@@ -317,13 +317,13 @@ class TestImportHDF5(ProcessTestCase):
     #     self.assertSucc('vtools import vcf/SAMP3_complex_variants.vcf --build hg18 --sample_name samp_vcf3')
     #     self.assertProj(numOfSamples= 3, numOfVariants=545)
     #     self.assertOutput('vtools show genotypes', 'output/vcf_assigned_sample_name_genotype.txt')
-        
+
     # def testSampleName_multiple(self):
     #     #Testing multiple samples in ONE vcf file with default setting
     #     self.assertSucc('vtools import vcf/500SAMP.vcf --build hg18')
     #     self.assertProj(numOfSamples= 501, numOfVariants=5)
     #     self.assertOutput('vtools show genotypes', 'output/vcf_multiple_samples_genotypes.txt')
-       
+
     # def testSampleName_multiple_assign(self):
     #     #Testing multiple samples in ONE vcf file with --sample_name option
     #     #Only one sample was generated, no genotype information were imported
@@ -343,7 +343,7 @@ class TestImportHDF5(ProcessTestCase):
     # def testCGAImport(self):
     #     self.assertSucc('vtools import txt/CGA.tsv.bz2 --format ../format/CGA.fmt --build hg19 --sample_name samp_csv')
     #     self.assertProj(numOfSamples=1, numOfVariants=95)
-    #     self.assertOutput('vtools output variant chr pos ref alt', 'output/import_cga.txt') 
+    #     self.assertOutput('vtools output variant chr pos ref alt', 'output/import_cga.txt')
     #     self.assertOutput('vtools show genotypes', 'output/import_cga_phenotype.txt')
 
     # def testMultiSamples_1(self):
@@ -359,7 +359,7 @@ class TestImportHDF5(ProcessTestCase):
     #     self.assertProj(numOfSamples=3)
     #     self.assertOutput('vtools show table variant', 'output/import_multi_sample2_variant.txt', -4)
     #     self.assertOutput('vtools show samples', 'output/import_multi_sample2_samples.txt')
-     
+
 
 if __name__ == '__main__':
     unittest.main()

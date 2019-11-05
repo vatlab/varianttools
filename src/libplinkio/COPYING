@@ -42,4 +42,3 @@ Directory/File              License
 libs/csv                    GNU Lesser General Public
 libs/cmockery               Apache License, Version 2.0
 src/plinkio/utarray.h       Revised BSD License
-

@@ -34,7 +34,7 @@ struct asTypeInfo asTypes[] = {
 };
 
 struct asTypeInfo *asTypeFindLow(char *name)
-/* Return asType for a low level type of given name.  (Low level because may be decorated 
+/* Return asType for a low level type of given name.  (Low level because may be decorated
  * with array or pointer  stuff at a higher level).  Returns NULL if not found. */
 {
 int i;
@@ -349,7 +349,7 @@ switch (size)
     default:
         errAbort("Unexpected error in asTypesIntSizeDescription: expecting integer type size of 1, 2, 4, or 8.  Got %d.", size);
 	return NULL; // happy compiler, never gets here
-    
+
     }
 }
 
@@ -529,7 +529,7 @@ boolean asCompareObjs(char *name1, struct asObject *as1, char *name2, struct asO
  int *retNumColumnsSame, boolean abortOnDifference)
 /* Compare as-objects as1 and as2 making sure several important fields show they are the same name and type.
  * If difference found, print it to stderr.  If abortOnDifference, errAbort.
- * Othewise, return TRUE if the objects columns match through the first numColumnsToCheck fields. 
+ * Othewise, return TRUE if the objects columns match through the first numColumnsToCheck fields.
  * If retNumColumnsSame is not NULL, then it will be set to the number of contiguous matching columns. */
 {
 boolean differencesFound = FALSE;
@@ -554,8 +554,8 @@ else
 	{
 	errAbort("asCompareObjLists only supports Table .as objects at this time.");
 	}
-    for (col1 = as1->columnList, col2 = as2->columnList; 
-	 col1 != NULL && col2 != NULL && checkCount < numColumnsToCheck; 
+    for (col1 = as1->columnList, col2 = as2->columnList;
+	 col1 != NULL && col2 != NULL && checkCount < numColumnsToCheck;
 	 col1 = col1->next, col2 = col2->next, ++checkCount)
 	{
 	if (!sameOk(col1->name, col2->name))

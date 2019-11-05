@@ -43,5 +43,4 @@ comment=The genomic region type (i.e., intergenic, ncRNA_intronic, etc) where th
 [region_name]
 index=2
 type=VARCHAR(255)
-comment=Genomic region name that corresponds to the region_type.  If the variant lies in an intergenic region, this field will specify the closest known regions upstream and downstream of this variant. 
-
+comment=Genomic region name that corresponds to the region_type.  If the variant lies in an intergenic region, this field will specify the closest known regions upstream and downstream of this variant.

@@ -1,6 +1,6 @@
 /* Some relatively small utility functions that act on ffAlis.
- * (Separated from fuzzyFinder.c so people can do light ffAli 
- * work without including 100k of fuzzyFinder object code.) 
+ * (Separated from fuzzyFinder.c so people can do light ffAli
+ * work without including 100k of fuzzyFinder object code.)
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -130,7 +130,7 @@ return acc;
 struct ffAli *ffAliFromSym(int symCount, char *nSym, char *hSym,
 	struct lm *lm, char *nStart, char *hStart)
 /* Convert symbol representation of alignments (letters plus '-')
- * to ffAli representation.  If lm is nonNULL, ffAli result 
+ * to ffAli representation.  If lm is nonNULL, ffAli result
  * will be lmAlloced, else it will be needMemed. This routine
  * depends on nSym/hSym being zero terminated. */
 {

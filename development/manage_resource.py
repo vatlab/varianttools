@@ -209,5 +209,3 @@ if __name__ == '__main__':
             uploadFile('MANIFEST.tmp', 'MANIFEST.txt', args.repo, args.user, args.passwd)
     else:
         env.logger.warning('No option has been provided. Please use -h to get a list of actions.')
-
-

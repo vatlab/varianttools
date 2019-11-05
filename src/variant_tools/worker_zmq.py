@@ -421,7 +421,7 @@ class AssoTestsWorker:
 
 
         sampleIDs=np.array(self.sample_IDs)
-        for fileName in files:   
+        for fileName in files:
             accessEngine=Engine_Access.choose_access_engine(fileName)
 
 
@@ -463,7 +463,7 @@ class AssoTestsWorker:
                 colnames=accessEngine.get_colnames(chrs[0])
                 colnames=np.array(colnames.tolist())
                 colnames=np.intersect1d(sampleIDs,colnames)
-                    
+
 
                 for ID in colnames:
                     gtmp = []
@@ -514,7 +514,7 @@ class AssoTestsWorker:
             values = list(grp)
 
 
-            try:                
+            try:
                 genotype, which, var_info, geno_info = self.getGenotype_HDF5(grp)
 
                 # if I throw an exception here, the program completes in 5 minutes, indicating

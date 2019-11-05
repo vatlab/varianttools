@@ -1,7 +1,7 @@
 # Copyright (C) 2012 Jerry Fowler (rgfowler@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 #
 # ChangeLog:
@@ -253,7 +253,7 @@ comment= MutationAssessor functional impact combined score (MAori)
 index=36
 type=FLOAT NULL
 adj=Nullify('.')
-comment=Scaled to 0-1: MAnew=(MAori-(-5.545))/(5.975-(-5.545)) 
+comment=Scaled to 0-1: MAnew=(MAori-(-5.545))/(5.975-(-5.545))
 
 [MutationAssessor_pred]
 index=37
@@ -300,7 +300,7 @@ comment=PhyloP score, the larger the score, the more conserved the site.
 [mg29way_pi]
 index=44
 type=VARCHAR(255) NULL
-comment=The estimated stationary distribution of A, C, G and T at the site, using SiPhy algorithm based on 29 mammals genomes. 
+comment=The estimated stationary distribution of A, C, G and T at the site, using SiPhy algorithm based on 29 mammals genomes.
 
 [mg29way_logOdds]
 index=45

@@ -6,7 +6,7 @@
 
 [pipeline description]
 description=Simulation of case control samples for 20 genes and analyze samples
-    of different sizes (1000, 2000 cases and matching number of 
+    of different sizes (1000, 2000 cases and matching number of
     controls) draw from European, Mexican American (mixed and matched case
     and control), and from both Asian (cases) and European (controls) populations
     for a mismatch design. This simulation model has been used to simulate data
@@ -32,10 +32,10 @@ regions_comment=One or more chromosome regions (separated by ',') in the format 
   annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947).
   Please visit http://varianttools.sourceforge.net/Simulation for detailed
   description of this parameter.
-  
+
 causing_genes=ccdsGene_exon.name:CCDS12419.1,CCDS46035.1,CCDS4360.1,CCDS3581.1,CCDS10170.1
 causing_genes_comment=A subset of regions from which a phenotype is simulated.
-  
+
 scale=4
 scale_comment=Scaling factor to speed up the simulation by scaling down the
   simulation while boosting mutation, selection and recombination rates.
@@ -91,9 +91,9 @@ action=EvolvePopulation(
 		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
 	demoModel=SettlementOfNewWorldModel(20000, scale=%(scale)s)
 	)
-comment=Evolve and expand the population using a K80 mutation model	and a demographic 
+comment=Evolve and expand the population using a K80 mutation model	and a demographic
 	model that models the settlement of new world model of the Mexican American population.
- 
+
 [European_40,Mismatch_40]
 # the same as MexicanAmerican but without final mixing step (mix=False)
 input='cache/${pipeline_name}_burnin.pop'
@@ -105,16 +105,16 @@ action=EvolvePopulation(
 		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
 	demoModel=SettlementOfNewWorldModel(20000, scale=%(scale)s, outcome=['AF', 'EU', 'AS'])
 	)
-comment=Evolve and expand the population using a K80 mutation model	and a demographic 
+comment=Evolve and expand the population using a K80 mutation model	and a demographic
 	model that models the settlement of new world model of the Mexican American population,
 	without mixing the final populations.
- 
+
 [*_50]
 action=OutputPopulationStatistics(
  	mut_count=['${pipeline_name}_freq_spec_${seed}.txt', 700],
     )
 comment=Get allele frequency spectrum in a sample of 700 individuals.
- 
+
 [MexicanAmerican_100,MexicanAmerican_200]
 # draw different numbers of samples for different pipeline steps
 input=${OUTPUT40}
@@ -124,34 +124,34 @@ action=DrawCaseControlSample(
 	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
 		s_stoploss=0.001, s_stopgain=0.01),
 	output='${pipeline_name}_sample_${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}_${seed}.pop')
-comment=Draw ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} cases 
-	and ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} controls 
+comment=Draw ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} cases
+	and ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} controls
 	from the mixed Mexican American population.
 
 [European_100,European_200]
 # The difference is that the case control samples are drawn from the European population
 input=${OUTPUT40}
 action=DrawCaseControlSample(
-	cases=[0, ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}, 0], 
+	cases=[0, ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}, 0],
 	controls=[0, ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}, 0],
 	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
 		s_stoploss=0.001, s_stopgain=0.01),
 	output='${pipeline_name}_sample_${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}_${seed}.pop')
 comment=Draw ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} cases
-    and ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} controls 
+    and ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} controls
 	from the European population.
 
 [Mismatch_100,Mismatch_200]
 # The difference is that the case control samples are drawn from different populations
 input=${OUTPUT40}
 action=DrawCaseControlSample(
-	cases=[0, 0, ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}], 
+	cases=[0, 0, ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}],
 	controls=[0, ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}, 0],
 	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
 		s_stoploss=0.001, s_stopgain=0.01),
 	output='${pipeline_name}_sample_${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}_${seed}.pop')
 comment=Draw ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} cases
-	from the European population and ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} controls 
+	from the European population and ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} controls
 	from the Asian population.
 
 
@@ -182,4 +182,3 @@ comment=Select non-synonymous variants according to snpEff annotation.
 [*_170,*_270]
 action=RunCommand(['vtools associate ns aff -m GroupStat BurdenBt --group_by refGene.name2 > ${INPUT: INPUT[0][:-4] + "_ns.res"}'])
 comment=Analyze the project using non-synonymous variants.
-

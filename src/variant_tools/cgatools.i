@@ -17,7 +17,7 @@
 
 namespace std
 {
-    %template()         vector<string>; 
+    %template()         vector<string>;
 }
 
 %include exception.i
@@ -136,7 +136,7 @@ bool fasta2crr(const std::vector<std::string> & fasta_files, const std::string &
  * Right trims or left extend a variant.
  * This is adapted from VT variant_manip.cpp
  */
-void right_trim_or_left_extend(cgatools::reference::CrrFile * crr, 
+void right_trim_or_left_extend(cgatools::reference::CrrFile * crr,
     std::vector<std::string>& alleles, uint32_t& pos1, int chrIdx, uint32_t& left_extended, uint32_t& right_trimmed)
 {
     bool to_right_trim = true;

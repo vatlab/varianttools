@@ -98,7 +98,7 @@ size_t bed_row_size(struct pio_bed_file_t *bed_file);
  * Returns the number of snps stored in a row for the
  * given bed file.
  *
- * @param bed_file Bed file. 
+ * @param bed_file Bed file.
  *
  * @return The number of snps stroed in a row.
  */
@@ -108,7 +108,7 @@ size_t bed_num_snps_per_row(struct pio_bed_file_t *bed_file);
  * Returns the SNP order for the given bed file.
  *
  * @param bed_file Bed file.
- * 
+ *
  * @return the SNP order for the given bed file.
  */
 enum SnpOrder bed_snp_order(struct pio_bed_file_t *bed_file);

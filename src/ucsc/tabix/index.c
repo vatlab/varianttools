@@ -485,7 +485,7 @@ static ti_index_t *ti_index_load_core(BGZF *fp)
 		fprintf(stderr, "[ti_index_load] wrong magic number.\n");
 		return 0;
 	}
-	idx = (ti_index_t*)calloc(1, sizeof(ti_index_t));	
+	idx = (ti_index_t*)calloc(1, sizeof(ti_index_t));
 	bgzf_read(fp, &idx->n, 4);
 	if (ti_is_be) bam_swap_endian_4p(&idx->n);
 	idx->tname = kh_init(s);
@@ -939,7 +939,7 @@ ti_iter_t ti_queryi(tabix_t *t, int tid, int beg, int end)
 {
 	if (tid < 0) return ti_iter_first();
 	if (ti_lazy_index_load(t) != 0) return 0;
-	return ti_iter_query(t->idx, tid, beg, end);	
+	return ti_iter_query(t->idx, tid, beg, end);
 }
 
 ti_iter_t ti_querys(tabix_t *t, const char *reg)

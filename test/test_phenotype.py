@@ -51,26 +51,26 @@ class TestPhenotype(ProcessTestCase):
         self.assertSucc('vtools phenotype --from_file phenotype/badphenotype1.txt')
         self.assertSucc('vtools phenotype --from_file phenotype/badphenotype2.txt')
         self.assertSucc('vtools phenotype --from_file phenotype/badphenotype3.txt')
-        
+
     def testImportFields(self):
         'Test command phenotype --from_file FIELD'
         # importing only a few fields, not all fields
         self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt aff')
         self.assertOutput('vtools show samples', 'output/phenotype_fields.txt')
-        
+
     def testImportPhenotypeWithFilename(self):
         'Test command phenotype --from_file'
         # too few arguments
         # opening project project_name. Importing phenotypes into table sample.
         self.assertSucc('vtools phenotype --from_file phenotype/pheno_filename.txt')
         self.assertOutput('vtools show samples -l -1', 'output/phenotype_phenotype_with_filename.txt')
-        
+
     def testImportFieldsWithFilename(self):
         'Test command phenotype --from_file FIELD'
         # importing only a few fields, not all fields
         self.runCmd('vtools phenotype --from_file phenotype/pheno_filename.txt aff')
         self.assertOutput('vtools show samples -l -1', 'output/phenotype_phenotype_with_filename_field.txt')
-        
+
     def testSetPhenotype(self):
         'Test command phenotype --set'
         self.assertFail('vtools phenotype --set')
@@ -79,7 +79,7 @@ class TestPhenotype(ProcessTestCase):
         # have to use quote to pass the test
         self.assertSucc('vtools phenotype --set \'race="white"\' --samples \'filename like "%CEU%"\'')
 
-    
+
     def testPhenotypeFromStat(self):
         'Test command phenotype --from_stat'
         self.assertFail('vtools phenotype --from_stat')
@@ -95,7 +95,7 @@ class TestPhenotype(ProcessTestCase):
         self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
         self.assertSucc('vtools phenotype --output sample_name filename aff sex BMI')
         self.assertSucc('vtools phenotype --set race=1 --samples \'filename like "%CEU%"\' --output sex BMI race')
-        self.assertSucc('vtools phenotype --from_stat "numGeno=count(*)" --output sample_name sex numGeno --header sample_name sex numGeno') 
+        self.assertSucc('vtools phenotype --from_stat "numGeno=count(*)" --output sample_name sex numGeno --header sample_name sex numGeno')
         self.assertSucc('vtools phenotype --output sample_name sex numGeno --genotypes "DP_geno>10" --header sample_name sex numGeno')
         #the options of --samples and genotypes could not be used without the 4 primary options (--set, --from_stat, --from_file and --output.
 

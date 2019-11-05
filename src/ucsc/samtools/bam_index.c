@@ -338,7 +338,7 @@ static bam_index_t *bam_index_load_core(FILE *fp)
 		fclose(fp);
 		return 0;
 	}
-	idx = (bam_index_t*)calloc(1, sizeof(bam_index_t));	
+	idx = (bam_index_t*)calloc(1, sizeof(bam_index_t));
 	fread(&idx->n, 4, 1, fp);
 	if (bam_is_be) bam_swap_endian_4p(&idx->n);
 	idx->index = (khash_t(i)**)calloc(idx->n, sizeof(void*));
@@ -582,7 +582,7 @@ struct __bam_iter_t {
 	pair64_t *off;
 };
 
-// bam_fetch helper function retrieves 
+// bam_fetch helper function retrieves
 bam_iter_t bam_iter_query(const bam_index_t *idx, int tid, int beg, int end)
 {
 	uint16_t *bins;

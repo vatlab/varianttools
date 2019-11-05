@@ -3,7 +3,7 @@
  * Copyright (C) 2004-2010 Gerhard Häring <gh@ghaering.de>
  *
  * This file is part of pysqlite.
- * 
+ *
  * This software is provided 'as-is', without any express or implied
  * warranty.  In no event will the authors be held liable for any damages
  * arising from the use of this software.
@@ -107,7 +107,7 @@ int pysqlite_connection_init(pysqlite_Connection* self, PyObject* args, PyObject
 
         Py_BEGIN_ALLOW_THREADS
         /* modified by Bo Peng for variant tools where a parameter readonly is passed
-         * when readonly is True, check_same_thread is false. In this case, we try to 
+         * when readonly is True, check_same_thread is false. In this case, we try to
          * open the database in readonly mode. */
         if (! check_same_thread)
             rc = sqlite3_open_v2(PyString_AsString(database_utf8), &self->db, SQLITE_OPEN_READONLY, NULL);
@@ -970,7 +970,7 @@ static int _progress_handler(void* user_arg)
         }
 
         /* abort query if error occurred */
-        rc = 1; 
+        rc = 1;
     } else {
         rc = (int)PyObject_IsTrue(ret);
         Py_DECREF(ret);

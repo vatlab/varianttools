@@ -1,4 +1,4 @@
-# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org) 
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
 #
 # Please refer to http://varianttools.sourceforge.net/Format/New for
@@ -20,7 +20,7 @@ comment=Chromosome
 [pos]
 index=2
 type=INTEGER NOT NULL
-comment=1-based Position of the snp 
+comment=1-based Position of the snp
 
 [ref]
 index=3
@@ -34,6 +34,6 @@ comment=Alternative allele
 
 [GT]
 index=5:
-type=INTEGER 
+type=INTEGER
 adj=Nullify(['3', 'E'])
 comment=Gentoype coded as 0 (ref ref), 1 (ref alt) and 2 (alt alt)

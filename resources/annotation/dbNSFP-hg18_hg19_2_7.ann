@@ -192,7 +192,7 @@ comment=SIFTori scores were first converted to SIFTnew=1-SIFTori, then ranked am
 [SIFT_pred]
 index=29
 type=VARCHAR(1) NULL
-adj=Nullify('.'), lambda x: None if x.strip() == '.' else ('D' if 'D' in x else ('T' if 'T' in x else '.')) 
+adj=Nullify('.'), lambda x: None if x.strip() == '.' else ('D' if 'D' in x else ('T' if 'T' in x else '.'))
 comment="D" if "D" appears in SIFT_pred_all, "T" otherwise.
 
 [SIFT_pred_all]
@@ -650,4 +650,3 @@ index=98
 type=VARCHAR(255) NULL
 adj=Nullify('.')
 comment=the trait/disease the clinvar_clnsig referring to. Note 1: Missing data is designated as '.'. Note 2: The three Uniprot entries are based on Polyphen-2 v2.2.2 annotations.
-

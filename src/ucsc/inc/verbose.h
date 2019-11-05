@@ -50,4 +50,3 @@ FILE *verboseLogFile();
 /* Get the verbose log file. */
 
 #endif /* VERBOSE_H */
-

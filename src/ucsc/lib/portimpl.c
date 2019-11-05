@@ -30,7 +30,7 @@ if (wss == NULL)
             wss = &wssMicrosoftII;
         else if (strncmp(wssMicrosoftPWS.name, s, strlen(wssMicrosoftPWS.name)) == 0)
             wss = &wssMicrosoftPWS;
-	else 
+	else
 	    {
 	    char *t = getenv("HTTP_HOST");
 	    if (t != NULL)
@@ -120,7 +120,7 @@ char *s = pathCopy, *e;
 while (*s++ == '/')
     /* do nothing */;
 
-/* Step through it one slash at a time 
+/* Step through it one slash at a time
  * making directory if possible, else dying. */
 for (; !isEmpty(s); s = e)
     {
@@ -133,4 +133,3 @@ for (; !isEmpty(s); s = e)
 	*e++ = '/';
     }
 }
-

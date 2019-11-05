@@ -1,14 +1,14 @@
 #ifndef BINRANGE_H
 #define BINRANGE_H
 
-/* binRange Stuff to handle binning - which helps us restrict 
+/* binRange Stuff to handle binning - which helps us restrict
  * our attention to the parts of database that contain info
  * about a particular window on a chromosome. This scheme
  * will work without modification for chromosome sizes up
  * to half a gigaBase.  The finest sized bin is 128k (1<<17).
  * The next coarsest is 8x as big (1<<13).  There's a hierarchy
  * of bins with the chromosome itself being the final bin.
- * Features are put in the finest bin they'll fit in. 
+ * Features are put in the finest bin they'll fit in.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -80,10 +80,10 @@ void binKeeperFree(struct binKeeper **pBk);
 /* Free up a bin keeper. */
 
 void binKeeperAdd(struct binKeeper *bk, int start, int end, void *val);
-/* Add item to binKeeper. */ 
+/* Add item to binKeeper. */
 
 void binKeeperRemove(struct binKeeper *bk, int start, int end, void *val);
-/* Remove item from binKeeper. */ 
+/* Remove item from binKeeper. */
 
 struct binElement *binKeeperFind(struct binKeeper *bk, int start, int end);
 /* Return a list of all items in binKeeper that intersect range.
@@ -106,7 +106,7 @@ struct binElement *binKeeperFindLowest(struct binKeeper *bk, int start, int end)
 /* Find the lowest overlapping range. Quick even if search range large */
 
 void binKeeperRemove(struct binKeeper *bk, int start, int end, void *val);
-/* Remove item from binKeeper. */ 
+/* Remove item from binKeeper. */
 
 struct binKeeperCookie binKeeperFirst(struct binKeeper *bk);
 /* Return an object to use by binKeeperNext() to traverse the binElements.
@@ -117,4 +117,3 @@ struct binElement* binKeeperNext(struct binKeeperCookie *cookie);
 /* Return the next entry in the binKeeper table.  */
 
 #endif /* BINRANGE_H */
-

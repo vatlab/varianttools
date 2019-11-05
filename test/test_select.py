@@ -79,13 +79,13 @@ class TestSelect(ProcessTestCase):
         self.assertSucc('vtools select variant -o \'max(testNSFP.polyphen2_score)\'')
         self.assertSucc('vtools select variant -o \'max(testNSFP.polyphen2_score)\' --header max')
         self.assertProj(numOfVariants={'ns': 1446})
-        # use strange characters 
+        # use strange characters
         self.assertSucc('vtools select variant \'testNSFP.chr is not null\' -t "* ns@"')
         self.assertSucc('vtools select "* ns@" \'testNSFP.chr is not null\' -t "ns@sub"')
         self.assertOutput('vtools show tables', '* ns@', partial=True)
         self.assertSucc('vtools show table "* ns@"')
         self.assertSucc('vtools show table "ns@sub"')
-        
+
     def testSelectSample(self):
         self.assertOutput("vtools select variant --samples 'filename like \"%input_nogeno.vcf\"' -c", '1446')
         self.assertOutput("vtools select variant --samples 'filename like \"%CEU.vcf.gz\" ' -c", '288\n')
@@ -109,14 +109,14 @@ class TestSelect(ProcessTestCase):
         lv=""
         variantlist=[]
         if self.storeMode=="sqlite":
-            variantlist = [self.runCmd('vtools execute "select variant_id from genotype_{} where GT <> 0"'.format(x), ret='list') 
+            variantlist = [self.runCmd('vtools execute "select variant_id from genotype_{} where GT <> 0"'.format(x), ret='list')
                     for x in namelist.strip().split('\n')]
             variantlist = [x for y in variantlist for x in y]
             lv = str(len(set(variantlist)))
             self.assertOutput("vtools select ns3 -c", '{}\n'.format(lv))
         self.assertOutput("vtools execute 'select count(*) from sample where aff=1 and BMI<20'", '10\n')
         self.assertSucc('vtools select variant --samples "aff=\'1\'" "BMI<20" -t ns3')
-  
+
         #
         self.assertSucc('vtools select variant --samples "aff=\'1\' or BMI<20" -t ns2')
         namelist = self.runCmd('vtools execute "select sample_id from sample where aff=1 or BMI<20"')
@@ -163,6 +163,6 @@ class TestSelect(ProcessTestCase):
             values = [int(x) for x in line.split()]
             self.assertEqual(min(values[0], values[1]), values[2])
 
-    
+
 if __name__ == '__main__':
     unittest.main()

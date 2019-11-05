@@ -416,7 +416,7 @@ namespace cgatools { namespace util {
             val |= static_cast<uint8_t>(ch);
         }
     }
-    
+
     //! Reads an integer stored in "zero-compressed" format. At each
     //! iteration, a byte is read in, and the lsb 7 bits are or'd into
     //! val. If the msb is set, then the val is shifted left by 7, and

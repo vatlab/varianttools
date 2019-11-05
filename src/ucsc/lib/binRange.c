@@ -1,11 +1,11 @@
-/* binRange Stuff to handle binning - which helps us restrict 
+/* binRange Stuff to handle binning - which helps us restrict
  * our attention to the parts of database that contain info
  * about a particular window on a chromosome. This scheme
  * will work without modification for chromosome sizes up
  * to half a gigaBase.  The finest sized bin is 128k (1<<17).
  * The next coarsest is 8x as big (1<<13).  There's a hierarchy
  * of bins with the chromosome itself being the final bin.
- * Features are put in the finest bin they'll fit in. 
+ * Features are put in the finest bin they'll fit in.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -169,12 +169,12 @@ if (bk != NULL)
 }
 
 void binKeeperAdd(struct binKeeper *bk, int start, int end, void *val)
-/* Add item to binKeeper. */ 
+/* Add item to binKeeper. */
 {
 int bin;
 struct binElement *el;
 if (start < bk->minPos || end > bk->maxPos || start > end)
-    errAbort("(%d %d) out of range (%d %d) in binKeeperAdd", 
+    errAbort("(%d %d) out of range (%d %d) in binKeeperAdd",
     	start, end, bk->minPos, bk->maxPos);
 bin = binFromRangeBinKeeperExtended(start, end);
 assert(bin < bk->binCount);
@@ -342,7 +342,7 @@ return first;
 
 
 void binKeeperRemove(struct binKeeper *bk, int start, int end, void *val)
-/* Remove item from binKeeper. */ 
+/* Remove item from binKeeper. */
 {
 int bin = binFromRangeBinKeeperExtended(start, end);
 struct binElement **pList = &bk->binLists[bin], *newList = NULL, *el, *next;

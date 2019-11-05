@@ -12,7 +12,7 @@
  */
 
 #ifndef __PIO_H__
-#define __PIO_H__ 
+#define __PIO_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -86,7 +86,7 @@ struct pio_sample_t * pio_get_sample(struct pio_file_t *plink_file, size_t pio_i
  * Returns the number of samples that are stored in the given plink file.
  *
  * @param plink_file Plink file.
- * 
+ *
  * @return the number of samples that are stored in the plink file.
  */
 size_t pio_num_samples(struct pio_file_t *plink_file);
@@ -107,7 +107,7 @@ struct pio_locus_t * pio_get_locus(struct pio_file_t *plink_file, size_t pio_id)
  * Returns the number of loci that are stored in the given plink file.
  *
  * @param plink_file Plink file.
- * 
+ *
  * @return the number of loci that are stored in the plink file.
  */
 size_t pio_num_loci(struct pio_file_t *plink_file);
@@ -162,7 +162,7 @@ int pio_one_locus_per_row(struct pio_file_t *plink_file);
 
 /**
  * Transposes the given file and writes it to another file.
- * 
+ *
  * @param plink_file_prefix Path to the plink files, without the extension.
  * @param transposed_file_prefix The transposed plink files will be stored at this path.
  *                               The .bim and .fam files will be copied.

@@ -36,7 +36,7 @@ enum affection_t
     PIO_CONTROL = 0,
     PIO_CASE = 1,
     PIO_MISSING,
-    PIO_CONTINUOUS 
+    PIO_CONTINUOUS
 };
 
 /**
@@ -110,7 +110,7 @@ struct pio_fam_file_t
  *
  * @param fam_file Fam file.
  * @param path The location of the fam file.
- * 
+ *
  * @return Returns PIO_OK if the file could be read, PIO_ERROR otherwise.
  */
 pio_status_t fam_open(struct pio_fam_file_t *fam_file, const char *path);
@@ -129,7 +129,7 @@ struct pio_sample_t * fam_get_sample(struct pio_fam_file_t *fam_file, size_t pio
  * Returns the number of samples that are stored in the given fam file.
  *
  * @param fam_file Fam file.
- * 
+ *
  * @return the number of samples that are stored in the fam file.
  */
 size_t fam_num_samples(struct pio_fam_file_t *fam_file);

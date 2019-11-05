@@ -30,7 +30,7 @@ boolean bamFileExists(char *fileOrUrl)
 {
 char *bamFileName = fileOrUrl;
 samfile_t *fh = samopen(bamFileName, "rb", NULL);
-boolean usingUrl = TRUE; 
+boolean usingUrl = TRUE;
 usingUrl = (strstr(fileOrUrl, "tp://") || strstr(fileOrUrl, "https://"));
 if (fh != NULL)
     {
@@ -61,7 +61,7 @@ return FALSE;
 }
 
 samfile_t *bamOpen(char *fileOrUrl, char **retBamFileName)
-/* Return an open bam file, dealing with FUSE caching if need be. 
+/* Return an open bam file, dealing with FUSE caching if need be.
  * Return parameter if NON-null will return the file name after FUSing */
 {
 char *bamFileName = fileOrUrl;
@@ -100,7 +100,7 @@ if (pSamFile != NULL)
     }
 }
 
-void bamFetchAlreadyOpen(samfile_t *samfile, bam_index_t *idx, char *bamFileName, 
+void bamFetchAlreadyOpen(samfile_t *samfile, bam_index_t *idx, char *bamFileName,
 			 char *position, bam_fetch_f callbackFunc, void *callbackData)
 /* With the open bam file, return items the same way with the callbacks as with bamFetch() */
 /* except in this case use an already-open bam file and index (use bam_index_load and free() for */
@@ -123,7 +123,7 @@ void bamFetch(char *fileOrUrl, char *position, bam_fetch_f callbackFunc, void *c
 		 samfile_t **pSamFile)
 /* Open the .bam file, fetch items in the seq:start-end position range,
  * and call callbackFunc on each bam item retrieved from the file plus callbackData.
- * This handles BAM files with "chr"-less sequence names, e.g. from Ensembl. 
+ * This handles BAM files with "chr"-less sequence names, e.g. from Ensembl.
  * The pSamFile parameter is optional.  If non-NULL it will be filled in, just for
  * the benefit of the callback function, with the open samFile.  */
 {
@@ -186,9 +186,9 @@ if (retClippedQLen != NULL)
 
 
 void bamUnpackQuerySequence(const bam1_t *bam, boolean useStrand, char *qSeq)
-/* Fill in qSeq with the nucleotide sequence encoded in bam.  The BAM format 
+/* Fill in qSeq with the nucleotide sequence encoded in bam.  The BAM format
  * reverse-complements query sequence when the alignment is on the - strand,
- * so if useStrand is given we rev-comp it back to restore the original query 
+ * so if useStrand is given we rev-comp it back to restore the original query
  * sequence. */
 {
 const bam1_core_t *core = &bam->core;
@@ -203,9 +203,9 @@ if (useStrand && bamIsRc(bam))
 }
 
 char *bamGetQuerySequence(const bam1_t *bam, boolean useStrand)
-/* Allocate and return the nucleotide sequence encoded in bam.  The BAM format 
+/* Allocate and return the nucleotide sequence encoded in bam.  The BAM format
  * reverse-complements query sequence when the alignment is on the - strand,
- * so if useStrand is given we rev-comp it back to restore the original query 
+ * so if useStrand is given we rev-comp it back to restore the original query
  * sequence. */
 {
 const bam1_core_t *core = &bam->core;
@@ -413,7 +413,7 @@ putc('\n', stdout);
 }
 
 char *bamGetTagString(const bam1_t *bam, char *tag, char *buf, size_t bufSize)
-/* If bam's tags include the given 2-character tag, place the value into 
+/* If bam's tags include the given 2-character tag, place the value into
  * buf (zero-terminated, trunc'd if nec) and return a pointer to buf,
  * or NULL if tag is not present. */
 {
@@ -534,7 +534,7 @@ while ((err = samread(sf, &one)) >= 0)
     // Approximate here... can do better if parse cigar.
     int start = one.core.pos;
     int size = one.core.l_qseq;
-    int end = start + size;	
+    int end = start + size;
     boolean isRc = (one.core.flag & BAM_FREVERSE);
     char strand = '+';
     if (isRc)
@@ -716,4 +716,3 @@ for (el = *pList; el != NULL; el = next)
     }
 *pList = NULL;
 }
-

@@ -27,19 +27,19 @@ class ProcessMonitor(threading.Thread):
         #cat_hdf5_all = subprocess.Popen(cat_hdf5, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True)
         #output_hdf5 = str(cat_hdf5_all.stdout.read())
         #bool_output = '--store hdf5' in output_hdf5 or '--STORE hdf5' in output_hdf5
-        
+
         # more elegant way is to get the information (store, hdf5) in .proj file, which is a database.
-        DB_projfile_name = glob.glob('*.proj')[0] 
+        DB_projfile_name = glob.glob('*.proj')[0]
         conn = sqlite3.connect(DB_projfile_name)
         #print(DB_projfile_name)
         c = conn.cursor()
         # cannot execute ".table" command in sqlite3 inside python
-        #c.execute("select name from sqlite_master where type='table' order by name") 
+        #c.execute("select name from sqlite_master where type='table' order by name")
         #c.fetchall()
         c.execute("select * from project;")
         result = c.fetchall()
         bool_output = ('store', 'hdf5') in result
-        
+
         # self.pulse_file = os.path.join(os.path.expanduser('~'), '.sos', 'tasks', task_id + '.pulse')
         #self.pulse_file = task_id + '.pulse'
         if 'HDF' in self.command or 'hdf' in self.command or bool_output == True:

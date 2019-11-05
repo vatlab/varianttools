@@ -395,7 +395,7 @@ knetFile *khttp_parse_url(const char *fn, const char *mode)
 	} else {
 		fp->host = (strstr(proxy, "http://") == proxy)? strdup(proxy + 7) : strdup(proxy);
 		for (q = fp->host; *q && *q != ':'; ++q);
-		if (*q == ':') *q++ = 0; 
+		if (*q == ':') *q++ = 0;
 		fp->port = strdup(*q? q : "80");
 		fp->path = strdup(fn);
 	}
@@ -476,7 +476,7 @@ knetFile *knet_open(const char *fn, const char *mode)
 		 * be undefined on some systems, although it is defined on my
 		 * Mac and the Linux I have tested on. */
 		int fd = open(fn, O_RDONLY | O_BINARY);
-#else		
+#else
 		int fd = open(fn, O_RDONLY);
 #endif
 		if (fd == -1) {
@@ -543,7 +543,7 @@ off_t knet_seek(knetFile *fp, int64_t off, int whence)
 		fp->offset = offset;
 		return 0;
 	}
-    else if (fp->type == KNF_TYPE_FTP) 
+    else if (fp->type == KNF_TYPE_FTP)
     {
         if (whence==SEEK_CUR)
             fp->offset += off;
@@ -553,8 +553,8 @@ off_t knet_seek(knetFile *fp, int64_t off, int whence)
             fp->offset = fp->file_size+off;
 		fp->is_ready = 0;
 		return 0;
-	} 
-    else if (fp->type == KNF_TYPE_HTTP) 
+	}
+    else if (fp->type == KNF_TYPE_HTTP)
     {
 		if (whence == SEEK_END) { // FIXME: can we allow SEEK_END in future?
 			fprintf(stderr, "[knet_seek] SEEK_END is not supported for HTTP. Offset is unchanged.\n");

@@ -42,7 +42,7 @@ class TestInit(ProcessTestCase):
         self.assertSucc('vtools init test -f')
         # can specify build
         self.assertSucc('vtools init test --build hg19 -f')
-    
+
 
     def testInitFromParentalProject(self):
         'Test command init --parent (create a project from a parent project)'
@@ -87,14 +87,14 @@ class TestInit(ProcessTestCase):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools import --format fmt/genotypes txt/genotypes.txt --build hg18')
         shutil.move('test.proj', 'parent/test.proj')
-        shutil.move('test_genotype.DB', 'parent/test_genotype.DB') 
-        self.assertSucc('vtools init test --parent parent --variants variant --samples "filename like \'%geno%\'" --genotypes GT=1 --store '+self.storeMode) 
+        shutil.move('test_genotype.DB', 'parent/test_genotype.DB')
+        self.assertSucc('vtools init test --parent parent --variants variant --samples "filename like \'%geno%\'" --genotypes GT=1 --store '+self.storeMode)
         self.assertProj(numOfSamples=49 )
         self.runCmd('vtools phenotype --from_stat "num=#(GT)" "hom=#(hom)" "het=#(het)"')
         #compare the first three lines of the output and result using "output" option
-        self.assertOutput('vtools phenotype --output num hom het', 
+        self.assertOutput('vtools phenotype --output num hom het',
                  '''3	0	3\n7	0	7\n7	0	7''', 3)
-        #compare the whole output and result table using "file" option, "output" is null and numOfLines=0 
+        #compare the whole output and result table using "file" option, "output" is null and numOfLines=0
         self.assertOutput('vtools phenotype --output num hom het', 'output/genotype_variant_sample_output.txt')
         shutil.rmtree('parent')
 
@@ -129,7 +129,7 @@ class TestInit(ProcessTestCase):
         shutil.move('sam1.proj', 'sam1/sam1.proj')
         if self.storeMode=="sqlite":
             shutil.move('sam1_genotype.DB', 'sam1/sam1_genotype.DB')
-        self.assertSucc('vtools init test --children ceu sam1 --store '+self.storeMode) 
+        self.assertSucc('vtools init test --children ceu sam1 --store '+self.storeMode)
         self.assertProj(numOfVariants={'variant': 577, 'refA': 101, 'refC': 85, 'refG': 96}, numOfSamples=61)
         #
         shutil.rmtree('ceu')

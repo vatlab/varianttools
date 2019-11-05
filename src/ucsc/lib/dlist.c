@@ -1,4 +1,4 @@
-/* dlist.c - Doubly-linked list routines. 
+/* dlist.c - Doubly-linked list routines.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -66,10 +66,10 @@ if (list != NULL)
 
 void dlInsertBetween(struct dlNode *before, struct dlNode *after, struct dlNode *newNode)
 {
-before->next = newNode; 
-newNode->prev = before; 
-newNode->next = after;  
-after->prev = newNode; 
+before->next = newNode;
+newNode->prev = before;
+newNode->next = after;
+after->prev = newNode;
 }
 
 void dlAddBefore(struct dlNode *anchor, struct dlNode *newNode)
@@ -195,7 +195,7 @@ return slCount(list->head) - 1;
 }
 
 
-struct dlSorter 
+struct dlSorter
 /* Helper structure for sorting dlNodes preserving order */
     {
     struct dlNode *node;
@@ -211,12 +211,12 @@ struct dlSorter *a = (struct dlSorter *)elem1;
 struct dlSorter *b = (struct dlSorter *)elem2;
 return compareFunc(&a->node->val, &b->node->val);
 }
-    
-void dlSort(struct dlList *list, 
+
+void dlSort(struct dlList *list,
 	int (*compare )(const void *elem1,  const void *elem2))
-/* Sort a singly linked list with Qsort and a temporary array. 
+/* Sort a singly linked list with Qsort and a temporary array.
  * The arguments to the compare function in real, non-void, life
- * are pointers to pointers of the type that is in the val field of 
+ * are pointers to pointers of the type that is in the val field of
  * the nodes of the list. */
 {
 int len = dlCount(list);

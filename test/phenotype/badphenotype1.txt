@@ -23,7 +23,7 @@ vcf/CEU.vcf.gz	NA11920	2	F	23.18
 vcf/CEU.vcf.gz	NA11931	2	F	16.15
 vcf/CEU.vcf.gz	NA11992	2	F	20.41
 vcf/CEU.vcf.gz	NA11993	2	F	17.09
-vcf/CEU.vcf.gz	
+vcf/CEU.vcf.gz
 vcf/CEU.vcf.gz	NA11995	1	F	17.15
 vcf/CEU.vcf.gz	NA12003	2	M	24.13
 vcf/CEU.vcf.gz	NA12004	2	F	20.31
@@ -37,7 +37,7 @@ vcf/CEU.vcf.gz	NA12154	2	M	22.35
 vcf/CEU.vcf.gz	NA12155	1	F	21.39
 vcf/CEU.vcf.gz	NA12156	1	F	21.67
 vcf/CEU.vcf.gz	NA12234	2	F	15.31
-vcf/CEU.vcf.gz	NA12249	2	M 	
+vcf/CEU.vcf.gz	NA12249	2	M
 vcf/CEU.vcf.gz	NA12287	2	F	24.58
 vcf/CEU.vcf.gz	NA12414	1	F	20.67
 vcf/CEU.vcf.gz	NA12489	1	F	20.29

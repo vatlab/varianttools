@@ -90,8 +90,8 @@ class GroupHDFGenerator(Process):
                                                         "colnames")
 
                 else:
-                    
-                   
+
+
                     select_group="SELECT {0}, group_concat(variant_id) from (select {0},t.variant_id from __asso_tmp as t join variant as v on t.variant_id=v.variant_id  order by v.pos) group by {0}".\
                        format(self.group_names[0])
                     cur.execute(
@@ -468,7 +468,7 @@ def getGenotype_HDF5(worker, group, sample_IDs):
 
         colnames=np.array(colnames.tolist())
         colnames=np.intersect1d(sample_IDs,colnames)
-        
+
         if len(chrs)==1:
             snpdict=accessEngine.get_geno_by_group(chr,geneSymbol)
 
@@ -476,7 +476,7 @@ def getGenotype_HDF5(worker, group, sample_IDs):
             for ID in colnames:
                 data=snpdict[ID]
                 gtmp = [data.get(x, [worker.g_na] + [float('NaN')]*len(worker.geno_info)) for x in varDict[chr]]
-                # handle -1 coding (double heterozygotes)     
+                # handle -1 coding (double heterozygotes)
 
                 genotype.append([2.0 if x[0] == -1.0 else x[0] for x in gtmp])
                 #

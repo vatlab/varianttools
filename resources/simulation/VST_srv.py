@@ -81,7 +81,7 @@ class BoundedMixedGammaDistributedFitness(RandomFitness):
         self.a = a
         self.lower = lower
         self.upper = upper
-     
+
     def _newS(self, loc, alleles):
         if self.p > 0 and sim.getRNG().randUniform() < self.p:
             return self.a
@@ -89,7 +89,7 @@ class BoundedMixedGammaDistributedFitness(RandomFitness):
             s = sim.getRNG().randGamma(self.k, self.theta)
             if s >= self.lower and s <= self.upper:
                 return s, self.h
-        
+
 class TrimmedMixedGammaDistributedFitness(RandomFitness):
     def __init__(self, k=0.562341, theta=0.01, h=0.5,
         p=0, a=0, lower=0.00001, upper=0.1, scale=1):
@@ -101,7 +101,7 @@ class TrimmedMixedGammaDistributedFitness(RandomFitness):
         self.a = a
         self.lower = lower
         self.upper = upper
-     
+
     def _newS(self):
         if self.p > 0 and sim.getRNG().randUniform() < self.p:
             return self.a
@@ -127,4 +127,3 @@ class RandomFitnessSelector(sim.PyMlSelector):
         elif model == 'trimmed_gamma1':
             pyFunc = TrimmedMixedGammaDistributedFitness(*coef, **{'scale':scale})
         sim.PyMlSelector.__init__(self, func=pyFunc)
-

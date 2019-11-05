@@ -21,7 +21,7 @@ source_pattern=
 #                         ##dbSNP_BUILD_ID=144
 #                         ##reference=GRCh37.p13
 #                         ##phasing=partial
-#                         ##variationPropertyDocumentationUrl=ftp://ftp.ncbi.nlm.nih.gov/snp/specs/dbSNP_BitField_latest.pdf	
+#                         ##variationPropertyDocumentationUrl=ftp://ftp.ncbi.nlm.nih.gov/snp/specs/dbSNP_BitField_latest.pdf
 #                         ##FILTER=<ID=NC,Description="Inconsistent Genotype Submission For At Least One Sample">
 
 [chr]
@@ -346,13 +346,13 @@ comment=Reference allele frequency based on 1000Genomes
 [CAF_alt]
 index=8
 type=REAL
-# 
+#
 # The reference allele can sometimes be ., which means missing.
 #
 # CAF=0.9998,.,0.0001997
 #
 adj=ExtractValue('CAF=', ';'), lambda x: tuple([v if v != '.' else None for v in x.split(',')[1:]])
-comment=Alternative allele frequency based on 1000Genomes. There might be multiple alleles at a locus so 
+comment=Alternative allele frequency based on 1000Genomes. There might be multiple alleles at a locus so
     CAF_ref + CAF_alt does not have to add to 1.
 
 
@@ -368,12 +368,12 @@ index=8
 type=VARCHAR(255)
 # this is a complicated lambda function that handles many cases
 #
-# step 1: 
+# step 1:
 #    get values of CLNHGVS and CLNALLE and split them, e.g.
 #
 #    CLNHGVS=NC_000003.11:g.38601888G>A,NC_000003.11:g.38601888G>C;CLNALLE=1,-1
 #
-#    turns to 
+#    turns to
 #
 #    [['NC_000003.11:g.38601888G>A', 'NC_000003.11:g.38601888G>C'], ['1', '-1']]
 #
@@ -382,7 +382,7 @@ type=VARCHAR(255)
 #
 #    [['NC_000003.11:g.38601888G>A', 'NC_000003.11:g.38601888G>C'], '1,-1']
 #
-#    turns to 
+#    turns to
 #
 #    {0: 'NC_000003.11:g.38601888G>A', -2: 'NC_000003.11:g.38601888G>C'}
 #
@@ -401,15 +401,15 @@ adj=lambda x: [ExtractValue('CLNHGVS=', ';')(x).split(','), ExtractValue('CLNALL
 comment=Variant names from HGVS.    The order of these variants corresponds to the order of the info in the other clinical  INFO tags.
 
 
-# 
+#
 # [CLNALLE]
 # index=8
 # type=INTEGER
 # adj=ExtractValue('CLNALLE=', ';'), lambda x: tuple(x.split(',')[1:])
-# comment=Variant alleles from REF or ALT columns.  0 is REF, 1 is the first ALT allele, etc. 
-#      This is used to match alleles with other corresponding clinical (CLN) INFO tags.  
+# comment=Variant alleles from REF or ALT columns.  0 is REF, 1 is the first ALT allele, etc.
+#      This is used to match alleles with other corresponding clinical (CLN) INFO tags.
 #      A value of -1 indicates that no allele was found to match a corresponding HGVS allele name.
-# 
+#
 [CLNSRC]
 index=8
 type=VARCHAR(255)
@@ -481,4 +481,3 @@ adj=lambda x: [ExtractValue('CLNACC=', ';')(x).split(','), ExtractValue('CLNALLE
 	lambda x: {int(j)-1: i for i,j in zip(x[0], x[1])}, \
     lambda x: tuple(x[i] if i in x else None for i in range(max(max(x.keys()), 0) + 1))
 comment=Variant Accession and Versions
-

@@ -9,7 +9,7 @@
 hg38=chr, pos, ref, alt
 
 [data sources]
-description=dbscSNV includes all potential human SNVs within splicing consensus regions (-3 to +8 at the 5' splice site and -12 to +2 at the 3' splice site), i.e. scSNVs, related functional annotations and two ensemble prediction scores for predicting their potential of altering splicing. If you uses dbscSNV, please cite:1. Jian X, Boerwinkle E and Liu X. 2014. In silico prediction of splice-altering single nucleotide variants in the human genome. Nucleic Acids Research 42(22):13534-13544. 
+description=dbscSNV includes all potential human SNVs within splicing consensus regions (-3 to +8 at the 5' splice site and -12 to +2 at the 3' splice site), i.e. scSNVs, related functional annotations and two ensemble prediction scores for predicting their potential of altering splicing. If you uses dbscSNV, please cite:1. Jian X, Boerwinkle E and Liu X. 2014. In silico prediction of splice-altering single nucleotide variants in the human genome. Nucleic Acids Research 42(22):13534-13544.
 header=1
 preprocessor=Dos2Unix()
 version=hg38_20150412
@@ -120,4 +120,3 @@ index=18
 type=FLOAT NULL
 adj=Nullify('.')
 comment=ensemble prediction score based on random forests. Ranges 0 to 1. The larger the score the higher probability the scSNV will affect splicing. The suggested cutoff for a binary prediction (affecting splicing vs. not affecting splicing) is 0.6.
-

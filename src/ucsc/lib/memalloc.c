@@ -1,9 +1,9 @@
-/* memalloc.c - Routines to allocate and deallocate dynamic memory. 
+/* memalloc.c - Routines to allocate and deallocate dynamic memory.
  * This lets you have a stack of memory handlers.  The default
  * memory handler is a thin shell around malloc/free.  You can
  * substitute routines that do more integrety checking with
  * pushCarefulMem(), or routines of your own devising with
- * pushMemHandler(). 
+ * pushMemHandler().
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -33,7 +33,7 @@ static void *defaultRealloc(void *vpt, size_t size)
 return realloc(vpt, size);
 }
 
-static struct memHandler defaultMemHandler = 
+static struct memHandler defaultMemHandler =
 /* Default memory handler. */
     {
     NULL,
@@ -215,7 +215,7 @@ if (pt != NULL)
 }
 
 void freez(void *vpt)
-/* Pass address of pointer.  Will free pointer and set it 
+/* Pass address of pointer.  Will free pointer and set it
  * to NULL. */
 {
 void **ppt = (void **)vpt;
@@ -328,7 +328,7 @@ if (cmb->startCookie != cmbStartCookie)
 if (memcmp(pEndCookie, cmbEndCookie, sizeof(cmbEndCookie)) != 0)
     {
     pthread_mutex_unlock( &carefulMutex );
-    errAbort("Bad end cookie %x%x%x%x freeing %llx\n", 
+    errAbort("Bad end cookie %x%x%x%x freeing %llx\n",
         pEndCookie[0], pEndCookie[1], pEndCookie[2], pEndCookie[3],
              ptrToLL(vpt));
     }
@@ -380,7 +380,7 @@ for (cmb = (struct carefulMemBlock *)(cmbAllocedList->head); cmb->next != NULL; 
 	}
     if (memcmp(pEndCookie, cmbEndCookie, sizeof(cmbEndCookie)) != 0)
 	{
-        safef(errMsg, sizeof errMsg, "Bad end cookie %x%x%x%x checking %llx\n", 
+        safef(errMsg, sizeof errMsg, "Bad end cookie %x%x%x%x checking %llx\n",
                  pEndCookie[0], pEndCookie[1], pEndCookie[2], pEndCookie[3],
                  ptrToLL(cmb+1));
 	errFound = TRUE;
@@ -416,7 +416,7 @@ pthread_mutex_unlock( &carefulMutex );
 return result;
 }
 
-static struct memHandler carefulMemHandler = 
+static struct memHandler carefulMemHandler =
 /* Default memory handler. */
     {
     NULL,

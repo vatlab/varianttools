@@ -295,7 +295,7 @@ static void mut_sequence(
 	//
 	std::string res("?");
 	try {
-		if (argc == 8) 
+		if (argc == 8)
 			res = cf->getSequence(cgatools::reference::Range(chrIdx, start - 1, end));
 		else
 			res[0] = cf->getBase(cgatools::reference::Location(chrIdx, start - 1));
@@ -303,7 +303,7 @@ static void mut_sequence(
 		// position out of range
 		sqlite3_result_null(context);
 	}
-	// if on the same chromosome, and position overlap 
+	// if on the same chromosome, and position overlap
 	if (chr == a_chr) {
 		// insertion
 		if (a_ref[0] == '-') {
@@ -325,7 +325,7 @@ static void mut_sequence(
 			if (d_start < res.size()) {
 				if (a_alt[0] == '-')
 					for (size_t i = d_start; i < d_end; ++i)
-						res[i] = '-';				
+						res[i] = '-';
 				else
 					for (size_t i = 0; i < d_end - d_start; ++i)
 						res[d_start + i] = a_alt[i];
@@ -1539,7 +1539,7 @@ static void bamTrack(void * track_file, char * chr, int pos, char *, char *, Fie
 						"2 (insertion) and 3 (deletion) are acceptable)", -1);
 					return;
 				}
-					
+
 			} else if (strncmp(pch, "strand=", 7) == 0) {
 				if (pch[7] == '+')
 					buf.strand = 0;
@@ -2017,7 +2017,7 @@ sqlite3 * geno_db;
 typedef std::map<std::string, int> SampleNameIdMap;
 SampleNameIdMap nameIdMap;
 
-class genotypeParams 
+class genotypeParams
 {
 public:
 	genotypeParams(const char * params = NULL) :
@@ -2049,7 +2049,7 @@ public:
 			pch = strtok(NULL, "&");
 		}
 	}
-	
+
 	~genotypeParams()
 	{
 		free(m_params);
@@ -2229,7 +2229,7 @@ typedef std::map<std::string, IdNameMap> SampleIdNameMap;
 SampleIdNameMap idNameMap;
 
 
-class samplesParams 
+class samplesParams
 {
 public:
 	samplesParams(const char * params = NULL) :
@@ -2255,7 +2255,7 @@ public:
 			pch = strtok(NULL, "&");
 		}
 	}
-	
+
 	~samplesParams()
 	{
 		free(m_params);
@@ -2263,7 +2263,7 @@ public:
 
 	char * geno_filter()
 	{
-		return m_geno_filter; 
+		return m_geno_filter;
 	}
 
 	//char * sample_filter()
@@ -4699,5 +4699,3 @@ void print_elem(void * e, int64_t c, void * p)
 
 	printf("%d => %lld\n", ee, c);
 }
-
-

@@ -3,7 +3,7 @@
 # Variant Tools
 
 A command line tool for the manipulation, annotation, and analysis of genetic variants
-from next-generation sequencing studies. 
+from next-generation sequencing studies.
 
 # Installation
 

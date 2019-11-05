@@ -1,7 +1,7 @@
 # Copyright (C) 2012 Jerry Fowler (rgfowler@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 #
 
@@ -220,6 +220,5 @@ comment= Known recessive status of the gene (from DOI] 10.1126/science.1215040)
 index=32
 type=VARCHAR(255)
 adj=Nullify('.')
-comment=Essential ("E") or Non-essential phenotype-changing ("N") based on 
+comment=Essential ("E") or Non-essential phenotype-changing ("N") based on
 		Mouse Genome Informatics database. from doi:10.1371/journal.pgen.1003484
-

@@ -1795,7 +1795,7 @@ int countSeparatedItems(char *string, char separator)
 int count = 0;
 char c, lastC = 0;
 while ((c = *string++) != 0)
-    {   
+    {
     if (c == separator)
        ++count;
     lastC = c;
@@ -1882,10 +1882,10 @@ return count;
  * outArray.  It returns the number of strings.
  * If you pass in NULL for outArray, it will just
  * return the number of strings that it *would*
- * chop. 
+ * chop.
  * GOTCHA: since multiple separators are skipped
- * and treated as one, it is impossible to parse 
- * a list with an empty string. 
+ * and treated as one, it is impossible to parse
+ * a list with an empty string.
  * e.g. cat\t\tdog returns only cat and dog but no empty string */
 int chopString(char *in, char *sep, char *outArray[], int outSize)
 {
@@ -1913,7 +1913,7 @@ return recordCount;
 }
 
 int chopByWhite(char *in, char *outArray[], int outSize)
-/* Like chopString, but specialized for white space separators. 
+/* Like chopString, but specialized for white space separators.
  * See the GOTCHA in chopString */
 {
 int recordCount = 0;
@@ -2609,7 +2609,7 @@ if (result < size)
     {
     if (result < 0)
 	errnoAbort("mustWriteFd: write failed");
-    else 
+    else
         errAbort("mustWriteFd only wrote %lld of %lld bytes. Likely the disk is full.",
 	    (long long)result, (long long)size);
     }

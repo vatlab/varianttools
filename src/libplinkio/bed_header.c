@@ -15,7 +15,7 @@
 #define BED_V100_MAGIC2 0x1b
 
 /**
- * Mask for SNP order. 
+ * Mask for SNP order.
  */
 #define BED_SNP_ORDER_BIT 0x01
 
@@ -46,7 +46,7 @@ get_snp_order(unsigned char order)
 }
 
 /**
- * Returns the file offset to the data for the 
+ * Returns the file offset to the data for the
  * given version.
  *
  * @param version Version of the bed file.

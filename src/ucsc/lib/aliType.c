@@ -27,4 +27,3 @@ if (sameWord(name, "RNAX")) return gftRnaX;
 errAbort("Unknown sequence type '%s'", name);
 return 0;
 }
-

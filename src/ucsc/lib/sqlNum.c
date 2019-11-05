@@ -1,5 +1,5 @@
 /* sqlnum.c - Routines to convert from ascii to integer
- * representation of numbers. 
+ * representation of numbers.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -12,7 +12,7 @@
 
 unsigned sqlUnsigned(char *s)
 /* Convert series of digits to unsigned integer about
- * twice as fast as atoi (by not having to skip white 
+ * twice as fast as atoi (by not having to skip white
  * space or stop except at the null byte.) */
 {
 unsigned res = 0;
@@ -33,9 +33,9 @@ return res;
 
 unsigned sqlUnsignedInList(char **pS)
 /* Convert series of digits to unsigned integer about
- * twice as fast as atoi (by not having to skip white 
- * space or stop except at the null byte.) 
- * All of string is number. Number may be delimited by a comma. 
+ * twice as fast as atoi (by not having to skip white
+ * space or stop except at the null byte.)
+ * All of string is number. Number may be delimited by a comma.
  * Returns the position of the delimiter or the terminating 0. */
 {
 char *s = *pS;
@@ -62,7 +62,7 @@ return res;
 
 unsigned long sqlUnsignedLong(char *s)
 /* Convert series of digits to unsigned long about
- * twice as fast as atol (by not having to skip white 
+ * twice as fast as atol (by not having to skip white
  * space or stop except at the null byte.) */
 {
 unsigned long res = 0;
@@ -82,9 +82,9 @@ return res;
 
 unsigned long sqlUnsignedLongInList(char **pS)
 /* Convert series of digits to unsigned long about
- * twice as fast as atol (by not having to skip white 
- * space or stop except at the null byte.) 
- * All of string is number. Number may be delimited by a comma. 
+ * twice as fast as atol (by not having to skip white
+ * space or stop except at the null byte.)
+ * All of string is number. Number may be delimited by a comma.
  * Returns the position of the delimiter or the terminating 0. */
 {
 char *s = *pS;
@@ -110,7 +110,7 @@ return res;
 }
 
 int sqlSigned(char *s)
-/* Convert string to signed integer.  Unlike atol assumes 
+/* Convert string to signed integer.  Unlike atol assumes
  * all of string is number. */
 {
 int res = 0;
@@ -135,8 +135,8 @@ else
 }
 
 int sqlSignedInList(char **pS)
-/* Convert string to signed integer.  Unlike atol assumes 
- * all of string is number. Number may be delimited by a comma. 
+/* Convert string to signed integer.  Unlike atol assumes
+ * all of string is number. Number may be delimited by a comma.
  * Returns the position of the delimiter or the terminating 0. */
 {
 char *s = *pS;
@@ -193,8 +193,8 @@ else
 }
 
 long long sqlLongLongInList(char **pS)
-/* Convert string to a long long.  Unlike atol, assumes 
- * all of string is number. Number may be delimited by a comma. 
+/* Convert string to a long long.  Unlike atol, assumes
+ * all of string is number. Number may be delimited by a comma.
  * Returns the position of the delimiter or the terminating 0. */
 {
 char *s = *pS;
@@ -243,8 +243,8 @@ return val;
 
 float sqlFloatInList(char **pS)
 /* Convert string to a float.  Assumes all of string is number
- * and aborts on an error. 
- * Number may be delimited by a comma. 
+ * and aborts on an error.
+ * Number may be delimited by a comma.
  * Returns the position of the delimiter or the terminating 0. */
 {
 char *s = *pS;
@@ -298,4 +298,3 @@ if ((end == s) || !(*end == '\0' || *end == ','))
 *pS = end;
 return val;
 }
-

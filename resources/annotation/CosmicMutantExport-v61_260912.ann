@@ -1,4 +1,4 @@
-# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org) 
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
 #
 # Please refer to http://varianttools.sourceforge.net/Format/New for
@@ -13,7 +13,7 @@ version=v61_260912
 anno_type=field
 delimiter='\t'
 direct_url=annoDB/CosmicMutantExport-v61_260912.DB.gz
-source_url=ftp://ftp.sanger.ac.uk/pub/CGP/cosmic/data_export/CosmicMutantExport_v61_260912.tsv.gz 
+source_url=ftp://ftp.sanger.ac.uk/pub/CGP/cosmic/data_export/CosmicMutantExport_v61_260912.tsv.gz
 source_type=txt
 source_pattern=
 
@@ -125,5 +125,3 @@ type=VARCHAR(256)
 [Comments]
 index=26
 type=VARCHAR(256)
-
-

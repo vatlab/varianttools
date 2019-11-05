@@ -61,7 +61,7 @@ class TestCompare(ProcessTestCase):
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --intersection')
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --intersection unique')
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --intersection common')
-        # WARNING: Existing table common is renamed to common_Aug09_170022. No error 
+        # WARNING: Existing table common is renamed to common_Aug09_170022. No error
         self.assertSucc('vtools compare d_plekhn1 ns_damaging --intersection common')
         self.assertProj(numOfVariants={'common': 572})
         self.assertSucc('vtools compare d_plekhn1 ns --union AorB')

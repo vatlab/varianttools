@@ -43,7 +43,7 @@ snp_array_t *snparray_from_array(PyTypeObject *prototype, snp_t *array, size_t l
  * Makes sure that the memory allocated on the C-side is
  * freed.
  *
- * @param self The snp array to deallocate. 
+ * @param self The snp array to deallocate.
  */
 void snparray_dealloc(snp_array_t *self);
 
@@ -84,7 +84,7 @@ Py_ssize_t snparray_length(PyObject *self);
  *
  * @param self Pointer to snp_array_t.
  * @param index Index in snp array to retreive.
- * 
+ *
  * @throws IndexError if index is outside of the array.
  */
 PyObject *snparray_getitem(PyObject *self, Py_ssize_t index);

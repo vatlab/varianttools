@@ -627,7 +627,7 @@ class HDF5Engine_access(Base_Access):
 
         if "GT" in group:
             self.GT=group.GT[:]
-           
+
             snpdict=dict.fromkeys(self.colnames,{})
             for key,value in snpdict.items():
                 snpdict[key]=dict.fromkeys(self.rownames,(0,))

@@ -20,7 +20,7 @@
  *
  * The finder supports three levels of stringency.
  * Generally you're best off using "ffTight".  "ffLoose"
- * will allow for more distant matches, but at the 
+ * will allow for more distant matches, but at the
  * expense of very often taking several seconds to
  * return a garbage alignment.  "ffExact" requires
  * an exact match - which is quick, but in the
@@ -34,7 +34,7 @@
 
 #ifndef MEMGFX_H
 #include "memgfx.h"
-#endif 
+#endif
 
 #ifndef DNAUTIL_H
 #include "dnautil.h"
@@ -93,7 +93,7 @@ struct ffAli *ffMakeRightLinks(struct ffAli *rightMost);
 /* Given a pointer to the rightmost block in an alignment
  * which has all of the left pointers filled in, fill in
  * the right pointers and return the leftmost block. */
- 
+
 void ffCountGoodEnds(struct ffAli *aliList);
 /* Fill in the goodEnd and badEnd scores. */
 
@@ -103,7 +103,7 @@ int ffAliCount(struct ffAli *d);
 struct ffAli *ffAliFromSym(int symCount, char *nSym, char *hSym,
 	struct lm *lm, char *nStart, char *hStart);
 /* Convert symbol representation of alignments (letters plus '-')
- * to ffAli representation.  If lm is nonNULL, ffAli result 
+ * to ffAli representation.  If lm is nonNULL, ffAli result
  * will be lmAlloced, else it will be needMemed. This routine
  * depends on nSym/hSym being zero terminated. */
 
@@ -111,7 +111,7 @@ struct ffAli *ffAliFromSym(int symCount, char *nSym, char *hSym,
 
 int ffScoreMatch(DNA *a, DNA *b, int size);
 /* Compare two pieces of DNA base by base. Total mismatches are
- * subtracted from total matches and returned as score. 'N's 
+ * subtracted from total matches and returned as score. 'N's
  * neither hurt nor help score. */
 
 int ffScoreCdna(struct ffAli *ali);
@@ -171,13 +171,13 @@ void ffExpandExactRight(struct ffAli *ali, DNA *needleEnd, DNA *hayEnd);
 void ffExpandExactLeft(struct ffAli *ali, DNA *needleStart, DNA *hayStart);
 /* Expand aligned segment to left as far as can exactly. */
 
-struct ffAli *ffMergeClose(struct ffAli *aliList, 
+struct ffAli *ffMergeClose(struct ffAli *aliList,
 	DNA *needleStart, DNA *hayStart);
 /* Remove overlapping areas needle in alignment. Assumes ali is sorted on
  * ascending nStart field. Also merge perfectly abutting neighbors or
  * ones that could be merged at the expense of just a few mismatches.*/
 
-void ffAliSort(struct ffAli **pList, 
+void ffAliSort(struct ffAli **pList,
 	int (*compare )(const void *elem1,  const void *elem2));
 /* Sort a doubly linked list of ffAlis. */
 
@@ -203,18 +203,18 @@ struct ffAli *ffFind(DNA *needleStart, DNA *needleEnd, DNA *hayStart, DNA *hayEn
 
 boolean ffFindEitherStrand(DNA *needle, DNA *haystack, enum ffStringency stringency,
     struct ffAli **pAli, boolean *pRcNeedle);
-/* Return TRUE if find an alignment using needle, or reverse complement of 
+/* Return TRUE if find an alignment using needle, or reverse complement of
  * needle to search haystack. DNA must be lower case. Needle and haystack
  * are zero terminated. */
 
 boolean ffFindEitherStrandN(DNA *needle, int needleSize, DNA *haystack, int haySize,
     enum ffStringency stringency, struct ffAli **pAli, boolean *pRcNeedle);
-/* Return TRUE if find an alignment using needle, or reverse complement of 
+/* Return TRUE if find an alignment using needle, or reverse complement of
  * needle to search haystack. DNA must be lower case. */
 
 boolean ffFindAndScore(DNA *needle, int needleSize, DNA *haystack, int haySize,
     enum ffStringency stringency, struct ffAli **pAli, boolean *pRcNeedle, int *pScore);
-/* Return TRUE if find an alignment using needle, or reverse complement of 
+/* Return TRUE if find an alignment using needle, or reverse complement of
  * needle to search haystack. DNA must be lower case. If pScore is non-NULL returns
  * score of alignment. */
 
@@ -225,24 +225,24 @@ void ffShowSideBySide(FILE *f, struct ffAli *leftAli, DNA *needle, int needleNum
 		      int blockMaxGap, boolean rcHaystack, boolean initialNewline);
 /* Print HTML side-by-side alignment of needle and haystack (no title or labels) to f.
  * {hay,needle}NumOffset are the coords at which the DNA sequence begins.
- * hayOff{Start,End} are the range of coords *relative to hayNumOffset* to which the 
+ * hayOff{Start,End} are the range of coords *relative to hayNumOffset* to which the
  * alignment display will be clipped -- pass in {0,haySize} for no clipping. */
 
-int ffShAliPart(FILE *f, struct ffAli *aliList, 
+int ffShAliPart(FILE *f, struct ffAli *aliList,
     char *needleName, DNA *needle, int needleSize, int needleNumOffset,
     char *haystackName, DNA *haystack, int haySize, int hayNumOffset,
     int blockMaxGap, boolean rcNeedle, boolean rcHaystack,
-    boolean showJumpTable, 
+    boolean showJumpTable,
     boolean showNeedle, boolean showHaystack,
     boolean showSideBySide, boolean upcMatch,
     int cdsS, int cdsE, int hayPartS, int hayPartE);
-/* Display parts of alignment on html page.  If hayPartS..hayPartE is a 
- * smaller subrange of the alignment, highlight that part of the alignment 
- * in both needle and haystack with underline & bold, and show only that 
+/* Display parts of alignment on html page.  If hayPartS..hayPartE is a
+ * smaller subrange of the alignment, highlight that part of the alignment
+ * in both needle and haystack with underline & bold, and show only that
  * part of the haystack (plus padding).  Returns number of blocks (after
  * merging blocks separated by blockMaxGap or less). */
 
-int ffShAli(FILE *f, struct ffAli *aliList, 
+int ffShAli(FILE *f, struct ffAli *aliList,
     char *needleName, DNA *needle, int needleSize, int needleNumOffset,
     char *haystackName, DNA *haystack, int haySize, int hayNumOffset,
     int blockMaxGap,
@@ -250,11 +250,10 @@ int ffShAli(FILE *f, struct ffAli *aliList,
 /* Display alignment on html page.  Returns number of blocks (after
  * merging blocks separated by blockMaxGap or less). */
 
-void ffShowAli(struct ffAli *aliList, 
+void ffShowAli(struct ffAli *aliList,
     char *needleName, DNA *needle, int needleNumOffset,
     char *haystackName, DNA *haystack, int hayNumOffset,
     boolean rcNeedle);
 /* Display alignment on html page to stdout. */
 
 #endif /* FUZZYFIND_H */
-

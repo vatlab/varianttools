@@ -180,13 +180,13 @@ if (stdinFd != STDIN_FILENO)
     if (dup2(stdinFd, STDIN_FILENO) < 0)
         errnoAbort("can't dup2 to stdin");
     }
-    
+
 if (stdoutFd != STDOUT_FILENO)
     {
     if (dup2(stdoutFd, STDOUT_FILENO) < 0)
         errnoAbort("can't dup2 to stdout");
     }
-    
+
 if (stderrFd != STDERR_FILENO)
     {
     if (dup2(stderrFd, STDERR_FILENO) < 0)
@@ -455,7 +455,7 @@ else
     if (setpgid(pl->groupLeader, pl->groupLeader) != 0)
         errnoAbort("error from parent setpgid(%d, %d)", pl->groupLeader, pl->groupLeader);
     }
-} 
+}
 
 static int openRead(char *fname)
 /* open a file for reading */

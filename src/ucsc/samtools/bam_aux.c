@@ -142,7 +142,7 @@ int bam_parse_region(bam_header_t *header, const char *str, int *ref_id, int *be
 		}
 	} else iter = kh_get(s, h, str);
         if (iter == kh_end(h)) {
-          free(s); 
+          free(s);
           return -1;
         }
 	*ref_id = kh_val(h, iter);

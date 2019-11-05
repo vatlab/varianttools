@@ -1,6 +1,6 @@
 /* kxTok - quick little tokenizer for stuff first
  * loaded into memory.  Originally developed for
- * "Key eXpression" evaluator. 
+ * "Key eXpression" evaluator.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -52,11 +52,11 @@ struct kxTok *kxTokenizeFancy(char *text, boolean wildAst,
 			      boolean wildPercent, boolean includeHyphen);
 /* Convert text to stream of tokens. If 'wildAst' is
  * TRUE then '*' character will be treated as wildcard
- * rather than multiplication sign.  
- * If wildPercent is TRUE then the '%' character will be treated as a 
+ * rather than multiplication sign.
+ * If wildPercent is TRUE then the '%' character will be treated as a
  * wildcard (as in SQL) rather than a modulo (kxtMod) or percent sign.
- * If includeHyphen is TRUE then a '-' character in the middle of a String 
- * token will be treated as a hyphen (part of the String token) instead of 
+ * If includeHyphen is TRUE then a '-' character in the middle of a String
+ * token will be treated as a hyphen (part of the String token) instead of
  * a new kxtSub token. */
 
 void kxTokIncludeQuotes(boolean val);

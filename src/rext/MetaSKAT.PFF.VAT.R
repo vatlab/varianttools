@@ -7,15 +7,15 @@
 # comment=p-value from MetaSKAT_wZ method
 # [sample.size]
 # # Adjust this for your data !!
-# n = 2 
+# n = 2
 # # Adjust this for your data !!
-# name = n.pop1, n.pop2 
+# name = n.pop1, n.pop2
 # comment=sample size per group
 # ENDCONF
 # Usage:
 # vtools associate variant sample_id \
 # -m 'RTest /path/to/this/script.R --name MetaSKAT --phenotype_files "c("file1.txt","file2.txt")" --phenotype_colname "QT_TRAIT" --out_type "C" --skip "c("covar1", "covar2")"' \
-# --group_by name2 -j8 --to_db MetaSKAT > result.txt 
+# --group_by name2 -j8 --to_db MetaSKAT > result.txt
 suppressMessages(library(MetaSKAT))
 MetaSKAT.PFF.VAT <- function (dat, out_type,
                           phenotype_colname,

@@ -34,7 +34,7 @@ class TestAvgDepth(ProcessTestCase):
         ProcessTestCase.setUp(self)
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18 --geno_info DP_geno')
         self.runCmd('vtools update variant --from_stat "num=#(alt)" "depth=avg(DP_geno)"')
-        
+
     def testAvgDepth(self):
         'Test command vtools_report avg_depth'
         self.assertFail('vtools_report avg_depth')

@@ -99,14 +99,14 @@ comment=Quality score for allele 2, derived from the probability estimates under
 index=21
 type=VARCHAR(255)
 comment=Semicolon-separated list of all gene annotations for the first allele of the
-	locus. For every gene annotation, the fields are geneId, mrnaAcc, symbol, 
+	locus. For every gene annotation, the fields are geneId, mrnaAcc, symbol,
 	component, and impact.
 
 [allele2Gene]
 index=22
 type=VARCHAR(255)
 comment=Semicolon-separated list of all gene annotations for the second allele of the
-	locus. For every gene annotation, the fields are geneId, mrnaAcc, symbol, 
+	locus. For every gene annotation, the fields are geneId, mrnaAcc, symbol,
 	component, and impact.
 
 [segDupOverlap]

@@ -56,13 +56,13 @@ class TestUpdate(ProcessTestCase):
         self.assertSucc('vtools update variant --format fmt/dbSNP_hg19validation --from_file txt/dbSNP_hg19validation.txt --build hg19')
         #If the file is already imported and you can add field(s) using the orginal file without --format
         self.assertSucc('vtools update variant --from_file vcf/CEU.vcf.gz --geno_info DP_geno')
-        #you could not use another file which is not loaded into the project to update the current variant table 
+        #you could not use another file which is not loaded into the project to update the current variant table
         # self.assertFail('vtools update variant --from_file vcf/SAMP4_complex_variants.vcf --geno_info DP_geno')
         self.assertOutput('vtools select variant "mut_type_dbSNP is not null" -c', '172')
         self.assertOutput("vtools select variant alt_pos=753405 -o chr pos mut_type_dbSNP validation -d'\t'",
             "1\t743268\tuntranslated-5\tby-cluster,by-1000genomes\n")
-     
-    
+
+
     def testSampleStat(self):
         'Test command vtools update'
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
@@ -85,7 +85,7 @@ class TestUpdate(ProcessTestCase):
         self.assertSucc('vtools update CEU --from_stat "CEU_cases_het=#(het)" --samples "filename like \'%CEU%\' and aff=\'2\'"')
         self.assertOutput("vtools execute 'select sum(CEU_cases_het) from variant'", '1601\n', partial=True)
         self.assertSucc('vtools update CEU --from_stat "CEU_strls_het=#(het)" -s "filename like \'%CEU%\' and aff=\'1\'"')
-     
+
     def testMaf(self):
         'Test computation of MAF'
         # all females
@@ -109,8 +109,8 @@ class TestUpdate(ProcessTestCase):
         #     value = float(n)/float(c)
         #     value = value if value < 0.5 else 1 - value
         #     self.assertAlmostEqual(float(m), value)
-        
-    
+
+
     @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
     def testGenotypeSumStats(self):
         print(os.getenv("STOREMODE"))
@@ -163,7 +163,7 @@ class TestUpdate(ProcessTestCase):
     #     self.assertProj(info={'res': ['0']*6})
     #     self.assertSucc('vtools update variant --set "res=mut-hom-het-other"')
     #     self.assertProj(info={'res': ['0']*6})
-        
+
 
     def testSet(self):
         'Testing vtools update --set'
@@ -179,7 +179,7 @@ class TestUpdate(ProcessTestCase):
     def testGenoAnnoSet(self):
         'Testing command vtools update --set'
         self.runCmd('vtools init test -f --store '+self.storeMode)
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')    
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.assertSucc("vtools update variant --from_stat 'total=#(GT)' 'num=#(alt)' 'het=#(het)' 'hom=#(hom)' 'other=#(other)' 'minDP=min(DP)' 'maxDP=max(DP)' 'meanDP=avg(DP)' 'minGQv=min(GQ)' 'maxGQv=max(GQ)' 'meanGQv=avg(GQ)'")
         self.assertSucc('vtools update variant --set "maf=num/(total*2.0)"')
         self.assertSucc('vtools output variant chr pos total num maf -l 10')
@@ -206,6 +206,6 @@ class TestUpdate(ProcessTestCase):
         lines = self.runCmd('vtools output variant chr pos ref alt vname refGene.name', ret='list')
         # there should not be more lines
         self.assertEqual(line_count, len(set(lines)))
-        
+
 if __name__ == '__main__':
     unittest.main()

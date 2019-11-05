@@ -77,7 +77,7 @@ fam_is_delim(unsigned char c)
  * @param status Status of the conversion.
  *
  * @return The parsed csv field, or NULL if it could
- *         not be parsed. Caller is responsible for 
+ *         not be parsed. Caller is responsible for
  *         deallocating the memory.
  */
 static char *

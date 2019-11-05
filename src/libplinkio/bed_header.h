@@ -17,7 +17,7 @@ extern "C" {
 
 #define BED_HEADER_MAX_SIZE 3
 
-enum SnpOrder 
+enum SnpOrder
 {
     /**
      * Means that when reading one row, you get one SNP for all
@@ -92,7 +92,7 @@ struct bed_header_t
 struct bed_header_t bed_header_init(size_t num_loci, size_t num_samples);
 
 /**
- * Initializes and creates a bed header from a 
+ * Initializes and creates a bed header from a
  *
  * @param num_loci Number of loci.
  * @param num_samples Number of samples.
@@ -110,7 +110,7 @@ struct bed_header_t bed_header_init2(size_t num_loci, size_t num_samples, const 
  * Note: The given header structure must be initialized.
  *
  * @param header The new header will be stored here.
- * @param header_bytes A packed header, assumed to be at least 
+ * @param header_bytes A packed header, assumed to be at least
  *                     BED_HEADER_MAX_SIZE bytes long.
  */
 void bed_header_from_bytes(struct bed_header_t *header, const unsigned char *header_bytes);

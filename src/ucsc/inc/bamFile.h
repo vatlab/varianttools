@@ -43,7 +43,7 @@ boolean bamFileExists(char *bamFileName);
 samfile_t *bamOpen(char *fileOrUrl, char **retBamFileName);
 /* Return an open bam file as well as the filename of the bam. */
 
-void bamFetchAlreadyOpen(samfile_t *samfile, bam_index_t *idx, char *bamFileName, 
+void bamFetchAlreadyOpen(samfile_t *samfile, bam_index_t *idx, char *bamFileName,
 			 char *position, bam_fetch_f callbackFunc, void *callbackData);
 /* With the open bam file, return items the same way with the callbacks as with bamFetch() */
 /* except in this case use an already-open bam file and index (use bam_index_load and free() for */
@@ -54,7 +54,7 @@ void bamFetch(char *fileOrUrl, char *position, bam_fetch_f callbackFunc, void *c
 	samfile_t **pSamFile);
 /* Open the .bam file, fetch items in the seq:start-end position range,
  * and call callbackFunc on each bam item retrieved from the file plus callbackData.
- * This handles BAM files with "chr"-less sequence names, e.g. from Ensembl. 
+ * This handles BAM files with "chr"-less sequence names, e.g. from Ensembl.
  * The pSamFile parameter is optional.  If non-NULL it will be filled in, just for
  * the benefit of the callback function, with the open samFile.  */
 
@@ -66,7 +66,7 @@ boolean bamIsRc(const bam1_t *bam);
 
 INLINE int bamUnpackCigarElement(unsigned int packed, char *retOp)
 /* Given an unsigned int containing a number of bases and an offset into an
- * array of BAM-enhanced-CIGAR ASCII characters (operations), store operation 
+ * array of BAM-enhanced-CIGAR ASCII characters (operations), store operation
  * char into *retOp (retOp must not be NULL) and return the number of bases. */
 {
 #ifdef USE_BAM
@@ -94,15 +94,15 @@ void bamGetSoftClipping(const bam1_t *bam, int *retLow, int *retHigh, int *retCl
  * (and the length of the query sequence that will be returned). */
 
 void bamUnpackQuerySequence(const bam1_t *bam, boolean useStrand, char *qSeq);
-/* Fill in qSeq with the nucleotide sequence encoded in bam.  The BAM format 
+/* Fill in qSeq with the nucleotide sequence encoded in bam.  The BAM format
  * reverse-complements query sequence when the alignment is on the - strand,
- * so if useStrand is given we rev-comp it back to restore the original query 
+ * so if useStrand is given we rev-comp it back to restore the original query
  * sequence. */
 
 char *bamGetQuerySequence(const bam1_t *bam, boolean useStrand);
-/* Return the nucleotide sequence encoded in bam.  The BAM format 
+/* Return the nucleotide sequence encoded in bam.  The BAM format
  * reverse-complements query sequence when the alignment is on the - strand,
- * so if useStrand is given we rev-comp it back to restore the original query 
+ * so if useStrand is given we rev-comp it back to restore the original query
  * sequence. */
 
 UBYTE *bamGetQueryQuals(const bam1_t *bam, boolean useStrand);
@@ -131,7 +131,7 @@ void bamShowTags(const bam1_t *bam);
 /* Print out tags in HTML: bold key, no type indicator for brevity. */
 
 char *bamGetTagString(const bam1_t *bam, char *tag, char *buf, size_t bufSize);
-/* If bam's tags include the given 2-character tag, place the value into 
+/* If bam's tags include the given 2-character tag, place the value into
  * buf (zero-terminated, trunc'd if nec) and return a pointer to buf,
  * or NULL if tag is not present. */
 

@@ -479,7 +479,7 @@ class AssociationTestManager:
             for index,value in enumerate(data):
                 if value[1] not in nameDict:
                     nameDict[value[1]]=index
-            
+
             for i, j, p, c in data:
                 if j in nameDict:
                     sample_IDs.append(i)
@@ -1322,7 +1322,7 @@ def runAssociation(args, asso, proj, results):
         # Tells the master process which samples are loaded, used by the progress bar.
         cached_samples = Array('L', max(asso.sample_IDs) + 1)
         #
-    
+
         loaders = []
 
         # use SQLite DB

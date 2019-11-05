@@ -6,9 +6,9 @@
 # comment=p-value from MetaSKAT_wZ method
 # [sample.size]
 # # Adjust this for your data !!
-# n = 3 
+# n = 3
 # # Adjust this for your data !!
-# name = n.pop1, n.pop2, n.pop3 
+# name = n.pop1, n.pop2, n.pop3
 # comment=sample size per group
 # ENDCONF
 suppressMessages(library(MetaSKAT))
@@ -45,11 +45,11 @@ MetaSKAT.VAT <- function (dat, out_type, group_colname,
   # y.list is a list object of phenotypes.
   # It has m elements for m studies.
   # Each element is a vector of phenotypes.
-  y.list <- NULL; for (i in 1:n.g) y.list[[i]] <- Y[which(groups == ugroups[i]), m] 
+  y.list <- NULL; for (i in 1:n.g) y.list[[i]] <- Y[which(groups == ugroups[i]), m]
   # x.list is a list object of covariates matrices.
   # It has m elements for m studies.
   # Each element is a matrix of covariates
-  x.list <- NULL; for (i in 1:n.g) x.list[[i]] <- as.matrix(Y[which(groups == ugroups[i]), -m]) 
+  x.list <- NULL; for (i in 1:n.g) x.list[[i]] <- as.matrix(Y[which(groups == ugroups[i]), -m])
   # Z is matrix of the gene
   # The rows of Z should be matched with phenotypes and covariates.
   # If there are 3 studies, and study 1,2, and 3 have n1, n2, and n3 samples,

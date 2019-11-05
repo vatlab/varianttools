@@ -95,4 +95,3 @@ void dyStringQuoteString(struct dyString *dy, char quotChar, char *text);
  * \-escaped) onto end of dy. */
 
 #endif /* DYSTRING_H */
-

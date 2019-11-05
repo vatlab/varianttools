@@ -76,4 +76,3 @@ comment=UniProt display ID, UniProt accession, or RefSeq protein ID
 index=12
 type=VARCHAR(255)
 comment=Unique identifier (GENCODE transcript ID for GENCODE Basic)
-

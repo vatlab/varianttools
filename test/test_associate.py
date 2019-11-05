@@ -55,7 +55,7 @@ class SetMafTester(ActionTester):
         print(data)
         return True
 
- 
+
 class TestAssociate(ProcessTestCase):
     def setUp(self):
         ProcessTestCase.setUp(self)

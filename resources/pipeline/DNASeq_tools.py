@@ -3,17 +3,17 @@ import os
 import re
 from variant_tools.pipeline import PipelineAction
 from variant_tools.utils import env, openFile
-        
+
 class CountMappedReads(PipelineAction):
     '''This action reads the input files in sam format and count the total
     number of reads and number of mapped reads. This action writes a count file
     to specified output files and read from this file directly if the file
     already exists. This action sets variables ``MAPPED_READS`` and ``TOTAL_READS`.
-    
+
     File Flow:
                count mapped reads
         INPUT =====================> OUTPUT
-    
+
     '''
     def __init__(self, output):
         '''
@@ -64,10 +64,10 @@ class GuessReadGroup(PipelineAction):
     def __call__(self, fastq_filename, pipeline=None):
         '''Get read group information from names of fastq files.'''
         # Extract read group information from filename such as
-        # GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt. The files are named 
+        # GERALD_18-09-2011_p-illumina.8_s_8_1_sequence.txt. The files are named
         # according to the lane that produced them and whether they
         # are paired or not: Single-end reads s_1_sequence.txt for lane 1;
-        # s_2_sequence.txt for lane 2 Paired-end reads s_1_1_sequence.txt 
+        # s_2_sequence.txt for lane 2 Paired-end reads s_1_1_sequence.txt
         # for lane 1, pair 1; s_1_2_sequence.txt for lane 1, pair 2
         #
         # This function return a read group string like '@RG\tID:foo\tSM:bar'
@@ -82,7 +82,7 @@ class GuessReadGroup(PipelineAction):
         # DT Date the run was produced (ISO8601 date or date/time).
         # FO Flow order. The array of nucleotide bases that correspond to the
         #     nucleotides used for each
-        #     flow of each read. Multi-base flows are encoded in IUPAC format, 
+        #     flow of each read. Multi-base flows are encoded in IUPAC format,
         #     and non-nucleotide flows by
         #     various other characters. Format: /\*|[ACMGRSVTWYHKDBN]+/
         # KS The array of nucleotide bases that correspond to the key sequence
@@ -90,7 +90,7 @@ class GuessReadGroup(PipelineAction):
         # LB Library.
         # PG Programs used for processing the read group.
         # PI Predicted median insert size.
-        # PL Platform/technology used to produce the reads. Valid values: 
+        # PL Platform/technology used to produce the reads. Valid values:
         #     CAPILLARY, LS454, ILLUMINA,
         #     SOLID, HELICOS, IONTORRENT and PACBIO.
         # PU Platform unit (e.g. flowcell-barcode.lane for Illumina or slide for
@@ -103,7 +103,7 @@ class GuessReadGroup(PipelineAction):
             # sample name is obtained from output filename without file extension
             SM = output.split('.', 1)[0]
             # always assume ILLUMINA for this script and BWA for processing
-            PL = 'ILLUMINA'  
+            PL = 'ILLUMINA'
             PG = 'BWA'
             #
             # PU is for flowcell and lane information, ID should be unique for each
@@ -131,7 +131,7 @@ class GuessReadGroup(PipelineAction):
             rg_output.write(rg)
         return self.output
 
- 
+
 class CheckFastqVersion(PipelineAction):
     '''
     Check the version of fastq file in order to set proper option for ``bwa aln`` runs.
@@ -178,7 +178,7 @@ class CheckFastqVersion(PipelineAction):
                         env.logger.warning(
                             'Suspiciout FASTA file {}: third line does not start with "+".'
                             .foramt(fastq_file))
-                        return 
+                        return
                     line = fastq.readline().decode('utf-8')
                     qual_scores += line.strip()
             #
@@ -195,6 +195,3 @@ class CheckFastqVersion(PipelineAction):
             else:
                 pipeline.VARS['ALN_PARAM'] = ''
         return self.output
-
-
-

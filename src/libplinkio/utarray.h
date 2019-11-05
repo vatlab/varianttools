@@ -21,7 +21,7 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-/* a dynamic array implementation using macros 
+/* a dynamic array implementation using macros
  * see http://uthash.sourceforge.net/utarray
  */
 #ifndef UTARRAY_H
@@ -34,9 +34,9 @@ extern "C" {
 #define UTARRAY_VERSION 1.9.4
 
 #ifdef __GNUC__
-#define _UNUSED_ __attribute__ ((__unused__)) 
+#define _UNUSED_ __attribute__ ((__unused__))
 #else
-#define _UNUSED_ 
+#define _UNUSED_
 #endif
 
 #include <stddef.h>  /* size_t */

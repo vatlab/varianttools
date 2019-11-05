@@ -110,4 +110,3 @@ index=16
 type=FLOAT NULL
 adj=Nullify('.')
 comment=ensemble prediction score based on random forests. Ranges 0 to 1. The larger the score the higher probability the scSNV will affect splicing. The suggested cutoff for a binary prediction (affecting splicing vs. not affecting splicing) is 0.6.
-

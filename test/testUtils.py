@@ -46,7 +46,7 @@ class ProcessTestCase(unittest.TestCase):
         'Create a new project. This will be called for each new test'
         self.test_command = self.id().split('.')[1]
         with open(self.test_command + '.log', 'a') as fcmd:
-            fcmd.write('\n# {}\n# {} \n'.format(self.id().split('.', 1)[-1], 
+            fcmd.write('\n# {}\n# {} \n'.format(self.id().split('.', 1)[-1],
                 '' if self.shortDescription() is None else '\n# '.join(self.shortDescription().split('\n'))))
         if os.environ.get("STOREMODE") is not None:
             self.storeMode=os.getenv("STOREMODE")
@@ -165,14 +165,14 @@ class ProcessTestCase(unittest.TestCase):
         output file (if output is a filename). cmd can be either a command (string) or a list of commands,
         with output joint together in the latter case. The output of the command will be converted to
         a list (split by newline) if output is a list.
-        
+
         If parameter partial is given,
         a) positive number: texts are split into lines and compares the first partial lines  ([:partial]),
         b) negative number: texts are split into lines and compares the last few lines ([partial:])
         c) a lambda function: texts are split into lines and compare the results returned after
             applying the lambda function
         d) True: if output is a substring of cmd (output in cmd)
-            
+
         if negate is True, test for negative assertaion (e.g. not equal, not include etc)
 
         NOTE: if output is a file (with pattern output/*) and the file does not exist, this
@@ -211,14 +211,14 @@ class ProcessTestCase(unittest.TestCase):
         self.compare(cmd_output, output, partial, negate=negate)
 
 
-    def assertProj(self, numOfSamples=None, numOfVariants=None, numOfGenotype=None, sampleNames=None, numOfColumns=None, 
+    def assertProj(self, numOfSamples=None, numOfVariants=None, numOfGenotype=None, sampleNames=None, numOfColumns=None,
         info=None, genotype=None, genoInfo=None, hasTable=None, tableDesc=None, partial=None, negate=None):
         '''Check properties of project
 
         numOfSamples:
             number of samples in the project
 
-        numOfVariants: 
+        numOfVariants:
             if a single number is given, assert number of variants in the master variant table.
             Otherwise a dictionary with table name and expected number of variants is checked.
 
@@ -241,7 +241,7 @@ class ProcessTestCase(unittest.TestCase):
         genotype:
             Compare genotype with a provided list. This parameter should be a dictionary with
             sample_id: genotype.
-        
+
         genoInfo:
             Compare genotype info with a provided list. This parameter should be a dictionary
             with key (sample_id, geno_info_name): geno_info.
@@ -256,9 +256,9 @@ class ProcessTestCase(unittest.TestCase):
 
         partial:
             partial can be True (if specified item is a subset of output list), positive integer
-            (compare the first few items), negative number (compare the last few items), or 
+            (compare the first few items), negative number (compare the last few items), or
             a lambda function (compare result of function call).
-        
+
         negate:
             If set to True, reverse the test (e.g. assert not equal, not include etc)
         '''
@@ -330,7 +330,7 @@ class ProcessTestCase(unittest.TestCase):
                         storageEngine=Engine_Storage.choose_storage_engine(HDF5FileName)
                         proj_geno,numCount=storageEngine.num_variants(table)
                         proj_num_geno=proj_geno
-                    
+
                     if negate:
                         self.assertNotEqual(int(proj_num_geno), numGeno)
                     else:
@@ -359,7 +359,7 @@ class ProcessTestCase(unittest.TestCase):
 
 
                         self.compare([int(x[1]) for x in proj_geno], list([int(x) for x in geno]), partial=partial, negate=negate)
-                        
+
 
         if genoInfo is not None:
             with open(os.devnull, 'w') as fnull:
@@ -405,6 +405,3 @@ class ProcessTestCase(unittest.TestCase):
                     proj_table_desc = subprocess.check_output("vtools show table '{}'".format(table), shell=True, stderr=fnull).decode()
                     proj_table_desc = proj_table_desc.strip().split('\n')[1].split(':', 1)[-1].strip()
                     self.compare(proj_table_desc, desc, partial=partial, negate=negate)
-                
-
-        

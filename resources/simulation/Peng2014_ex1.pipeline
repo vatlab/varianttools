@@ -15,16 +15,16 @@ ms_description=This simulator calls ms to execute coalescent-based simulations,
     create a population with simulated dataset and run through the same statistical
 	analysis as other pipeline.
 
-neutral_description=A neutral simulation using a Juke-Cantor (1969) DNA 
+neutral_description=A neutral simulation using a Juke-Cantor (1969) DNA
     nucleotide mutation model, a mutation rate of 1.8x10^-8, a fine-scale
 	recombination map, a demographic model that mimicks the European
-	population, and no natural selelction. 
+	population, and no natural selelction.
 
 with_selection_description=A simulation that uses identical models as the neutral
 	model but use a protein selection model with selection pressure 0.005,
 	0.02 and 0.1 for missense, stoploss and stopgain mutations.
 
-resample_description=A simulation model that extracts genotypes within the 
+resample_description=A simulation model that extracts genotypes within the
 	sepecified regions from the 1000 genomes project, and expands it very
 	rapidly to mimick a resampling-based simulation.
 
@@ -35,15 +35,15 @@ regions_comment=One or more chromosome regions (separated by ',') in the format 
   annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947).
   Please visit http://varianttools.sourceforge.net/Simulation for detailed
   description of this parameter.
-  
+
 scale=10
 scale_comment=Scaling factor to speed up the simulation by scaling down the
   simulation while boosting mutation, selection and recombination rates.
 
 extracted_vcf=extracted.vcf
 extracted_vcf_comment=Filename (with dir) to save genotypes (.vcf file extracted by tabix
-  command) for the resample model. This file will be automatically created and 
-  reused if it already exists. You will need to remove this file if you run the 
+  command) for the resample model. This file will be automatically created and
+  reused if it already exists. You will need to remove this file if you run the
   same pipeline using another region.
 
 [*_0]
@@ -239,6 +239,3 @@ comment=Get allele frequency spectrum in a sample of 700 individuals.
 [resample_999]
 action=RemoveIntermediateFiles(['ex1_resample_sampled_${seed}.pop'])
 comment=Remove intermediate populations to save diskspace.
-
-
-

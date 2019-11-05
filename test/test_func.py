@@ -47,7 +47,7 @@ class TestFunc(ProcessTestCase):
     #     self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'info.AN')" ''')
     #     self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'qual')" ''')
 
-    
+
     def testGenotype(self):
         'Testing function genotype'
         self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')
@@ -60,13 +60,13 @@ class TestFunc(ProcessTestCase):
         self.runCmd('vtools import vcf/SAMP3_complex_variants.vcf --sample_name SAMP3')
         self.assertSucc("vtools output variant chr pos 'genotype()'")
 
- 
+
     def testSamples(self):
         'Testing function samples'
         self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')
         self.runCmd('vtools import vcf/SAMP2.vcf')
         self.assertSucc("vtools output variant chr pos 'samples()'")
         self.assertSucc(r'''vtools output variant chr pos "samples(\"sample_filter=sample_name like 'SAMP%'&d=,\")"''')
-        
+
 if __name__ == '__main__':
     unittest.main()

@@ -40,7 +40,7 @@ class TestExclude(ProcessTestCase):
         self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
         self.runCmd('vtools use ann/testNSFP.ann')
         self.runCmd('vtools select variant \'testNSFP.chr is not null\' -t ns')
-        
+
     def testExclude(self):
         'Test command vtools exclude'
         self.assertFail('vtools exclude')

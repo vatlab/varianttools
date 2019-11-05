@@ -129,7 +129,7 @@ namespace cgatools { namespace util {
             fieldCount++;
             first = next+1;
         }
-        
+
         if (fields_.size() != fieldCount && !allowOptionalFieldsInLine_)
             throw Exception("failed to parse line: not enough fields");
     }

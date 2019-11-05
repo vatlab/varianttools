@@ -34,10 +34,10 @@ namespace cgatools { namespace util {
     typedef std::vector<std::string> StringVector;
 
     //! the class is designed to support a relatively small set of ranges
-    //! and answer the questions: 
+    //! and answer the questions:
     //! - does a given range intersect one of the ranges in the FastRangeSet?
     //! - is a given location contained by one of the ranges in the FastRangeSet?
-    class FastRangeSet 
+    class FastRangeSet
     {
     public:
         typedef std::pair<uint32_t,uint32_t> Range;

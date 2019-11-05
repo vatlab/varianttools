@@ -19,7 +19,7 @@ comment=Chromosome name
 [pos]
 index=2
 type=INTEGER NOT NULL
-comment=Start position of the indel event. 
+comment=Start position of the indel event.
 
 [type]
 index=3

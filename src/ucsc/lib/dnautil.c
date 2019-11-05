@@ -1,13 +1,13 @@
 /* Some stuff that you'll likely need in any program that works with
- * DNA.  Includes stuff for amino acids as well. 
+ * DNA.  Includes stuff for amino acids as well.
  *
  * Assumes that DNA is stored as a character.
- * The DNA it generates will include the bases 
+ * The DNA it generates will include the bases
  * as lowercase tcag.  It will generally accept
  * uppercase as well, and also 'n' or 'N' or '-'
- * for unknown bases. 
+ * for unknown bases.
  *
- * Amino acids are stored as single character upper case. 
+ * Amino acids are stored as single character upper case.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -24,7 +24,7 @@ struct codonTable
     AA mitoCode;	/* Upper case. Vertebrate Mitochondrial translations */
     };
 
-struct codonTable codonTable[] = 
+struct codonTable codonTable[] =
 /* The master codon/protein table. */
 {
     {"ttt", 'F', 'F',},
@@ -147,15 +147,15 @@ if (!inittedNtVal)
 	    ntValMasked[i] = (islower(i) ? (N_BASE_VAL|MASKED_BASE_BIT) : N_BASE_VAL);
             }
         }
-    ntVal5['t'] = ntVal5['T'] = ntValNoN['t'] = ntValNoN['T'] = ntVal['t'] = ntVal['T'] = 
+    ntVal5['t'] = ntVal5['T'] = ntValNoN['t'] = ntValNoN['T'] = ntVal['t'] = ntVal['T'] =
     	ntValLower['t'] = ntValUpper['T'] = T_BASE_VAL;
-    ntVal5['u'] = ntVal5['U'] = ntValNoN['u'] = ntValNoN['U'] = ntVal['u'] = ntVal['U'] = 
+    ntVal5['u'] = ntVal5['U'] = ntValNoN['u'] = ntValNoN['U'] = ntVal['u'] = ntVal['U'] =
     	ntValLower['u'] = ntValUpper['U'] = U_BASE_VAL;
-    ntVal5['c'] = ntVal5['C'] = ntValNoN['c'] = ntValNoN['C'] = ntVal['c'] = ntVal['C'] = 
+    ntVal5['c'] = ntVal5['C'] = ntValNoN['c'] = ntValNoN['C'] = ntVal['c'] = ntVal['C'] =
     	ntValLower['c'] = ntValUpper['C'] = C_BASE_VAL;
-    ntVal5['a'] = ntVal5['A'] = ntValNoN['a'] = ntValNoN['A'] = ntVal['a'] = ntVal['A'] = 
+    ntVal5['a'] = ntVal5['A'] = ntValNoN['a'] = ntValNoN['A'] = ntVal['a'] = ntVal['A'] =
     	ntValLower['a'] = ntValUpper['A'] = A_BASE_VAL;
-    ntVal5['g'] = ntVal5['G'] = ntValNoN['g'] = ntValNoN['G'] = ntVal['g'] = ntVal['G'] = 
+    ntVal5['g'] = ntVal5['G'] = ntValNoN['g'] = ntValNoN['G'] = ntVal['g'] = ntVal['G'] =
     	ntValLower['g'] = ntValUpper['G'] = G_BASE_VAL;
 
     valToNt[T_BASE_VAL] = valToNt[T_BASE_VAL|MASKED_BASE_BIT] = 't';
@@ -193,7 +193,7 @@ if (!inittedNtVal)
     }
 }
 
-/* Returns one letter code for protein, 
+/* Returns one letter code for protein,
  * 0 for stop codon or X for bad input,
  * The "Standard" Code */
 AA lookupCodon(DNA *dna)
@@ -250,7 +250,7 @@ boolean isReallyStopCodon(char *dna, boolean selenocysteine)
 {
 if (selenocysteine)
     {
-    /* Luckily the mitochondria *also* replaces TGA with 
+    /* Luckily the mitochondria *also* replaces TGA with
      * something else, even though it isn't selenocysteine */
     return lookupMitoCodon(dna) == 0;
     }
@@ -261,7 +261,7 @@ else
 }
 
 
-/* Returns one letter code for protein, 
+/* Returns one letter code for protein,
  * 0 for stop codon or X for bad input,
  * Vertebrate Mitochondrial Code */
 AA lookupMitoCodon(DNA *dna)
@@ -286,7 +286,7 @@ return c;
 }
 
 Codon codonVal(DNA *start)
-/* Return value from 0-63 of codon starting at start. 
+/* Return value from 0-63 of codon starting at start.
  * Returns -1 if not a codon. */
 {
 int v1,v2,v3;
@@ -308,7 +308,7 @@ return codonTable[val].codon;
 }
 
 void dnaTranslateSome(DNA *dna, char *out, int outSize)
-/* Translate DNA upto a stop codon or until outSize-1 amino acids, 
+/* Translate DNA upto a stop codon or until outSize-1 amino acids,
  * whichever comes first. Output will be zero terminated. */
 {
 int i;
@@ -327,7 +327,7 @@ for (i=0; i<dnaSize-2; i+=3)
 out[protSize] = 0;
 }
 
-/* A little array to help us decide if a character is a 
+/* A little array to help us decide if a character is a
  * nucleotide, and if so convert it to lower case. */
 char ntChars[256];
 
@@ -508,7 +508,7 @@ for (;;)
 }
 
 char *skipIgnoringDash(char *a, int size, bool skipTrailingDash)
-/* Count size number of characters, and any 
+/* Count size number of characters, and any
  * dash characters. */
 {
 while (size > 0)
@@ -528,14 +528,14 @@ int countNonDash(char *a, int size)
 int count = 0;
 int i;
 for (i=0; i<size; ++i)
-    if (a[i] != '-') 
+    if (a[i] != '-')
         ++count;
 return count;
 }
 
 int nextPowerOfFour(long x)
 /* Return next power of four that would be greater or equal to x.
- * For instance if x < 4, return 1, if x < 16 return 2.... 
+ * For instance if x < 4, return 1, if x < 16 return 2....
  * (From biological point of view how many bases are needed to
  * code this number.) */
 {
@@ -644,7 +644,7 @@ for (i=0; i<size; ++i)
 
 
 void dnaBaseHistogram(DNA *dna, int dnaSize, int histogram[4])
-/* Count up frequency of occurance of each base and store 
+/* Count up frequency of occurance of each base and store
  * results in histogram. */
 {
 int val;
@@ -765,7 +765,7 @@ assert(sizeof(bits16) == 2);
 }
 
 int intronOrientationMinSize(DNA *iStart, DNA *iEnd, int minIntronSize)
-/* Given a gap in genome from iStart to iEnd, return 
+/* Given a gap in genome from iStart to iEnd, return
  * Return 1 for GT/AG intron between left and right, -1 for CT/AC, 0 for no
  * intron.  Assumes DNA is lower cased. */
 {
@@ -784,7 +784,7 @@ else
 }
 
 int intronOrientation(DNA *iStart, DNA *iEnd)
-/* Given a gap in genome from iStart to iEnd, return 
+/* Given a gap in genome from iStart to iEnd, return
  * Return 1 for GT/AG intron between left and right, -1 for CT/AC, 0 for no
  * intron.  Assumes DNA is lower cased. */
 {
@@ -799,7 +799,7 @@ if (a == b) return 1;
 else return -1;
 }
 
-int  dnaOrAaScoreMatch(char *a, char *b, int size, int matchScore, int mismatchScore, 
+int  dnaOrAaScoreMatch(char *a, char *b, int size, int matchScore, int mismatchScore,
 	char ignore)
 /* Compare two sequences (without inserts or deletions) and score. */
 {
@@ -821,7 +821,7 @@ return score;
 
 int dnaScoreMatch(DNA *a, DNA *b, int size)
 /* Compare two pieces of DNA base by base. Total mismatches are
- * subtracted from total matches and returned as score. 'N's 
+ * subtracted from total matches and returned as score. 'N's
  * neither hurt nor help score. */
 {
 return dnaOrAaScoreMatch(a, b, size, 1, -1, 'n');
@@ -860,8 +860,8 @@ while (lettersLeft > 0)
 
 static int findTailPolyAMaybeMask(DNA *dna, int size, boolean doMask,
 				  boolean loose)
-/* Identify PolyA at end; mask to 'n' if specified.  This allows a few 
- * non-A's as noise to be trimmed too.  Returns number of bases trimmed.  
+/* Identify PolyA at end; mask to 'n' if specified.  This allows a few
+ * non-A's as noise to be trimmed too.  Returns number of bases trimmed.
  * Leaves first two bases of PolyA in case there's a taa stop codon. */
 {
 int i;
@@ -915,15 +915,15 @@ return trimSize;
 }
 
 int tailPolyASizeLoose(DNA *dna, int size)
-/* Return size of PolyA at end (if present).  This allows a few non-A's as 
- * noise to be trimmed too, but skips first two aa for taa stop codon.  
+/* Return size of PolyA at end (if present).  This allows a few non-A's as
+ * noise to be trimmed too, but skips first two aa for taa stop codon.
  * It is less conservative in extending the polyA region than maskTailPolyA. */
 {
 return findTailPolyAMaybeMask(dna, size, FALSE, TRUE);
 }
 
 int maskTailPolyA(DNA *dna, int size)
-/* Convert PolyA at end to n.  This allows a few non-A's as noise to be 
+/* Convert PolyA at end to n.  This allows a few non-A's as noise to be
  * trimmed too.  Returns number of bases trimmed.  Leaves very last a. */
 {
 return findTailPolyAMaybeMask(dna, size, TRUE, FALSE);
@@ -931,7 +931,7 @@ return findTailPolyAMaybeMask(dna, size, TRUE, FALSE);
 
 static int findHeadPolyTMaybeMask(DNA *dna, int size, boolean doMask,
 				  boolean loose)
-/* Return size of PolyT at start (if present); mask to 'n' if specified.  
+/* Return size of PolyT at start (if present); mask to 'n' if specified.
  * This allows a few non-T's as noise to be trimmed too, but skips last
  * two tt for revcomp'd taa stop codon. */
 {
@@ -987,16 +987,16 @@ return trimSize;
 }
 
 int headPolyTSizeLoose(DNA *dna, int size)
-/* Return size of PolyT at start (if present).  This allows a few non-T's as 
- * noise to be trimmed too, but skips last two tt for revcomp'd taa stop 
- * codon.  
+/* Return size of PolyT at start (if present).  This allows a few non-T's as
+ * noise to be trimmed too, but skips last two tt for revcomp'd taa stop
+ * codon.
  * It is less conservative in extending the polyA region than maskHeadPolyT. */
 {
 return findHeadPolyTMaybeMask(dna, size, FALSE, TRUE);
 }
 
 int maskHeadPolyT(DNA *dna, int size)
-/* Convert PolyT at start.  This allows a few non-T's as noise to be 
+/* Convert PolyT at start.  This allows a few non-T's as noise to be
  * trimmed too.  Returns number of bases trimmed.  */
 {
 return findHeadPolyTMaybeMask(dna, size, TRUE, FALSE);
@@ -1011,7 +1011,7 @@ int dnaCount = 0;
 dnaUtilOpen();
 for (i=0; i<size; ++i)
     {
-    if (ntChars[(int)poly[i]]) 
+    if (ntChars[(int)poly[i]])
 	dnaCount += 1;
     }
 return (dnaCount >= round(0.9 * size));
@@ -1027,7 +1027,7 @@ if (size <= 1)
 dnaUtilOpen();
 for (i=0; i<size-1; ++i)
     {
-    if (ntChars[(int)poly[i]] == 0) 
+    if (ntChars[(int)poly[i]] == 0)
 	return FALSE;
     }
 return TRUE;
@@ -1051,7 +1051,7 @@ struct aminoAcidTable
     char *name;
     };
 
-struct aminoAcidTable aminoAcidTable[] = 
+struct aminoAcidTable aminoAcidTable[] =
 {
     {0, 'A', "ala", "alanine"},
     {1, 'C', "cys", "cysteine"},

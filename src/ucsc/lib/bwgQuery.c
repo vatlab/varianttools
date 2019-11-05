@@ -64,7 +64,7 @@ head->itemCount = memReadBits16(&pt, isSwapped);
 *pPt = pt;
 }
 
-static int bigWigBlockDumpIntersectingRange(boolean isSwapped, char *blockPt, char *blockEnd, 
+static int bigWigBlockDumpIntersectingRange(boolean isSwapped, char *blockPt, char *blockEnd,
 	char *chrom, bits32 rangeStart, bits32 rangeEnd, int maxCount, FILE *out)
 /* Print out info on parts of block that intersect start-end, block starting at current position. */
 {
@@ -122,7 +122,7 @@ switch (head.type)
 	        {
 		if (!gotStart)
 		    {
-		    fprintf(out, "fixedStep chrom=%s start=%u step=%u span=%u\n", 
+		    fprintf(out, "fixedStep chrom=%s start=%u step=%u span=%u\n",
 			    chrom, start+1, head.itemStep, head.itemSpan);
 		    gotStart = TRUE;
 		    }
@@ -151,7 +151,7 @@ if (bwf->typeSig != bigWigSig)
    errAbort("Trying to do bigWigIntervalQuery on a non big-wig file.");
 bbiAttachUnzoomedCir(bwf);
 struct bbiInterval *el, *list = NULL;
-struct fileOffsetSize *blockList = bbiOverlappingBlocks(bwf, bwf->unzoomedCir, 
+struct fileOffsetSize *blockList = bbiOverlappingBlocks(bwf, bwf->unzoomedCir,
 	chrom, start, end, NULL);
 struct fileOffsetSize *block, *beforeGap, *afterGap;
 struct udcFile *udc = bwf->udc;
@@ -164,7 +164,7 @@ char *uncompressBuf = NULL;
 if (bwf->uncompressBufSize > 0)
     uncompressBuf = needLargeMem(bwf->uncompressBufSize);
 
-/* This loop is a little complicated because we merge the read requests for efficiency, but we 
+/* This loop is a little complicated because we merge the read requests for efficiency, but we
  * have to then go back through the data one unmerged block at a time. */
 for (block = blockList; block != NULL; )
     {
@@ -279,13 +279,13 @@ return list;
 
 int bigWigIntervalDump(struct bbiFile *bwf, char *chrom, bits32 start, bits32 end, int maxCount,
 	FILE *out)
-/* Print out info on bigWig parts that intersect chrom:start-end.   Set maxCount to 0 if you 
+/* Print out info on bigWig parts that intersect chrom:start-end.   Set maxCount to 0 if you
  * don't care how many are printed.  Returns number printed. */
 {
 if (bwf->typeSig != bigWigSig)
    errAbort("Trying to do bigWigIntervalDump on a non big-wig file.");
 bbiAttachUnzoomedCir(bwf);
-struct fileOffsetSize *blockList = bbiOverlappingBlocks(bwf, bwf->unzoomedCir, 
+struct fileOffsetSize *blockList = bbiOverlappingBlocks(bwf, bwf->unzoomedCir,
 	chrom, start, end, NULL);
 struct fileOffsetSize *block, *beforeGap, *afterGap;
 struct udcFile *udc = bwf->udc;
@@ -296,7 +296,7 @@ char *uncompressBuf = NULL;
 if (bwf->uncompressBufSize > 0)
     uncompressBuf = needLargeMem(bwf->uncompressBufSize);
 
-/* This loop is a little complicated because we merge the read requests for efficiency, but we 
+/* This loop is a little complicated because we merge the read requests for efficiency, but we
  * have to then go back through the data one unmerged block at a time. */
 for (block = blockList; block != NULL; )
     {
@@ -327,7 +327,7 @@ for (block = blockList; block != NULL; )
 	    }
 
 	/* Do the actual dump. */
-	int oneCount = bigWigBlockDumpIntersectingRange(bwf->isSwapped, blockPt, blockEnd, 
+	int oneCount = bigWigBlockDumpIntersectingRange(bwf->isSwapped, blockPt, blockEnd,
 		chrom, start, end, maxCount, out);
 
 	/* Keep track of how many dumped, not exceeding maximum. */
@@ -396,4 +396,3 @@ if (sig == bigWigSig)
 sig = byteSwap32(sig);
 return sig == bigWigSig;
 }
-
