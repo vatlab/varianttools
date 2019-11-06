@@ -24,15 +24,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
-import glob
+
 import unittest
-import subprocess
-import shutil
 from testUtils import ProcessTestCase
 
 
 class TestPipeline(ProcessTestCase):
+
     def testCheckVariantToolsVersion(self):
         'Test functor CheckVariantToolsVersion'
         self.assertSucc('vtools execute test_pipeline.pipeline checkvtools')
@@ -47,8 +45,7 @@ class TestPipeline(ProcessTestCase):
 
     def testRunCommand(self):
         self.assertSucc('vtools execute test_pipeline.pipeline runcommand')
-        self.assertFail(
-            'vtools execute test_pipeline.pipeline runcommand_fail')
+        self.assertFail('vtools execute test_pipeline.pipeline runcommand_fail')
 
     # def testCreatePopulation(self):
     #     self.assertSucc('vtools execute test_pipeline.pipeline createpop')

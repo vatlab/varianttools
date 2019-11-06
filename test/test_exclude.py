@@ -24,19 +24,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
-import glob
 import unittest
-import subprocess
 from testUtils import ProcessTestCase
 
 
 class TestExclude(ProcessTestCase):
+
     def setUp(self):
         'Create a project'
         ProcessTestCase.setUp(self)
         # self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+        self.runCmd(
+            'vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv'
+        )
         self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
         self.runCmd('vtools use ann/testNSFP.ann')
         self.runCmd('vtools select variant \'testNSFP.chr is not null\' -t ns')
@@ -49,13 +49,15 @@ class TestExclude(ProcessTestCase):
         self.assertFail('vtools exclude non_existing_table "aff=\'1\'" -t aff')
         # Cannot overwrite master variant table. Please choose another name for the variant table.
         self.assertFail('vtools exclude ns "sift_score<=0.94" -t variant')
-        self.assertSucc('vtools exclude ns "sift_score <= 0.94" -t ns_non_damaging')
-        #should have 5 variants
-        #select "sift_score >= 0.94" will result in 6 variants
-        self.assertOutput('vtools select ns "sift_score > 0.94" -c', 'output/exclude_sift.txt')
-        self.assertOutput('vtools exclude ns "sift_score <= 0.94" -c', 'output/exclude_sift.txt')
+        self.assertSucc(
+            'vtools exclude ns "sift_score <= 0.94" -t ns_non_damaging')
+        # should have 5 variants
+        # select "sift_score >= 0.94" will result in 6 variants
+        self.assertOutput('vtools select ns "sift_score > 0.94" -c',
+                          'output/exclude_sift.txt')
+        self.assertOutput('vtools exclude ns "sift_score <= 0.94" -c',
+                          'output/exclude_sift.txt')
         self.assertOutput('vtools exclude ns "variant_id=604" -c', '1445')
-
 
     # def testExcludeAnno(self):
     #    self.runCmd('vtools liftover hg19')

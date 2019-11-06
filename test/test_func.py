@@ -30,13 +30,22 @@ import unittest
 import subprocess
 from testUtils import ProcessTestCase
 
-@unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
+
+@unittest.skipUnless(
+    os.getenv("STOREMODE") == "sqlite",
+    "HDF5 version is not implemented for this test")
 class TestFunc(ProcessTestCase):
+
     def testRefSequence(self):
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.assertSucc('vtools output variant chr pos ref alt "ref_sequence(chr, pos)"')
-        self.assertSucc('vtools output variant chr pos ref alt "ref_sequence(chr, pos-10, pos+10)"')
-        self.assertSucc('''vtools output variant chr pos ref alt "ref_sequence('1', pos-10, pos+10)" ''')
+        self.assertSucc(
+            'vtools output variant chr pos ref alt "ref_sequence(chr, pos)"')
+        self.assertSucc(
+            'vtools output variant chr pos ref alt "ref_sequence(chr, pos-10, pos+10)"'
+        )
+        self.assertSucc(
+            '''vtools output variant chr pos ref alt "ref_sequence('1', pos-10, pos+10)" '''
+        )
 
     # def testVcfTrack(self):
     #     'Testing vcf track'
@@ -47,26 +56,32 @@ class TestFunc(ProcessTestCase):
     #     self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'info.AN')" ''')
     #     self.assertSucc('''vtools output variant "track('vcf/CEU.vcf.gz', 'qual')" ''')
 
-
     def testGenotype(self):
         'Testing function genotype'
         self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')
         self.runCmd('vtools import vcf/SAMP2.vcf')
         self.assertSucc("vtools output variant chr pos 'genotype()'")
         self.assertSucc('''vtools output variant chr pos "genotype('SAMP1')"''')
-        self.assertSucc(r'''vtools output variant chr pos "genotype(\"sample_name like 'SAMP%'\", 'd=,')"''')
-        self.assertSucc(r'''vtools output variant chr pos "genotype(\"sample_name like 'SAMP%'\", 'd=,&missing=.')"''')
+        self.assertSucc(
+            r'''vtools output variant chr pos "genotype(\"sample_name like 'SAMP%'\", 'd=,')"'''
+        )
+        self.assertSucc(
+            r'''vtools output variant chr pos "genotype(\"sample_name like 'SAMP%'\", 'd=,&missing=.')"'''
+        )
         # create a sample without GT
-        self.runCmd('vtools import vcf/SAMP3_complex_variants.vcf --sample_name SAMP3')
+        self.runCmd(
+            'vtools import vcf/SAMP3_complex_variants.vcf --sample_name SAMP3')
         self.assertSucc("vtools output variant chr pos 'genotype()'")
-
 
     def testSamples(self):
         'Testing function samples'
         self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')
         self.runCmd('vtools import vcf/SAMP2.vcf')
         self.assertSucc("vtools output variant chr pos 'samples()'")
-        self.assertSucc(r'''vtools output variant chr pos "samples(\"sample_filter=sample_name like 'SAMP%'&d=,\")"''')
+        self.assertSucc(
+            r'''vtools output variant chr pos "samples(\"sample_filter=sample_name like 'SAMP%'&d=,\")"'''
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

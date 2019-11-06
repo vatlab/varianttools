@@ -25,12 +25,12 @@
 #
 
 import os
-import glob
 import unittest
-import subprocess
 from testUtils import ProcessTestCase
 
+
 class TestExecute(ProcessTestCase):
+
     def setUp(self):
         'Create a project'
         ProcessTestCase.setUp(self)
@@ -42,28 +42,37 @@ class TestExecute(ProcessTestCase):
         'Test command vtools execute'
         self.assertFail('vtools execute')
         self.assertSucc('vtools execute -h')
-        self.assertFail('vtools execute select non_existing_field from sample -v2')
+        self.assertFail(
+            'vtools execute select non_existing_field from sample -v2')
         self.assertSucc('vtools execute select sample_name from sample -v2')
         self.assertFail('vtools execute select * from sample -v0')
         self.assertSucc('vtools execute \'select * from sample\'')
-        self.assertSucc('vtools execute \'delete FROM variant where chr=1\' -v2')
-        self.assertSucc('vtools execute \'delete FROM variant where ref="T"\' -v2')
+        self.assertSucc(
+            'vtools execute \'delete FROM variant where chr=1\' -v2')
+        self.assertSucc(
+            'vtools execute \'delete FROM variant where ref="T"\' -v2')
         self.assertSucc('vtools execute \'delete FROM sample where aff=2\' -v2')
 
     def testExeAnno(self):
         self.runCmd('vtools init test -f')
         if os.environ.get("LOCALRESOURCE") is not None:
-            self.local_resource=os.getenv("LOCALRESOURCE")
-            self.runCmd('vtools admin --set_runtime_option local_resource='+self.local_resource)
+            self.local_resource = os.getenv("LOCALRESOURCE")
+            self.runCmd('vtools admin --set_runtime_option local_resource=' +
+                        self.local_resource)
         self.runCmd('vtools import vcf/SAMP1.vcf --build hg19')
         self.runCmd('vtools import vcf/SAMP2.vcf')
         self.runCmd('vtools use refGene')
         self.runCmd('vtools update variant --set ref_name=refGene.name')
-        self.assertSucc('''vtools execute 'select chr,txStart,txEnd,name from refGene where name is not null' ''')
-        self.assertOutput('''vtools execute 'select chr,txStart,txEnd,name from refGene where name="NR_024321"' ''',
+        self.assertSucc(
+            '''vtools execute 'select chr,txStart,txEnd,name from refGene where name is not null' '''
+        )
+        self.assertOutput(
+            '''vtools execute 'select chr,txStart,txEnd,name from refGene where name="NR_024321"' ''',
             '1\t761586\t762902\tNR_024321\n')
-        self.assertOutput('''vtools execute 'select pos from variant where ref_name = "NR_024321"' ''',
+        self.assertOutput(
+            '''vtools execute 'select pos from variant where ref_name = "NR_024321"' ''',
             'output/exclude_anno1.txt')
+
 
 if __name__ == '__main__':
     unittest.main()
