@@ -117,6 +117,9 @@ class TestInit(ProcessTestCase):
             + self.storeMode)
         self.assertProj(numOfVariants=288, numOfSamples=51)
 
+    @unittest.skipUnless(
+        os.getenv("STOREMODE") == "sqlite3",
+        "HDF5 version is not implemented for this test")
     def testGenotypes_sample(self):
         'Test command init --genotypes with samples option'
         try:
@@ -137,17 +140,20 @@ class TestInit(ProcessTestCase):
         self.runCmd(
             'vtools phenotype --from_stat "num=#(GT)" "hom=#(hom)" "het=#(het)"'
         )
-        #compare the first three lines of the output and result using "output" option
+        # compare the first three lines of the output and result using "output" option
         self.assertOutput('vtools phenotype --output num hom het',
                           '''3	0	3\n7	0	7\n7	0	7''', 3)
-        #compare the whole output and result table using "file" option, "output" is null and numOfLines=0
+        # compare the whole output and result table using "file" option, "output" is null and numOfLines=0
         self.assertOutput('vtools phenotype --output num hom het',
                           'output/genotype_variant_sample_output.txt')
         shutil.rmtree('parent')
 
+    @unittest.skipUnless(
+        os.getenv("STOREMODE") == "sqlite3",
+        "HDF5 version is not implemented for this test")
     def testChildren(self):
         'Test command init --children'
-        #first project
+        # first project
         try:
             os.mkdir('ceu')
         except OSError:
