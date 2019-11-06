@@ -31,7 +31,7 @@ from collections import defaultdict
 from multiprocessing import Manager, Process
 from multiprocessing import Queue as mpQueue
 
-
+import numpy as np
 from .geno_store import GenoStore
 from .project import Project
 from .utils import (SQL_KEYWORDS, DatabaseEngine, ProgressBar, env,
@@ -107,9 +107,9 @@ class GenotypeStatCalculator(threading.Thread):
                 # run query
                 res = [None] * len(self.stat)
                 # regular stat
-                query = 'SELECT {} FROM genotype_{} {};'\
-                    .format(', '.join([x[0] for x in self.stat]), ID,
-                        'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else '')
+                query = 'SELECT {} FROM genotype_{} {};'.format(
+                    ', '.join([x[0] for x in self.stat]), ID, 'WHERE {}'.format(
+                        self.genotypes) if self.genotypes.strip() else '')
                 env.logger.debug(query)
                 try:
                     cur.execute(query)
@@ -117,9 +117,9 @@ class GenotypeStatCalculator(threading.Thread):
                 except Exception:
                     # some field might not exist, so we will have to run one by one
                     for idx, (expr, where) in enumerate(self.stat):
-                        query = 'SELECT {} FROM genotype_{} {};'\
-                            .format(expr, ID,
-                                'WHERE {}'.format(self.genotypes) if self.genotypes.strip() else '')
+                        query = 'SELECT {} FROM genotype_{} {};'.format(
+                            expr, ID, 'WHERE {}'.format(self.genotypes)
+                            if self.genotypes.strip() else '')
                         env.logger.debug(query)
                         try:
                             cur.execute(query)
@@ -376,8 +376,8 @@ class Sample:
                 count[2] += 1  # updated
             null_count = defaultdict(int)
 
-            id_records={}
-            for key,rec in records.items():
+            id_records = {}
+            for key, rec in records.items():
                 # by sample_name only
                 if len(key) == 1:
                     # get matching sample
@@ -395,26 +395,28 @@ class Sample:
                     invalid_sample_names.add(key[0])
                     continue
                 for id in ids:
-                    id_records[id]=rec
+                    id_records[id] = rec
 
-           #
-            #CHANGE: for deal with large sample list
-            # for id in [x for x in ids if x in allowed_samples]:
-            allowed_samples=np.array(allowed_samples)
-            phenoIDs=np.array(list(id_records.keys()))
-            overlapIDs=np.intersect1d(phenoIDs,allowed_samples,assume_unique=True)
+        #
+        # CHANGE: for deal with large sample list
+        # for id in [x for x in ids if x in allowed_samples]:
+            allowed_samples = np.array(allowed_samples)
+            phenoIDs = np.array(list(id_records.keys()))
+            overlapIDs = np.intersect1d(
+                phenoIDs, allowed_samples, assume_unique=True)
 
             for id in overlapIDs:
                 count[0] += 1
-                rec=id_records[id]
+                rec = id_records[id]
                 if rec[idx] == na_str:
                     null_count[field] += 1
                     rec[idx] = None
                 elif fldtype.upper().startswith('INT'):
                     try:
                         int(rec[idx])
-                    except:
-                        env.logger.warning('Value "{}" is treated as missing in phenotype {}'
+                    except Exception:
+                        env.logger.warning(
+                            'Value "{}" is treated as missing in phenotype {}'
                             .format(rec[idx], field))
                         null_count[field] += 1
                         rec[idx] = None
@@ -422,7 +424,7 @@ class Sample:
                 elif fldtype.upper().startswith('FLOAT'):
                     try:
                         float(rec[idx])
-                    except:
+                    except Exception:
                         env.logger.warning(
                             'Value "{}" is treated as missing in phenotype {}'
                             .format(rec[idx], field))
@@ -818,8 +820,7 @@ def phenotype(args):
                 p.output(args.output, args.header, args.delimiter, args.na,
                          args.limit,
                          ' AND '.join(['({})'.format(x) for x in args.samples]))
-            if not (args.from_file or args.set or args.from_stat or
-                    args.output):
+            if not any([args.from_file, args.set, args.from_stat, args.output]):
                 raise ValueError(
                     'Please add "-h" after phenotype to get more help for this command'
                 )
