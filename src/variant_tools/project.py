@@ -2315,8 +2315,9 @@ class Project:
     def createIndexOnSampleTable(self):
         try:
             if not self.db.hasIndex('idx_sample_name'):
+                # sample_name does not have to be unique
                 self.db.execute(
-                    '''CREATE UNIQUE INDEX idx_sample_name ON sample (sample_name);''')
+                    '''CREATE INDEX idx_sample_name ON sample (sample_name);''')
             if not self.db.hasIndex('idx_file_ID'):
                 self.db.execute(
                     '''CREATE INDEX idx_file_ID ON sample (file_id);''')
