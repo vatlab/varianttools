@@ -1484,6 +1484,19 @@ class HDF5_Store(Base_Store):
             accessEngine.close()
         return num
 
+    def num_samples_variants(self,sampleIDs):
+        sampleFileMap = self.get_HDF5_sampleMap()
+        num=[]
+        for HDFfileName in glob.glob("tmp*genotypes.h5"):
+            filename = HDFfileName.split("/")[-1]
+            if filename in sampleFileMap:
+                samplesInfile = sampleFileMap[filename]
+                accessEngine = Engine_Access.choose_access_engine(HDFfileName)
+                num, _ = accessEngine.num_samples_variants(samplesInfile)
+                accessEngine.close()
+        return num
+
+
     def geno_fields(self, sampleID):
         HDFfileName = self.get_sampleFileName(sampleID)
         genoFields = ""

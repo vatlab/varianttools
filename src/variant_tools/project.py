@@ -5057,17 +5057,32 @@ def show(args):
                 cur.execute(
                     'SELECT sample.sample_id, sample_name, filename FROM sample, filename WHERE sample.file_id = filename.file_id ORDER BY sample.sample_id {};'.format(limit_clause))
                 records = cur.fetchall()
-                for rec in records:
-                    # now get sample genotype counts and sample specific fields
-                    sampleId = rec[0]
-                    store = GenoStore(proj)
-                    numGenotypes = store.num_variants(sampleId)
+                if proj.store == 'sqlite':
+                    for rec in records:
+                        # now get sample genotype counts and sample specific fields
+                        sampleId = rec[0]
+                        store = GenoStore(proj)
+                        numGenotypes = store.num_variants(sampleId)
 
-                    # get fields for each genotype table
-                    sampleGenotypeFields = ','.join(
-                        store.geno_fields_nolower(sampleId))
-                    prt.write([rec[1], rec[2], str(
-                        numGenotypes), sampleGenotypeFields])
+                        # get fields for each genotype table
+                        sampleGenotypeFields = ','.join(
+                            store.geno_fields_nolower(sampleId))
+                        prt.write([rec[1], rec[2], str(
+                            numGenotypes), sampleGenotypeFields])
+                elif proj.store == 'hdf5':
+                    sampleIDs=[]
+                    for rec in records:
+                        sampleIDs.append(rec[0])
+                    store=GenoStore(proj)
+                    numGenotypes = store.num_samples_variants(sampleIDs)
+                    for sampleId,numGenotype in zip(sampleIDs,numGenotypes):
+                        sampleGenotypeFields = ','.join(
+                            store.geno_fields_nolower(sampleId))
+                        prt.write([rec[1], rec[2], str(
+                            numGenotype), sampleGenotypeFields])
+
+
+
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:

@@ -591,6 +591,21 @@ class HDF5Engine_access(Base_Access):
             numCount[chr] = numVariants - len(numNan[0])
         return totalNum, numCount
 
+    def num_samples_variants(self,sampleIDs):
+        totalNum = [0]*len(sampleIDs)
+        numCount={}
+        for rownames, colnames, genoinfo in self.get_all_genotype(sampleIDs):
+            total=0
+            for i, sampleID in enumerate(sampleIDs):
+                numVariants = rownames.shape[:][0]
+                colPos = np.where(colnames == sampleID)[0]
+                data = genoinfo[:, colPos]
+                numNan = np.where(np.isnan(data))
+                totalNum[i] += numVariants - len(numNan[0])
+                # numCount[chr] = numVariants - len(numNan[0])
+        return totalNum,numCount
+
+
     def num_genotypes(self, sampleID, cond, genotypes):
         totalNum = 0
 
