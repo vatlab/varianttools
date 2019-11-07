@@ -29,6 +29,7 @@ from multiprocessing import Queue as mpQueue
 
 from .accessor import Engine_Access, Engine_Storage
 from .utils import DatabaseEngine
+import numpy as np
 
 
 class GroupHDFGenerator(Process):
@@ -463,7 +464,7 @@ def getGenotype_HDF5(worker, group, sample_IDs):
     HDFfileNames=sorted(HDFfileNames, key=lambda name: int(name.split("_")[1]))
     sample_IDs=np.array(sample_IDs)
     for fileName in HDFfileNames:
-        accessEngine=Engine_Access.choose_access_engine(fileName)
+        accessEngine=Engine_Access.choose_access_engine(fileName,read_only=True)
         colnames=accessEngine.get_colnames(chr)
 
         colnames=np.array(colnames.tolist())
