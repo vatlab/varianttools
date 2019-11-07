@@ -107,7 +107,7 @@ class ImportStatus:
     def pendingImport(self):
         # return waiting (queued, to be imported) and ongoing import
         return sum([x == 0 for x in list(self.tasks.values())
-                   ]), sum([x == 1 for x in list(self.tasks.values())])
+            ]), sum([x == 1 for x in list(self.tasks.values())])
 
     def addDedupItem(self, geno_file, geno_status, IDs):
         self.lock.acquire()
@@ -449,7 +449,8 @@ class GenotypeCopier(Process):
                 try:
                     # remove the temporary file
                     os.remove(self.genotype_file)
-                except:
+                except Exception as e:
+                    print(e)
                     pass
 
 
@@ -757,8 +758,8 @@ class Sqlite_Store(Base_Store):
                 self.cur.execute(
                     'CREATE INDEX genotype_{0}_index ON genotype_{0} (variant_id ASC)'
                     .format(ID))
-            self.cur.execute('DELETE FROM genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'\
-                .format(ID, self.proj.name+"."+table))
+            self.cur.execute('DELETE FROM genotype_{} WHERE variant_id IN (SELECT variant_id FROM {});'
+                .format(ID, self.proj.name + "." + table))
 
             env.logger.info('{} genotypes are removed from sample {}'.format(
                 self.cur.rowcount, name))
@@ -1486,15 +1487,20 @@ class HDF5_Store(Base_Store):
 
     def num_samples_variants(self,sampleIDs):
         sampleFileMap = self.get_HDF5_sampleMap()
-        num=[]
+        totalNum=[]
         for HDFfileName in glob.glob("tmp*genotypes.h5"):
+            num=[]
             filename = HDFfileName.split("/")[-1]
             if filename in sampleFileMap:
                 samplesInfile = sampleFileMap[filename]
                 accessEngine = Engine_Access.choose_access_engine(HDFfileName)
-                num, _ = accessEngine.num_samples_variants(samplesInfile)
+
+                colnames=np.intersect1d(sampleIDs,samplesInfile)
+                if len(colnames)>0:
+                    num, _ = accessEngine.num_samples_variants(samplesInfile)
                 accessEngine.close()
-        return num
+            totalNum.extend(num)
+        return totalNum
 
 
     def geno_fields(self, sampleID):

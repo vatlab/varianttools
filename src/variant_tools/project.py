@@ -5075,13 +5075,11 @@ def show(args):
                         sampleIDs.append(rec[0])
                     store=GenoStore(proj)
                     numGenotypes = store.num_samples_variants(sampleIDs)
-                    for sampleId,numGenotype in zip(sampleIDs,numGenotypes):
-                        sampleGenotypeFields = ','.join(
-                            store.geno_fields_nolower(sampleId))
+                    sampleGenotypeFields = ','.join(
+                            store.geno_fields_nolower(sampleIDs[0]))
+                    for sampleId,numGenotype,rec in zip(sampleIDs,numGenotypes,records):
                         prt.write([rec[1], rec[2], str(
                             numGenotype), sampleGenotypeFields])
-
-
 
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
