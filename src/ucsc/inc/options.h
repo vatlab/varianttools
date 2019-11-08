@@ -1,4 +1,4 @@
-/* Stuff to process options out of command line. 
+/* Stuff to process options out of command line.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -73,7 +73,7 @@ void optionInit(int *pArgc, char *argv[], struct optionSpec *optionSpecs);
  */
 
 void optionHash(int *pArgc, char *argv[]);
-/* Read options in command line into options hash.   
+/* Read options in command line into options hash.
  * Options come in three forms:
  *      -option         words starting with dash
  *      option=val      words with = in the middle
@@ -94,4 +94,3 @@ void optionFree();
 /* free the option hash */
 
 #endif /* OPTIONS_H */
-

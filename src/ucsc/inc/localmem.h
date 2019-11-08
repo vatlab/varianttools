@@ -1,5 +1,5 @@
-/* LocalMem.h - local memory routines. 
- * 
+/* LocalMem.h - local memory routines.
+ *
  * These routines are meant for the sort of scenario where
  * a lot of little to medium size pieces of memory are
  * allocated, and then disposed of all at once.

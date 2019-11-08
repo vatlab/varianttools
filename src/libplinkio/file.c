@@ -41,8 +41,8 @@ file_copy(const char *from_path, const char *to_path)
 file_status_t
 file_remove(const char *path)
 {
-    char *rm_command = malloc( sizeof( char ) * ( strlen( path ) + 4 ) ); 
-    
+    char *rm_command = malloc( sizeof( char ) * ( strlen( path ) + 4 ) );
+
     sprintf( rm_command, "rm %s", path );
     int status = system( rm_command );
     free( rm_command );

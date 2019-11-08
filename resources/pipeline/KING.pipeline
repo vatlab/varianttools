@@ -25,7 +25,7 @@ KING=${: "%(king_path)s/king" if "%(king_path)s" else "king"}
 PLINK=${: "%(plink_path)s/plink" if "%(plink_path)s" else "plink"}
 SED=${: "gsed" if sys.platform == "darwin" else "sed"}
 
-# Properly format --samples option 
+# Properly format --samples option
 SAMP=${: convertDoubleQuote('''%(samples)s''')}
 
 [DEFAULT]
@@ -43,13 +43,13 @@ reported_ancestry_comment=Field name for self-reported ancestry.
   ancestry group.
 
 king_path=
-king_path_comment=Path to a directory that contains the "king" program, 
+king_path_comment=Path to a directory that contains the "king" program (version 2.2+),
   if it is not in the default $PATH.
 
 plink_path=
-plink_path_comment=Path to a directory that contains the "plink" program, 
+plink_path_comment=Path to a directory that contains the "plink" program (version 1.9+),
   if it is not in the default $PATH.
-  
+
 num_comp=5
 num_comp_comment= number of MDS components in global ancestry analysis that
   will be imported to sample table.
@@ -61,7 +61,7 @@ maf_comment= Minor Allele Frequency cutoff. Variants having MAF smaller than thi
 jobname=KING
 jobname_comment=A jobname, an identifier that will be part of filenames and field names
   generated during the execution of this pipeline. Please ONLY
-  use combination of letters and underscore ("_") for job name. 
+  use combination of letters and underscore ("_") for job name.
 
 [king_0]
 input=${CMD_INPUT: CMD_INPUT if CMD_INPUT else glob.glob('*.proj')}
@@ -92,11 +92,11 @@ comment=Calculate LD pruning candidate list with a cutoff of R^2=0.5
 [king_31]
 action=RunCommand('${PLINK} --tped %(jobname)s.tped --tfam %(jobname)s.tfam --extract %(jobname)s.LD.50.prune.in --no-parents --no-sex --no-pheno --maf %(maf)s --make-bed --out %(jobname)s',
   working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s.bed')
-comment=LD pruning from pre-calculated list 
+comment=LD pruning from pre-calculated list
 
 [king_41]
-action=RunCommand('${KING} -b %(jobname)s.bed --mds --ibs --prefix %(jobname)s-',
-  working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s-pc.ped')
+action=RunCommand('${KING} -b %(jobname)s.bed --mds --prefix %(jobname)s-',
+  working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s-pc.txt')
 comment=Global ancestry inference
 
 [king_42]
@@ -105,7 +105,7 @@ action=RunCommand('${KING} -b %(jobname)s.bed --kinship --related --degree 3 --p
 comment=Kinship inference
 
 [king_51]
-action=RunCommand('''cut  -f 2,7-`echo $((7+%(num_comp)s-1))` -d " " %(jobname)s-pc.ped | ${SED} -e "s/ /,/g" | ${SED} 1i"sample_name`seq -s, 1 %(num_comp)s | awk -F, '{if (NF>20) NF=20; for (i=1; i<=NF; ++i) printf(",%%s", "%(jobname)s_MDS"$i)}'`" > %(jobname)s-mds.vtools.txt''',
+action=RunCommand('''cut -f 2,7-`echo $((7+%(num_comp)s-1))` -d " " %(jobname)s-pc.txt | ${SED} 1c"sample_name`seq 1 %(num_comp)s | awk '{if (NF>20) NF=20; for (i=1; i<=NF; ++i) printf(" %%s", "%(jobname)s_MDS"$i)}'`" > %(jobname)s-mds.vtools.txt''',
   working_dir='${CACHE_DIR}', output='${CACHE_DIR}/%(jobname)s-mds.vtools.txt')
 comment=Extract MDS result for vtools phenotype import
 

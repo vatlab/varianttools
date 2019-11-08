@@ -67,7 +67,7 @@ void htmStart(FILE *f, char *title);
 /* Write the start of a stand alone .html file. */
 
 void printBodyTag(FILE *f);
-// print starting BODY tag, including any appropriate attributes (class, background and bgcolor). 
+// print starting BODY tag, including any appropriate attributes (class, background and bgcolor).
 
 void htmStartWithHead(FILE *f, char *head, char *title);
 /* Write the start of a stand alone .html file, plus head info */

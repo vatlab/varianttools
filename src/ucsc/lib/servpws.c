@@ -1,4 +1,4 @@
-/* Stuff that's specific for the Personal Web Server goes here. 
+/* Stuff that's specific for the Personal Web Server goes here.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -33,7 +33,7 @@ static double _speed()
 {
 return 1.25;
 }
-        
+
 struct webServerSpecific wssMicrosoftPWS =
     {
     "Microsoft-PWS",

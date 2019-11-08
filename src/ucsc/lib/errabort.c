@@ -283,7 +283,7 @@ struct perThreadAbortVars *ptav = getThreadVars();
 ptav->debugPushPopErr = TRUE;
 }
 
-boolean isErrAbortInProgress() 
+boolean isErrAbortInProgress()
 /* Flag to indicate that an error abort is in progress.
  * Needed so that a warn handler can tell if it's really
  * being called because of a warning or an error. */
@@ -310,14 +310,14 @@ static pthread_mutex_t pidInUseMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_lock( &pidInUseMutex );
 // If this pid equals pidInUse, then this function has been re-entered due to severe out-of-memory error.
 // But we only compare them when pidInUseValid is TRUE.
-if (pidInUseValid && pthread_equal(pid, pidInUse)) 
+if (pidInUseValid && pthread_equal(pid, pidInUse))
     {
     // Avoid deadlock on self by exiting immediately.
     // Use pthread_equal because directly comparing two pthread_t vars is not allowed.
     // This re-entrancy only happens when it has aborted already due to out of memory
     // which should be a rare occurrence.
     char *errMsg = "errAbort re-entered due to out-of-memory condition. Exiting.\n";
-    write(STDERR_FILENO, errMsg, strlen(errMsg)); 
+    write(STDERR_FILENO, errMsg, strlen(errMsg));
     exit(1);   // out of memory is a serious problem, exit immediately, but allow atexit cleanup.
     }
 pthread_mutex_unlock( &pidInUseMutex );
@@ -368,4 +368,3 @@ pthread_mutex_unlock( &pidInUseMutex );
 pthread_mutex_unlock( &ptavMutex );
 return (struct perThreadAbortVars *)(hel->val);
 }
-

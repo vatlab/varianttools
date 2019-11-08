@@ -1,7 +1,7 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 #
 # ChangeLog:
@@ -137,7 +137,7 @@ comment=Polyphen2 score, i.e. pph2_prob
 index=22
 type=VARCHAR(2) NULL
 adj=Nullify('NA')
-comment=Polyphen2 prediction,  "D" ("probably damaging"), "P" ("possibly damaging") or "B" ("benign") 
+comment=Polyphen2 prediction,  "D" ("probably damaging"), "P" ("possibly damaging") or "B" ("benign")
 
 [LRT_score]
 index=23
@@ -355,5 +355,3 @@ index=34
 adj=Nullify('.'), ExtractValue('CHBJPT:'), ExtractField(2, '/')
 type=INTEGER
 comment=Total number of allele in the CHBJPT population, reported by 1000 genome low coverage data
-
-

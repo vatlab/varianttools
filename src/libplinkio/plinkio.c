@@ -41,7 +41,7 @@ pio_open(struct pio_file_t *plink_file, const char *plink_file_prefix)
     /* int error = 0; */
     /* int num_samples = 0; */
     /* int num_loci = 0; */
-    
+
     char *fam_path = concatenate( plink_file_prefix, ".fam" );
     char *bim_path = concatenate( plink_file_prefix, ".bim" );
     char *bed_path = concatenate( plink_file_prefix, ".bed" );
@@ -61,7 +61,7 @@ pio_status_t pio_open_ex(struct pio_file_t *plink_file, const char *fam_path, co
     int error = 0;
     int num_samples = 0;
     int num_loci = 0;
-    
+
     if( fam_open( &plink_file->fam_file, fam_path ) == PIO_OK )
     {
         num_samples = fam_num_samples( &plink_file->fam_file );
@@ -114,7 +114,7 @@ pio_num_samples(struct pio_file_t *plink_file)
 struct pio_locus_t *
 pio_get_locus(struct pio_file_t *plink_file, size_t pio_id)
 {
-    return bim_get_locus( &plink_file->bim_file, pio_id ); 
+    return bim_get_locus( &plink_file->bim_file, pio_id );
 }
 
 size_t
@@ -126,7 +126,7 @@ pio_num_loci(struct pio_file_t *plink_file)
 pio_status_t
 pio_next_row(struct pio_file_t *plink_file, snp_t *buffer)
 {
-    return bed_read_row( &plink_file->bed_file, buffer ); 
+    return bed_read_row( &plink_file->bed_file, buffer );
 }
 
 void
@@ -175,7 +175,7 @@ pio_transpose(const char *plink_file_prefix, const char *transposed_file_prefix)
         file_copy( fam_path, transposed_fam_path );
         free( fam_path );
         free( transposed_fam_path );
-        
+
         char *bim_path = concatenate( plink_file_prefix, ".bim" );
         char *transposed_bim_path = concatenate( transposed_file_prefix, ".bim" );
         file_copy( bim_path, transposed_bim_path );

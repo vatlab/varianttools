@@ -26,7 +26,7 @@ namespace cgatools { namespace util {
     using std::string;
 
 #if defined(CGA_USE_WIN_API)
-    inline float strtof(_In_z_ const char * _Str, _Out_opt_ _Deref_post_z_ char ** _EndPtr) 
+    inline float strtof(_In_z_ const char * _Str, _Out_opt_ _Deref_post_z_ char ** _EndPtr)
     {
         return (float)strtod(_Str, _EndPtr);
     }
@@ -64,11 +64,11 @@ namespace cgatools { namespace util {
 
     // Parse a user-token-specified separated string
     //
-    void parseTokenString(std::string const & inputString, char const * sep, 
-        std::vector<std::string> & tokens, bool trimWhitespace, 
-        bool compressEmpty) 
+    void parseTokenString(std::string const & inputString, char const * sep,
+        std::vector<std::string> & tokens, bool trimWhitespace,
+        bool compressEmpty)
     {
-        const boost::char_separator<char> separator(sep, "", 
+        const boost::char_separator<char> separator(sep, "",
             compressEmpty ? boost::drop_empty_tokens : boost::keep_empty_tokens);
         typedef boost::tokenizer< boost::char_separator<char> > Tokenizer;
         Tokenizer tokenizer(inputString, separator);

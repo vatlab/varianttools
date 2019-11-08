@@ -192,7 +192,7 @@ comment=SIFTori scores were first converted to SIFTnew=1-SIFTori, then ranked am
 [SIFT_pred]
 index=29
 type=VARCHAR(1) NULL
-adj=Nullify('.'), lambda x: None if x.strip() == '.' else ('D' if 'D' in x else ('T' if 'T' in x else '.')) 
+adj=Nullify('.'), lambda x: None if x.strip() == '.' else ('D' if 'D' in x else ('T' if 'T' in x else '.'))
 comment="D" if "D" appears in SIFT_pred_all, "T" otherwise.
 
 [SIFT_pred_all]

@@ -59,7 +59,7 @@ struct lineFile
     boolean fullLineReuse;      // If TRUE, next call to lineFileNextFull will get
                                 // already built fullLine
     void *dataForCallBack;                                 // ptr to data needed for callbacks
-    void(*checkSupport)(struct lineFile *lf, char *where); // check if operation supported 
+    void(*checkSupport)(struct lineFile *lf, char *where); // check if operation supported
     boolean(*nextCallBack)(struct lineFile *lf, char **retStart, int *retSize); // next line callback
     void(*closeCallBack)(struct lineFile *lf);             // close callback
     };
@@ -199,10 +199,10 @@ int lineFileChopNextTab(struct lineFile *lf, char *words[], int maxWords);
 #define lineFileChopTab(lf, words) lineFileChopNextTab(lf, words, ArraySize(words))
 /* Ease-of-usef macro for lineFileChopNext above. */
 
-int lineFileCheckAllIntsNoAbort(char *s, void *val, 
-    boolean isSigned, int byteCount, char *typeString, boolean noNeg, 
+int lineFileCheckAllIntsNoAbort(char *s, void *val,
+    boolean isSigned, int byteCount, char *typeString, boolean noNeg,
     char *errMsg, int errMsgSize);
-/* Convert string to (signed) integer of the size specified.  
+/* Convert string to (signed) integer of the size specified.
  * Unlike atol assumes all of string is number, no trailing trash allowed.
  * Returns 0 if conversion possible, and value is returned in 'val'
  * Otherwise 1 for empty string or trailing chars, and 2 for numeric overflow,
@@ -285,5 +285,3 @@ boolean lineFileSetTabixRegion(struct lineFile *lf, char *seqName, int start, in
  * and return TRUE (or if there are no items in region, return FALSE). */
 
 #endif /* LINEFILE_H */
-
-

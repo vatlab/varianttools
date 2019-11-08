@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 #
-# $File: project.py $
-# $LastChangedDate$
-# $Rev$
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,37 +20,36 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
-import sys
-import glob
-import textwrap
-import shutil
 import argparse
-import threading
+import glob
+import os
 import queue
-import time
 import re
+import shutil
+import sys
 import tarfile
-import urllib.request
-import urllib.parse
+import textwrap
+import threading
+import time
 import urllib.error
-
-from .ucsctools import showTrack
-from .cgatools import fasta2crr
-from .geno_store import GenoStore, HDF5_Store
+import urllib.parse
+import urllib.request
+from collections import defaultdict, namedtuple
 from configparser import ConfigParser, RawConfigParser
 from io import StringIO
-
 from multiprocessing import Process
-from collections import namedtuple, defaultdict
-from ._version import VTOOLS_VERSION, VTOOLS_COPYRIGHT, VTOOLS_CONTACT
-from .utils import (DatabaseEngine, ProgressBar, SQL_KEYWORDS, delayedAction,
-                    RefGenome, downloadFile, env, sizeExpr,
-                    getSnapshotInfo, ResourceManager, decodeTableName, encodeTableName,
-                    PrettyPrinter, determineSexOfSamples, getVariantsOnChromosomeX,
-                    getVariantsOnChromosomeY, getTermWidth, matchName, ProgressFileObj,
-                    substituteVars, calculateMD5, dehtml, default_user_options, RuntimeFiles)
 
+from ._version import VTOOLS_CONTACT, VTOOLS_COPYRIGHT, VTOOLS_VERSION
+from .cgatools import fasta2crr
+from .geno_store import GenoStore
+from .ucsctools import showTrack
+from .utils import (SQL_KEYWORDS, DatabaseEngine, PrettyPrinter, ProgressBar,
+                    ProgressFileObj, RefGenome, ResourceManager, RuntimeFiles,
+                    calculateMD5, createUserConfigFile, decodeTableName, default_user_options,
+                    dehtml, delayedAction, determineSexOfSamples, downloadFile,
+                    encodeTableName, env, getSnapshotInfo, getTermWidth,
+                    getVariantsOnChromosomeX, getVariantsOnChromosomeY,
+                    matchName, sizeExpr, substituteVars)
 
 try:
     from .cgatools import normalize_variant
@@ -68,7 +63,7 @@ except ImportError as e:
 Field = namedtuple('Field', ['name', 'index', 'adj', 'fmt', 'type', 'comment'])
 Column = namedtuple('Column', ['index', 'field', 'adj', 'comment'])
 #
-# see http://varianttools.sourceforge.net/Calling/New for details
+# see https://github.com/vatlab/varianttools/Calling/New for details
 #
 PipelineCommand = namedtuple('PipelineCommand', ['index', 'options', 'input',
                                                  'input_emitter', 'action', 'init_action_vars', 'pre_action_vars', 'post_action_vars', 'comment'])
@@ -1797,6 +1792,8 @@ class Project:
         self.db.commit()
         self.db.close()
         self.db.connect(self.proj_file)
+        # create a config file if not already exist
+        createUserConfigFile()
 
     def open(self, verify=True):
         '''Open an existing project'''
@@ -2054,7 +2051,7 @@ class Project:
                 # res can be an unicode string and need to be converted to
                 # string
                 return str(res)
-        except Exception as e:
+        except Exception:
             # env.logger.debug(e)
             #env.logger.warning('Failed to retrieve value for project property {}'.format(key))
             self.saveProperty(key, default)
@@ -2072,7 +2069,7 @@ class Project:
             else:
                 cur.execute('INSERT INTO project VALUES ({0}, {0});'.format(
                     self.db.PH), (key, value))
-        except Exception as e:
+        except Exception:
             pass
         self.db.commit()
 
@@ -2081,7 +2078,7 @@ class Project:
         try:
             cur.execute('DELETE FROM project WHERE name={};'.format(
                 self.db.PH), (key,))
-        except Exception as e:
+        except Exception:
             pass
         self.db.commit()
 
@@ -2153,7 +2150,7 @@ class Project:
         try:
             cur.execute(
                 '''CREATE UNIQUE INDEX filename_index ON filename (filename ASC);''')
-        except Exception as e:
+        except Exception:
             # the index might already exists
             return
 
@@ -2316,10 +2313,11 @@ class Project:
 
 
     def createIndexOnSampleTable(self):
-        try:   
+        try:
             if not self.db.hasIndex('idx_sample_name'):
+                # sample_name does not have to be unique
                 self.db.execute(
-                    '''CREATE UNIQUE INDEX idx_sample_name ON sample (sample_name);''')
+                    '''CREATE INDEX idx_sample_name ON sample (sample_name);''')
             if not self.db.hasIndex('idx_file_ID'):
                 self.db.execute(
                     '''CREATE INDEX idx_file_ID ON sample (file_id);''')
@@ -2592,9 +2590,9 @@ class Project:
                         # if two fields have the same name and different types, they will be merged silently.
                         new_fields.extend([fld for fld in fields if fld.split(None, 1)[
                                           0] not in [x.split(None, 1)[0] for x in new_fields]])
-                    except Exception as e:
+                    except Exception:
                         raise RuntimeError('Corrupted genotype database: Failed to '
-                                           'get structure of genotype table {}'.format(id))
+                                           'get structure of genotype table {}'.format(self.name))
                 #
                 query = 'CREATE TABLE {} ({})'.format(
                     new_table, ', '.join(new_fields))
@@ -3223,7 +3221,7 @@ class MaintenanceProcess(Process):
             missing_indexes = all_indexes - cur_indexes
             if len(missing_indexes) == 0:
                 return
-        except KeyboardInterrupt as e:
+        except KeyboardInterrupt:
             # interrupted just return, nothing harmful is done.
             db.close()
             return
@@ -3239,7 +3237,7 @@ class MaintenanceProcess(Process):
                 cur.execute(
                     'CREATE INDEX {0} ON {1} (variant_id)'.format(idx, idx[:-6]))
                 db.commit()
-        except KeyboardInterrupt as e:
+        except KeyboardInterrupt:
             # if keyboard interrupt, stop, but not immediately
             self.active_flag.value = 0
         finally:
@@ -4424,7 +4422,7 @@ def init(args):
         #
         if args.children:
             if args.store != 'sqlite':
-                raise NotImplemented(
+                raise NotImplementedError(
                     'Option --parent is not supported yet with non-sqlite storage model')
             # A default value 4 is given for args.jobs because more threads usually
             # do not improve effiency
@@ -4964,7 +4962,7 @@ def show(args):
                         dbName = dbName[:-3]
                     annoDB = [
                         x for x in proj.annoDB if x.linked_name.lower() == dbName][0]
-                except Exception as e:
+                except Exception:
                     raise IndexError('Database {} is not currently used in the project.'
                                      .format(args.items[0]))
                 annoDB.describe(args.verbosity == '2')
@@ -5059,17 +5057,17 @@ def show(args):
                 cur.execute(
                     'SELECT sample.sample_id, sample_name, filename FROM sample, filename WHERE sample.file_id = filename.file_id ORDER BY sample.sample_id {};'.format(limit_clause))
                 records = cur.fetchall()
+                
+                sampleIDs=[]
                 for rec in records:
-                    # now get sample genotype counts and sample specific fields
-                    sampleId = rec[0]
-                    store = GenoStore(proj)
-                    numGenotypes = store.num_variants(sampleId)
-
-                    # get fields for each genotype table
-                    sampleGenotypeFields = ','.join(
-                        store.geno_fields_nolower(sampleId))
+                    sampleIDs.append(rec[0])
+                store=GenoStore(proj)
+                numGenotypes = store.num_samples_variants(sampleIDs)
+                samplesGenotypeFields=store.get_samplesGenotypeFields(sampleIDs)
+                for sampleId,numGenotype,rec,sampleGenotypeField in zip(sampleIDs,numGenotypes,records,samplesGenotypeFields):
                     prt.write([rec[1], rec[2], str(
-                        numGenotypes), sampleGenotypeFields])
+                        numGenotype), sampleGenotypeField])
+
                 prt.write_rest()
                 nAll = proj.db.numOfRows('sample')
                 if args.limit is not None and args.limit >= 0 and args.limit < nAll:
@@ -5474,7 +5472,7 @@ def admin(args):
                 try:
                     _user_options = __import__(
                         'user_options',  globals(), locals()).__dict__
-                except Exception as e:
+                except Exception:
                     _user_options = {}
                     print(
                         'Failed to load user settings from ~/.variant_tools/user_options.py')
@@ -5504,7 +5502,7 @@ def admin(args):
             try:
                 _user_options = __import__(
                     'user_options',  globals(), locals()).__dict__
-            except Exception as e:
+            except Exception:
                 _user_options = {}
                 print(
                     'Failed to load user settings from ~/.variant_tools/user_options.py')

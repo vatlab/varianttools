@@ -2,7 +2,7 @@
 #
 # Varianttools Installer
 # Gao Wang and Bo Peng Copyright 2013
-# 
+#
 ARCH=x64
 BUNDLE=
 EXE=vtools
@@ -83,7 +83,7 @@ extract() {
       echo "Unable to create temporary directory."
       exit 1
    fi
-   
+
    echo -e "Extracting files ...\n"
 
    (cd $VTOOLS_TEMP && sed -e '1,/^exit$/d' "$1" | tar xzf -)

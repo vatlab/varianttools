@@ -60,5 +60,5 @@ NA12872    	vcf/CEU.vcf.gz	287          	GT
 NA12873    	vcf/CEU.vcf.gz	287          	GT
 NA12874    	vcf/CEU.vcf.gz	287          	GT
 SAMP1      	vcf/SAMP1.vcf 	289          	GT
-input.tsv  	txt/input.tsv 	1446         	
+input.tsv  	txt/input.tsv 	1446
 SAMP2      	vcf/SAMP2.vcf 	288          	GT

@@ -78,7 +78,7 @@ bim_is_delim(unsigned char c)
  * @param status Status of the conversion.
  *
  * @return The parsed csv field, or NULL if it could
- *         not be parsed. Caller is responsible for 
+ *         not be parsed. Caller is responsible for
  *         deallocating the memory.
  */
 static char *
@@ -225,7 +225,7 @@ new_field(void *field, unsigned long int field_length, void *data)
             status = PIO_ERROR;
             break;
     }
-    
+
     free( buffer );
 
     if( status == PIO_OK )
@@ -279,6 +279,6 @@ parse_loci(FILE *bim_fp, UT_array *locus)
 
     csv_fini( &parser, new_field, new_row, (void *) &state );
     csv_free( &parser );
-    
+
     return ( state.any_error == 0 ) ? PIO_OK : PIO_ERROR;
 }

@@ -361,4 +361,3 @@ index=8
 adj=ExtractFlag('GCF', ';')
 type=INTEGER
 comment=Has Genotype Conflict Same (rs, ind), different genotype.  N/N is not included.
-

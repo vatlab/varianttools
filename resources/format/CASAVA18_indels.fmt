@@ -104,10 +104,9 @@ comment=The smallest repeating sequence unit within the inserted or deleted sequ
 [ref_repeat_count]
 index=15
 type=VARCHAR(255)
-comment=Number of times the repeat_unit sequence is contiguously repeated starting from the indel start position in the reference case. 
+comment=Number of times the repeat_unit sequence is contiguously repeated starting from the indel start position in the reference case.
 
 [indel_repeat_count]
 index=16
 type=VARCHAR(255)
 comment=Number of times the repeat_unit sequence is contiguously repeated starting from the indel start position in the indel case.
-

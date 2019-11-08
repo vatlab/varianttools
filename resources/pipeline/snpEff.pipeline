@@ -29,7 +29,7 @@ snpEff_path_comment=Path to directory that contains snpEff.jar.
 
 eff_fields=EFF
 eff_fields_comment=Fields that will be imported to the project from the output
-    of snpEff. The default value is EFF, which is the whole EFF info. You can 
+    of snpEff. The default value is EFF, which is the whole EFF info. You can
     also specify one or more off EFF_Type, EFF_Impact and Eff_Functional_Class,
     which are from extracted from the Effect(Effct_impact|Functional_Class...
     field.
@@ -60,15 +60,15 @@ action=RunCommand('%(java)s -jar %(snpEff_path)s/snpEff.jar download -c %(snpEff
     ' -v ${REF_GENOME_BUILD}',
     output='${DATA_DIR,REF_GENOME_BUILD: DATA_DIR + "/" + REF_GENOME_BUILD + "/snpEffectPredictor.bin"}')
 comment=Download reference database for the project reference genome
- 
+
 [eff_20]
 action=RunCommand('vtools export %(var_table)s --format vcf --output ${CACHE_DIR}/snpEff_input.vcf',
     output='${CACHE_DIR}/snpEff_input.vcf')
 comment=Export variants in VCF format
- 
+
 [eff_30]
-action=RunCommand('%(java)s -jar %(opt_java)s %(snpEff_path)s/snpEff.jar -c %(snpEff_path)s/snpEff.config 
-    -v ${REF_GENOME_BUILD} ${INPUT} 
+action=RunCommand('%(java)s -jar %(opt_java)s %(snpEff_path)s/snpEff.jar -c %(snpEff_path)s/snpEff.config
+    -v ${REF_GENOME_BUILD} ${INPUT}
     > ${CACHE_DIR: CACHE_DIR + "/snpEff_output.vcf"}',
     output="${CACHE_DIR}/snpEff_output.vcf")
 comment=Execute snpEff eff to annotate variants

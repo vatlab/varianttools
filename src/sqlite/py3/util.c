@@ -103,4 +103,3 @@ int _pysqlite_seterror(sqlite3* db, sqlite3_stmt* st)
 
     return errorcode;
 }
-

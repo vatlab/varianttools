@@ -181,7 +181,7 @@ void tokenizerErrAbort(struct tokenizer *tkz, char *format, ...)
 va_list args;
 va_start(args, format);
 vaWarn(format, args);
-errAbort("line %d of %s:\n%s", 
+errAbort("line %d of %s:\n%s",
 	tokenizerLineCount(tkz), tokenizerFileName(tkz), tkz->curLine);
 }
 
@@ -210,4 +210,3 @@ if (sameWord(tkz->string, string))
 else
     tokenizerErrAbort(tkz, "Expecting %s got %s", string, tkz->string);
 }
-

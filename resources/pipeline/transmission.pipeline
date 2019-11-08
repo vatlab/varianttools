@@ -19,7 +19,7 @@ denovo_description=This pipeline identifies de novo mutations from a
   that are observed only in the proband), A table $name_denovo_SNP will be created with all SNP markers
   in table $name_denovo. And, depending on values of parameter
   --databases, it can produce tables $table_1kg for variants in 1000 genomes
-  project, $table_dbSNP for variants in dbSNP project, and $table_refGene, 
+  project, $table_dbSNP for variants in dbSNP project, and $table_refGene,
   $table_refGene_exon, $table_ccdsGene, $table_ccdsGene_exon, $table_CancerGenomeCensus,
   $table_COSMIC, $table_dbNSFP, $table_phastCons, $table_phastConsElements,
   $table_genomicSuperDups for tables in respective annotation databases. It is
@@ -31,7 +31,7 @@ recessive_description=This pipeline identifies recessive mutations from a
   family of unaffected parents, affected offspring, and optional unaffected
   siblings. Recessive variant is defined as variants that are homozygous in
   the affected offspring (proband), heterozygous in both parents, and
-  heterozygous or wildtype in a sibling (if available). The pipeline 
+  heterozygous or wildtype in a sibling (if available). The pipeline
   can be applied either to the current project (no --input is
   specified), or a snapshot (--input) for which the snapshot will be loaded
   and overwrite the existing project. The parameter --parents and --offspring
@@ -41,7 +41,7 @@ recessive_description=This pipeline identifies recessive mutations from a
   that are observed only in the proband). A table $name_denovo_SNP will be created with all SNP
   markers in table $name_denovo. And, depending on values of parameter
   --databases, it can produce tables $table_1kg for variants in 1000 genomes
-  project, $table_dbSNP for variants in dbSNP project, and $table_refGene, 
+  project, $table_dbSNP for variants in dbSNP project, and $table_refGene,
   $table_refGene_exon, $table_ccdsGene, $table_ccdsGene_exon, $table_CancerGenomeCensus,
   $table_COSMIC, $table_dbNSFP, $table_phastCons, $table_phastConsElements,
   $table_genomicSuperDups for tables in respective annotation databases. It is
@@ -54,14 +54,14 @@ recessive_description=This pipeline identifies recessive mutations from a
 # inconsistent_description=This pipeline identifies variants that are inconsistent
 #   across members of a family, which includes, 1) homozygous parent with wildtype
 #   offspring, 2) double homozygous parents with wildtype or heterzygous offspring,
-#   3) wildtype parents with heterozygous or homozygous offspring (de novo), 
+#   3) wildtype parents with heterozygous or homozygous offspring (de novo),
 #   4) homozygous variants on chromosome Y. If
-#   there are multiple variants at a location, 
+#   there are multiple variants at a location,
 #   recessive mutations from a
 #   family of unaffected parents, affected offspring, and optional unaffected
 #   siblings. Recessive variant is defined as variants that are homozygous in
 #   the affected offspring (proband), heterozygous in both parents, and
-#   heterozygous or wildtype in a sibling (if available). The pipeline 
+#   heterozygous or wildtype in a sibling (if available). The pipeline
 #   can be applied either to the current project (no --input is
 #   specified), or a snapshot (--input) for which the snapshot will be loaded
 #   and overwrite the existing project. The parameter --samples is required to
@@ -73,7 +73,7 @@ recessive_description=This pipeline identifies recessive mutations from a
 #   sibling at this site). A table $name_denovo_SNP will be created with all SNP
 #   markers in table $name_denovo. And, depending on values of parameter
 #   --databases, it can produce tables $table_1kg for variants in 1000 genomes
-#   project, $table_dbSNP for variants in dbSNP project, and $table_refGene, 
+#   project, $table_dbSNP for variants in dbSNP project, and $table_refGene,
 #   $table_refGene_exon, $table_ccdsGene, $table_ccdsGene_exon, $table_CancerGenomeCensus,
 #   $table_COSMIC, $table_dbNSFP, $table_phastCons, $table_phastConsElements,
 #   $table_genomicSuperDups for tables in respective annotation databases. It is
@@ -81,7 +81,7 @@ recessive_description=This pipeline identifies recessive mutations from a
 #   'vtools compare' command.  Two optional output files are allowed. The project
 #   will be saved to a snapshot if a name (or filename with extension .tar or
 #   .tar.gz) is specified as the output.
-# 
+#
 
 
 PAR1=${:"%(parents)s".split(',')[0]}
@@ -134,7 +134,7 @@ action=RunCommand(cmd=([
         --denovo "%(name)s_denovo_${PROBAND}" "%(name)s_denovo_${SIBLING}"',
     'vtools compare "%(name)s_denovo_${PROBAND}" "%(name)s_denovo_${SIBLING}" --difference  "%(name)s_denovo"' ]
     if '${SIBLING}' else [
-    'vtools_report transmission --parents "${PAR1}" "${PAR2}" --offspring "${PROBAND}" 
+    'vtools_report transmission --parents "${PAR1}" "${PAR2}" --offspring "${PROBAND}"
         --denovo "%(name)s_denovo"']) + [
     '''vtools select "%(name)s_denovo" "length(ref)=1" "length(alt)=1" "ref!='-'" "alt!='-'"
     --to_table "%(name)s_denovo_SNP" "Recessive SNP markers for family %(name)s" '''
@@ -144,7 +144,7 @@ comment=Locate de novo variants of the proband
 
 [denovo_50]
 action=RunCommand(cmd=[
-    '''vtools select "%(name)s_denovo" "%%s.chr IS NOT NULL" 
+    '''vtools select "%(name)s_denovo" "%%s.chr IS NOT NULL"
     --to_table "%(name)s_denovo_in_%%s" "de novo variants in database %%s"''' %% (x, x, x)
     for x in [os.path.basename(z).split('.')[0] for z in '%(databases)s'.split(',')]
     ])
@@ -152,7 +152,7 @@ comment=Create variant tables according to their membership in different annotat
 
 [denovo_100]
 input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT)>0})
-action=RunCommand(cmd='''vtools admin --save_snapshot "${CMD_OUTPUT}" 
+action=RunCommand(cmd='''vtools admin --save_snapshot "${CMD_OUTPUT}"
   "snapshot after identification of de novo variants for family %(name)s" ''')
 comment=Save the project to a snapshot if an output is specified.
 
@@ -200,7 +200,7 @@ action=RunCommand(cmd=([
         --recessive "%(name)s_recessive_${PROBAND}" "%(name)s_recessive_${SIBLING}"',
     'vtools compare "%(name)s_recessive_${PROBAND}" "%(name)s_recessive_${SIBLING}" --difference  "%(name)s_recessive"' ]
     if '${SIBLING}' else [
-    'vtools_report transmission --parents "${PAR1}" "${PAR2}" --offspring "${PROBAND}" 
+    'vtools_report transmission --parents "${PAR1}" "${PAR2}" --offspring "${PROBAND}"
         --recessive "%(name)s_recessive"']) + [
     '''vtools select "%(name)s_recessive" "length(ref)=1" "length(alt)=1" "ref!='-'" "alt!='-'"
     --to_table "%(name)s_recessive_SNP" "Recessive SNP markers for family %(name)s" '''
@@ -210,7 +210,7 @@ comment=Locate recessive variants of the proband (homozygous only in proband)
 
 [recessive_50]
 action=RunCommand(cmd=[
-    '''vtools select "%(name)s_recessive" "%%s.chr IS NOT NULL" 
+    '''vtools select "%(name)s_recessive" "%%s.chr IS NOT NULL"
     --to_table "%(name)s_recessive_in_%%s" "recessive variants in database %%s"''' %% (x, x, x)
     for x in [os.path.basename(z).split('.')[0] for z in '%(databases)s'.split(',')]
     ])
@@ -239,5 +239,3 @@ action=OutputText(text=[
     ""]
   )
 comment=Summarize the results.
-
-

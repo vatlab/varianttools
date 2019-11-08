@@ -89,7 +89,7 @@ namespace cgatools { namespace util {
     #define CGA_ASSERT_L(var1,var2) CGA_ASSERT_MSG((var1)<(var2), CGA_VOUT(var1)<<CGA_VOUT(var2))
     #define CGA_ASSERT_LE(var1,var2) CGA_ASSERT_MSG((var1)<=(var2), CGA_VOUT(var1)<<CGA_VOUT(var2))
 
-    //throws an exception. 
+    //throws an exception.
     #define CGA_ERROR_EX(m_message) \
     { \
         std::stringstream stx; \
@@ -100,4 +100,3 @@ namespace cgatools { namespace util {
 } } // cgatools::util
 
 #endif // CGATOOLS_UTIL_EXCEPTION_HPP_
-

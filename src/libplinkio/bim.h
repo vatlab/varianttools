@@ -81,7 +81,7 @@ struct pio_bim_file_t
  *
  * @param bim_file Bim file.
  * @param path The location of the bim file.
- * 
+ *
  * @return Returns PIO_OK if the file could be read, PIO_ERROR otherwise.
  */
 pio_status_t bim_open(struct pio_bim_file_t *bim_file, const char *path);
@@ -100,7 +100,7 @@ struct pio_locus_t * bim_get_locus(struct pio_bim_file_t *bim_file, size_t pio_i
  * Returns the number of loci that are stored in the given bim file.
  *
  * @param bim_file Bim file.
- * 
+ *
  * @return the number of loci that are stored in the bim file.
  */
 size_t bim_num_loci(struct pio_bim_file_t *bim_file);

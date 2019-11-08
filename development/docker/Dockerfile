@@ -20,10 +20,10 @@ RUN wget http://www.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.gz \
  && make clean
 
 RUN wget http://download.zeromq.org/zeromq-4.0.3.tar.gz \
-  && tar -zxvf zeromq-4.0.3.tar.gz 
+  && tar -zxvf zeromq-4.0.3.tar.gz
 
 RUN wget -O boost_1_49_0.tar.gz "http://downloads.sourceforge.net/project/boost/boost/1.49.0/boost_1_49_0.tar.gz?r=&ts=1435893980&use_mirror=iweb" \
- && tar -xf boost_1_49_0.tar.gz boost_1_49_0/boost boost_1_49_0/libs/iostreams boost_1_49_0/libs/regex boost_1_49_0/libs/filesystem boost_1_49_0/libs/detail boost_1_49_0/libs/system 
+ && tar -xf boost_1_49_0.tar.gz boost_1_49_0/boost boost_1_49_0/libs/iostreams boost_1_49_0/libs/regex boost_1_49_0/libs/filesystem boost_1_49_0/libs/detail boost_1_49_0/libs/system
 
 RUN conda install pytables scipy
 WORKDIR /home/bpeng
@@ -65,7 +65,3 @@ RUN     vtools use refGene
 
 WORKDIR /home/bpeng
 RUN     rm -rf temp
-
-
-
-

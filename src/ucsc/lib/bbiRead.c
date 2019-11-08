@@ -1,4 +1,4 @@
-/* bbiRead - Big Binary Indexed file.  Stuff that's common between bigWig and bigBed on the 
+/* bbiRead - Big Binary Indexed file.  Stuff that's common between bigWig and bigBed on the
  * read side. */
 
 #include "common.h"
@@ -13,7 +13,7 @@
 #include "bbiFile.h"
 
 struct bbiZoomLevel *bbiBestZoom(struct bbiZoomLevel *levelList, int desiredReduction)
-/* Return zoom level that is the closest one that is less than or equal to 
+/* Return zoom level that is the closest one that is less than or equal to
  * desiredReduction. */
 {
 if (desiredReduction < 0)
@@ -315,7 +315,7 @@ sum->chromId = udcReadBits32(udc, isSwapped);
 sum->start = udcReadBits32(udc, isSwapped);
 sum->end = udcReadBits32(udc, isSwapped);
 sum->validCount = udcReadBits32(udc, isSwapped);
-// looks like a bug to me, these should call udcReadFloat() 
+// looks like a bug to me, these should call udcReadFloat()
 udcMustReadOne(udc, sum->minVal);
 udcMustReadOne(udc, sum->maxVal);
 udcMustReadOne(udc, sum->sumData);
@@ -355,7 +355,7 @@ out->sumSquares = in->sumSquares;
 return out;
 }
 
-struct bbiSummary *bbiSummariesInRegion(struct bbiZoomLevel *zoom, struct bbiFile *bbi, 
+struct bbiSummary *bbiSummariesInRegion(struct bbiZoomLevel *zoom, struct bbiFile *bbi,
 	int chromId, bits32 start, bits32 end)
 /* Return list of all summaries in region at given zoom level of bbiFile. */
 {
@@ -372,7 +372,7 @@ if (bbi->uncompressBufSize > 0)
     uncompressBuf = needLargeMem(bbi->uncompressBufSize);
 
 
-/* This loop is a little complicated because we merge the read requests for efficiency, but we 
+/* This loop is a little complicated because we merge the read requests for efficiency, but we
  * have to then go back through the data one unmerged block at a time. */
 for (block = blockList; block != NULL; )
     {
@@ -439,7 +439,7 @@ slReverse(&sumList);
 return sumList;
 }
 
-static bits32 bbiSummarySlice(struct bbiFile *bbi, bits32 baseStart, bits32 baseEnd, 
+static bits32 bbiSummarySlice(struct bbiFile *bbi, bits32 baseStart, bits32 baseEnd,
 	struct bbiSummary *sumList, struct bbiSummaryElement *el)
 /* Update retVal with the average value if there is any data in interval.  Return number
  * of valid data bases in interval. */
@@ -490,7 +490,7 @@ chromIdSizeHandleSwapped(bbi->isSwapped, &idSize);
 return idSize.chromId;
 }
 
-static boolean bbiSummaryArrayFromZoom(struct bbiZoomLevel *zoom, struct bbiFile *bbi, 
+static boolean bbiSummaryArrayFromZoom(struct bbiZoomLevel *zoom, struct bbiFile *bbi,
 	char *chrom, bits32 start, bits32 end,
 	int summarySize, struct bbiSummaryElement *summary)
 /* Look up region in index and get data at given zoom level.  Summarize this data
@@ -527,7 +527,7 @@ if (sumList != NULL)
 return result;
 }
 
-static bits32 bbiIntervalSlice(struct bbiFile *bbi, bits32 baseStart, bits32 baseEnd, 
+static bits32 bbiIntervalSlice(struct bbiFile *bbi, bits32 baseStart, bits32 baseEnd,
 	struct bbiInterval *intervalList, struct bbiSummaryElement *el)
 /* Update retVal with the average value if there is any data in interval.  Return number
  * of valid data bases in interval. */
@@ -541,7 +541,7 @@ if (intervalList != NULL)
     double minVal = intervalList->val;
     double maxVal = intervalList->val;
 
-    for (interval = intervalList; interval != NULL && interval->start < baseEnd; 
+    for (interval = intervalList; interval != NULL && interval->start < baseEnd;
 	    interval = interval->next)
 	{
 	int overlap = rangeIntersection(baseStart, baseEnd, interval->start, interval->end);
@@ -569,7 +569,7 @@ return round(validCount);
 }
 
 
-static boolean bbiSummaryArrayFromFull(struct bbiFile *bbi, 
+static boolean bbiSummaryArrayFromFull(struct bbiFile *bbi,
 	char *chrom, bits32 start, bits32 end, BbiFetchIntervals fetchIntervals,
 	int summarySize, struct bbiSummaryElement *summary)
 /* Summarize data, not using zoom. */
@@ -610,7 +610,7 @@ return result;
 boolean bbiSummaryArrayExtended(struct bbiFile *bbi, char *chrom, bits32 start, bits32 end,
 	BbiFetchIntervals fetchIntervals,
 	int summarySize, struct bbiSummaryElement *summary)
-/* Fill in summary with  data from indicated chromosome range in bigWig file. 
+/* Fill in summary with  data from indicated chromosome range in bigWig file.
  * Returns FALSE if no data at that position. */
 {
 boolean result = FALSE;
@@ -622,7 +622,7 @@ bzero(summary, summarySize * sizeof(summary[0]));
 
 /* Figure out what size of data we want.  We actually want to get 2 data points per summary
  * value if possible to minimize the effect of a data point being split between summary pixels. */
-bits32 baseSize = end - start; 
+bits32 baseSize = end - start;
 int fullReduction = (baseSize/summarySize);
 int zoomLevel = fullReduction/2;
 if (zoomLevel < 0)
@@ -648,7 +648,7 @@ boolean bbiSummaryArray(struct bbiFile *bbi, char *chrom, bits32 start, bits32 e
 {
 struct bbiSummaryElement *elements;
 AllocArray(elements, summarySize);
-boolean ret = bbiSummaryArrayExtended(bbi, chrom, start, end, 
+boolean ret = bbiSummaryArrayExtended(bbi, chrom, start, end,
 	fetchIntervals, summarySize, elements);
 if (ret)
     {
@@ -780,4 +780,3 @@ if (chromId != lastChromId)
     bptStringKeyAtPos(bbi->chromBpt, chromId, chromBuf, chromBufSize);
 return chromBuf;
 }
-

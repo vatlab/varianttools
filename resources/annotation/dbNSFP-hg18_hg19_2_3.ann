@@ -1,7 +1,7 @@
 # Copyright (C) 2012 Jerry Fowler (rgfowler@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 #
 
@@ -257,7 +257,7 @@ comment= MutationAssessor functional impact combined score (MAori)
 index=38
 type=FLOAT NULL
 adj=Nullify('.')
-comment=Scaled to 0-1: MAnew=(MAori-(-5.545))/(5.975-(-5.545)) 
+comment=Scaled to 0-1: MAnew=(MAori-(-5.545))/(5.975-(-5.545))
 
 [MutationAssessor_pred]
 index=39
@@ -287,18 +287,18 @@ comment= If a FATHMM_score is <=-1.5 the corresponding NS is predicted as "D(AMA
 index=43
 type=FLOAT NULL
 adj=Nullify('.')
-comment=Our support vector machine (SVM) based ensemble prediction score, which 
-	incorporated 10 scores (SIFT, PolyPhen-2 HDIV, PolyPhen-2 HVAR, GERP++, MutationTaster, 
-	Mutation Assessor, FATHMM, LRT, SiPhy, PhyloP) and the maximum frequency observed in 
-	the 1000 genomes populations. Larger value means the SNV is more likely to be damaging. 
+comment=Our support vector machine (SVM) based ensemble prediction score, which
+	incorporated 10 scores (SIFT, PolyPhen-2 HDIV, PolyPhen-2 HVAR, GERP++, MutationTaster,
+	Mutation Assessor, FATHMM, LRT, SiPhy, PhyloP) and the maximum frequency observed in
+	the 1000 genomes populations. Larger value means the SNV is more likely to be damaging.
 	The threshold seperationg "T(olerated)" and "D(amaging)" is 0.
 
 [RadialSVM_score_converted]
 index=44
 type=FLOAT NULL
 adj=Nullify('.')
-comment=Scaled to 0-1. If predicted "D", 
-	RadialSVMnew=(1+RadialSVMori/3.03993691875303)*0.5, otherwise, 
+comment=Scaled to 0-1. If predicted "D",
+	RadialSVMnew=(1+RadialSVMori/3.03993691875303)*0.5, otherwise,
 	RadialSVMnew=(1-RadialSVMori/-2.00575697514507)*0.5
 	The threshold seperationg "T(olerated)" and "D(amaging)" is 0.5.
 
@@ -306,17 +306,17 @@ comment=Scaled to 0-1. If predicted "D",
 index=45
 type=VARCHAR(20)
 adj=Nullify('.')
-comment=Prediction of our SVM based ensemble prediction score,"T(olerated)" or 
+comment=Prediction of our SVM based ensemble prediction score,"T(olerated)" or
 	"D(amaging)".
 
 [LR_score]
 index=46
 type=FLOAT NULL
 adj=Nullify('.')
-comment=Our logistic regression (LR) based ensemble prediction score, which 
-	incorporated 10 scores (SIFT, PolyPhen-2 HDIV, PolyPhen-2 HVAR, GERP++, MutationTaster, 
-	Mutation Assessor, FATHMM, LRT, SiPhy, PhyloP) and the maximum frequency observed in 
-	the 1000 genomes populations. Larger value means the SNV is more likely to be damaging. 
+comment=Our logistic regression (LR) based ensemble prediction score, which
+	incorporated 10 scores (SIFT, PolyPhen-2 HDIV, PolyPhen-2 HVAR, GERP++, MutationTaster,
+	Mutation Assessor, FATHMM, LRT, SiPhy, PhyloP) and the maximum frequency observed in
+	the 1000 genomes populations. Larger value means the SNV is more likely to be damaging.
 	The threshold seperationg "T(olerated)" and "D(amaging)" is 0.5.
 
 [LR_pred]
@@ -329,10 +329,10 @@ comment=Prediction of our LR based ensemble prediction score,"T(olerated)" or "D
 index=48
 type=FLOAT NULL
 adj=Nullify('.')
-comment=Number of observed component scores (except the maximum frequency in 
-	the 1000 genomes populations) for RadialSVM and LR. Ranges from 1 to 10. As RadialSVM 
-	and LR scores are calculated based on imputed data, the less missing component scores, 
-	the higher the reliability of the scores and predictions. 
+comment=Number of observed component scores (except the maximum frequency in
+	the 1000 genomes populations) for RadialSVM and LR. Ranges from 1 to 10. As RadialSVM
+	and LR scores are calculated based on imputed data, the less missing component scores,
+	the higher the reliability of the scores and predictions.
 
 [GERP_NR]
 index=49
@@ -355,7 +355,7 @@ comment=PhyloP score, the larger the score, the more conserved the site.
 [mg29way_pi]
 index=52
 type=VARCHAR(255) NULL
-comment=The estimated stationary distribution of A, C, G and T at the site, using SiPhy algorithm based on 29 mammals genomes. 
+comment=The estimated stationary distribution of A, C, G and T at the site, using SiPhy algorithm based on 29 mammals genomes.
 
 [mg29way_logOdds]
 index=53

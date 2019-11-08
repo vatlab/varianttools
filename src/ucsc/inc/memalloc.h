@@ -1,5 +1,5 @@
 /* Let the user redirect where memory allocation/deallocation
- * happens.  'careful' routines help debug scrambled heaps. 
+ * happens.  'careful' routines help debug scrambled heaps.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -31,7 +31,7 @@ void pushCarefulMemHandler(size_t maxAlloc);
 
 void carefulCheckHeap();
 /* Walk through allocated memory and make sure that all cookies are
- * in place. Only walks through what's been done since 
+ * in place. Only walks through what's been done since
  * pushCarefulMemHandler(). */
 
 int carefulCountBlocksAllocated();
@@ -52,4 +52,3 @@ void memTrackerEnd();
 /* Free any remaining blocks and pop tracker memory handler. */
 
 #endif /* MEMALLOC_H */
-

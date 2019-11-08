@@ -54,7 +54,7 @@ struct asTypeInfo
     };
 
 struct asTypeInfo *asTypeFindLow(char *name);
-/* Return asType for a low level type of given name.  (Low level because may be decorated 
+/* Return asType for a low level type of given name.  (Low level because may be decorated
  * with array or pointer  stuff at a higher level).  Returns NULL if not found. */
 
 struct asIndex
@@ -132,7 +132,7 @@ boolean asCompareObjs(char *name1, struct asObject *as1, char *name2, struct asO
  int *retNumColumnsSame, boolean abortOnDifference);
 /* Compare as-objects as1 and as2 making sure several important fields show they are the same name and type.
  * If difference found, print it to stderr.  If abortOnDifference, errAbort.
- * Othewise, return TRUE if the objects columns match through the first numColumnsToCheck fields. 
+ * Othewise, return TRUE if the objects columns match through the first numColumnsToCheck fields.
  * If retNumColumnsSame is not NULL, then it will be set to the number of contiguous matching columns. */
 
 INLINE boolean asObjectsMatchFirstN(struct asObject *as1, struct asObject *as2, int n)

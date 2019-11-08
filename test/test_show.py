@@ -24,21 +24,22 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
-import glob
 import unittest
-import subprocess
 from testUtils import ProcessTestCase
 
+
 class TestShow(ProcessTestCase):
+
     def setUp(self):
         'Create a project'
         ProcessTestCase.setUp(self)
-        self.runCmd('vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv')
+        self.runCmd(
+            'vtools import --format fmt/basic_hg18 txt/input.tsv --build hg18 --sample_name input.tsv'
+        )
         self.runCmd('vtools phenotype --from_file phenotype/phenotype.txt')
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.runCmd('vtools use ann/testNSFP.ann')
-        
+
     def testShow(self):
         'Test command vtools show'
         self.assertSucc('vtools show -h')

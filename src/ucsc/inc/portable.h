@@ -1,5 +1,5 @@
 /* portable.h - wrappers around things that vary from server
- * to server and operating system to operating system. 
+ * to server and operating system to operating system.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -11,16 +11,16 @@
 #include <sys/stat.h>
 
 struct slName *listDir(char *dir, char *pattern);
-/* Return an alphabetized list of all files that match 
+/* Return an alphabetized list of all files that match
  * the wildcard pattern in directory. */
 
 struct slName *listDirRegEx(char *dir, char *regEx, int flags);
-/* Return an alphabetized list of all files that match 
+/* Return an alphabetized list of all files that match
  * the regular expression pattern in directory.
  * See REGCOMP(3) for flags (e.g. REG_ICASE)  */
 
 
-struct fileInfo 
+struct fileInfo
 /* Info about a file. */
     {
     struct fileInfo  *next;	/* Next in list. */
@@ -31,7 +31,7 @@ struct fileInfo
     char name[1];	/* Allocated at run time. */
     };
 
-struct fileInfo *newFileInfo(char *name, off_t size, bool isDir, int statErrno, 
+struct fileInfo *newFileInfo(char *name, off_t size, bool isDir, int statErrno,
 	time_t lastAccess);
 /* Return a new fileInfo. */
 
@@ -162,4 +162,3 @@ long long freeSpaceOnFileSystem(char *path);
  * in bytes. */
 
 #endif /* PORTABLE_H */
-

@@ -87,4 +87,3 @@ boolean regexMatchSubstrNoCase(const char *string, const char *exp,
 {
 return regexMatchSubstrMaybeCase(string, exp, substrArr, substrArrSize, TRUE);
 }
-

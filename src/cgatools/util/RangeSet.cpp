@@ -88,7 +88,7 @@ namespace cgatools { namespace util {
             add(st);
     }
 
-    FastRangeSet::FastRangeSet( const reference::CrrFile &ref ) 
+    FastRangeSet::FastRangeSet( const reference::CrrFile &ref )
         : reference_(ref), ranges_(ref.listChromosomes().size())
     {
     }

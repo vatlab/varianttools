@@ -34,7 +34,7 @@
  * See the file "license.terms" (in the Tcl distribution) for complete
  * license (which is a BSD-style license).
  *
- * Since hashCrc() is in use elsewhere, 
+ * Since hashCrc() is in use elsewhere,
  * a new function hashString() was created for use in hash table.
  * -- markd
  */
@@ -116,7 +116,7 @@ struct hashEl *hashAddN(struct hash *hash, char *name, int nameSize, void *val)
 /* Add name of given size to hash (no need to be zero terminated) */
 {
 struct hashEl *el;
-if (hash->lm) 
+if (hash->lm)
     el = lmAlloc(hash->lm, sizeof(*el));
 else
     AllocVar(el);
@@ -174,7 +174,7 @@ freeMem(hel);
 }
 
 void *hashRemove(struct hash *hash, char *name)
-/* Remove item of the given name from hash table. 
+/* Remove item of the given name from hash table.
  * Returns value of removed item, or NULL if not in the table.
  * If their are multiple entries for name, the last one added
  * is removed (LIFO behavior).
@@ -248,7 +248,7 @@ return ptToInt(val);
 }
 
 int hashIntValDefault(struct hash *hash, char *name, int defaultInt)
-/* Return integer value associated with name in a simple 
+/* Return integer value associated with name in a simple
  * hash of ints or defaultInt if not found. */
 {
 struct hashEl *hel = hashLookup(hash, name);
@@ -296,7 +296,7 @@ return hel->val;
 }
 
 char *hashMustFindName(struct hash *hash, char *name)
-/* Return name as stored in hash table (in hel->name). 
+/* Return name as stored in hash table (in hel->name).
  * Abort if not found. */
 {
 struct hashEl *hel = hashLookup(hash, name);
@@ -362,7 +362,7 @@ if (powerOfTwoSize < 8)
     memBlockPower = 8;
 else if (powerOfTwoSize < 16)
     memBlockPower = powerOfTwoSize;
-if (useLocalMem) 
+if (useLocalMem)
     hash->lm = lmInit(1<<memBlockPower);
 hash->mask = hash->size-1;
 AllocArray(hash->table, hash->size);
@@ -402,7 +402,7 @@ for (i=0; i<oldHashSize; ++i)
 for (i=0; i<hash->size; ++i)
     {
     struct hashEl *hel = hash->table[i];
-    if (hel != NULL && hel->next != NULL)	    
+    if (hel != NULL && hel->next != NULL)
 	slReverse(&hash->table[i]);
     }
 freeMem(oldTable);

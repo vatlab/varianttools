@@ -5,9 +5,9 @@
 # a description of the format of this file.
 
 [format description]
-description=Output to TPED format with the first four columns chr name gen_pos pos, and the 
+description=Output to TPED format with the first four columns chr name gen_pos pos, and the
     rest for genotypes. Variant tools cannot import from this format because it does not contain
-    information about reference genome. 
+    information about reference genome.
 variant=chr,pos,ref,alt
 # COMMENT:
 # export_by=chr,pos,ref will ignore all multi-allele genotypes
@@ -94,4 +94,3 @@ comment=Physical position
 [col_5]
 field=GT
 comment=genotype
-

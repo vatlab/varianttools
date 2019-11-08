@@ -111,7 +111,7 @@ namespace cgatools { namespace reference {
         for(size_t ii=0; ii<chromosomes_.size(); ii++)
         {
             const std::string & name = chromosomes_[ii].getName();
-            if (chromosomeName == name || 
+            if (chromosomeName == name ||
                 // add by Bo Peng to handle chrX and X name difference
                 (name[0] == 'c' && name[1] == 'h' && name[2] == 'r' && name.compare(3, std::string::npos, chromosomeName)==0) ||
                 (chromosomeName[0] == 'c' && chromosomeName[1] == 'h' && chromosomeName[2] == 'r' && chromosomeName.compare(3, std::string::npos, name)==0))

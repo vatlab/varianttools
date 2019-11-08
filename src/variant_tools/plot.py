@@ -1,12 +1,8 @@
 #!/usr/bin/env python
 #
-# $File: plot.py $
-# $LastChangedDate: 2012-06-05 12:31:19 -0500 (Tue, 05 Jun 2012) $
-# $Rev: 1179 $
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
 # Copyright (C) 2012 Bo Peng and Gao Wang
 #
@@ -23,28 +19,30 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import sys
 import os
 import pickle
-from collections import OrderedDict
-from .utils import env, runCommand, mkdir_p, downloadFile, whereisRPackage
-from .rtester import Str4R
 import subprocess
+import sys
+from collections import OrderedDict
+
+from .rtester import Str4R
+from .utils import downloadFile, env, mkdir_p, runCommand, whereisRPackage
+
 
 def size(bytes):
     system = [
-    (1024 ** 5, 'P'),
-    (1024 ** 4, 'T'),
-    (1024 ** 3, 'G'),
-    (1024 ** 2, 'M'),
-    (1024 ** 1, 'K'),
-    (1024 ** 0, 'B'),
+        (1024**5, 'P'),
+        (1024**4, 'T'),
+        (1024**3, 'G'),
+        (1024**2, 'M'),
+        (1024**1, 'K'),
+        (1024**0, 'B'),
     ]
 
     for factor, suffix in system:
         if bytes >= factor:
             break
-    amount = int(bytes/factor)
+    amount = int(bytes / factor)
     if isinstance(suffix, tuple):
         singular, multiple = suffix
         if amount == 1:
@@ -53,15 +51,20 @@ def size(bytes):
             suffix = multiple
     return str(amount) + suffix
 
+
 def ismissing(x):
-    return (x != x or x.lower() in ['none', 'null', 'nan', 'na', '.', '-', '', '\t', '\n', ' '])
-    
-CTHEME = ["Dark2", "grayscale", "default", "BrBG", "PiYG", "PRGn", "PuOr", "RdBu", "RdGy", 
-"RdYlBu", "RdYlGn", "Spectral","Accent", "Paired", 
-"Pastel1", "Pastel2", "Set1", "Set2", "Set3", "Blues", 
-"BuGn", "BuPu", "GnBu", "Greens", "Greys", "Oranges",
-"OrRd", "PuBu", "PuBuGn", "PuRd", "Purples", "RdPu", 
-"Reds", "YlGn", "YlGnBu", "YlOrBr", "YlOrRd"]
+    return (x != x or x.lower() in [
+        'none', 'null', 'nan', 'na', '.', '-', '', '\t', '\n', ' '
+    ])
+
+
+CTHEME = [
+    "Dark2", "grayscale", "default", "BrBG", "PiYG", "PRGn", "PuOr", "RdBu",
+    "RdGy", "RdYlBu", "RdYlGn", "Spectral", "Accent", "Paired", "Pastel1",
+    "Pastel2", "Set1", "Set2", "Set3", "Blues", "BuGn", "BuPu", "GnBu",
+    "Greens", "Greys", "Oranges", "OrRd", "PuBu", "PuBuGn", "PuRd", "Purples",
+    "RdPu", "Reds", "YlGn", "YlGnBu", "YlOrBr", "YlOrRd"
+]
 
 
 def RdeviceFromFilename(filename, width=800, height=600):
@@ -91,10 +94,12 @@ def RdeviceFromFilename(filename, width=800, height=600):
             device = 'postscript'
             params = ', width={}/90, height={}/90'.format(width, height)
     except Exception as e:
-        env.logger.warning('Can not determine which device to use to save file {}. A postscript driver is used: {}'.format(
-            filename, e))
+        env.logger.warning(
+            'Can not determine which device to use to save file {}. A postscript driver is used: {}'
+            .format(filename, e))
         device = 'postscript'
     return '{}("{}" {})'.format(device, filename, params)
+
 
 def resolvePlotFilename(name, fields):
     if len(fields) == 1:
@@ -103,29 +108,47 @@ def resolvePlotFilename(name, fields):
         if name is None:
             return [None for x in fields]
         else:
-            return [os.path.splitext(name)[0] + '_{}'.format(x) + os.path.splitext(name)[1] for x in fields]
-    
+            return [
+                os.path.splitext(name)[0] + '_{}'.format(x) +
+                os.path.splitext(name)[1] for x in fields
+            ]
+
+
 def executeRScript(script):
     # write script to log file for debugging and customization purposes
-    env.logger.info('Running R script (complete script available in vtools_report.log)'.format(script))
+    env.logger.info(
+        'Running R script (complete script available in vtools_report.log)'
+        .format(script))
     env.logger.debug(script)
     # start R
-    process = subprocess.Popen(['R', '--slave', '--no-save', '--no-restore'], 
-        stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(['R', '--slave', '--no-save', '--no-restore'],
+                               stdin=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
     # send script and get standard output and error
     out, err = process.communicate(script)
     if err.strip():
         env.logger.warning(err)
     return process.wait()
 
+
 def loadGgplot(script):
     # load R libraries
     for l in ['ggplot2', 'scales', 'RColorBrewer', 'plyr']:
         rlib = whereisRPackage('{}'.format(l))
-        script = ('\nsuppressMessages(library("{}", lib.loc="{}"))'.format(l, rlib) if rlib else '\nsuppressMessages(library("{}"))'.format(l)) + script
+        script = ('\nsuppressMessages(library("{}", lib.loc="{}"))'.format(
+            l, rlib) if rlib else
+                  '\nsuppressMessages(library("{}"))'.format(l)) + script
     return script
 
-def rhist(data, output, width, height, vlines = None, normcurve = True, save_data = None, save_script = None):
+
+def rhist(data,
+          output,
+          width,
+          height,
+          vlines=None,
+          normcurve=True,
+          save_data=None,
+          save_script=None):
     '''draw histogram using ggplot2'''
     if vlines:
         vlines = Str4R(vlines)
@@ -137,14 +160,16 @@ def rhist(data, output, width, height, vlines = None, normcurve = True, save_dat
         stat_foo <- NULL
         vlines <- {0}
         fns <- c({2})
-        for (i in 1:ncol(dat)) {{  
+        for (i in 1:ncol(dat)) {{
         if ({1}) stat_foo <- function(x) dnorm(x, mean(dat[,i], na.rm=T), sd(dat[,i], na.rm=T))
         d <- subset(dat, select=c(colnames(dat)[i]))
         p <- gghist(d, stat_foo, vlines=vlines, xname=colnames(dat)[i])
         eval(parse(text=fns[i]))
         print(p)
         graphics.off()
-        }}'''.format(vlines, int(normcurve), ','.join([repr(RdeviceFromFilename(x, width, height)) for x in output]))
+        }}'''.format(
+        vlines, int(normcurve),
+        ','.join([repr(RdeviceFromFilename(x, width, height)) for x in output]))
     #
     # Here we pipe data from standard input (which can be big),
     # create a script dynamically, and pump it to a R process.
@@ -153,12 +178,13 @@ def rhist(data, output, width, height, vlines = None, normcurve = True, save_dat
         with open(save_data, 'w') as f:
             f.write(data)
     rstr = HIST_FOO + loadGgplot(rstr)
-    rscript = save_script if save_script else os.path.join(env.cache_dir, 'hist.R')
+    rscript = save_script if save_script else os.path.join(
+        env.cache_dir, 'hist.R')
     with open(rscript, 'w') as f:
         f.write(rstr)
     env.logger.info('Generating histogram {} ...'.format(repr(output)))
     cmd = "Rscript {} --slave --no-save --no-restore".format(rscript)
-    out = runCommand(cmd, data) 
+    out = runCommand(cmd, data)
     if out:
         sys.stdout.write(out)
     env.logger.info("Complete!")
@@ -167,8 +193,15 @@ def rhist(data, output, width, height, vlines = None, normcurve = True, save_dat
         os.remove(rscript)
     return
 
-def rdot(data, output, width, height, psize = 2.5, color = None,
-         save_data = None, save_script = None):
+
+def rdot(data,
+         output,
+         width,
+         height,
+         psize=2.5,
+         color=None,
+         save_data=None,
+         save_script=None):
     '''draw dotplot using ggplot2
     input can be 1, 2 or 3 columns for x, y, and z (i.e., dot colors) axis'''
     rstr = '''
@@ -178,7 +211,9 @@ def rdot(data, output, width, height, psize = 2.5, color = None,
         eval(parse(text={2}))
         print(p)
         graphics.off()
-        '''.format(psize, repr(color) if color else "NULL", repr(RdeviceFromFilename(output, width, height)))
+        '''.format(psize,
+                   repr(color) if color else "NULL",
+                   repr(RdeviceFromFilename(output, width, height)))
     #
     # Here we pipe data from standard input (which can be big),
     # create a script dynamically, and pump it to a R process.
@@ -187,12 +222,13 @@ def rdot(data, output, width, height, psize = 2.5, color = None,
         with open(save_data, 'w') as f:
             f.write(data)
     rstr = DOT_FOO + loadGgplot(rstr)
-    rscript = save_script if save_script else os.path.join(env.cache_dir, 'hist.R')
+    rscript = save_script if save_script else os.path.join(
+        env.cache_dir, 'hist.R')
     with open(rscript, 'w') as f:
         f.write(rstr)
     env.logger.info('Generating dot plot {} ...'.format(repr(output)))
     cmd = "Rscript {} --slave --no-save --no-restore".format(rscript)
-    out = runCommand(cmd, data) 
+    out = runCommand(cmd, data)
     if out:
         sys.stdout.write(out)
     env.logger.info("Complete!")
@@ -201,13 +237,23 @@ def rdot(data, output, width, height, psize = 2.5, color = None,
         os.remove(rscript)
     return
 
-def rbox(raw_data, fields, stratify, output, width, height, psize = 2, color = None,
-         save_data = None, save_script = None):
+
+def rbox(raw_data,
+         fields,
+         stratify,
+         output,
+         width,
+         height,
+         psize=2,
+         color=None,
+         save_data=None,
+         save_script=None):
     '''draw box using ggplot2
     input should be 3 columns: 1st column is values, 2nd column is bin ID's and 3rd column is bin order'''
     if stratify is not None:
         if len(fields) > 2:
-            raise ValueError('Less than 2 input fields are allowed with --stratify option')
+            raise ValueError(
+                'Less than 2 input fields are allowed with --stratify option')
         # create strata for given field
         strata = sorted(stratify)
         data = '{}\t{}\torder\n'.\
@@ -220,26 +266,26 @@ def rbox(raw_data, fields, stratify, output, width, height, psize = 2, color = N
             if item[0] == 'NA':
                 continue
             else:
-                found = False 
+                found = False
                 for i, s in enumerate(strata):
                     if float(item[-1]) < s:
                         found = True
                         if i == 0:
                             xaxis = ('Below {}'.format(s))
                         else:
-                            xaxis = ('{}-{}'.format(strata[i-1], s))
-                        order = i+1
+                            xaxis = ('{}-{}'.format(strata[i - 1], s))
+                        order = i + 1
                         break
                 if found is not True:
                     xaxis = '{} or more'.format(strata[-1])
                     order = len(strata) + 1
-            data += '{}\t{}\t{}\n'.format(item[0], xaxis, order) 
+            data += '{}\t{}\t{}\n'.format(item[0], xaxis, order)
     else:
         # stack data to 3 columns retaining the input order of fields
         data = 'values\tvariables\torder\n'
         for item in [x.split() for x in raw_data.split('\n')[1:]]:
             for i, x in enumerate(item):
-                data += '{}\t{}\t{}\n'.format(x, fields[i], i+1)
+                data += '{}\t{}\t{}\n'.format(x, fields[i], i + 1)
     rstr = '''
         tryCatch( {{dat <- read.delim(pipe('cat /dev/stdin'), header=T, stringsAsFactors=F)
         }}, error = function(e) {{ quit("no") }} )
@@ -247,7 +293,9 @@ def rbox(raw_data, fields, stratify, output, width, height, psize = 2, color = N
         eval(parse(text={2}))
         print(p)
         graphics.off()
-        '''.format(psize, repr(color) if color else "NULL", repr(RdeviceFromFilename(output, width, height)))
+        '''.format(psize,
+                   repr(color) if color else "NULL",
+                   repr(RdeviceFromFilename(output, width, height)))
     #
     # Here we pipe data from standard input (which can be big),
     # create a script dynamically, and pump it to a R process.
@@ -256,12 +304,13 @@ def rbox(raw_data, fields, stratify, output, width, height, psize = 2, color = N
         with open(save_data, 'w') as f:
             f.write(data)
     rstr = BOX_FOO + loadGgplot(rstr)
-    rscript = save_script if save_script else os.path.join(env.cache_dir, 'hist.R')
+    rscript = save_script if save_script else os.path.join(
+        env.cache_dir, 'hist.R')
     with open(rscript, 'w') as f:
         f.write(rstr)
     env.logger.info('Generating dot plot {} ...'.format(repr(output)))
     cmd = "Rscript {} --slave --no-save --no-restore".format(rscript)
-    out = runCommand(cmd, data) 
+    out = runCommand(cmd, data)
     if out:
         sys.stdout.write(out)
     env.logger.info("Complete!")
@@ -281,10 +330,13 @@ def plotAssociation(args):
         except:
             data_size += len(x)
         data.append(x.rstrip().split())
-    env.logger.info("Processing {} of input data ...".format(size(len(data) + data_size)))
-    p=PlotAssociation(args, data)
-    
-    pinput = eval(args.method.upper() + '_FOO') + eval('p.{}'.format(args.method if args.method == 'qq' else 'manhattan'))() + eval(args.method.upper() + '_MAIN')
+    env.logger.info("Processing {} of input data ...".format(
+        size(len(data) + data_size)))
+    p = PlotAssociation(args, data)
+
+    pinput = eval(args.method.upper() + '_FOO') + eval(
+        'p.{}'.format(args.method if args.method == 'qq' else 'manhattan'))(
+        ) + eval(args.method.upper() + '_MAIN')
 
     pinput = loadGgplot(pinput)
     env.logger.info("Generating graph(s) ...")
@@ -295,7 +347,9 @@ def plotAssociation(args):
     env.logger.info("Complete!")
     return
 
+
 class PlotAssociation:
+
     def __init__(self, args, inlines):
         '''Prepare R script to generate qq and manhattan plots'''
         if len(inlines) < 2:
@@ -305,16 +359,19 @@ class PlotAssociation:
             self.a.font_size = self.a.font_size / 2.5
         # processing chroms
         if hasattr(self.a, 'chrom'):
-            allchroms = list(map(str, list(range(1,23)))) + ['X','Y','Un']
-            userange = [idx for idx, item in enumerate(self.a.chrom) if ':' in item and len(item.split(":")) == 2]
+            allchroms = list(map(str, list(range(1, 23)))) + ['X', 'Y', 'Un']
+            userange = [
+                idx for idx, item in enumerate(self.a.chrom)
+                if ':' in item and len(item.split(":")) == 2
+            ]
             for item in userange:
                 start, end = self.a.chrom[item].split(':')
                 start = allchroms.index(start)
                 end = allchroms.index(end)
                 if start < end:
-                    self.a.chrom += allchroms[start:end+1]
+                    self.a.chrom += allchroms[start:end + 1]
                 else:
-                    self.a.chrom += allchroms[end:start+1]
+                    self.a.chrom += allchroms[end:start + 1]
             chrom = []
             for item in self.a.chrom:
                 if item in allchroms:
@@ -324,8 +381,8 @@ class PlotAssociation:
                 raise ValueError("Invalid --chrom input")
             self.a.chrom = chrom
         else:
-            self.a.chrom=''
-        if not hasattr(self.a,'chrom_prefix'):
+            self.a.chrom = ''
+        if not hasattr(self.a, 'chrom_prefix'):
             self.a.chrom_prefix = "None"
         # processing gene map
         if hasattr(self.a, 'gene_map'):
@@ -339,14 +396,20 @@ class PlotAssociation:
 
     def m_read(self, inlines):
         # fields headers
-        headline = [x.replace('#','') for x in inlines[0]]
-        self.fields = ['_'.join(x.split('_')[1:]) for x in headline if x.startswith('pvalue')]
+        headline = [x.replace('#', '') for x in inlines[0]]
+        self.fields = [
+            '_'.join(x.split('_')[1:])
+            for x in headline
+            if x.startswith('pvalue')
+        ]
         if len(self.fields) == 0:
-            raise ValueError("Invalid headers (see header convention of 'vtools associate' command output).")
+            raise ValueError(
+                "Invalid headers (see header convention of 'vtools associate' command output)."
+            )
         idxes = []
         for field in self.fields:
             idxes.append(headline.index('pvalue_' + field))
-        self.fields.insert(0,'GENE')
+        self.fields.insert(0, 'GENE')
         # data
         self.is_snv = False
         self.dat = []
@@ -357,16 +420,18 @@ class PlotAssociation:
                 try:
                     self.dat.append([':'.join(x[0:2])] + [x[i] for i in idxes])
                 except IndexError:
-                    badlines.append(str(idx+2))
+                    badlines.append(str(idx + 2))
             self.is_snv = True
         else:
             for idx, x in enumerate(inlines[1:]):
                 try:
                     self.dat.append([x[0]] + [x[i] for i in idxes])
                 except IndexError:
-                    badlines.append(str(idx+2))
+                    badlines.append(str(idx + 2))
         if len(badlines):
-            env.logger.warning("The following lines are ignored due to having empty fields: {}. You may want to manually fill them up with placeholder 'NaN'.".format(', '.join(badlines)))
+            env.logger.warning(
+                "The following lines are ignored due to having empty fields: {}. You may want to manually fill them up with placeholder 'NaN'."
+                .format(', '.join(badlines)))
         return
 
     def m_qqdata(self):
@@ -376,7 +441,10 @@ class PlotAssociation:
                 rdat[x] = list(y)
             else:
                 try:
-                    rdat[x] = [i if i == i else None for i in list(map(float, list(y)))]
+                    rdat[x] = [
+                        i if i == i else None
+                        for i in list(map(float, list(y)))
+                    ]
                 except ValueError as e:
                     raise ValueError("{}".format(e))
         self.rdat = Str4R(rdat)
@@ -398,7 +466,7 @@ class PlotAssociation:
             if not os.path.exists(pfname):
                 mkdir_p(os.path.join(env.local_resource, 'resource'))
                 downloadFile('resource/refgene.pkl',
-                             os.path.join(env.local_resource, 'resource')) 
+                             os.path.join(env.local_resource, 'resource'))
             with open(pfname, 'rb') as f:
                 gdict = pickle.load(f)
             if self.gene_map:
@@ -408,9 +476,10 @@ class PlotAssociation:
                     try:
                         for item in f.readlines():
                             item = item.rstrip().split()
-                            gd[item[0]] = [item[1],item[2]]
+                            gd[item[0]] = [item[1], item[2]]
                     except:
-                        sys.exit('ERROR: {0} format is not valid'.format(self.gene_map))
+                        sys.exit('ERROR: {0} format is not valid'.format(
+                            self.gene_map))
                 gdict.update(gd)
                 #
             failed = []
@@ -428,20 +497,29 @@ class PlotAssociation:
                     dat.append([x[0]] + ['Un', '{0}'.format(i)] + x[1:])
                     i += 1000
             if len(multi_chrom):
-                env.logger.warning('There are {1} genes belonging to more than one chromosomes. This might due to discrepancies between refgene database versions. Using whatever first entry (alphanumeric order) as the coordinate: {0}'.format(', '.join(multi_chrom), len(multi_chrom)))
+                env.logger.warning(
+                    'There are {1} genes belonging to more than one chromosomes. This might due to discrepancies between refgene database versions. Using whatever first entry (alphanumeric order) as the coordinate: {0}'
+                    .format(', '.join(multi_chrom), len(multi_chrom)))
             if len(failed):
-                env.logger.warning('There are {1} genes not found in local gene name database. You may want to provide your own list of genomic coordinates of genes: {0}'.format(', '.join(failed), len(failed)))
+                env.logger.warning(
+                    'There are {1} genes not found in local gene name database. You may want to provide your own list of genomic coordinates of genes: {0}'
+                    .format(', '.join(failed), len(failed)))
         #
         rdat = OrderedDict()
 
         for x, y in zip(self.fields, list(zip(*dat))):
             if x == 'BP':
-                rdat[x] = [i if i == i else None for i in list(map(int, list(y)))]
+                rdat[x] = [
+                    i if i == i else None for i in list(map(int, list(y)))
+                ]
             elif x in ['GENE', 'CHR']:
                 rdat[x] = list(y)
             else:
                 try:
-                    rdat[x] = [i if i == i else None for i in list(map(float, list(y)))]
+                    rdat[x] = [
+                        i if i == i else None
+                        for i in list(map(float, list(y)))
+                    ]
                 except ValueError as e:
                     raise ValueError("{}".format(e))
         self.rdat = Str4R(rdat)
@@ -469,24 +547,26 @@ class PlotAssociation:
         tryCatch({{dat <- as.data.frame({12})}}, warning = function(ex) {{ paste("WARNING from Str4R:", str(ex)) }})
         qq_width <- {13}
         qq_height <- {14}
-        '''.format(self.fname,
-                'true' if self.a.same_page else 'false',
-                'grayscale' if not self.a.color else self.a.color,
-                'true' if self.a.fixed_shape or not self.a.same_page else 'false',
-                self.a.shape,
-                self.a.title,
-                'true' if self.a.bonferroni else 'false',
-                'false' if self.a.no_slope else 'true',
-                ' ' if not self.a.hlines else ' '.join(list(map(str,self.a.hlines))),
-                self.a.font_size,
-                self.a.label_top,
-                ' ' if not self.a.label_these else ' '.join(self.a.label_these),
-                self.rdat,
-                self.a.width_height[0] if self.a.width_height else 9,
-                self.a.width_height[1] if self.a.width_height else 8,
-                )
+        '''.format(
+            self.fname,
+            'true' if self.a.same_page else 'false',
+            'grayscale' if not self.a.color else self.a.color,
+            'true' if self.a.fixed_shape or not self.a.same_page else 'false',
+            self.a.shape,
+            self.a.title,
+            'true' if self.a.bonferroni else 'false',
+            'false' if self.a.no_slope else 'true',
+            ' ' if not self.a.hlines else ' '.join(
+                list(map(str, self.a.hlines))),
+            self.a.font_size,
+            self.a.label_top,
+            ' ' if not self.a.label_these else ' '.join(self.a.label_these),
+            self.rdat,
+            self.a.width_height[0] if self.a.width_height else 9,
+            self.a.width_height[1] if self.a.width_height else 8,
+        )
         return astr
-    
+
     def manhattan(self):
         self.m_manhattandata()
         astr = '''
@@ -508,22 +588,26 @@ class PlotAssociation:
         tryCatch({{dat <- as.data.frame({11})}}, warning = function(ex) {{ paste("WARNING from Str4R:", str(ex)) }})
         man_width <- {12}
         man_height <- {13}
-        '''.format(self.fname,
-                'true' if self.a.same_page else 'false',
-                'grayscale' if not self.a.color else self.a.color,
-                self.a.title,
-                ' '.join(self.a.chrom),
-                'true' if self.a.bonferroni else 'false',
-                ' ' if not self.a.hlines else ' '.join(list(map(str,self.a.hlines))),
-                self.a.font_size,
-                self.a.label_top,
-                ' ' if not self.a.label_these else ' '.join(self.a.label_these),
-                'NULL' if self.a.chrom_prefix == "None" else repr(self.a.chrom_prefix),
-                self.rdat,
-                self.a.width_height[0] if self.a.width_height else 12,
-                self.a.width_height[1] if self.a.width_height else 6,
-                )
+        '''.format(
+            self.fname,
+            'true' if self.a.same_page else 'false',
+            'grayscale' if not self.a.color else self.a.color,
+            self.a.title,
+            ' '.join(self.a.chrom),
+            'true' if self.a.bonferroni else 'false',
+            ' ' if not self.a.hlines else ' '.join(
+                list(map(str, self.a.hlines))),
+            self.a.font_size,
+            self.a.label_top,
+            ' ' if not self.a.label_these else ' '.join(self.a.label_these),
+            'NULL'
+            if self.a.chrom_prefix == "None" else repr(self.a.chrom_prefix),
+            self.rdat,
+            self.a.width_height[0] if self.a.width_height else 12,
+            self.a.width_height[1] if self.a.width_height else 6,
+        )
         return astr
+
 
 QQ_FOO = '''
 #! QQplot function
@@ -636,14 +720,14 @@ MANHATTAN_FOO = '''
 #   SINA   1 202300047 0.47280
 #   SOHU   1  66400050      NA
 #   HAHA   1  64900051 0.53430
-#       Accent    8 
-#       Dark2     8 
-#       Paired   12 
-#       Pastel1   9 
-#       Pastel2   8 
-#       Set1      9 
-#       Set2      8 
-#       Set3     12 
+#       Accent    8
+#       Dark2     8
+#       Paired   12
+#       Pastel1   9
+#       Pastel2   8
+#       Set1      9
+#       Set2      8
+#       Set3     12
 
 #! manhattan plot using ggplot2
 manhattanplot <- function(dataframe, facet=F, color='default', title='', chroms=c(1:22,'X','Y','Un'), chrprefix=chrprefix, gwLine=T, optLines=c(), topFont=2, labelTopGenes=0, annotate=NULL) {
@@ -751,8 +835,8 @@ MANHATTAN_PLAIN_FOO = '''
 # See license at http://gettinggeneticsdone.blogspot.com/p/copyright.html
 
 # Last updated: Tuesday, April 19, 2011
-# R code for making manhattan plots and QQ plots from plink output files. 
-# manhattan() with GWAS data this can take a lot of memory, recommended for use on 64bit machines only, for now. 
+# R code for making manhattan plots and QQ plots from plink output files.
+# manhattan() with GWAS data this can take a lot of memory, recommended for use on 64bit machines only, for now.
 # Altnernatively, use bmanhattan() , i.e., base manhattan. uses base graphics. way faster.
 
 # Modified by Zongxiao He, Thu July 19 16:34:07 CDT 2012
@@ -853,7 +937,7 @@ manhattanplainplot <- function(dataframe, facetLastOne=T, color='default', title
     }
 
     gwPval = -log10(0.05/length(d$GENE))
-    if (gwLine) abline(h=gwPval, col="red", lty=2) 
+    if (gwLine) abline(h=gwPval, col="red", lty=2)
     if (length(optLines) > 0){
         for( i in optLines ) {
             abline(h=i,,col="blue", lty=3)
@@ -941,7 +1025,7 @@ if (facet) {
             par(mar=c(5,5,2,2)+0.1)
         } else {
             lastOne=F  #no x lab
-            if(i==4) par(mar=c(2,5,5,2)+0.1) 
+            if(i==4) par(mar=c(2,5,5,2)+0.1)
             else par(mar=c(2,5,2,2)+0.1)
         }
         manhattanplainplot(pval, facetLastOne=lastOne, color=color, title="", subtitle=subtitle, chroms=chroms, chrprefix=chrprefix, gwLine=gwLine, optLines=optLines, topFont=topFont, labelTopGenes=labelTopGenes, annotate=annotate)
@@ -989,7 +1073,7 @@ gghist <- function(dat, stat_foo = NULL, vlines = NULL, xname='x') {
         plottitle <- 'Histogram & fitted vs. normal distribution density curve for "'
         } else {
         plottitle <- 'Histogram & fitted density curve for "'
-        } 
+        }
         myplot <- myplot + labs(title = paste(plottitle, xname, '"\\n', 'mean = ', toString(average), '; ', 'stdev = ', toString(stdev), '; ', 'range = ', '[', toString(r1), ',', toString(r2), ']', '\\n', sep=''))
         return(myplot)
 }
@@ -1009,7 +1093,7 @@ ggdot <- function(dat, psize=2.5, color=NULL) {
             myplot = myplot + scale_colour_manual(values = mycolors)
         }
     } else if (length(xyz) == 2) {
-        myplot = ggplot(dat, aes_string(x=xyz[1], y=xyz[2])) + 
+        myplot = ggplot(dat, aes_string(x=xyz[1], y=xyz[2])) +
             xlab(paste('\\n', xyz[1], sep='')) + ylab(paste(xyz[2], '\\n', sep=''))
     } else {
         dat = cbind(seq(1:nrow(dat)), dat)
@@ -1023,7 +1107,7 @@ ggdot <- function(dat, psize=2.5, color=NULL) {
 	    theme(axis.title.x=element_text(size=10)) +
 	    theme(axis.title.y=element_text(size=10)) +
 	    theme_bw()
-    return(myplot) 
+    return(myplot)
 }
 '''
 BOX_FOO = '''
@@ -1047,6 +1131,6 @@ ggbox <- function(dat, psize=2, color=NULL) {
 	    theme(axis.title.x=element_text(size=10)) +
 	    theme(axis.title.y=element_text(size=10)) +
 	    theme_bw()
-    return(myplot) 
+    return(myplot)
 }
 '''

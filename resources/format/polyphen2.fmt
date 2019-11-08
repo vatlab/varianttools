@@ -5,7 +5,7 @@
 # a description of the format of this file.
 
 [format description]
-description=To be used to export variants in a format that is acceptable by the polyphen2 server 
+description=To be used to export variants in a format that is acceptable by the polyphen2 server
 	http://genetics.bwh.harvard.edu/pph2/bgi.shtml, and to import the FULL report returned
 	by this server.
 variant=chr,pos,ref,alt
@@ -152,5 +152,3 @@ type=VARCHAR(255)
 [IdQmin]
 index=55
 type=VARCHAR(255)
-
-

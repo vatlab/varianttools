@@ -24,29 +24,33 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
-import glob
 import unittest
-import subprocess
 from testUtils import ProcessTestCase
 
+
 class TestTransRatio(ProcessTestCase):
+
     def setUp(self):
         'Create a project'
         ProcessTestCase.setUp(self)
         self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
-        self.runCmd('vtools update variant --from_stat "num=#(alt)" "depth=sum(DP_geno)"')
+        self.runCmd(
+            'vtools update variant --from_stat "num=#(alt)" "depth=sum(DP_geno)"'
+        )
 
     def testTransRatio(self):
         'Test command vtools_report trans_ratio'
         self.assertFail('vtools_report trans_ratio')
         self.assertSucc('vtools_report trans_ratio -h')
         # no such column: non_existing_column
-        self.assertFail('vtools_report trans_ratio non_existing -n non_existing_column')
+        self.assertFail(
+            'vtools_report trans_ratio non_existing -n non_existing_column')
         self.assertSucc('vtools_report trans_ratio variant -n num')
         # ValueError: invalid literal for int() with base 10: '6292.38333333\n'
-        #self.assertFail('vtools_report trans_ratio variant -n depth')
-        self.assertSucc('vtools_report trans_ratio variant -n num --group_by num')
+        # self.assertFail('vtools_report trans_ratio variant -n depth')
+        self.assertSucc(
+            'vtools_report trans_ratio variant -n num --group_by num')
+
 
 if __name__ == '__main__':
     unittest.main()

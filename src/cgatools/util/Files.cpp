@@ -38,7 +38,7 @@ namespace cgatools { namespace util { namespace files {
         bool completePaths(directory.is_complete());
         boost::regex re(filename, regExOptions);
 
-        if (!exists(directory)) 
+        if (!exists(directory))
         {
             return(false);
         }
@@ -72,7 +72,7 @@ namespace cgatools { namespace util { namespace files {
                     }
                     if (recursive)
                     {
-                        (void)findFiles(itr->path(), filename, filesFound, 
+                        (void)findFiles(itr->path(), filename, filesFound,
                             recursive, includeDir, regExOptions);
                     }
                 }

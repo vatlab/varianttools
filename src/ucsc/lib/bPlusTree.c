@@ -1,4 +1,4 @@
-/* bptFile - B+ Trees.  These are a method of indexing data similar to binary trees, but 
+/* bptFile - B+ Trees.  These are a method of indexing data similar to binary trees, but
  * with many children rather than just two at each node. They work well when stored on disk,
  * since typically only two or three disk accesses are needed to locate any particular
  * piece of data.  This implementation is *just* for disk based storage.  For memory
@@ -17,7 +17,7 @@
  * dynamic updates - it just creates a b+ tree from a sorted list.
  *
  * Each node can be one of two types - index or leaf.  The index nodes contain pointers
- * to child nodes.  The leaf nodes contain the actual data. 
+ * to child nodes.  The leaf nodes contain the actual data.
  *
  * The layout of the file header is:
  *       <magic number>  4 bytes - The value bptSig (0x78CA8C91)
@@ -28,7 +28,7 @@
  *       <reserved2>     4 bytes - Always 0 for now
  *       <reserved3>     4 bytes - Always 0 for now
  * The magic number may be byte-swapped, in which case all numbers in the file
- * need to be byte-swapped. 
+ * need to be byte-swapped.
  *
  * The nodes start with a header:
  *       <is leaf>       1 byte  - 1 for leaf nodes, 0 for index nodes.
@@ -114,7 +114,7 @@ if (bpt != NULL)
 }
 
 static boolean rFind(struct bptFile *bpt, bits64 blockStart, void *key, void *val)
-/* Find value corresponding to key.  If found copy value to memory pointed to by val and return 
+/* Find value corresponding to key.  If found copy value to memory pointed to by val and return
  * true. Otherwise return false. */
 {
 /* Seek to start of block. */
@@ -163,7 +163,7 @@ else
 }
 
 static void rFindMulti(struct bptFile *bpt, bits64 blockStart, void *key, struct slRef **pList)
-/* Find values corresponding to key and add them to pList.  You'll need to 
+/* Find values corresponding to key and add them to pList.  You'll need to
  * Do a slRefFreeListAndVals() on the list when done. */
 {
 /* Seek to start of block. */
@@ -226,7 +226,7 @@ else
 }
 
 
-static void rTraverse(struct bptFile *bpt, bits64 blockStart, void *context, 
+static void rTraverse(struct bptFile *bpt, bits64 blockStart, void *context,
     void (*callback)(void *context, void *key, int keySize, void *val, int valSize) )
 /* Recursively go across tree, calling callback at leaves. */
 {
@@ -303,7 +303,7 @@ static bits64 bptDataOffset(struct bptFile *bpt, bits64 itemPos)
  * data pass in 0. */
 {
 if (itemPos >= bpt->itemCount)
-    errAbort("Item index %lld greater than item count %lld in %s", 
+    errAbort("Item index %lld greater than item count %lld in %s",
 	itemPos, bpt->itemCount, bpt->fileName);
 bits64 blockPos = itemPos/bpt->blockSize;
 bits32 insidePos = itemPos - blockPos*bpt->blockSize;
@@ -316,7 +316,7 @@ return itemOffset;
 }
 
 void bptKeyAtPos(struct bptFile *bpt, bits64 itemPos, void *result)
-/* Fill in result with the key at given itemPos.  For first piece of data itemPos is 0 
+/* Fill in result with the key at given itemPos.  For first piece of data itemPos is 0
  * Result must be at least bpt->keySize.  If result is a string it won't be zero terminated
  * by this routine.  Use bptStringKeyAtPos instead. */
 {
@@ -366,7 +366,7 @@ else
 }
 
 boolean bptFileFind(struct bptFile *bpt, void *key, int keySize, void *val, int valSize)
-/* Find value associated with key.  Return TRUE if it's found. 
+/* Find value associated with key.  Return TRUE if it's found.
 *  Parameters:
 *     bpt - file handle returned by bptFileOpen
 *     key - pointer to key string, which needs to be bpt->keySize long
@@ -377,7 +377,7 @@ return bptFileFindMaybeMulti(bpt, key, keySize, valSize, FALSE, val, NULL);
 }
 
 struct slRef *bptFileFindMultiple(struct bptFile *bpt, void *key, int keySize, int valSize)
-/* Find all values associated with key.  Store this in ->val item of returned list. 
+/* Find all values associated with key.  Store this in ->val item of returned list.
  * Do a slRefFreeListAndVals() on list when done. */
 {
 struct slRef *list = NULL;
@@ -428,9 +428,9 @@ return levels;
 }
 
 
-static bits32 writeIndexLevel(bits16 blockSize, 
-	void *itemArray, int itemSize, long itemCount, 
-	bits32 indexOffset, int level, 
+static bits32 writeIndexLevel(bits16 blockSize,
+	void *itemArray, int itemSize, long itemCount,
+	bits32 indexOffset, int level,
 	void (*fetchKey)(const void *va, char *keyBuf), bits32 keySize, bits32 valSize,
 	FILE *f)
 /* Write out a non-leaf level. */
@@ -440,7 +440,7 @@ char *items = itemArray;
 /* Calculate number of nodes to write at this level. */
 long slotSizePer = xToY(blockSize, level);   // Number of items per slot in node
 long nodeSizePer = slotSizePer * blockSize;  // Number of items per node
-long nodeCount = (itemCount + nodeSizePer - 1)/nodeSizePer;	
+long nodeCount = (itemCount + nodeSizePer - 1)/nodeSizePer;
 
 
 /* Calculate sizes and offsets. */
@@ -496,7 +496,7 @@ for (i=0; i<itemCount; i += nodeSizePer)
 return endLevel;
 }
 
-static void writeLeafLevel(bits16 blockSize, void *itemArray, int itemSize, int itemCount, 
+static void writeLeafLevel(bits16 blockSize, void *itemArray, int itemSize, int itemCount,
 	void (*fetchKey)(const void *va, char *keyBuf), bits32 keySize,
 	void* (*fetchVal)(const void *va), bits32 valSize,
 	FILE *f)
@@ -531,7 +531,7 @@ for (i=0; i<itemCount; i += countOne)
 	mustWrite(f, keyBuf, keySize);
 	mustWrite(f, (*fetchVal)(item), valSize);
 	}
-    
+
     /* Pad out any unused bits of last block with zeroes. */
     int slotSize = keySize + valSize;
     for (j=countOne; j<blockSize; ++j)
@@ -563,7 +563,7 @@ int levels = bptCountLevels(blockSize, itemCount);
 int i;
 for (i=levels-1; i > 0; --i)
     {
-    bits32 endLevelOffset = writeIndexLevel(blockSize, itemArray, itemSize, itemCount, indexOffset, 
+    bits32 endLevelOffset = writeIndexLevel(blockSize, itemArray, itemSize, itemCount, indexOffset,
     	i, fetchKey, keySize, valSize, f);
     indexOffset = ftell(f);
     if (endLevelOffset != indexOffset)
@@ -571,7 +571,7 @@ for (i=levels-1; i > 0; --i)
     }
 
 /* Write leaf nodes */
-writeLeafLevel(blockSize, itemArray, itemSize, itemCount, 
+writeLeafLevel(blockSize, itemArray, itemSize, itemCount,
 	fetchKey, keySize, fetchVal, valSize, f);
 }
 
@@ -580,7 +580,7 @@ void bptFileCreate(
 	int itemSize, 		/* Size of each element in array. */
 	bits64 itemCount, 	/* Number of elements in array. */
 	bits32 blockSize,	/* B+ tree block size - # of children for each node. */
-	void (*fetchKey)(const void *va, char *keyBuf),  /* Given item, copy key to keyBuf */ 
+	void (*fetchKey)(const void *va, char *keyBuf),  /* Given item, copy key to keyBuf */
 	bits32 keySize,					 /* Size of key */
 	void* (*fetchVal)(const void *va), 		 /* Given item, return pointer to value */
 	bits32 valSize, 				 /* Size of value */
@@ -590,8 +590,7 @@ void bptFileCreate(
 {
 /* Open file and write header. */
 FILE *f = mustOpen(fileName, "wb");
-bptFileBulkIndexToOpenFile(itemArray, itemSize, itemCount, blockSize, fetchKey, keySize, 
+bptFileBulkIndexToOpenFile(itemArray, itemSize, itemCount, blockSize, fetchKey, keySize,
 	fetchVal, valSize, f);
 carefulClose(&f);
 }
-

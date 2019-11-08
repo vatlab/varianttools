@@ -6,7 +6,7 @@
 //
 // This file is part of variant_tools, a software application to annotate,
 // summarize, and filter variants for next-gen sequencing ananlysis.
-// Please visit http://varianttools.sourceforge.net for details.
+// Please visit https://github.com/vatlab/varianttools for details.
 //
 // Copyright (C) 2011 Gao Wang (wangow@gmail.com) and Bo Peng (bpeng@mdanderson.org)
 //
@@ -93,7 +93,7 @@ std::string wrap(char * input, int start=24)
         if (count > 78 && *p == ' ') {
             res += "\n                        ";
             count = 24;
-        } else 
+        } else
             res += *p;
     }
     return res;
@@ -113,7 +113,7 @@ void showTrack(const std::string & track_file, const std::string output_file = s
         else
             output_style = 1;
     }
-    if (endsWith((char *)track_file.c_str(), ".vcf.gz") || 
+    if (endsWith((char *)track_file.c_str(), ".vcf.gz") ||
         endsWith((char *)track_file.c_str(), ".vcf")) {
         /* if it is a local file, but does not exist. This is needed
            because vcfFileMayOpen will simply crash if file does not exist */
@@ -129,12 +129,12 @@ void showTrack(const std::string & track_file, const std::string output_file = s
         if (endsWith((char *)track_file.c_str(), ".vcf"))
             vcff = vcfFileMayOpen((char *)track_file.c_str(),
                 VCF_IGNORE_ERRS, 1, true);
-        else 
+        else
             vcff = vcfTabixFileMayOpen((char *)track_file.c_str(),
                 NULL, 0, 0, VCF_IGNORE_ERRS, 1);
         if (vcff == NULL)
              return;
-        
+
         if (output_style == 0) {
             fprintf(output, "%-23s VCF v%d.%d\n", "Version", vcff->majorVersion, vcff->minorVersion);
             fprintf(output, "%-23s %d\n\n", "Number of fields:", 8 + (vcff->genotypeCount > 0 ? vcff->genotypeCount + 1 : 0));
@@ -217,7 +217,7 @@ void showTrack(const std::string & track_file, const std::string output_file = s
                     fprintf(output, "type=INTEGER\nadj=ExtractValue('%s=', ';')\n", def->key);
                 else if (def->type == vcfInfoFloat)
                     fprintf(output, "type=FLOAT\nadj=ExtractValue('%s=', ';')\n", def->key);
-                else 
+                else
                     fprintf(output, "type=VARCHAR(255)\nadj=ExtractValue('%s=', ';')\n", def->key);
                 fprintf(output, "comment=%s\n\n", def->description);
             }
@@ -269,7 +269,7 @@ void showTrack(const std::string & track_file, const std::string output_file = s
                     fprintf(output, "type=INTEGER\nadj=ExtractValue('%s=', ';')\n", def->key);
                 else if (def->type == vcfInfoFloat)
                     fprintf(output, "type=FLOAT\nadj=ExtractValue('%s=', ';')\n", def->key);
-                else 
+                else
                     fprintf(output, "type=VARCHAR(255)\nadj=ExtractValue('%s=', ';')\n", def->key);
                 fprintf(output, "comment=%s\n\n", def->description);
             }
@@ -364,24 +364,24 @@ void showTrack(const std::string & track_file, const std::string output_file = s
                 } else if (type == 'c') {
                     fprintf(output, "%c%c                      c (int8)   : %d\n", key[0], key[1], *(int8_t*)s);
                     ++s;
-                } else if (type == 'S') { 
+                } else if (type == 'S') {
                     fprintf(output, "%c%c                      S (uint16) : %u\n", key[0], key[1], *(uint16_t*)s);
-                    s += 2; 
+                    s += 2;
                 } else if (type == 's') {
                     fprintf(output, "%c%c                      s (int16)  : %d\n", key[0], key[1], *(int16_t*)s);
                     s += 2;
                 } else if (type == 'I') {
                     fprintf(output, "%c%c                      I (uint32  : %u\n", key[0], key[1], *(uint32_t*)s);
                     s += 4;
-                } else if (type == 'i') { 
+                } else if (type == 'i') {
                     fprintf(output, "%c%c                      i (int32)  : %d\n", key[0], key[1], *(int32_t*)s);
                     s += 4;
-                } else if (type == 'f') { 
+                } else if (type == 'f') {
                     fprintf(output, "%c%c                      f (float)  : %g\n", key[0], key[1], *(float*)s);
-                    s += 4; 
-                } else if (type == 'd') { 
+                    s += 4;
+                } else if (type == 'd') {
                     fprintf(output, "%c%c                      d (double) : %lg\n", key[0], key[1], *(double*)s);
-                    s += 8; 
+                    s += 8;
                 } else if (type == 'Z') {
                     fprintf(output, "%c%c                      Z (string) : %s\n", key[0], key[1], (char *)s);
                     s += strlen((char *)s) + 1;
@@ -496,7 +496,7 @@ void showTrack(const std::string & track_file, const std::string output_file = s
 }
 
 
-bool tabixFetch(const std::string & filenameOrURL, const std::vector<std::string> & regions, 
+bool tabixFetch(const std::string & filenameOrURL, const std::vector<std::string> & regions,
     const std::string & output_file = std::string(), bool print_header=true)
 {
     FILE * output = NULL;
@@ -540,7 +540,7 @@ bool tabixFetch(const std::string & filenameOrURL, const std::vector<std::string
     // retrieve from specified regions
     int len;
     const char *s;
-    
+
     if (ti_lazy_index_load(t) < 0) {
         fprintf(stderr,"[tabix] failed to load the index file.\n");
         return false;
@@ -568,7 +568,7 @@ bool tabixFetch(const std::string & filenameOrURL, const std::vector<std::string
                     fputc('\n', output);
             }
             ti_iter_destroy(iter);
-        } 
+        }
     }
     ti_close(t);
     if (!output_file.empty())
@@ -576,10 +576,9 @@ bool tabixFetch(const std::string & filenameOrURL, const std::vector<std::string
 	return true;
 }
 
-%} 
+%}
 
 
 void showTrack(const std::string & track_file, const std::string output_file = std::string());
 bool tabixFetch(const std::string & filenameOrURL, const std::vector<std::string> & regions,
     const std::string & output_file = std::string(), bool print_header=true);
-

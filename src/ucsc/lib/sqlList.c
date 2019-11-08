@@ -1,6 +1,6 @@
 /* Stuff for processing comma separated lists - a little long so
  * in a separate module from jksql.c though interface is still
- * in jksql.c. 
+ * in jksql.c.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -15,7 +15,7 @@
 
 
 int sqlByteArray(char *s, signed char *array, int arraySize)
-/* Convert comma separated list of numbers to an array.  Pass in 
+/* Convert comma separated list of numbers to an array.  Pass in
  * array an max size of array. */
 {
 unsigned count = 0;
@@ -95,7 +95,7 @@ if (s)
 /*-------------------------*/
 
 int sqlUbyteArray(char *s, unsigned char *array, int arraySize)
-/* Convert comma separated list of numbers to an array.  Pass in 
+/* Convert comma separated list of numbers to an array.  Pass in
  * array an max size of array. */
 {
 unsigned count = 0;
@@ -175,7 +175,7 @@ if (s)
 /*-------------------------*/
 
 int sqlCharArray(char *s, char *array, int arraySize)
-/* Convert comma separated list of chars to an array.  Pass in 
+/* Convert comma separated list of chars to an array.  Pass in
  * array and max size of array. */
 {
 unsigned count = 0;
@@ -265,7 +265,7 @@ if (s)
 /*-------------------------*/
 
 int sqlShortArray(char *s, short *array, int arraySize)
-/* Convert comma separated list of numbers to an array.  Pass in 
+/* Convert comma separated list of numbers to an array.  Pass in
  * array an max size of array. */
 {
 unsigned count = 0;
@@ -345,7 +345,7 @@ if (s)
 /*-------------------------*/
 
 int sqlUshortArray(char *s, unsigned short *array, int arraySize)
-/* Convert comma separated list of numbers to an array.  Pass in 
+/* Convert comma separated list of numbers to an array.  Pass in
  * array an max size of array. */
 {
 unsigned count = 0;
@@ -424,7 +424,7 @@ if (s)
 
 /*-------------------------*/
 int sqlDoubleArray(char *s, double *array, int maxArraySize)
-/* Convert comma separated list of floating point numbers to an array.  
+/* Convert comma separated list of floating point numbers to an array.
  * Pass in array and max size of array. */
 {
 unsigned count = 0;
@@ -444,7 +444,7 @@ return count;
 
 
 int sqlFloatArray(char *s, float *array, int maxArraySize)
-/* Convert comma separated list of floating point numbers to an array.  
+/* Convert comma separated list of floating point numbers to an array.
  * Pass in array and max size of array. */
 {
 unsigned count = 0;
@@ -583,7 +583,7 @@ if (s)
 /*-------------------------*/
 
 int sqlUnsignedArray(char *s, unsigned *array, int arraySize)
-/* Convert comma separated list of numbers to an array.  Pass in 
+/* Convert comma separated list of numbers to an array.  Pass in
  * array and max size of array. */
 {
 unsigned count = 0;
@@ -663,7 +663,7 @@ if (s)
 /*-------------------------*/
 
 int sqlSignedArray(char *s, int *array, int arraySize)
-/* Convert comma separated list of numbers to an array.  Pass in 
+/* Convert comma separated list of numbers to an array.  Pass in
  * array an max size of array. */
 {
 int count = 0;
@@ -744,7 +744,7 @@ if (s)
 /*-------------------------*/
 
 int sqlLongLongArray(char *s, long long *array, int arraySize)
-/* Convert comma separated list of numbers to an array.  Pass in 
+/* Convert comma separated list of numbers to an array.  Pass in
  * array and max size of array. */
 {
 unsigned count = 0;
@@ -825,7 +825,7 @@ if (s)
 
 
 int sqlStringArray(char *s, char **array, int maxArraySize)
-/* Convert comma separated list of strings to an array.  Pass in 
+/* Convert comma separated list of strings to an array.  Pass in
  * array and max size of array.  Returns actual size*/
 {
 int count = 0;
@@ -877,7 +877,7 @@ for (;;)
 void sqlStringDynamicArray(char *s, char ***retArray, int *retSize)
 /* Convert comma separated list of strings to an dynamically allocated
  * array, which should be freeMem()'d when done. As a speed option all
- * of the elements in the array are needMem()'d at the same time. This 
+ * of the elements in the array are needMem()'d at the same time. This
  * means that all the entries are free()'d by calling freeMem() on the
  * first element. For example:
  * sqlStringDynamicArray(s, &retArray, &retSize);
@@ -1124,7 +1124,7 @@ return ret;
 }
 
 long long sqlLongLongComma(char **pS)
-/* Return offset (often 64 bits) at *pS.  Advance *pS past comma at 
+/* Return offset (often 64 bits) at *pS.  Advance *pS past comma at
  * end */
 {
 char *s = *pS;

@@ -1,4 +1,4 @@
-/* rbTree - rbTreeRed-rbTreeBlack Tree - a type of binary tree which 
+/* rbTree - rbTreeRed-rbTreeBlack Tree - a type of binary tree which
  * automatically keeps relatively balanced during
  * inserts and deletions.
  *   original author: Shane Saunders
@@ -11,7 +11,7 @@ typedef enum {rbTreeRed,rbTreeBlack} rbTreeColor;
 
 
 /* Structure type for nodes in the red-black tree. */
-struct rbTreeNode 
+struct rbTreeNode
     {
     struct rbTreeNode *left, *right;		/* Children. */
     rbTreeColor color;				/* Heart of algorithm. */
@@ -19,7 +19,7 @@ struct rbTreeNode
     };
 
 /* Structure type for the red-black tree. */
-struct rbTree 
+struct rbTree
     {
     struct rbTree *next;			/* Next tree in list. */
     struct rbTreeNode *root;			/* Root of tree */
@@ -42,10 +42,10 @@ void rbTreeFree(struct rbTree **pTree);
 void rbTreeFreeList(struct rbTree **pList);
 /* Free up a list of rbTrees. */
 
-struct rbTree *rbTreeNewDetailed(int (*compare)(void *, void *), struct lm *lm, 
+struct rbTree *rbTreeNewDetailed(int (*compare)(void *, void *), struct lm *lm,
 	struct rbTreeNode *stack[128]);
 /* Allocate rbTree on an existing local memory & stack.  This is for cases
- * where you want a lot of trees, and don't want the overhead for each one. 
+ * where you want a lot of trees, and don't want the overhead for each one.
  * Note, to clean these up, just do freez(&rbTree) rather than rbFreeTree(&rbTree). */
 
 void *rbTreeAdd(struct rbTree *t, void *item);
@@ -80,7 +80,7 @@ struct slRef *rbTreeItemsInRange(struct rbTree *tree, void *minItem, void *maxIt
 void rbTreeTraverse(struct rbTree *tree, void (*doItem)(void *item));
 /* Apply doItem function to all items in tree */
 
-void rbTreeTraverseWithContext(struct rbTree *tree, 
+void rbTreeTraverseWithContext(struct rbTree *tree,
 	void (*doItem)(void *item, void *context), void *context);
 /* Traverse tree calling doItem on every item with context pointer passed through to doItem.
  * This often avoids having to declare global or static variables for the doItem callback to use. */
@@ -88,15 +88,14 @@ void rbTreeTraverseWithContext(struct rbTree *tree,
 struct slRef *rbTreeItems(struct rbTree *tree);
 /* Return sorted list of items.  slFreeList this when done.*/
 
-void rbTreeDump(struct rbTree *tree, FILE *f, 
+void rbTreeDump(struct rbTree *tree, FILE *f,
 	void (*dumpItem)(void *item, FILE *f));
 /* Dump out rb tree to file, mostly for debugging. */
 
-int rbTreeCmpString(void *a, void *b);	
+int rbTreeCmpString(void *a, void *b);
 /* Set up rbTree so as to work on strings. */
 
-int rbTreeCmpWord(void *a, void *b);	
+int rbTreeCmpWord(void *a, void *b);
 /* Set up rbTree so as to work on case-insensitive strings. */
 
 #endif /* RBTREE_H */
-

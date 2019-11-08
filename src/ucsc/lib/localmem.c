@@ -1,5 +1,5 @@
-/* LocalMem.c - local memory routines. 
- * 
+/* LocalMem.c - local memory routines.
+ *
  * These routines are meant for the sort of scenario where
  * a lot of little to medium size pieces of memory are
  * allocated, and then disposed of all at once.
@@ -169,7 +169,7 @@ if (endFirstWord == NULL)
 else
     return lmCloneStringZ(lm, startFirstWord, endFirstWord - startFirstWord);
 }
-    
+
 char *lmCloneSomeWord(struct lm *lm, char *line, int wordIx)
 /* Return a clone of the given space-delimited word within line.  Returns NULL if
  * not that many words in line. */
@@ -197,4 +197,3 @@ n = lmAlloc(lm, size);
 strcpy(n->name, name);
 return n;
 }
-

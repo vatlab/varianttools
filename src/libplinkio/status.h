@@ -39,7 +39,7 @@ enum pio_status_e
      * BIM IO error.
      */
     P_BIM_IO_ERROR,
-    
+
     /**
      * Bed IO error.
      */

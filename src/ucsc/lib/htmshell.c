@@ -251,7 +251,7 @@ htmlWarnBoxSetUpAlready=TRUE;
 // FF3.0 (but not FF2.0) was resizable with the following, but it took some experimentation.
 // Remember what worked nicely on FF3.0:
 //      "var app=navigator.appName.substr(0,9); "
-//      "if(app == 'Microsoft') {warnBox.style.display='';} 
+//      "if(app == 'Microsoft') {warnBox.style.display='';}
 //       else {warnBox.style.display=''; warnBox.style.width='auto';}"
 fprintf(f, "<script type='text/javascript'>\n");
 fprintf(f, "document.write(\"<center>"
@@ -289,7 +289,7 @@ char *encodedMessage = htmlEncodeText(warning,TRUE); // NOTE: While some interna
                                                      // a single quote (') will will screw it up!
 printf("<script type='text/javascript'>{showWarnBox();"
         "var warnList=document.getElementById('warnList');"
-        "warnList.innerHTML += '<li>%s</li>';}</script><!-- ERROR -->\n",encodedMessage); 
+        "warnList.innerHTML += '<li>%s</li>';}</script><!-- ERROR -->\n",encodedMessage);
                                      // NOTE that "--ERROR --" is needed at the end of this print!!
 freeMem(encodedMessage);
 
@@ -442,7 +442,7 @@ printf("\n");
 
 void printBodyTag(FILE *f)
 {
-// print starting BODY tag, including any appropriate attributes (class, background and bgcolor). 
+// print starting BODY tag, including any appropriate attributes (class, background and bgcolor).
 fprintf(f, "<BODY");
 struct slName *classes = NULL;
 
@@ -486,7 +486,7 @@ if (printDocType)
     }
 fputs("<HTML>", f);
 fprintf(f,"<HEAD>\n%s<TITLE>%s</TITLE>\n", head, title);
-if (endsWith(title,"Login - UCSC Genome Browser")) 
+if (endsWith(title,"Login - UCSC Genome Browser"))
     fprintf(f,"\t<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html;CHARSET=iso-8859-1\">\n");
 fprintf(f, "\t<META http-equiv=\"Content-Script-Type\" content=\"text/javascript\">\n");
 if (htmlStyle != NULL)
@@ -667,4 +667,3 @@ char *docRoot = "/usr/local/apache/htdocs";
 safef(path, sizeof path, "%s/%s", docRoot, file);
 htmlIncludeFile(path);
 }
-

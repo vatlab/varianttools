@@ -73,7 +73,7 @@ namespace cgatools { namespace util {
             iterator b = findBucket(index);
             if (b==buckets_.end() || !(index==b->first)
                 //handle the case if the default bucket index equals the given index
-                || (buckets_.size()==1 && index==index_type()) 
+                || (buckets_.size()==1 && index==index_type())
                 )
                 buckets_.insert(b,std::make_pair(index,value_type()));
         }
@@ -120,8 +120,8 @@ namespace cgatools { namespace util {
             if (buckets_.empty())
                 return;
             Value cumulativeValue=begin()->second;
-            for(typename GenericHistogram<Value,Index>::const_iterator it=begin(), 
-                itEnd=last(); it!=itEnd; ++it, cumulativeValue+=it->second) 
+            for(typename GenericHistogram<Value,Index>::const_iterator it=begin(),
+                itEnd=last(); it!=itEnd; ++it, cumulativeValue+=it->second)
             {
                 out << it->first << separator << it->second << separator << cumulativeValue << std::endl;
             }

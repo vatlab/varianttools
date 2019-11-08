@@ -30,7 +30,7 @@ snparray_dealloc(snp_array_t *self)
 
 PyObject *
 snparray_str(PyObject *self)
-{   
+{
     snp_array_t *snp_array = (snp_array_t *) self;
     int i;
     size_t string_length = 3 * snp_array->length + 3;
@@ -60,7 +60,7 @@ snparray_str(PyObject *self)
     /* string_p -= 2; */
     /* modified by Gao Wang */
     /* We should remove the last ",". */
-    string_p -= 1; 
+    string_p -= 1;
     /* commented out by Gao Wang */
     /* *string_p++ = ']'; */
     *string_p++ = '\0';
@@ -113,7 +113,7 @@ PyObject *
 snparray_getitem(PyObject *self, Py_ssize_t index)
 {
     snp_array_t *snp_array = (snp_array_t *) self;
-    
+
     if( index >= snp_array->length )
     {
         PyErr_SetString( PyExc_IndexError, "snparray index out of range" );

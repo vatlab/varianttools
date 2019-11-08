@@ -53,6 +53,3 @@ RUN     python setup.py install
 
 # WORKDIR /home/bpeng
 # RUN     rm -rf temp
-
-
-

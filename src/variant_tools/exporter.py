@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 #
-# $File: exporter.py $
-# $LastChangedDate$
-# $Rev$
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,23 +20,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
-import sys
-import re
-import time
 import datetime
+import os
+import re
+import sys
 from argparse import SUPPRESS
-from multiprocessing import Process, Pipe, Lock
-from .project import Project, fileFMT
-from .utils import ProgressBar, delayedAction, \
-    consolidateFieldName, DatabaseEngine, env, encodeTableName, decodeTableName, \
-    splitField
 
+from .exporter_reader import VariantReader
+from .preprocessor import PlainFormatter, SequentialCollector
 from .preprocessor import *
-# from .geno_store import GenoStore
-# from .accessor import *
-import glob as glob
-from .exporter_reader import *
+from .project import Project, fileFMT
+from .utils import (ProgressBar, decodeTableName, encodeTableName, env,
+                    splitField)
 
 MAX_COLUMN = 62
 
@@ -75,7 +66,7 @@ class Exporter:
                 for rec in cur:
                     self.samples.append('{}'.format(rec[1]))
                     env.logger.debug('\t'.join(['{}'.format(x) for x in rec]))
-        # 
+        #
         # build
         if build is None:
             if self.proj.build is not None:
@@ -108,7 +99,7 @@ class Exporter:
             raise IndexError('Unrecognized input format: {}\nPlease check your input parameters or configuration file *{}* '.format(e, format))
         #
         if not self.format.columns:
-            raise ValueError('Cannot output in format {} because no output column is defined for this format.'.format(format)) 
+            raise ValueError('Cannot output in format {} because no output column is defined for this format.'.format(format))
         #
         # header
         if header is None:
@@ -201,7 +192,7 @@ class Exporter:
                     raise ValueError('Invalid filename specification "{}".'.format(item))
                 try:
                     eval('{}'.format('self.export{}(base)'.format(ext[1:].capitalize())))
-                except Exception as e:
+                except Exception:
                     raise ValueError('Additional export to file *{} is not supported'.format(ext))
         else:
             pass
@@ -209,11 +200,11 @@ class Exporter:
         var_fields = [x.strip() for x in self.format.export_by_fields.split(',')] if self.format.export_by_fields else []
 
 
-       
+
         geno_fields = []
         for col in self.format.columns:
             col_fields = splitField(col.field)
-            
+
             if 'GT' in col_fields:
                 for fld in col_fields:
                     if fld not in geno_fields:
@@ -231,7 +222,7 @@ class Exporter:
             field_indexes[(-1, fld.lower())] = idx
         #
         idx = len(var_fields)
-      
+
         if geno_fields:
             for id in self.IDs:
                 if self.proj.store=="sqlite":
@@ -240,8 +231,8 @@ class Exporter:
                     field_indexes[(id, fld.lower())] = idx
                     idx += 1
 
-      
-        # 
+
+        #
         # how to process each column
         sep = '\t' if self.format.delimiter is None else self.format.delimiter
         formatters = [] # formatters that will be used to produce strings from values
@@ -271,7 +262,7 @@ class Exporter:
                 col_idx += max(1, len(fmt))
                 if col_adj[-1][0] is None and type(col_adj[-1][1]) is not int:
                     raise ValueError('Columns with multiple fields must have an adjust function to merge values')
-        
+
         # needs fmt and adj
         count = 0
         failed_count = 0
@@ -281,7 +272,7 @@ class Exporter:
         rec_stack = []
         # if export_by_fields is empty
         nFieldBy = len([x for x in self.format.export_by_fields.split(',') if x])
-        # 
+        #
         # cur=self.db.cursor()
         # cur.execute("select group_concat(sample_id) from sample group by HDF5;")
         # res=cur.fetchall()
@@ -289,13 +280,13 @@ class Exporter:
         #     # IDlist=[]
         #     # groupIDs=[int(id) for id in ids[0].split(",")]
         #     # if len(self.IDs)>0:
-                
+
         #     #     IDlist=list(set(self.IDs).intersection(set(groupIDs)))
         #     # else:
         #     #     IDlist=groupIDs
         #     self.IDs=ids[0]
         #     if len(self.IDs)>0:
-        
+
         reader = VariantReader(self.proj, self.table, self.format.export_by_fields, self.format.order_by_fields,
             var_fields, geno_fields, self.export_alt_build, self.IDs, max(self.jobs - 1, 0))
         reader.start()
@@ -357,7 +348,7 @@ class Exporter:
                     rec_alleles[1] = raw_rec[1]
                     rec = raw_rec[2:]
 
-                # step one: apply formatters 
+                # step one: apply formatters
                 # if there is no fmt, the item must be either empty or a single item
                 #
                 # fmt: single or list
@@ -400,7 +391,7 @@ class Exporter:
                         try:
                             if type(col) is int:
                                 adj(fields[col])
-                            elif adj:      
+                            elif adj:
                                 [fields[x] for x in col]
                             else:
                                 fields[col]
@@ -412,7 +403,7 @@ class Exporter:
                 line = sep.join(columns)
                 output.write(line + '\n')
                 count += 1
-                
+
             except Exception as e:
                 env.logger.debug('Failed to process record {}: {}'.format(rec, e))
                 failed_count += 1
@@ -512,7 +503,7 @@ def exportArguments(parser):
         help='''Build version of the reference genome (e.g. hg18) of the exported data. It
             can only be one of the primary (default) of alternative (if exists) reference
             genome of the project.''')
-    parser.add_argument('--header', nargs='*', 
+    parser.add_argument('--header', nargs='*',
         help='''A complete header or a list of names that will be joined by a
             delimiter specified by the file format to form a header. If a special
             name - is specified, the header will be read from the standard input,
@@ -534,7 +525,7 @@ def export(args):
                 raise ValueError('Specifying output filename without --output is deprecated.')
             exporter = Exporter(proj=proj, table=args.table, filename=args.output,
                 samples=' AND '.join(['({})'.format(x) for x in args.samples]),
-                format=args.format, build=args.build, header=args.header,  
+                format=args.format, build=args.build, header=args.header,
                 jobs=args.jobs, fmt_args=args.unknown_args)
             exporter.exportData()
         proj.close()

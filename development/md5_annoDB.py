@@ -59,7 +59,7 @@ def fixMD5(annFile):
                 print('md5 signature of {} added to {}'.format(unzippedFile, annFile))
             else:
                 lines.append(line.rstrip())
-                
+
     #
     with open(annFile, 'w') as ann:
         ann.write('\n'.join(lines))
@@ -68,7 +68,7 @@ def fixMD5(annFile):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='''Manage variant tools resources''')
     parser.add_argument('annFiles', nargs='+',
-        help='''One or more .ann files that will be modified for md5 information. For 
+        help='''One or more .ann files that will be modified for md5 information. For
             each file with name $name.ann, a $name.DB file is expected. ''')
     args = parser.parse_args()
     for ann in args.annFiles:
@@ -78,5 +78,3 @@ if __name__ == '__main__':
             raise ValueError('Missing .ann file {}'.format(ann))
         #
         fixMD5(ann)
-
-

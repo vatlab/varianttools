@@ -27,7 +27,9 @@ import os
 import unittest
 from testUtils import ProcessTestCase
 
+
 class TestAdmin(ProcessTestCase):
+
     def testAdminCommand(self):
         'Test command line options of vtools admin'
         self.assertSucc('vtools admin')
@@ -35,35 +37,41 @@ class TestAdmin(ProcessTestCase):
 
     def testMergeSamples(self):
         # Test command vtools admin --merge_samples'
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         # this should actually be hg19, but we use it anyway for testing.
         self.runCmd('vtools import vcf/SAMP1.vcf  --build hg18')
-        self.assertProj(numOfVariants=577, numOfSamples= 61)
-        self.runCmd('vtools admin --rename_samples \'filename like "%SAMP1%"\' NA06985')
-        self.assertProj(numOfSamples= 61)
-        if self.storeMode=="sqlite":
-            self.runCmd('vtools admin --merge_samples')         
-            self.assertProj(numOfVariants=577, numOfSamples= 60)
+        self.assertProj(numOfVariants=577, numOfSamples=61)
+        self.runCmd(
+            'vtools admin --rename_samples \'filename like "%SAMP1%"\' NA06985')
+        self.assertProj(numOfSamples=61)
+        if self.storeMode == "sqlite":
+            self.runCmd('vtools admin --merge_samples')
+            self.assertProj(numOfVariants=577, numOfSamples=60)
 
-    @unittest.skipUnless(os.getenv("STOREMODE")=="sqlite","HDF5 version is not implemented for this test")
+    @unittest.skipUnless(
+        os.getenv("STOREMODE") == "sqlite",
+        "HDF5 version is not implemented for this test")
     def testMergeWithOverlappingSamples(self):
         # Test merge samples with overlapping variants
         self.assertSucc('vtools import vcf/SAMP2.vcf --build hg19')
         self.assertSucc('vtools import vcf/SAMP1.vcf')
-        self.assertSucc('vtools admin --rename_samples \'filename like "%2%"\' SAMP1')
-        #the reason is that the two samepls have some identical variants. 
+        self.assertSucc(
+            'vtools admin --rename_samples \'filename like "%2%"\' SAMP1')
+        #the reason is that the two samepls have some identical variants.
         # If you want to merge them, the samples should have different unique variant information.
         self.assertFail('vtools admin --merge_samples')
 
     def testRenameSamples(self):
         'Test command vtools admin --rename_samples'
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18') 
+        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18')
         self.assertFail('vtools admin --rename_samples 1')
         # all samples are assigned name NA
-        self.assertSucc('''vtools admin --rename_samples "sample_name like 'NA1'" NA ''')
+        self.assertSucc(
+            '''vtools admin --rename_samples "sample_name like 'NA1'" NA ''')
         # NA12716 is not renamed because of no match.
         self.assertProj(sampleNames=['NA12716'], partial=True)
-        self.assertSucc('''vtools admin --rename_samples "sample_name like 'NA1%'" NA ''')
+        self.assertSucc(
+            '''vtools admin --rename_samples "sample_name like 'NA1%'" NA ''')
         # sample no longer exists
         self.assertProj(sampleNames=['NA12716'], partial=True, negate=True)
         self.assertSucc('vtools admin --rename_samples 1 NA NNA')
@@ -96,6 +104,7 @@ class TestAdmin(ProcessTestCase):
         self.assertTrue(os.path.isfile('a.tar.gz'))
         self.assertSucc('vtools admin --load_snapshot a.tar.gz')
         os.remove('a.tar.gz')
-        
+
+
 if __name__ == '__main__':
     unittest.main()

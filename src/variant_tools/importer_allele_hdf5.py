@@ -1,5 +1,23 @@
-
-# -*- coding: utf-8 -*-
+#
+# This file is part of variant_tools, a software application to annotate,
+# summarize, and filter variants for next-gen sequencing ananlysis.
+# Please visit https://github.com/vatlab/varianttools for details.
+#
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 """
 Extract data from VCF files.
 
@@ -7,54 +25,25 @@ This module contains Functions for extracting data from Variant Call Format (VCF
 into NumPy arrays, NumPy files, HDF5 files or Zarr array stores.
 
 """
-from __future__ import absolute_import, print_function, division
+import glob
+import gzip
 import os
-import sys
-import re
-import array
-import time
-from heapq import heappush, heappop, heappushpop
-from multiprocessing import Process, Pipe, Value, Lock, Manager,Array
-from multiprocessing import Queue as mpQueue
 import queue
-from itertools import repeat
-from collections import defaultdict
-# from .project import Project, fileFMT
-# from .liftOver import LiftOverTool
-from .utils import ProgressBar, lineCount, getMaxUcscBin, delayedAction, \
-    openFile, DatabaseEngine, hasCommand, \
-    downloadFile, env, RefGenome
+import re
+import subprocess
+import time
+import warnings
+from collections import namedtuple
+from multiprocessing import Process, Value
+from shutil import copyfile
 
 import numpy as np
-import tables as tb
-#import HDF5_storage as storage
-import glob
-from shutil import copyfile
-from .accessor import *
-from subprocess import call
 
-import json
-import pickle
+from variant_tools.io_vcf_read import FileInputStream, VCFChunkIterator
 
-try:
-    from variant_tools.cgatools import normalize_variant
-except ImportError as e:
-    sys.exit('Failed to import module ({})\n'
-        'Please verify if you have installed variant tools successfully (using command '
-        '"python setup.py install")'.format(e))
+from .accessor import Engine_Storage, Engine_Access
+from .utils import DatabaseEngine, ProgressBar, env
 
-
-# preprocessors
-from .preprocessor import *
-
-
-import gzip
-from collections import namedtuple
-import warnings
-import subprocess
-
-
-from variant_tools.io_vcf_read import VCFChunkIterator, FileInputStream
 # expose some names from cython extension
 # from variant_tools.io_vcf_read import (  # noqa: F401
 #     ANNTransformer, ANN_AA_LENGTH_FIELD, ANN_AA_POS_FIELD, ANN_ANNOTATION_FIELD,
@@ -64,14 +53,12 @@ from variant_tools.io_vcf_read import VCFChunkIterator, FileInputStream
 #     ANN_RANK_FIELD, ANN_TRANSCRIPT_BIOTYPE_FIELD
 # )
 
-
 DEFAULT_BUFFER_SIZE = 2**14
 DEFAULT_CHUNK_LENGTH = 2**11
 DEFAULT_CHUNK_WIDTH = 2**6
 DEFAULT_ALT_NUMBER = 3
 
-READ_EXISTING_CHUNK_LENGTH=2**10
-
+READ_EXISTING_CHUNK_LENGTH = 2**10
 
 
 def _prep_fields_param(fields):
@@ -108,10 +95,9 @@ def _chunk_iter_progress(it, log, prefix):
         elapsed = after_chunk - before_all
         n_variants += chunk_length
         chrom = str(chrom, 'ascii')
-        message = (
-            '%s %s rows in %.2fs; chunk in %.2fs (%s rows/s)' %
-            (prefix, n_variants, elapsed, elapsed_chunk, int(chunk_length // elapsed_chunk))
-        )
+        message = ('%s %s rows in %.2fs; chunk in %.2fs (%s rows/s)' %
+                   (prefix, n_variants, elapsed, elapsed_chunk,
+                    int(chunk_length // elapsed_chunk)))
         if chrom:
             message += '; %s:%s' % (chrom, pos)
         print(message, file=log)
@@ -120,8 +106,9 @@ def _chunk_iter_progress(it, log, prefix):
         before_chunk = after_chunk
     after_all = time.time()
     elapsed = after_all - before_all
-    print('%s all done (%s rows/s)' %
-          (prefix, int(n_variants // elapsed)), file=log)
+    print(
+        '%s all done (%s rows/s)' % (prefix, int(n_variants // elapsed)),
+        file=log)
     log.flush()
 
 
@@ -206,11 +193,8 @@ _doc_param_log = \
     """A file-like object (e.g., `sys.stderr`) to print progress information."""
 
 
-
-
-
-def _hdf5_setup_datasets(chunk, root, chunk_length, chunk_width, compression, compression_opts,
-                         shuffle, overwrite, headers, vlen):
+def _hdf5_setup_datasets(chunk, root, chunk_length, chunk_width, compression,
+                         compression_opts, shuffle, overwrite, headers, vlen):
     import h5py
 
     # handle no input
@@ -219,7 +203,7 @@ def _hdf5_setup_datasets(chunk, root, chunk_length, chunk_width, compression, co
 
     # setup datasets
     # keys = sorted(chunk.keys())
-    keys =["variants/ID","calldata/GT"]
+    keys = ["variants/ID", "calldata/GT"]
     for k in keys:
 
         # obtain initial data
@@ -229,7 +213,8 @@ def _hdf5_setup_datasets(chunk, root, chunk_length, chunk_width, compression, co
         if data.ndim == 1:
             chunk_shape = (chunk_length,)
         else:
-            chunk_shape = (chunk_length, min(chunk_width, data.shape[1])) + data.shape[2:]
+            chunk_shape = (chunk_length, min(chunk_width,
+                                             data.shape[1])) + data.shape[2:]
 
         # create dataset
         group, name = k.split('/')
@@ -237,7 +222,9 @@ def _hdf5_setup_datasets(chunk, root, chunk_length, chunk_width, compression, co
             if overwrite:
                 del root[group][name]
             else:
-                raise ValueError('dataset exists at path %r; use overwrite=True to replace' % k)
+                raise ValueError(
+                    'dataset exists at path %r; use overwrite=True to replace' %
+                    k)
 
         shape = (0,) + data.shape[1:]
         maxshape = (None,) + data.shape[1:]
@@ -249,10 +236,15 @@ def _hdf5_setup_datasets(chunk, root, chunk_length, chunk_width, compression, co
                 dt = data.dtype
         else:
             dt = data.dtype
-        ds = root[group].create_dataset(
-            name, shape=shape, maxshape=maxshape, chunks=chunk_shape, dtype=dt,
-            compression=compression, compression_opts=compression_opts, shuffle=shuffle
-        )
+        root[group].create_dataset(
+            name,
+            shape=shape,
+            maxshape=maxshape,
+            chunks=chunk_shape,
+            dtype=dt,
+            compression=compression,
+            compression_opts=compression_opts,
+            shuffle=shuffle)
 
         # copy metadata from VCF headers
         # meta = None
@@ -274,7 +266,6 @@ def _hdf5_setup_datasets(chunk, root, chunk_length, chunk_width, compression, co
 
 _doc_param_chunk_width = \
     """Width (number of samples) to use when storing chunks in output."""
-
 
 
 def iter_vcf_chunks(input,
@@ -332,8 +323,14 @@ def iter_vcf_chunks(input,
     """
 
     # setup commmon keyword args
-    kwds = dict(fields=fields, types=types, numbers=numbers, alt_number=alt_number,
-                chunk_length=chunk_length, fills=fills, samples=samples)
+    kwds = dict(
+        fields=fields,
+        types=types,
+        numbers=numbers,
+        alt_number=alt_number,
+        chunk_length=chunk_length,
+        fills=fills,
+        samples=samples)
 
     # obtain a file-like object
     close = False
@@ -364,13 +361,15 @@ def iter_vcf_chunks(input,
 
             except FileNotFoundError:
                 # no tabix, fall back to scanning
-                warnings.warn('tabix not found, falling back to scanning to region')
+                warnings.warn(
+                    'tabix not found, falling back to scanning to region')
                 fileobj = gzip.open(input, mode='rb')
                 close = True
 
             except Exception as e:
-                warnings.warn('error occurred attempting tabix (%s); falling back to '
-                              'scanning to region' % e)
+                warnings.warn(
+                    'error occurred attempting tabix (%s); falling back to '
+                    'scanning to region' % e)
                 fileobj = gzip.open(input, mode='rb')
                 close = True
 
@@ -425,7 +424,6 @@ iter_vcf_chunks.__doc__ = iter_vcf_chunks.__doc__.format(
     chunk_length=_doc_param_chunk_length,
     log=_doc_param_log,
 )
-
 
 FIXED_VARIANTS_FIELDS = (
     'CHROM',
@@ -575,11 +573,16 @@ def _normalize_fields(fields, headers, samples):
         elif f in ['calldata', 'calldata*', 'calldata/*'] and len(samples) > 0:
             _add_all_calldata_fields(normed_fields, headers)
 
-        elif f in ['INFO', 'INFO*', 'INFO/*', 'variants/INFO', 'variants/INFO*', 'variants/INFO/*']:
+        elif f in [
+                'INFO', 'INFO*', 'INFO/*', 'variants/INFO', 'variants/INFO*',
+                'variants/INFO/*'
+        ]:
             _add_all_info_fields(normed_fields, headers)
 
-        elif f in ['FILTER', 'FILTER*', 'FILTER/*', 'FILTER_*', 'variants/FILTER',
-                   'variants/FILTER*', 'variants/FILTER/*', 'variants/FILTER_*']:
+        elif f in [
+                'FILTER', 'FILTER*', 'FILTER/*', 'FILTER_*', 'variants/FILTER',
+                'variants/FILTER*', 'variants/FILTER/*', 'variants/FILTER_*'
+        ]:
             _add_all_filter_fields(normed_fields, headers)
 
         # exact field specification
@@ -656,8 +659,10 @@ def _normalize_types(types, fields, headers):
     # normalize user-provided types
     if types is None:
         types = dict()
-    types = {_normalize_field_prefix(f, headers): _normalize_type(t)
-             for f, t in types.items()}
+    types = {
+        _normalize_field_prefix(f, headers): _normalize_type(t)
+        for f, t in types.items()
+    }
 
     # setup output
     normed_types = dict()
@@ -746,7 +751,8 @@ def _normalize_number(field, n, alt_number):
         try:
             return int(n)
         except ValueError:
-            warnings.warn('error parsing %r as number for field %r' % (n, field))
+            warnings.warn('error parsing %r as number for field %r' %
+                          (n, field))
         return 1
 
 
@@ -755,7 +761,9 @@ def _normalize_numbers(numbers, fields, headers, alt_number):
     # normalize field prefixes
     if numbers is None:
         numbers = dict()
-    numbers = {_normalize_field_prefix(f, headers): n for f, n in numbers.items()}
+    numbers = {
+        _normalize_field_prefix(f, headers): n for f, n in numbers.items()
+    }
 
     # setup output
     normed_numbers = dict()
@@ -768,7 +776,8 @@ def _normalize_numbers(numbers, fields, headers, alt_number):
             normed_numbers[f] = _normalize_number(f, numbers[f], alt_number)
 
         elif f in default_numbers:
-            normed_numbers[f] = _normalize_number(f, default_numbers[f], alt_number)
+            normed_numbers[f] = _normalize_number(f, default_numbers[f],
+                                                  alt_number)
 
         elif group == 'variants':
 
@@ -780,7 +789,8 @@ def _normalize_numbers(numbers, fields, headers, alt_number):
                 normed_numbers[f] = 0
 
             elif name in headers.infos:
-                normed_numbers[f] = _normalize_number(f, headers.infos[name]['Number'], alt_number)
+                normed_numbers[f] = _normalize_number(
+                    f, headers.infos[name]['Number'], alt_number)
 
             else:
                 # fall back to 1
@@ -790,8 +800,8 @@ def _normalize_numbers(numbers, fields, headers, alt_number):
         elif group == 'calldata':
 
             if name in headers.formats:
-                normed_numbers[f] = _normalize_number(f, headers.formats[name]['Number'],
-                                                      alt_number)
+                normed_numbers[f] = _normalize_number(
+                    f, headers.formats[name]['Number'], alt_number)
 
             else:
                 # fall back to 1
@@ -808,8 +818,7 @@ def _normalize_fills(fills, fields, headers):
 
     if fills is None:
         fills = dict()
-    fills = {_normalize_field_prefix(f, headers): v
-             for f, v in fills.items()}
+    fills = {_normalize_field_prefix(f, headers): v for f, v in fills.items()}
 
     # setup output
     normed_fills = dict()
@@ -853,14 +862,15 @@ def _normalize_samples(samples, headers, types):
     return normed_samples, loc_samples
 
 
-def _iter_vcf_stream(stream, fields, types, numbers, alt_number, chunk_length, fills, region,
-                     samples):
+def _iter_vcf_stream(stream, fields, types, numbers, alt_number, chunk_length,
+                     fills, region, samples):
 
     # read VCF headers
     headers = _read_vcf_headers(stream)
 
     # setup samples
-    samples, loc_samples = _normalize_samples(samples=samples, headers=headers, types=types)
+    samples, loc_samples = _normalize_samples(
+        samples=samples, headers=headers, types=types)
 
     # setup fields to read
     if fields is None:
@@ -873,23 +883,30 @@ def _iter_vcf_stream(stream, fields, types, numbers, alt_number, chunk_length, f
             fields.append('calldata/GT')
 
     else:
-        fields = _normalize_fields(fields=fields, headers=headers, samples=samples)
+        fields = _normalize_fields(
+            fields=fields, headers=headers, samples=samples)
 
     # setup data types
     types = _normalize_types(types=types, fields=fields, headers=headers)
 
     # setup numbers (a.k.a., arity)
-    numbers = _normalize_numbers(numbers=numbers, fields=fields, headers=headers,
-                                 alt_number=alt_number)
+    numbers = _normalize_numbers(
+        numbers=numbers, fields=fields, headers=headers, alt_number=alt_number)
 
     # setup fills
     fills = _normalize_fills(fills=fills, fields=fields, headers=headers)
 
     # setup chunks iterator
     chunks = VCFChunkIterator(
-        stream, chunk_length=chunk_length, headers=headers, fields=fields, types=types,
-        numbers=numbers, fills=fills, region=region, loc_samples=loc_samples
-    )
+        stream,
+        chunk_length=chunk_length,
+        headers=headers,
+        fields=fields,
+        types=types,
+        numbers=numbers,
+        fills=fills,
+        region=region,
+        loc_samples=loc_samples)
 
     return fields, samples, headers, chunks
 
@@ -902,8 +919,8 @@ _re_info_header = \
 _re_format_header = \
     re.compile('##FORMAT=<ID=([^,]+),Number=([^,]+),Type=([^,]+),Description="([^"]+)">')
 
-
-VCFHeaders = namedtuple('VCFHeaders', ['headers', 'filters', 'infos', 'formats', 'samples'])
+VCFHeaders = namedtuple('VCFHeaders',
+                        ['headers', 'filters', 'infos', 'formats', 'samples'])
 
 
 def _read_vcf_headers(stream):
@@ -969,19 +986,17 @@ def _read_vcf_headers(stream):
     # check if we saw the mandatory header line or not
     if samples is None:
         # can't warn about this, it's fatal
-        raise RuntimeError('VCF file is missing mandatory header line ("#CHROM...")')
+        raise RuntimeError(
+            'VCF file is missing mandatory header line ("#CHROM...")')
 
     return VCFHeaders(headers, filters, infos, formats, samples)
-
-
-
 
 
 class HDF5GenotypeImportWorker(Process):
     '''This class starts a process, import genotype to a temporary HDF5 file.
         Args
 
-            processor: a processor to parse the row 
+            processor: a processor to parse the row
             readQueue: a Queue of vcf rows
             variantIndex: a dictionary that returns ID for each variant.
             start_sample: the sample id of sample in the first column
@@ -990,505 +1005,519 @@ class HDF5GenotypeImportWorker(Process):
             variant_count: count of variants
             proc_index: the index of process
             geno_info: genotype info other than GT
-            dbLocation: the HDF5 file name 
+            dbLocation: the HDF5 file name
 
     '''
-    def __init__(self, chunk,variantIndex,start_sample,end_sample,sample_ids,variant_count, 
-        proc_index,dbLocation,genotype_info,build):
+
+    def __init__(self, chunk, variantIndex, start_sample, end_sample,
+                 sample_ids, variant_count, proc_index, dbLocation,
+                 genotype_info, build):
 
         Process.__init__(self, name='GenotypeImporter')
         # self.daemon=True
-        self.chunk=chunk
+        self.chunk = chunk
         self.variantIndex = variantIndex
         self.variant_count = variant_count
         self.proc_index = proc_index
-        self.start_sample=start_sample
-        self.end_sample=end_sample
-        
-        self.indptr=[]
-        self.indices=[]
-        self.data=[]
-        self.rownames=[]
-        self.sample_ids=sample_ids
-        self.firstID=0
+        self.start_sample = start_sample
+        self.end_sample = end_sample
+
+        self.indptr = []
+        self.indices = []
+        self.data = []
+        self.rownames = []
+        self.sample_ids = sample_ids
+        self.firstID = 0
         # if sample_ids[0]!=1 and start_sample!=0:
         #     self.firstID=sample_ids[0]
         #     self.start_sample=self.start_sample+1
         #     self.end_sample=self.end_sample+1
         # self.colnames=[self.sample_ids[i-self.firstID] for i in range(self.start_sample,self.end_sample)]
-        self.colnames=[self.sample_ids[i] for i in range(self.start_sample,self.end_sample)]
-        self.genoCount=0
-        self.dbLocation=dbLocation
-        self.build=build
-        self.info={}
-        self.rowData=[]
-        self.info["GT"]=[]
-        self.info["Mask"]=[]
-        self.namedict={}
-        self.geno_info=[]
+        self.colnames = [
+            self.sample_ids[i]
+            for i in range(self.start_sample, self.end_sample)
+        ]
+        self.genoCount = 0
+        self.dbLocation = dbLocation
+        self.build = build
+        self.info = {}
+        self.rowData = []
+        self.info["GT"] = []
+        self.info["Mask"] = []
+        self.namedict = {}
+        self.geno_info = []
         if "GT" in genotype_info:
             genotype_info.remove("GT")
-        if len(genotype_info)>0:
+        if len(genotype_info) > 0:
             for info in genotype_info:
                 #indptr,indices,data,shape,rownames
-                if not isinstance(info,str):
-                    self.geno_info.append(info.name.replace("_geno",""))
+                if not isinstance(info, str):
+                    self.geno_info.append(info.name.replace("_geno", ""))
                 else:
-                    self.geno_info.append(info.replace("_geno",""))
+                    self.geno_info.append(info.replace("_geno", ""))
         for info in self.geno_info:
-            self.info[info]=[]
-            if "calldata/"+info in self.chunk and np.nansum(self.chunk["calldata/"+info][:10])>0:
-                    self.namedict[info]="calldata/"+info
-            elif "variants/"+info in self.chunk and np.nansum(self.chunk["variants/"+info][:10])>0:
-                    self.namedict[info]="variants/"+info
+            self.info[info] = []
+            if "calldata/" + info in self.chunk and np.nansum(
+                    self.chunk["calldata/" + info][:10]) > 0:
+                self.namedict[info] = "calldata/" + info
+            elif "variants/" + info in self.chunk and np.nansum(
+                    self.chunk["variants/" + info][:10]) > 0:
+                self.namedict[info] = "variants/" + info
 
-  
     # check io_vcf_read.pyx function vcf_genotype_parse to see the meaning of coding
-    def get_geno(self,variant_id,pos,altIndex):
+    def get_geno(self, variant_id, pos, altIndex):
         self.rownames.append(variant_id)
         # print(self.dbLocation,self.start_sample,self.end_sample,self.firstID)
 
         if "calldata/GT" in self.chunk:
 
-            GT=self.chunk["calldata/GT"][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]
-            GT=GT.astype(float)
-            if altIndex==0:
-                GT[np.logical_or(GT==3, GT==4)]=np.nan          
-            elif altIndex==1:
+            GT = self.chunk["calldata/GT"][pos, self.start_sample -
+                                           self.firstID:self.end_sample -
+                                           self.firstID]
+            GT = GT.astype(float)
+            if altIndex == 0:
+                GT[np.logical_or(GT == 3, GT == 4)] = np.nan
+            elif altIndex == 1:
                 # GT_geno[GT_geno==3]=1
                 # GT_geno[GT_geno==4]=2
-                GT[(GT!=3)&(GT!=4)&(GT!=-1)]=np.nan
+                GT[(GT != 3) & (GT != 4) & (GT != -1)] = np.nan
                 # GT_geno[np.logical_and(GT_geno!=3, GT_geno!=4)]=np.nan
-                GT[GT==3]=1
-                GT[GT==4]=2
-            GT[GT==-10]=np.nan
+                GT[GT == 3] = 1
+                GT[GT == 4] = 2
+            GT[GT == -10] = np.nan
             self.info["GT"].append(GT)
-            self.info["Mask"].append([1]*len(GT))
+            self.info["Mask"].append([1] * len(GT))
         else:
             # GT_geno=[np.nan]
-            GT=[-1]
+            GT = [-1]
             self.info["GT"].append(GT)
-            self.info["Mask"].append([1]*len(GT))
-      
-        if len(self.geno_info)>0:
+            self.info["Mask"].append([1] * len(GT))
+
+        if len(self.geno_info) > 0:
             # self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
             # self.getInfoTable(variant_id,infoDict,altIndex)
             for info in self.geno_info:
                 if "variants" in self.namedict[info]:
-                    self.info[info].append(np.array([self.chunk[self.namedict[info]][pos]]))
+                    self.info[info].append(
+                        np.array([self.chunk[self.namedict[info]][pos]]))
                 else:
-                    self.info[info].append(self.chunk[self.namedict[info]][pos,self.start_sample-self.firstID:self.end_sample-self.firstID])
+                    self.info[info].append(self.chunk[self.namedict[info]]
+                                           [pos, self.start_sample -
+                                            self.firstID:self.end_sample -
+                                            self.firstID])
                 # print(self.namedict[info],info,self.start_sample,self.end_sample,pos,(self.chunk[self.namedict[info]][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]))
-        
 
+    def writeIntoHDF(self, chr):
+        storageEngine = Engine_Storage.choose_storage_engine(self.dbLocation)
+        shape = np.array([len(self.rownames), len(self.colnames)])
+        storageEngine.store(np.array(self.info["GT"]), chr, "GT")
+        storageEngine.store(np.array(self.info["Mask"]), chr, "Mask")
+        storageEngine.store(np.array(self.rownames), chr, "rownames")
+        rowmask = np.zeros(len(self.rownames), dtype=np.bool)
+        storageEngine.store(np.array(rowmask), chr, "rowmask")
 
+        if not storageEngine.checkGroup(chr, "colnames"):
+            storageEngine.store(np.array(self.colnames), chr, "colnames")
+            colmask = np.zeros(len(self.colnames), dtype=np.bool)
+            storageEngine.store(np.array(colmask), chr, "samplemask")
 
-    def writeIntoHDF(self,chr):
-        storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
-        shape=np.array([len(self.rownames),len(self.colnames)])
-        storageEngine.store(np.array(self.info["GT"]),chr,"GT")
-        storageEngine.store(np.array(self.info["Mask"]),chr,"Mask")
-        storageEngine.store(np.array(self.rownames),chr,"rownames")
-        rowmask=np.zeros(len(self.rownames),dtype=np.bool)
-        storageEngine.store(np.array(rowmask),chr,"rowmask")
-        
-        if not storageEngine.checkGroup(chr,"colnames"):
-            storageEngine.store(np.array(self.colnames),chr,"colnames")
-            colmask=np.zeros(len(self.colnames),dtype=np.bool)
-            storageEngine.store(np.array(colmask),chr,"samplemask")
-        
-        storageEngine.store(shape,chr,"shape")
+        storageEngine.store(shape, chr, "shape")
 
-        self.info["GT"]=[]
-        self.info["Mask"]=[]
+        self.info["GT"] = []
+        self.info["Mask"] = []
 
-        if len(self.geno_info)>0:
+        if len(self.geno_info) > 0:
             for info in self.geno_info:
-                storageEngine.store_genoInfo(np.array(self.info[info]),chr,info)
-                self.info[info]=[]
- 
-        storageEngine.close()       
-        self.rownames=[]
- 
+                storageEngine.store_genoInfo(
+                    np.array(self.info[info]), chr, info)
+                self.info[info] = []
 
-   
+        storageEngine.close()
+        self.rownames = []
+
     def run(self):
-        
-        prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
-        prev_variant_id=-1     
+
+        prev_chr = self.chunk["variants/CHROM"][0].replace("chr", "")
+        prev_variant_id = -1
         for i in range(len(self.chunk["variants/ID"])):
-            infoDict={}
-            chr=self.chunk["variants/CHROM"][i].replace("chr","")
-            if chr!=prev_chr:
+            chr = self.chunk["variants/CHROM"][i].replace("chr", "")
+            if chr != prev_chr:
                 self.writeIntoHDF(prev_chr)
-                prev_chr=chr             
-            ref=self.chunk["variants/REF"][i]
-            pos=self.chunk["variants/POS"][i]
+                prev_chr = chr
+            ref = self.chunk["variants/REF"][i]
+            pos = self.chunk["variants/POS"][i]
             for altIndex in range(len(self.chunk["variants/ALT"][i])):
-                alt=self.chunk["variants/ALT"][i][altIndex]
-                if alt!="":
+                alt = self.chunk["variants/ALT"][i][altIndex]
+                if alt != "":
                     if tuple((chr, ref, alt)) in self.variantIndex:
-                        variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
-                        
-                        if variant_id!=prev_variant_id:
-                            self.get_geno(variant_id,i,altIndex)
-                            prev_variant_id=variant_id
-                        
+                        variant_id = self.variantIndex[tuple(
+                            (chr, ref, alt))][pos][0]
+
+                        if variant_id != prev_variant_id:
+                            self.get_geno(variant_id, i, altIndex)
+                            prev_variant_id = variant_id
+
                     else:
-                        rec=[str(chr),str(pos),ref,alt]  
-                        msg=normalize_variant(RefGenome(self.build).crr, rec, 0, 1, 2, 3)
+                        rec = [str(chr), str(pos), ref, alt]
+                        #msg = normalize_variant(
+                        #    RefGenome(self.build).crr, rec, 0, 1, 2, 3)
                         if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
-                            variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
-                            if variant_id!=prev_variant_id:
-                                self.get_geno(variant_id,i,altIndex)
-                                prev_variant_id=variant_id
+                            variant_id = self.variantIndex[tuple(
+                                (rec[0], rec[2], rec[3]))][rec[1]][0]
+                            if variant_id != prev_variant_id:
+                                self.get_geno(variant_id, i, altIndex)
+                                prev_variant_id = variant_id
         self.writeIntoHDF(chr)
 
 
-
-
 class HDF5GenotypeSortWorker(Process):
-    
-    def __init__(self, chunk,importer, start_sample,end_sample,sample_ids,variant_count, 
-        proc_index,dbLocation,estart,eend,efirst):
+
+    def __init__(self, chunk, importer, start_sample, end_sample, sample_ids,
+                 variant_count, proc_index, dbLocation, estart, eend, efirst):
 
         Process.__init__(self, name='GenotypeSorter')
         # self.daemon=True
-        self.importer=importer
-        self.chunk=chunk
+        self.importer = importer
+        self.chunk = chunk
         self.variantIndex = importer.variantIndex
         self.variant_count = variant_count
         self.proc_index = proc_index
-        self.start_sample=start_sample
-        self.end_sample=end_sample
+        self.start_sample = start_sample
+        self.end_sample = end_sample
         # self.geno_info=geno_info
-        self.indptr=[]
-        self.indices=[]
-        self.data=[]
-        self.rownames=[]
-        self.sample_ids=sample_ids
-        self.firstID=0
+        self.indptr = []
+        self.indices = []
+        self.data = []
+        self.rownames = []
+        self.sample_ids = sample_ids
+        self.firstID = 0
         # if sample_ids[0]!=1 and start_sample!=0:
         #     self.firstID=sample_ids[0]
         #     self.start_sample=self.start_sample+1
         #     self.end_sample=self.end_sample+1
         # self.colnames=[self.sample_ids[i-self.firstID] for i in range(self.start_sample,self.end_sample)]
-        self.colnames=[self.sample_ids[i] for i in range(self.start_sample,self.end_sample)]
-        self.genoCount=0
-        self.dbLocation=dbLocation
-        
-        self.originLocation=dbLocation.replace("_sort","")
-        self.build=importer.build
-        self.info={}
-        self.rowData=[]
-        self.info["GT"]=[]
-        self.info["Mask"]=[]
-        self.namedict={}
-        self.geno_info=[]
-        self.estart=estart
-        self.eend=eend
-        self.efirst=efirst
-        self.countcheck=0
-        self.readcheck=0
+        self.colnames = [
+            self.sample_ids[i]
+            for i in range(self.start_sample, self.end_sample)
+        ]
+        self.genoCount = 0
+        self.dbLocation = dbLocation
+
+        self.originLocation = dbLocation.replace("_sort", "")
+        self.build = importer.build
+        self.info = {}
+        self.rowData = []
+        self.info["GT"] = []
+        self.info["Mask"] = []
+        self.namedict = {}
+        self.geno_info = []
+        self.estart = estart
+        self.eend = eend
+        self.efirst = efirst
+        self.countcheck = 0
+        self.readcheck = 0
         # if self.dbLocation==self.checkfileName:
         #     print("new process")
-        if len(importer.genotype_info)>0:
+        if len(importer.genotype_info) > 0:
             for info in importer.genotype_info:
                 #indptr,indices,data,shape,rownames
-                if not isinstance(info,str):
+                if not isinstance(info, str):
                     self.geno_info.append(info.name)
                 else:
                     self.geno_info.append(info)
-        for info in self.geno_info:    
-            self.info[info]=[]
-            self.namedict[info]="calldata/"+info
-        
-   
+        for info in self.geno_info:
+            self.info[info] = []
+            self.namedict[info] = "calldata/" + info
 
     # check io_vcf_read.pyx function vcf_genotype_parse to see the meaning of coding
-    def get_geno(self,variant_id,pos,altIndex):
-        self.readcheck+=1
+    def get_geno(self, variant_id, pos, altIndex):
+        self.readcheck += 1
         self.rownames.append(variant_id)
-        
-        GT=self.chunk["calldata/GT"][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]
-        GT=GT.astype(float)
-        if altIndex==0:
-            GT[np.logical_or(GT==3, GT==4)]=np.nan          
-        elif altIndex==1:
-            GT[np.logical_and(GT!=3, GT!=4)]=np.nan
-            GT[GT==3]=1
-            GT[GT==4]=2
+
+        GT = self.chunk["calldata/GT"][pos, self.start_sample -
+                                       self.firstID:self.end_sample -
+                                       self.firstID]
+        GT = GT.astype(float)
+        if altIndex == 0:
+            GT[np.logical_or(GT == 3, GT == 4)] = np.nan
+        elif altIndex == 1:
+            GT[np.logical_and(GT != 3, GT != 4)] = np.nan
+            GT[GT == 3] = 1
+            GT[GT == 4] = 2
         # GT_geno[GT_geno==-10]=np.nan
         self.info["GT"].append(GT)
-        self.info["Mask"].append([1]*len(GT))
-        if len(self.geno_info)>0:
+        self.info["Mask"].append([1] * len(GT))
+        if len(self.geno_info) > 0:
             # self.rowData.extend([[variant_id,idx,self.chunk["calldata/DP"][i][idx],self.chunk["calldata/GQ"][i][idx]] for idx in range(self.start_sample,self.end_sample)])
             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
             # self.getInfoTable(variant_id,infoDict,altIndex)
             for info in self.geno_info:
-                self.info[info].append(self.chunk[self.namedict[info]][pos,self.start_sample-self.firstID:self.end_sample-self.firstID])
+                self.info[info].append(self.chunk[self.namedict[info]]
+                                       [pos, self.start_sample -
+                                        self.firstID:self.end_sample -
+                                        self.firstID])
 
-
-   
-
-
-    def writeIntoHDF(self,chr):
+    def writeIntoHDF(self, chr):
         # if self.dbLocation==self.checkfileName:
-        print("writing ",self.dbLocation, self.countcheck,self.readcheck,chr,len(self.rownames))
-  
-        storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
-        shape=np.array([len(self.rownames),len(self.colnames)])
-        storageEngine.store(np.array(self.info["GT"]),chr,"GT")
-        storageEngine.store(np.array(self.info["Mask"]),chr,"Mask")
-        storageEngine.store(np.array(self.rownames),chr,"rownames")
-        rowmask=np.zeros(len(self.rownames),dtype=np.bool)
-        storageEngine.store(np.array(rowmask),chr,"rowmask")
-        
-        if not storageEngine.checkGroup(chr,"colnames"):
-            storageEngine.store(np.array(self.colnames),chr,"colnames")
-            colmask=np.zeros(len(self.colnames),dtype=np.bool)
-            storageEngine.store(np.array(colmask),chr,"samplemask")
-        
-        storageEngine.store(shape,chr,"shape")
+        print("writing ", self.dbLocation, self.countcheck, self.readcheck, chr,
+              len(self.rownames))
 
-        self.info["GT"]=[]
-        self.info["Mask"]=[]
+        storageEngine = Engine_Storage.choose_storage_engine(self.dbLocation)
+        shape = np.array([len(self.rownames), len(self.colnames)])
+        storageEngine.store(np.array(self.info["GT"]), chr, "GT")
+        storageEngine.store(np.array(self.info["Mask"]), chr, "Mask")
+        storageEngine.store(np.array(self.rownames), chr, "rownames")
+        rowmask = np.zeros(len(self.rownames), dtype=np.bool)
+        storageEngine.store(np.array(rowmask), chr, "rowmask")
 
-        if len(self.geno_info)>0:
+        if not storageEngine.checkGroup(chr, "colnames"):
+            storageEngine.store(np.array(self.colnames), chr, "colnames")
+            colmask = np.zeros(len(self.colnames), dtype=np.bool)
+            storageEngine.store(np.array(colmask), chr, "samplemask")
+
+        storageEngine.store(shape, chr, "shape")
+
+        self.info["GT"] = []
+        self.info["Mask"] = []
+
+        if len(self.geno_info) > 0:
             for info in self.geno_info:
-                storageEngine.store_genoInfo(np.array(self.info[info]),chr,info)
-                self.info[info]=[]
- 
-        storageEngine.close()
-        self.rownames=[]
+                storageEngine.store_genoInfo(
+                    np.array(self.info[info]), chr, info)
+                self.info[info] = []
 
-    def get_existing_geno(self,chr,startPos,endPos):
-        accessEngine=Engine_Access.choose_access_engine(self.originLocation)
-        node=accessEngine.file.get_node("/chr"+str(chr))
-        colnames=node.colnames[:].tolist()
-        shape=node.shape[:]
-        colpos=list(map(lambda x:colnames.index(x),colnames))
-        allgenoinfo={}
+        storageEngine.close()
+        self.rownames = []
+
+    def get_existing_geno(self, chr, startPos, endPos):
+        accessEngine = Engine_Access.choose_access_engine(self.originLocation)
+        node = accessEngine.file.get_node("/chr" + str(chr))
+        colnames = node.colnames[:].tolist()
+        #shape = node.shape[:]
+        colpos = list(map(lambda x: colnames.index(x), colnames))
+        allgenoinfo = {}
         # if endPos>shape[0]:
         #     print(endPos,shape[0])
         #     endPos=shape[0]
-        rownames,colnames,genotype=accessEngine.filter_on_genotypes("",chr,node,"GT",startPos,endPos,colpos,[])
-        allgenoinfo["GT"]=genotype
-        if len(self.geno_info)>0:
+        rownames, colnames, genotype = accessEngine.filter_on_genotypes(
+            "", chr, node, "GT", startPos, endPos, colpos, [])
+        allgenoinfo["GT"] = genotype
+        if len(self.geno_info) > 0:
             for info in self.geno_info:
-                _,_,genoinfo=accessEngine.filter_on_genotypes("",chr,node,info,startPos,endPos,colpos,[])
-                allgenoinfo[info]=genoinfo
-        
+                _, _, genoinfo = accessEngine.filter_on_genotypes(
+                    "", chr, node, info, startPos, endPos, colpos, [])
+                allgenoinfo[info] = genoinfo
+
         # cur=self.importer.db.cursor()
-        proj_file = self.importer.proj.name+'.proj'
+        proj_file = self.importer.proj.name + '.proj'
         #
         # create a temporary directory
         db = DatabaseEngine()
         db.connect(proj_file)
-        cur=db.cursor()
+        cur = db.cursor()
 
-        sql="SELECT variant_id,pos from variant where variant_id in ("+",".join([str(rowname) for rowname in rownames])+")"
-        rowpos=[]
-        updatedrownames=[]
-        count=0
-        rows=cur.execute(sql)
+        sql = "SELECT variant_id,pos from variant where variant_id in (" + ",".join(
+            [str(rowname) for rowname in rownames]) + ")"
+        rowpos = []
+        updatedrownames = []
+        count = 0
+        rows = cur.execute(sql)
         for row in rows:
             updatedrownames.append(row[0])
             rowpos.append(row[1])
-            count+=1
+            count += 1
         accessEngine.close()
         db.close()
-        if count!=len(rownames):
-            print("alert", self.dbLocation,len(rowpos),len(updatedrownames),len(rownames),startPos,endPos,count)
+        if count != len(rownames):
+            print("alert", self.dbLocation, len(rowpos), len(updatedrownames),
+                  len(rownames), startPos, endPos, count)
 
-        return rowpos,updatedrownames,allgenoinfo
+        return rowpos, updatedrownames, allgenoinfo
 
-    def get_remaining(self,chr,startPos):
-        accessEngine=Engine_Access.choose_access_engine(self.originLocation)
-        node=accessEngine.file.get_node("/chr"+str(chr))
-        rownames=node.rownames[:].tolist()
-        colnames=node.colnames[:].tolist()
-        colpos=list(map(lambda x:colnames.index(x),colnames))
+    def get_remaining(self, chr, startPos):
+        accessEngine = Engine_Access.choose_access_engine(self.originLocation)
+        node = accessEngine.file.get_node("/chr" + str(chr))
+        rownames = node.rownames[:].tolist()
+        colnames = node.colnames[:].tolist()
+        colpos = list(map(lambda x: colnames.index(x), colnames))
 
-        while startPos<len(rownames):
-            endPos=startPos+READ_EXISTING_CHUNK_LENGTH
-            if endPos>=len(rownames):
-                endPos=len(rownames)
-            chunk_rownames,colnames,genotype=accessEngine.filter_on_genotypes("",chr,node,"GT",startPos,endPos,colpos,[])
+        while startPos < len(rownames):
+            endPos = startPos + READ_EXISTING_CHUNK_LENGTH
+            if endPos >= len(rownames):
+                endPos = len(rownames)
+            chunk_rownames, colnames, genotype = accessEngine.filter_on_genotypes(
+                "", chr, node, "GT", startPos, endPos, colpos, [])
             for rowname in chunk_rownames:
                 self.rownames.append(rowname)
             for rec in genotype:
                 self.info["GT"].append(rec)
-                self.info["Mask"].append([1.0]*len(rec))
-            if len(self.geno_info)>0:
+                self.info["Mask"].append([1.0] * len(rec))
+            if len(self.geno_info) > 0:
                 for info in self.geno_info:
-                    _,_,genoinfo=accessEngine.filter_on_genotypes("",chr,node,info,startPos,endPos,colpos,[])
+                    _, _, genoinfo = accessEngine.filter_on_genotypes(
+                        "", chr, node, info, startPos, endPos, colpos, [])
                     for rec in genoinfo:
                         self.info[info].append(rec)
             self.writeIntoHDF(chr)
             # if self.dbLocation==self.checkfileName:
             #     print("remaining",startPos,endPos)
-            startPos=endPos
+            startPos = endPos
         accessEngine.close()
 
- 
-   
     def run(self):
-        prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
-        if self.efirst.value==True:
-            storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
+        prev_chr = self.chunk["variants/CHROM"][0].replace("chr", "")
+        if self.efirst.value == True:
+            storageEngine = Engine_Storage.choose_storage_engine(
+                self.dbLocation)
             storageEngine.removeNode([prev_chr])
             # command = ["ptrepack", "-o", "--chunkshape=auto", "--propindexes", self.dbLocation, self.dbLocation+"test"]
             # call(command)
             storageEngine.close()
-            self.efirst.value=False
-        erowpos,erownames,egenoinfo=self.get_existing_geno(prev_chr,self.estart.value,self.eend.value)
-        last=0
-        chunksize=len(self.chunk["variants/ID"])
+            self.efirst.value = False
+        erowpos, erownames, egenoinfo = self.get_existing_geno(
+            prev_chr, self.estart.value, self.eend.value)
+        last = 0
+        chunksize = len(self.chunk["variants/ID"])
 
         for i in range(len(self.chunk["variants/ID"])):
-            infoDict={}
-            chr=self.chunk["variants/CHROM"][i].replace("chr","")
-            if chr!=prev_chr:
-                if self.estart.value!=self.eend.value:
-                    self.estart.value=self.estart.value+last
-                    self.get_remaining(prev_chr,self.estart.value)
+            chr = self.chunk["variants/CHROM"][i].replace("chr", "")
+            if chr != prev_chr:
+                if self.estart.value != self.eend.value:
+                    self.estart.value = self.estart.value + last
+                    self.get_remaining(prev_chr, self.estart.value)
                 else:
                     self.writeIntoHDF(prev_chr)
-                prev_chr=chr
-                storageEngine=Engine_Storage.choose_storage_engine(self.dbLocation)
+                prev_chr = chr
+                storageEngine = Engine_Storage.choose_storage_engine(
+                    self.dbLocation)
                 storageEngine.removeNode([prev_chr])
                 storageEngine.close()
-                self.estart.value=0
-                self.eend.value=self.estart.value+READ_EXISTING_CHUNK_LENGTH
-                erowpos,erownames,egenoinfo=self.get_existing_geno(prev_chr,self.estart.value,self.eend.value)
-                last=0
-            ref=self.chunk["variants/REF"][i]
-            pos=self.chunk["variants/POS"][i]
+                self.estart.value = 0
+                self.eend.value = self.estart.value + READ_EXISTING_CHUNK_LENGTH
+                erowpos, erownames, egenoinfo = self.get_existing_geno(
+                    prev_chr, self.estart.value, self.eend.value)
+                last = 0
+            ref = self.chunk["variants/REF"][i]
+            pos = self.chunk["variants/POS"][i]
 
-            while last<len(erowpos) and pos>erowpos[last]:
-                self.countcheck+=1
+            while last < len(erowpos) and pos > erowpos[last]:
+                self.countcheck += 1
                 # if self.dbLocation==self.checkfileName:
                 #     print("add old file",erowpos[last],last,i)
                 self.rownames.append(erownames[last])
                 for info in egenoinfo.keys():
-                    self.info[info].append(egenoinfo[info][last,:])
-                self.info["Mask"].append([1]*len(egenoinfo["GT"][last,:]))
-                last+=1
+                    self.info[info].append(egenoinfo[info][last, :])
+                self.info["Mask"].append([1] * len(egenoinfo["GT"][last, :]))
+                last += 1
             # if self.dbLocation==self.checkfileName:
             #         print("before",last,len(erowpos))
-                
+
             # if last==len(erowpos) and last!=0:
-            if last==READ_EXISTING_CHUNK_LENGTH:
-                
+            if last == READ_EXISTING_CHUNK_LENGTH:
+
                 ##left over in new file
-                self.estart.value=self.eend.value
-                self.eend.value+=READ_EXISTING_CHUNK_LENGTH
+                self.estart.value = self.eend.value
+                self.eend.value += READ_EXISTING_CHUNK_LENGTH
                 # if self.dbLocation==self.checkfileName:
                 #     print("read more from existing",self.estart.value,self.eend.value)
-                erowpos,erownames,egenoinfo=self.get_existing_geno(prev_chr,self.estart.value,self.eend.value)
-                last=0
+                erowpos, erownames, egenoinfo = self.get_existing_geno(
+                    prev_chr, self.estart.value, self.eend.value)
+                last = 0
                 # if self.dbLocation==self.checkfileName:
                 #     print("after",last,len(erowpos))
-            elif last==len(erowpos) and last!=0:
-                self.estart.value=self.eend.value
+            elif last == len(erowpos) and last != 0:
+                self.estart.value = self.eend.value
 
             for altIndex in range(len(self.chunk["variants/ALT"][i])):
-                alt=self.chunk["variants/ALT"][i][altIndex]
-                if alt!="":
+                alt = self.chunk["variants/ALT"][i][altIndex]
+                if alt != "":
                     if tuple((chr, ref, alt)) in self.variantIndex:
-                        variant_id  = self.variantIndex[tuple((chr, ref, alt))][pos][0]
-                        self.get_geno(variant_id,i,altIndex)
-                        
+                        variant_id = self.variantIndex[tuple(
+                            (chr, ref, alt))][pos][0]
+                        self.get_geno(variant_id, i, altIndex)
+
                     else:
-                        rec=[str(chr),str(pos),ref,alt]  
-                        msg=normalize_variant(RefGenome(self.build).crr, rec, 0, 1, 2, 3)
+                        rec = [str(chr), str(pos), ref, alt]
+                        #msg = normalize_variant(
+                        #    RefGenome(self.build).crr, rec, 0, 1, 2, 3)
                         if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
-                            variant_id  = self.variantIndex[tuple((rec[0], rec[2], rec[3]))][rec[1]][0]
-                            self.get_geno(variant_id,i,altIndex)
+                            variant_id = self.variantIndex[tuple(
+                                (rec[0], rec[2], rec[3]))][rec[1]][0]
+                            self.get_geno(variant_id, i, altIndex)
                     # if self.dbLocation==self.checkfileName:
                     #     print("1",pos,variant_id)
-        if last<len(erowpos):
-            self.estart.value=self.estart.value+last
-            self.eend.value=self.estart.value+READ_EXISTING_CHUNK_LENGTH
+        if last < len(erowpos):
+            self.estart.value = self.estart.value + last
+            self.eend.value = self.estart.value + READ_EXISTING_CHUNK_LENGTH
             # if self.dbLocation==self.checkfileName:
             #     print("process end, restart from new position",self.estart.value,self.eend.value)
         self.writeIntoHDF(chr)
-        if chunksize<DEFAULT_CHUNK_LENGTH:
-            self.get_remaining(prev_chr,self.estart.value)
+        if chunksize < DEFAULT_CHUNK_LENGTH:
+            self.get_remaining(prev_chr, self.estart.value)
 
 
-
-
-
-       
-
-
-def updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDF5fileName):
-    firstID=0
-    adjust=0
+def updateSample(cur, start_sample, end_sample, sample_ids, names, allNames,
+                 HDF5fileName):
+    firstID = 0
     # if sample_ids[0]!=1 and start_sample!=0:
     #     firstID=sample_ids[0]
     #     start_sample=start_sample+1
     #     end_sample=end_sample+1
     #     adjust=1
     #print(start_sample,end_sample,sample_ids,HDF5fileName)
-    for id in range(start_sample,end_sample):
+    for id in range(start_sample, end_sample):
         try:
-            sql="UPDATE sample SET HDF5=? WHERE sample_id=? and sample_name=?"
+            sql = "UPDATE sample SET HDF5=? WHERE sample_id=? and sample_name=?"
             # task=(HDF5fileName,allNames[names[id]],sample_ids[id],names[id])
-            task=(HDF5fileName,sample_ids[id-firstID],names[id-firstID])
-            cur.execute(sql,task)
+            task = (HDF5fileName, sample_ids[id - firstID], names[id - firstID])
+            cur.execute(sql, task)
         except Exception as e:
             print(e)
 
-def remove_duplicate_samples(cur,original_sample_ids):
-    try:       
+
+def remove_duplicate_samples(cur, original_sample_ids):
+    try:
         # sql="DELETE from SAMPLE where sample_id in (%s)" % ','.join(['?'] * len(original_sample_ids))
         # print(sql)
         # cur.execute(sql,original_sample_ids)
         for id in original_sample_ids:
-            sql="DELETE from SAMPLE where sample_id in (?)"
-            cur.execute(sql,[str(id)])
+            sql = "DELETE from SAMPLE where sample_id in (?)"
+            cur.execute(sql, [str(id)])
         cur.execute('UPDATE project SET value=1 WHERE name="multiVCF"')
     except Exception as e:
         print(e)
-  
 
 
+def manageHDF5(cur, allNames={}):
 
-def manageHDF5(cur,allNames={}):
-
-   
-    sql="ALTER TABLE sample ADD COLUMN HDF5 CHAR(25)"
+    sql = "ALTER TABLE sample ADD COLUMN HDF5 CHAR(25)"
     try:
         cur.execute(sql)
     except:
         pass
-   
-    sql="SELECT sample_name,sample_id from sample"
+
+    sql = "SELECT sample_name,sample_id from sample"
 
     for rec in cur.execute(sql):
         if rec[0] not in allNames:
-            allNames[rec[0]]=int(rec[1])
-     
+            allNames[rec[0]] = int(rec[1])
+
     return allNames
 
 
-
-
-def importGenotypesInParallel(importer,num_sample=0):
-    cur=importer.db.cursor()
-    allNames=manageHDF5(cur)
+def importGenotypesInParallel(importer, num_sample=0):
+    cur = importer.db.cursor()
+    allNames = manageHDF5(cur)
 
     for count, input_filename in enumerate(importer.files):
 
-        env.logger.info('{} variants from {} ({}/{})'.format('Importing', input_filename, count + 1, len(importer.files)))
+        env.logger.info('{} variants from {} ({}/{})'.format(
+            'Importing', input_filename, count + 1, len(importer.files)))
         importer.importVariant(input_filename)
 
         env.logger.info('{:,} new variants {}{}{} from {:,} lines are imported.'\
-            .format(importer.count[2], "(" if importer.count[2] else '', 
+            .format(importer.count[2], "(" if importer.count[2] else '',
                 ', '.join(['{:,} {}'.format(x, y) for x, y in \
                     zip(importer.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'unsupported']) if x > 0]),
                     ")" if importer.count[2] else '', importer.count[0]))
@@ -1496,259 +1525,296 @@ def importGenotypesInParallel(importer,num_sample=0):
         if importer.genotype_field:
             importer.prober.reset()
         # if there are samples?
-        original_sample_ids, genotype_status,names = importer.getSampleIDs(input_filename)
+        original_sample_ids, genotype_status, names = importer.getSampleIDs(
+            input_filename)
         if len(original_sample_ids) == 0:
             continue
-        allNames=manageHDF5(cur,allNames)
-        sample_ids=[int(allNames[name]) for name in names]
+        allNames = manageHDF5(cur, allNames)
+        sample_ids = [int(allNames[name]) for name in names]
+        if original_sample_ids[0] != sample_ids[0]:
+            remove_duplicate_samples(cur, original_sample_ids)
+        workload = None
 
-        if original_sample_ids[0]!=sample_ids[0]:
-            remove_duplicate_samples(cur,original_sample_ids)
-        workload=None
-
-        
         #determine number of samples to be processed in each process
-        if num_sample>0:
+        if num_sample > 0:
             #if number of samples in each HDF5 is determined
-            num_files=int(len(sample_ids)/num_sample)
-            workload=[num_sample]*num_files
-            if len(sample_ids)%num_sample!=0:
-                workload.append(len(sample_ids)%num_sample)
-            if len(workload)<importer.jobs:
-                importer.jobs=len(workload)
+            num_files = int(len(sample_ids) / num_sample)
+            workload = [num_sample] * num_files
+            if len(sample_ids) % num_sample != 0:
+                workload.append(len(sample_ids) % num_sample)
+            if len(workload) < importer.jobs:
+                importer.jobs = len(workload)
         else:
-            if len(sample_ids)<50:
-                importer.jobs=1
-                workload=[len(sample_ids)]
+            if len(sample_ids) < 50:
+                importer.jobs = 1
+                workload = [len(sample_ids)]
             else:
-                workload = [int(float(len(sample_ids)) / importer.jobs)] * importer.jobs
-          
+                workload = [int(float(len(sample_ids)) / importer.jobs)
+                           ] * importer.jobs
+
             unallocated = max(0, len(sample_ids) - sum(workload))
             for i in range(unallocated):
                 workload[i % importer.jobs] += 1
-   
-        env.logger.debug("work load {}".format(workload))
-        numTasks=len(workload)
-        # importers = [None] * numProcess
-        importers=[None]*importer.jobs
-        variant_import_count = [Value('L', 0) for x in range(numTasks)]
 
+        env.logger.debug("work load {}".format(workload))
+        numTasks = len(workload)
+        # importers = [None] * numProcess
+        importers = [None] * importer.jobs
+        variant_import_count = [Value('L', 0) for x in range(numTasks)]
 
         for i in range(len(importer.count)):
             importer.total_count[i] += importer.count[i]
             importer.count[i] = 0
-        
 
         # env.logger.debug('Workload of processes: {}'.format(workload))
 
-        taskQueue=queue.Queue()
-        task=None
+        taskQueue = queue.Queue()
+        task = None
 
-
-        compression='gzip'
-        compression_opts=1
-        shuffle=False
-        overwrite=False
-        vlen=True
-        fields=['variants/ID','variants/REF','variants/ALT','variants/POS','variants/CHROM']
-        types=None
-        numbers=None
-        if (len(importer.genotype_field)>0):
+        #compression = 'gzip'
+        #compression_opts = 1
+        #shuffle = False
+        #overwrite = False
+        #vlen = True
+        fields = [
+            'variants/ID', 'variants/REF', 'variants/ALT', 'variants/POS',
+            'variants/CHROM'
+        ]
+        types = None
+        numbers = None
+        if (len(importer.genotype_field) > 0):
             fields.append('calldata/GT')
-        if (len(importer.genotype_info)>0):
+        if (len(importer.genotype_info) > 0):
             for genoinfo in importer.genotype_info:
-                fields.append("calldata/"+genoinfo.name.replace("_geno",""))
-                fields.append("variants/"+genoinfo.name.replace("_geno",""))
-        alt_number=DEFAULT_ALT_NUMBER
-        fills=None
-        region=None
-        tabix='tabix'
-        samples=None
-        transformers=None
-        buffer_size=DEFAULT_BUFFER_SIZE
-        chunk_length=DEFAULT_CHUNK_LENGTH
-        chunk_width=DEFAULT_CHUNK_WIDTH
+                fields.append("calldata/" + genoinfo.name.replace("_geno", ""))
+                fields.append("variants/" + genoinfo.name.replace("_geno", ""))
+        alt_number = DEFAULT_ALT_NUMBER
+        fills = None
+        region = None
+        tabix = 'tabix'
+        samples = None
+        transformers = None
+        buffer_size = DEFAULT_BUFFER_SIZE
+        chunk_length = DEFAULT_CHUNK_LENGTH
+        #chunk_width = DEFAULT_CHUNK_WIDTH
 
-        log=None
+        #log = None
 
         _, samples, headers, it = iter_vcf_chunks(
-                input_filename, fields=fields, types=types, numbers=numbers, alt_number=alt_number,
-                buffer_size=buffer_size, chunk_length=chunk_length, fills=fills, region=region,
-                tabix=tabix, samples=samples, transformers=transformers
-            )
+            input_filename,
+            fields=fields,
+            types=types,
+            numbers=numbers,
+            alt_number=alt_number,
+            buffer_size=buffer_size,
+            chunk_length=chunk_length,
+            fills=fills,
+            region=region,
+            tabix=tabix,
+            samples=samples,
+            transformers=transformers)
         # print(importer.genotype_info)
 
         #Put tasks in the queue first
-        for job in range(numTasks):      
+        for job in range(numTasks):
             if workload[job] == 0:
                 continue
             # readQueue.append(mpQueue())
-        prog = ProgressBar('Importing genotypes', importer.total_count[2],initCount=0)
-        lines=0
+        prog = ProgressBar(
+            'Importing genotypes', importer.total_count[2], initCount=0)
+        lines = 0
 
-        estart=[Value('L', 0) for x in range(numTasks)]
-        eend=[Value('L', READ_EXISTING_CHUNK_LENGTH) for x in range(numTasks)]
-        efirst=[Value('b',True) for x in range(numTasks)]
-   
+
+        estart = [Value('L', 0) for x in range(numTasks)]
+        eend = [Value('L', READ_EXISTING_CHUNK_LENGTH) for x in range(numTasks)]
+        efirst = [Value('b', True) for x in range(numTasks)]
+
         for chunk, _, _, _ in it:
-            start_sample =0
+            start_sample = 0
             for job in range(numTasks):
-     
+
                 if workload[job] == 0:
                     continue
                 end_sample = min(start_sample + workload[job], len(sample_ids))
                 if end_sample <= start_sample:
                     continue
                 if not importer.sort:
-                    HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
-                    updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge)
-                    taskQueue.put(HDF5GenotypeImportWorker(chunk, importer.variantIndex, start_sample, end_sample, 
-                        sample_ids,variant_import_count[job], job,HDFfile_Merge,importer.genotype_info,importer.build))
+                    HDFfile_Merge = "tmp_" + str(
+                        allNames[names[start_sample]]) + "_" + str(
+                            allNames[names[end_sample - 1]]) + "_genotypes.h5"
+                    updateSample(cur, start_sample, end_sample, sample_ids,
+                                 names, allNames, HDFfile_Merge)
+                    taskQueue.put(
+                        HDF5GenotypeImportWorker(
+                            chunk, importer.variantIndex, start_sample,
+                            end_sample, sample_ids, variant_import_count[job],
+                            job, HDFfile_Merge, importer.genotype_info,
+                            importer.build))
 
-             
-                    # do_work.delay(chunk,importer.variantIndex,start_sample, end_sample, 
+                    # do_work.delay(chunk,importer.variantIndex,start_sample, end_sample,
                     #      sample_ids, job,HDFfile_Merge,importer.genotype_info,importer.build)
-           
-                else:
-                    originalFile="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_genotypes.h5"
-                    HDFfile_Merge="tmp_"+str(allNames[names[start_sample]])+"_"+str(allNames[names[end_sample-1]])+"_sort_genotypes.h5"
-                    if not os.path.isfile(HDFfile_Merge):
-                        copyfile(originalFile,HDFfile_Merge)
-                    updateSample(cur,start_sample,end_sample,sample_ids,names,allNames,HDFfile_Merge.replace("_sort",""))
 
-                    taskQueue.put(HDF5GenotypeSortWorker(chunk, importer, start_sample, end_sample, 
-                        sample_ids,variant_import_count[job], job, HDFfile_Merge,estart[job],eend[job],efirst[job]))
-                start_sample = end_sample 
-            while taskQueue.qsize()>0:
-                for i in range(importer.jobs):    
-                    if importers[i] is None or not importers[i].is_alive(): 
-                        task=taskQueue.get()
-                        importers[i]=task
-                        importers[i].start()         
-                        break 
-            # starttime=time.time()   
+                else:
+                    originalFile = "tmp_" + str(
+                        allNames[names[start_sample]]) + "_" + str(
+                            allNames[names[end_sample - 1]]) + "_genotypes.h5"
+                    HDFfile_Merge = "tmp_" + str(
+                        allNames[names[start_sample]]) + "_" + str(
+                            allNames[names[end_sample -
+                                           1]]) + "_sort_genotypes.h5"
+                    if not os.path.isfile(HDFfile_Merge):
+
+                        copyfile(originalFile, HDFfile_Merge)
+                    updateSample(cur, start_sample, end_sample, sample_ids,
+                                 names, allNames,
+                                 HDFfile_Merge.replace("_sort", ""))
+
+                    taskQueue.put(
+                        HDF5GenotypeSortWorker(chunk, importer, start_sample,
+                                               end_sample, sample_ids,
+                                               variant_import_count[job], job,
+                                               HDFfile_Merge, estart[job],
+                                               eend[job], efirst[job]))
+                start_sample = end_sample
+            while taskQueue.qsize() > 0:
+                for i in range(importer.jobs):
+                    if importers[i] is None or not importers[i].is_alive():
+                        task = taskQueue.get()
+                        importers[i] = task
+                        importers[i].start()
+                        break
             for worker in importers:
                 if worker is not None:
                     worker.join()
-            # print("jointime "+str(time.time()-starttime))
-            lines+=chunk_length
+            lines += chunk_length
+
             prog.update(lines)
         for sortFile in glob.glob("tmp*_sort_genotypes.h5"):
-            os.rename(sortFile,sortFile.replace("_sort",""))
+            os.rename(sortFile, sortFile.replace("_sort", ""))
 
         prog.done()
 
-     
 
 class HDF5GenotypeUpdateWorker(Process):
 
-    def __init__(self, chunk,variantIndex, start_sample,end_sample,sample_ids,geno_info,HDFfile,build):
+    def __init__(self, chunk, variantIndex, start_sample, end_sample,
+                 sample_ids, geno_info, HDFfile, build):
         Process.__init__(self, name='GenotypeUpdater')
         # self.daemon=True
-        self.chunk=chunk
+        self.chunk = chunk
         self.variantIndex = variantIndex
-        self.start_sample=start_sample
-        self.end_sample=end_sample
-        self.sample_ids=sample_ids
-        self.geno_info=geno_info
-        self.HDFfile=HDFfile
-        self.build=build
-        self.info={}
-        self.namedict={}
+        self.start_sample = start_sample
+        self.end_sample = end_sample
+        self.sample_ids = sample_ids
+        self.geno_info = geno_info
+        self.HDFfile = HDFfile
+        self.build = build
+        self.info = {}
+        self.namedict = {}
 
-        if len(self.geno_info)>0:
+        if len(self.geno_info) > 0:
             for info in self.geno_info:
-                name=info.name.replace("_geno","")
-                self.info[name]=[]
+                name = info.name.replace("_geno", "")
+                self.info[name] = []
                 # if "_geno" in info.name:
                 #     self.namedict[info.name]="calldata/"+info.name.replace("_geno","")
                 # else:
                 #     self.namedict[info.name]="variants/"+info.name.replace("_geno","")
-                if "calldata/"+name in self.chunk and np.nansum(self.chunk["calldata/"+name][:10])>0:
-                    self.namedict[name]="calldata/"+name
-                elif "variants/"+name in self.chunk and np.nansum(self.chunk["variants/"+name][:10])>0:
-                    self.namedict[name]="variants/"+name
-       
-                
+                if "calldata/" + name in self.chunk and np.nansum(
+                        self.chunk["calldata/" + name][:10]) > 0:
+                    self.namedict[name] = "calldata/" + name
+                elif "variants/" + name in self.chunk and np.nansum(
+                        self.chunk["variants/" + name][:10]) > 0:
+                    self.namedict[name] = "variants/" + name
 
-    def writeIntoHDF(self,chr):
-        storageEngine=Engine_Storage.choose_storage_engine(self.HDFfile)
-        if len(self.geno_info)>0:
+    def writeIntoHDF(self, chr):
+        storageEngine = Engine_Storage.choose_storage_engine(self.HDFfile)
+        if len(self.geno_info) > 0:
             for info in self.geno_info:
                 # if "_geno" in info.name:
-                name=info.name.replace("_geno","")
-                storageEngine.store_genoInfo(np.array(self.info[name]),chr,name)
+                name = info.name.replace("_geno", "")
+                storageEngine.store_genoInfo(
+                    np.array(self.info[name]), chr, name)
                 # else:
                 #     ar=np.array(self.info[info.name])
                 #     storageEngine.store_genoInfo(np.reshape(ar,(len(ar),-1)),chr,info.name)
-                self.info[name]=[]
+                self.info[name] = []
         storageEngine.close()
 
-    
-
     def run(self):
-        prev_chr=self.chunk["variants/CHROM"][0].replace("chr","")
+        prev_chr = self.chunk["variants/CHROM"][0].replace("chr", "")
         for i in range(len(self.chunk["variants/ID"])):
-            infoDict={}
-            chr=self.chunk["variants/CHROM"][i].replace("chr","")
-            if chr!=prev_chr:
+            chr = self.chunk["variants/CHROM"][i].replace("chr", "")
+            if chr != prev_chr:
                 self.writeIntoHDF(prev_chr)
-                prev_chr=chr             
-            ref=self.chunk["variants/REF"][i]
-            pos=self.chunk["variants/POS"][i]
+                prev_chr = chr
+            #ref = self.chunk["variants/REF"][i]
+            #pos = self.chunk["variants/POS"][i]
 
             for altIndex in range(len(self.chunk["variants/ALT"][i])):
-                alt=self.chunk["variants/ALT"][i][altIndex]
-                if alt!="":
+                alt = self.chunk["variants/ALT"][i][altIndex]
+                if alt != "":
                     for info in self.geno_info:
-                        name=info.name.replace("_geno","")
+                        name = info.name.replace("_geno", "")
                         if "variants" in self.namedict[name]:
-                            self.info[name].append(np.array([self.chunk[self.namedict[name]][i]]))
+                            self.info[name].append(
+                                np.array([self.chunk[self.namedict[name]][i]]))
                         else:
-                            self.info[name].append(self.chunk[self.namedict[name]][i,self.start_sample:self.end_sample])  
+                            self.info[name].append(
+                                self.chunk[self.namedict[name]]
+                                [i, self.start_sample:self.end_sample])
 
         self.writeIntoHDF(chr)
 
 
+def UpdateGenotypeInParallel(updater, input_filename, sample_ids, hdf5Files):
 
-
-def UpdateGenotypeInParallel(updater,input_filename,sample_ids,hdf5Files):
-
-    jobs=updater.jobs
-    numTasks=jobs
-    updaters=[None]*jobs
-    taskQueue=queue.Queue()
-    task=None
+    jobs = updater.jobs
+    #numTasks = jobs
+    updaters = [None] * jobs
+    taskQueue = queue.Queue()
+    task = None
     variantIndex = updater.proj.createVariantMap('variant', False)
 
-    fields=['variants/ID','variants/REF','variants/ALT','variants/POS','variants/CHROM']
-    if (len(updater.genotype_info)>0):
-        for field in updater.genotype_info:          
-            fields.append("calldata/"+field.name.replace("_geno",""))
-            fields.append("variants/"+field.name.replace("_geno",""))
-    types=None
-    numbers=None
-    alt_number=DEFAULT_ALT_NUMBER
-    fills=None
-    region=None
-    tabix='tabix'
-    samples=None
-    transformers=None
-    buffer_size=DEFAULT_BUFFER_SIZE
-    chunk_length=DEFAULT_CHUNK_LENGTH
-    chunk_width=DEFAULT_CHUNK_WIDTH
+    fields = [
+        'variants/ID', 'variants/REF', 'variants/ALT', 'variants/POS',
+        'variants/CHROM'
+    ]
+    if (len(updater.genotype_info) > 0):
+        for field in updater.genotype_info:
+            fields.append("calldata/" + field.name.replace("_geno", ""))
+            fields.append("variants/" + field.name.replace("_geno", ""))
+    types = None
+    numbers = None
+    alt_number = DEFAULT_ALT_NUMBER
+    fills = None
+    region = None
+    tabix = 'tabix'
+    samples = None
+    transformers = None
+    buffer_size = DEFAULT_BUFFER_SIZE
+    chunk_length = DEFAULT_CHUNK_LENGTH
+    #chunk_width = DEFAULT_CHUNK_WIDTH
 
-    log=None
+    #log = None
     _, samples, headers, it = iter_vcf_chunks(
-            input_filename, fields=fields, types=types, numbers=numbers, alt_number=alt_number,
-            buffer_size=buffer_size, chunk_length=chunk_length, fills=fills, region=region,
-            tabix=tabix, samples=samples, transformers=transformers
-        )
+        input_filename,
+        fields=fields,
+        types=types,
+        numbers=numbers,
+        alt_number=alt_number,
+        buffer_size=buffer_size,
+        chunk_length=chunk_length,
+        fills=fills,
+        region=region,
+        tabix=tabix,
+        samples=samples,
+        transformers=transformers)
 
     for HDFfileName in hdf5Files:
-        storageEngine=Engine_Storage.choose_storage_engine(HDFfileName)
+        storageEngine = Engine_Storage.choose_storage_engine(HDFfileName)
         for info in updater.genotype_info:
-            storageEngine.removeNode([],info.name)
+            storageEngine.removeNode([], info.name)
             storageEngine.close()
 
     for chunk, _, _, _ in it:
@@ -1758,22 +1824,21 @@ def UpdateGenotypeInParallel(updater,input_filename,sample_ids,hdf5Files):
             # result=cur.fetchone()
             # start_sample=result[0]-1
             # end_sample=result[1]
-            cols=HDFfileName.split("_")
-            start_sample=int(cols[1])-1
-            end_sample=int(cols[2])
-            taskQueue.put(HDF5GenotypeUpdateWorker(chunk, variantIndex, start_sample, end_sample, 
-                 sample_ids, updater.genotype_info,HDFfileName,updater.proj.build))
-        while taskQueue.qsize()>0:
-            for i in range(jobs):    
-                if updaters[i] is None or not updaters[i].is_alive():     
-                    task=taskQueue.get()
-                    updaters[i]=task
-                    updaters[i].start()          
-                    break 
+            cols = HDFfileName.split("_")
+            start_sample = int(cols[1]) - 1
+            end_sample = int(cols[2])
+            taskQueue.put(
+                HDF5GenotypeUpdateWorker(chunk, variantIndex, start_sample,
+                                         end_sample, sample_ids,
+                                         updater.genotype_info, HDFfileName,
+                                         updater.proj.build))
+        while taskQueue.qsize() > 0:
+            for i in range(jobs):
+                if updaters[i] is None or not updaters[i].is_alive():
+                    task = taskQueue.get()
+                    updaters[i] = task
+                    updaters[i].start()
+                    break
         for worker in updaters:
             if worker is not None:
                 worker.join()
-        
-    
-
-   

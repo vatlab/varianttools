@@ -5,7 +5,7 @@
 # a description of the format of this file.
 
 [pipeline description]
-description=A pipeline to align raw reads from fastq or BAM/SAM files using 
+description=A pipeline to align raw reads from fastq or BAM/SAM files using
 	Mosaik-aligner. It uses hg19 of human reference genome and assumes
 	paired-end reads in plain text and compressed formats.
 
@@ -42,7 +42,7 @@ opt_mosaikjump=-hs 15
 
 opt_mosaikaligner=-hs 15 -mm 4 -mhp 100 -act 20
 opt_mosaikaligner_comment=Parameters to MosaikAligner -hs (hash size) -mm
-	(mismatch allowed) -mhp (maximum number of hash positions to be used 
+	(mismatch allowed) -mhp (maximum number of hash positions to be used
 	per seed)
 
 [step_0]
@@ -63,21 +63,21 @@ action=CheckFiles(["%(picard_path)s/SortSam.jar", "%(gatk_path)s/GenomeAnalysisT
 comment=Check existence of class files for Picard and GATK
 
 [step_30]
-# customized input and output 
+# customized input and output
 input=${RESOURCE_DIR}/ucsc.hg19.fasta.gz
 # this step will be ignored if output exists and newer than $INPUT
 action=RunCommand('MosaikBuild -fr ucsc.hg19.fasta.gz -oa ucsc.hg19.fasta.dat}',
-    working_dir='${RESOURCE_DIR}', 
+    working_dir='${RESOURCE_DIR}',
     output='${RESOURCE_DIR}/ucsc.hg19.fasta.dat')
 comment=Build Mosaik index for build hg19 of reference genome
 
 [step_31]
-# customized input and output 
+# customized input and output
 input=${RESOURCE_DIR}/ucsc.hg19.fasta
 # this step will be ignored if output exists and newer than $INPUT
 action=RunCommand('MosaikJump -ia ${INPUT: INPUT[0] + ".dat"}
 	%(opt_mosaikjump)s -out ${INPUT: INPUT[0] + "_15"}',
-    working_dir='${RESOURCE_DIR}', 
+    working_dir='${RESOURCE_DIR}',
     output='${RESOURCE_DIR}/ucsc.hg19.fasta_15')
 comment=Build Mosaik index for build hg19 of reference genome
 
@@ -89,8 +89,8 @@ comment=Decompress all input files (.tgz2, .tar, .tar.gz, .gz, .tgz, .zip etc) t
 
 [step_200]
 input=${OUTPUT101}
-action=RunCommand(cmd=r"MosaikBuild 
-		-q ${INPUT: INPUT[0]} 
+action=RunCommand(cmd=r"MosaikBuild
+		-q ${INPUT: INPUT[0]}
 		-q2 ${INPUT: INPUT[1]}
 		%(opt_read_group)s
 		-out ${CACHE_DIR}/${INPUT: os.path.basename(INPUT[0]) + '.mkb'}",
@@ -109,4 +109,3 @@ action=RunCommand(cmd=r"MosaikAligner
     output="${INPUT: INPUT[0][:-4] + '.mka.bam'}")
 input_emitter=EmitInput(group_by='paired')
 comment=Running MosaikAlign to align reads to reference genome
-

@@ -1,12 +1,12 @@
 /*****************************************************************************
  * This file is copyright 2005 Jim Kent, but license is hereby
- * granted for all use - public, private or commercial. 
+ * granted for all use - public, private or commercial.
  *****************************************************************************/
 /* mime.h - parses MIME messages, especially from a cgi from a multipart web form */
 
 #ifndef HASH_H
 #include "hash.h"
-#endif 
+#endif
 
 #define MIMEBUFSIZE 32*1024  /* size of buffer for mime input */
 
@@ -39,7 +39,7 @@ struct mimeBuf
 
 char *getMimeHeaderMainVal(char *header);
 /* Parse a typical mime header line returning the first
- * main value up to whitespace, punctuation, or end. 
+ * main value up to whitespace, punctuation, or end.
  * freeMem the returned string when done */
 
 char *getMimeHeaderFieldVal(char *header, char *field);
@@ -48,8 +48,8 @@ char *getMimeHeaderFieldVal(char *header, char *field);
  * freeMem the returned string when done */
 
 struct mimeBuf * initMimeBuf(int d);
-/* d is a descriptor for a file or socket or some other descriptor 
-   that the MIME input can be read from. 
+/* d is a descriptor for a file or socket or some other descriptor
+   that the MIME input can be read from.
    Initializes the mimeBuf structure. */
 
 struct mimePart *parseMultiParts(struct mimeBuf *b, char *altHeader);

@@ -97,5 +97,3 @@
 /* Signature for a url data cache bitmap file. */
 
 #endif /* SIG_H */
-
-

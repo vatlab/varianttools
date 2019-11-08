@@ -41,11 +41,11 @@ namespace cgatools { namespace util { namespace files {
     //! checks if the specifide directory exists
     void check_dir(const boost::filesystem::path& p);
 
-    //! check existence and returns path to the specified data file. 
+    //! check existence and returns path to the specified data file.
     //! The function tries first the compressed versions (baseName+'.bz2) or (baseName+'.gz')
     std::string findDataFile(const boost::filesystem::path& dir, const std::string& baseName);
 
-    //! check existence and returns path to the specified data file. 
+    //! check existence and returns path to the specified data file.
     //! The function tries first the compressed versions (baseName+'.bz2') or (baseName+'.gz')
     //! The first matching file is returned, or if multiple files match
     //! a single regex, throws an exception. On failure, returns "".

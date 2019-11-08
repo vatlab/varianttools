@@ -11,8 +11,8 @@ extern "C" {
 	char *sam_header_write(const void *headerDict);   // returns a newly allocated string
 
     /*
-        // Usage example 
-        const char *key, *val; 
+        // Usage example
+        const char *key, *val;
         void *iter = sam_header_parse2(bam->header->text);
         while ( iter = sam_header_key_val(iter, "RG","ID","SM" &key,&val) ) printf("%s\t%s\n", key,val);
     */
@@ -22,13 +22,13 @@ extern "C" {
     /*
         // Usage example
         int i, j, n;
-        const char *tags[] = {"SN","LN","UR","M5",NULL}; 
+        const char *tags[] = {"SN","LN","UR","M5",NULL};
         void *dict = sam_header_parse2(bam->header->text);
         char **tbl = sam_header2tbl_n(h->dict, "SQ", tags, &n);
         for (i=0; i<n; i++)
         {
-            for (j=0; j<4; j++) 
-                if ( tbl[4*i+j] ) printf("\t%s", tbl[4*i+j]); 
+            for (j=0; j<4; j++)
+                if ( tbl[4*i+j] ) printf("\t%s", tbl[4*i+j]);
                 else printf("-");
             printf("\n");
         }

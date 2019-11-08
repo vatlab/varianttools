@@ -1,4 +1,4 @@
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org) 
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
 #
 # Please refer to http://varianttools.sourceforge.net/Format/New for
@@ -22,7 +22,7 @@ format_string_comment=FORMAT string that is outputted in the 9th column of
 geno_info=
 geno_info_comment=Genotype information fields. No genotype field is imported by
     default. You may edit it into, for example, "geno_info=GD,GQ,PL", if the .vcf
-    format field looks like "GT:GD:GQ:PL". Please check the FORMAT string of your .vcf 
+    format field looks like "GT:GD:GQ:PL". Please check the FORMAT string of your .vcf
     file to determine available fields to be imported.
 
 geno=GT
@@ -153,7 +153,7 @@ comment=Common leading alleles of ref and alt alleles stored in .vcf
 index=4,5
 adj=CommonEnding()
 type=VARCHAR(255)
-comment=Common ending alleles of ref and alt alleles stored in .vcf 
+comment=Common ending alleles of ref and alt alleles stored in .vcf
     file, common leading is extracted before common ending. This field
     is only available for indels.
 
@@ -165,7 +165,7 @@ comment=phred-scaled quality score for the assertion made in ALT. High QUAL scor
 [filter]
 index=7
 type=VARCHAR(255)
-comment=PASS if this position has passed all filters, i.e. a call is made at this position. Otherwise, if the site has not passed all filters, a semicolon-separated list of codes for filters that fail. 
+comment=PASS if this position has passed all filters, i.e. a call is made at this position. Otherwise, if the site has not passed all filters, a semicolon-separated list of codes for filters that fail.
 
 [GT]
 index=10:
@@ -175,7 +175,7 @@ fmt=GenoFormatter(style='vcf')
 comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file. Missing genotype will be dropped.
 
 [safe_GT]
-# This vcf genotype extractor uses format string and genotype to 
+# This vcf genotype extractor uses format string and genotype to
 # extract genotype. Although the format string should not be needed
 # because the genotype field should be the first one, one of my dataset
 # does not following this rule. The performance penalty is significant
@@ -188,7 +188,7 @@ comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt
 [info]
 index=8
 type=VARCHAR(255)
-comment=Raw INFO column in the vcf file. This may be further splitted into various specified info fields, such as DP, etc. 
+comment=Raw INFO column in the vcf file. This may be further splitted into various specified info fields, such as DP, etc.
 
 [AA]
 index=8
@@ -282,14 +282,14 @@ fmt=InfoFormatter('H2')
 type=INTEGER
 comment=membership in hapmap2
 
-[H3] 
+[H3]
 index=8
 adj=ExtractValue('H3=', ';')
 fmt=InfoFormatter('H3')
 type=INTEGER
 comment=membership in hapmap3
 
-[MQ] 
+[MQ]
 index=8
 adj=ExtractValue('MQ=', ';')
 fmt=InfoFormatter('MQ')
@@ -303,35 +303,35 @@ fmt=InfoFormatter('MQ0')
 type=INTEGER
 comment=Number of MAPQ == 0 reads covering this record (Total Mapping Quality Zero Reads)
 
-[NS] 
+[NS]
 index=8
 adj=ExtractValue('NS=', ';')
 fmt=InfoFormatter('NS')
 type=INTEGER
 comment=Number of samples with data
 
-[SB] 
+[SB]
 index=8
 adj=ExtractValue('SB=', ';')
 fmt=InfoFormatter('SB')
 type=INTEGER
 comment=strand bias at this position
 
-[SOMATIC] 
+[SOMATIC]
 index=8
 adj=ExtractValue('SOMATIC=', ';')
 fmt=InfoFormatter('SOMATIC')
 type=INTEGER
 comment=indicates that the record is a somatic mutation, for cancer genomics
 
-[VALIDATED] 
+[VALIDATED]
 index=8
 adj=ExtractValue('VALIDATED=', ';')
 fmt=InfoFormatter('VALIDATED')
 type=INTEGER
 comment=validated by follow-up experiment
 
-[1000G] 
+[1000G]
 index=8
 adj=ExtractValue('1000G=', ';')
 fmt=InfoFormatter('1000G')
@@ -486,7 +486,7 @@ index=8
 type=VARCHAR(255)
 adj=ExtractValue('EFF=',';'), lambda x: x.split('(')[0]
 fmt=InfoFormatter('EFF_Type')
-comment=Category of effect returned by snpEff, as the first entry in the EFF info. 
+comment=Category of effect returned by snpEff, as the first entry in the EFF info.
     A complete list of effect is available at http://snpeff.sourceforge.net/SnpEff_manual.html#eff.
 
 
@@ -504,7 +504,7 @@ index=8
 type=VARCHAR(255)
 adj=ExtractValue('EFF=',';'), lambda x: x.split('|', 1)[-1].split('|')[0]
 fmt=InfoFormatter('EFF_Functional_Class')
-comment=Category of effect returned by snpEff, as the first entry in the EFF info. 
+comment=Category of effect returned by snpEff, as the first entry in the EFF info.
     A complete list of effect is available at http://snpeff.sourceforge.net/SnpEff_manual.html#eff.
 
 [DP_geno]
@@ -531,5 +531,3 @@ index=9, 10:
 adj=FieldFromFormat('PL', ':')
 type=INTEGER
 comment=Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification
-
-

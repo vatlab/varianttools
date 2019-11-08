@@ -12,7 +12,7 @@ NUMBER_OF_PROCESSES_PER_NODE=8
 NODE_LIST=`cat $PBS_NODEFILE | uniq`
 nodes=(`echo $NODE_LIST | cut -d " "  --output-delimiter=" " -f 1-`)
 
-#The main program is running on the node with $HOSTNAME, the rest of nodes are saved into $WORKDER_NODES and written into hostlist.txt. 
+#The main program is running on the node with $HOSTNAME, the rest of nodes are saved into $WORKDER_NODES and written into hostlist.txt.
 WORKER_NODES=()
 for node in "${nodes[@]}"
 do
@@ -33,5 +33,5 @@ done
 
 #Get the path for mpiexec
 MPIEXECPATH=$(which mpiexec)
-#The IP address for the main node $ZEROMQIP and $PROJECTFOLDER are needed for the woker script to communicate. 
+#The IP address for the main node $ZEROMQIP and $PROJECTFOLDER are needed for the woker script to communicate.
 $MPIEXECPATH -d -x PATH  -H $HOSTNAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -npernode $NUMBER_OF_PROCESSES_PER_NODE  worker_run

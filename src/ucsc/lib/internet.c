@@ -41,7 +41,7 @@ else
     zeroBytes(&hints, sizeof(hints));
     hints.ai_family = AF_INET;
 
-    if ((err = getaddrinfo(hostName, NULL, &hints, &res)) != 0) 
+    if ((err = getaddrinfo(hostName, NULL, &hints, &res)) != 0)
 	{
 	warn("getaddrinfo() error on hostName=%s: %s\n", hostName, gai_strerror(err));
 	return 0;
@@ -74,8 +74,8 @@ return TRUE;
 }
 
 boolean internetIpToDottedQuad(bits32 ip, char dottedQuad[17])
-/* Convert IP4 address in host byte order to dotted quad 
- * notation.  Warn and return FALSE if there's a 
+/* Convert IP4 address in host byte order to dotted quad
+ * notation.  Warn and return FALSE if there's a
  * problem. */
 {
 #ifndef __CYGWIN32__
@@ -85,7 +85,7 @@ ZeroVar(&ia);
 ia.s_addr = htonl(ip);
 if (inet_ntop(AF_INET, &ia, dottedQuad, 16) == NULL)
     {
-    warn("conversion problem on 0x%x in internetIpToDottedQuad: %s", 
+    warn("conversion problem on 0x%x in internetIpToDottedQuad: %s",
     	ip, strerror(errno));
     return FALSE;
     }
@@ -98,7 +98,7 @@ return FALSE;
 
 boolean internetDottedQuadToIp(char *dottedQuad, bits32 *retIp)
 /* Convert dotted quad format address to IP4 address in
- * host byte order.  Warn and return FALSE if there's a 
+ * host byte order.  Warn and return FALSE if there's a
  * problem. */
 {
 #ifndef __CYGWIN32__
@@ -156,4 +156,3 @@ for (i=0; i<4; ++i)
     }
 return TRUE;
 }
-

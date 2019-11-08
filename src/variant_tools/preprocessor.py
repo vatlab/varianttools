@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 #
-# $File: preprocessor.py $
-# $LastChangedDate: 2013-03-26 17:15:07 -0500 (Tue, 26 Mar 2013) $
-# $Rev: 1775 $
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org) and Gao Wang (wangow@gmail.com)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org) and Gao Wang (wangow@gmail.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,28 +19,32 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-
-import sys, os
 import itertools as it
-from .utils import ProgressBar, RefGenome, env, openFile, DatabaseEngine, downloadFile
-from .plinkfile import PlinkFile
-
+import os
+import sys
 from collections import defaultdict
 from multiprocessing import Lock
+
+from .plinkfile import PlinkFile
+from .utils import (DatabaseEngine, ProgressBar, RefGenome, downloadFile, env,
+                    openFile)
+
+
 #
 #
-# Functors to process input 
+# Functors to process input
 #
 #
 # Extractors to extract value from a field
 class ExtractField:
+
     def __init__(self, index, sep=';', default=None):
         '''Define an extractor that returns the index-th (1-based) field of the fields
         separated by specified delimiter. Return default if unsuccessful.'''
         self.index = index - 1
         self.sep = sep
         self.default = default
-    
+
     def __call__(self, item):
         try:
             return item.split(self.sep, self.index + 1)[self.index]
@@ -54,7 +54,9 @@ class ExtractField:
 
 g_geneNameStandardizer = {}
 
+
 class _GeneNameStandardizer:
+
     def __init__(self, convertTo='geneSymbol'):
         self.convertTo = convertTo
         # CREATE TABLE `kgAlias` (
@@ -62,8 +64,10 @@ class _GeneNameStandardizer:
         #  `alias` varchar(80) default NULL,
         #  KEY `kgID` (`kgID`),
         #  KEY `alias` (`alias`)
-        #) 
-        kgAliasFile = downloadFile('ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/kgAlias.txt.gz')
+        #)
+        kgAliasFile = downloadFile(
+            'ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/kgAlias.txt.gz'
+        )
         #CREATE TABLE `kgXref` (
         #  `kgID` varchar(255) NOT NULL,
         #  `mRNA` varchar(255) NOT NULL,
@@ -86,7 +90,9 @@ class _GeneNameStandardizer:
         #  KEY `tRnaName` (`tRnaName`)
         #) ENGINE=MyISAM DEFAULT CHARSET=latin1;
         #
-        kgXRefFile = downloadFile('ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/kgXref.txt.gz')
+        kgXRefFile = downloadFile(
+            'ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/kgXref.txt.gz'
+        )
         self.nameMap = self.processAlias(kgAliasFile, kgXRefFile)
 
     def processAlias(self, kgAliasFile, kgXRefFile):
@@ -101,7 +107,7 @@ class _GeneNameStandardizer:
                 'kgID': 0,
                 'mRNA': 1,
                 'spID': 2,
-                'spDisplayID':3,
+                'spDisplayID': 3,
                 'geneSymbol': 4,
                 'refseq': 5,
                 'protAcc': 6,
@@ -109,9 +115,11 @@ class _GeneNameStandardizer:
                 'rfamAcc': 8,
                 'tRnaName': 9
             }[self.convertTo]
-        except KeyError as e:
-            raise ValueError('Incorrect conversion type {}. Allowed types for GeneNameStandardizer '
-                'are kgID, mRNA, spID, spDisplayID, geneSymbol, refseq, protAcc, description, rfamAcc, and tRnaName'.format(self.convertTo))
+        except KeyError:
+            raise ValueError(
+                'Incorrect conversion type {}. Allowed types for GeneNameStandardizer '
+                'are kgID, mRNA, spID, spDisplayID, geneSymbol, refseq, protAcc, description, rfamAcc, and tRnaName'
+                .format(self.convertTo))
         with openFile(kgXRefFile) as kgXRef:
             for line in kgXRef:
                 try:
@@ -135,7 +143,9 @@ class _GeneNameStandardizer:
             # if there is alreay another name
             if alias in nameMap:
                 #nameMap[alias].append(name)
-                sys.stderr.write('Multiple {} names for alias {}: {} used\n'.format(self.convertTo, alias, name))
+                sys.stderr.write(
+                    'Multiple {} names for alias {}: {} used\n'.format(
+                        self.convertTo, alias, name))
             nameMap[alias] = name
         #
         return nameMap
@@ -145,17 +155,19 @@ class _GeneNameStandardizer:
             #if item.upper() in self.nameMap:
             #    print item.upper(), '==> ', self.nameMap[item.upper()]
             return self.nameMap[item.upper()]
-        except Exception as e:
+        except Exception:
             return item
+
 
 def ConvertGeneName(convertTo='geneSymbol'):
     global g_geneNameStandardizer
     if convertTo not in g_geneNameStandardizer:
         g_geneNameStandardizer[convertTo] = _GeneNameStandardizer(convertTo)
-    return g_geneNameStandardizer[convertTo];
+    return g_geneNameStandardizer[convertTo]
 
 
 class CheckSplit:
+
     def __init__(self, sep=','):
         '''Define an extractor that returns all items in a field separated by
         specified delimiter. Return default if unsuccessful. It differs from
@@ -163,21 +175,25 @@ class CheckSplit:
         of one element) when there is only one element. The item will then
         will copy if multiple items exist.'''
         self.sep = sep
-    
+
     def __call__(self, item):
         return item if self.sep not in item else tuple(item.split(self.sep))
-    
+
+
 class SplitField:
+
     def __init__(self, sep=','):
         '''Define an extractor that returns all items in a field separated by
         specified delimiter. These items will lead to multiple records in
         the database.'''
         self.sep = sep
-    
+
     def __call__(self, item):
         return tuple(item.split(self.sep))
 
+
 class ExtractFlag:
+
     def __init__(self, name, sep=';'):
         '''Define an extractor that returns 1 is item contains name as one of the fields,
         and 0 otherwise. No space is allowed between delimiter and flag.'''
@@ -185,25 +201,28 @@ class ExtractFlag:
         self.s = name + sep
         self.e = sep + name
         self.m = sep + name + sep
-    
+
     def __call__(self, item):
         # this should be faster than
         #
         #     if self.name in item.split(self.sep):
-        # 
+        #
         # because we do not have to split the whole string.
         #
         if self.n not in item:
             return '0'
         # put the most common case first
-        if self.m in item or item.startswith(self.s) or item.endswith(self.e) or item == self.n:
+        if self.m in item or item.startswith(self.s) or item.endswith(
+                self.e) or item == self.n:
             return '1'
         else:
             return '0'
 
+
 class CommonLeading:
     '''Find the common leading piece of two input strings (ref and alt).
     '''
+
     def __init__(self):
         pass
 
@@ -216,16 +235,20 @@ class CommonLeading:
 
     def __call__(self, item):
         if ',' in item[1]:
-            return tuple([self._commonLeading(item[0], alt) for alt in item[1].split(',')])
+            return tuple([
+                self._commonLeading(item[0], alt) for alt in item[1].split(',')
+            ])
         else:
             return self._commonLeading(item[0], item[1])
+
 
 class CommonEnding:
     '''Find the common ending piece of two input strings (ref and alt).
     '''
+
     def __init__(self):
         pass
-    
+
     def _commonEnding(self, ref, alt):
         common_leading = 0
         for i in range(min(len(ref), len(alt))):
@@ -235,7 +258,7 @@ class CommonEnding:
             ref = ref[common_leading:]
             alt = alt[common_leading:]
         common_ending = 0
-        for i in range(-1, - min(len(ref), len(alt)) - 1, -1):
+        for i in range(-1, -min(len(ref), len(alt)) - 1, -1):
             if ref[i] == alt[i]:
                 common_ending -= 1
             else:
@@ -244,17 +267,20 @@ class CommonEnding:
             return ref[common_ending:]
         else:
             return ''
-    
+
     def __call__(self, item):
         if ',' in item[1]:
-            return tuple([self._commonEnding(item[0], alt) for alt in item[1].split(',')])
+            return tuple([
+                self._commonEnding(item[0], alt) for alt in item[1].split(',')
+            ])
         else:
             return self._commonEnding(item[0], item[1])
 
 
 class __FieldFromFormat:
+
     def __init__(self, name, sep=';', default=None):
-        '''Define an extractor that return the value of a field according 
+        '''Define an extractor that return the value of a field according
         to a format string. This is used to extract stuff from the format
         string of vcf files.
         '''
@@ -298,7 +324,9 @@ class __FieldFromFormat:
                     self.factory[fmt][val] = self.default
                     return self.default
 
+
 __all_field_from_format = {}
+
 
 def FieldFromFormat(name, sep=';', default=None):
     # this is a factory of __FieldFromFormat class
@@ -311,7 +339,9 @@ def FieldFromFormat(name, sep=';', default=None):
         __all_field_from_format[(name, sep, default)] = obj
         return obj
 
+
 class VcfGenotype:
+
     def __init__(self, default=None):
         '''Define an extractor that extract genotype from a .vcf file'''
         #
@@ -319,22 +349,60 @@ class VcfGenotype:
         # missing data (e.g. ./1) and phase.
         #
         self.default = default
-        self.map = {'0/0': default, '0|0': default,
-            '0/1': ('1',), '1/0': ('1',), '0|1': ('1',), '1|0': ('1',),
-            '1/1': ('2',), '1|1': ('2',),
-            '0/2': (None, '1'), '2/0': (None, '1'), '0|2': (None, '1'), '2|0': (None, '1'), 
-            '1/2': ('-1', '-1'), '2/1': ('-1', '-1'), '1|2': ('-1', '-1'), '2|1': ('-1', '-1'),
-            '2/2': (None, '2'), '2|2': (None, '2'),
-            '0/3': (None, None, '1'), '3/0': (None, None, '1'), '0|3': (None, None, '1'), '3|0': (None, None, '1'), 
-            '1/3': ('-1', None, '-1'), '3/1': ('-1', None, '-1'), '1|3': ('-1', None, '-1'), '3|1': ('-1', None, '-1'), 
-            '2/3': (None, '-1', '-1'), '3/2': (None, '-1', '-1'), '2|3': (None, '-1', '-1'), '3|2': (None, '-1', '-1'), 
-            '3/3': (None, None, '2'), '3|3': (None, None, '2'), 
-            '0/4': (None, None, None, '1'), '4/0': (None, None, None, '1'), '0|4': (None, None, None, '1'), '4|0': (None, None, None, '1'), 
-            '1/4': ('-1', None, '-1'), '4/1': ('-1', None, '-1'), '1|4': ('-1', None, '-1'), '4|1': ('-1', None, '-1'), 
-            '2/4': (None, '-1', None, '-1'), '4/2': (None, '-1', None, '-1'), '2|4': (None, '-1', None, '-1'), '4|2': (None, '-1', None, '-1'), 
-            '3/4': (None, None, '-1', '-1'), '4/3': (None, None, '-1', '-1'), '3|4': (None, None, '-1', '-1'), '4|3': (None, None, '-1', '-1'), 
-            '4/4': (None, None, None, '2'), '4|4': (None, None, None, '2'), 
-            '0': default, '1': ('1',)}
+        self.map = {
+            '0/0': default,
+            '0|0': default,
+            '0/1': ('1',),
+            '1/0': ('1',),
+            '0|1': ('1',),
+            '1|0': ('1',),
+            '1/1': ('2',),
+            '1|1': ('2',),
+            '0/2': (None, '1'),
+            '2/0': (None, '1'),
+            '0|2': (None, '1'),
+            '2|0': (None, '1'),
+            '1/2': ('-1', '-1'),
+            '2/1': ('-1', '-1'),
+            '1|2': ('-1', '-1'),
+            '2|1': ('-1', '-1'),
+            '2/2': (None, '2'),
+            '2|2': (None, '2'),
+            '0/3': (None, None, '1'),
+            '3/0': (None, None, '1'),
+            '0|3': (None, None, '1'),
+            '3|0': (None, None, '1'),
+            '1/3': ('-1', None, '-1'),
+            '3/1': ('-1', None, '-1'),
+            '1|3': ('-1', None, '-1'),
+            '3|1': ('-1', None, '-1'),
+            '2/3': (None, '-1', '-1'),
+            '3/2': (None, '-1', '-1'),
+            '2|3': (None, '-1', '-1'),
+            '3|2': (None, '-1', '-1'),
+            '3/3': (None, None, '2'),
+            '3|3': (None, None, '2'),
+            '0/4': (None, None, None, '1'),
+            '4/0': (None, None, None, '1'),
+            '0|4': (None, None, None, '1'),
+            '4|0': (None, None, None, '1'),
+            '1/4': ('-1', None, '-1'),
+            '4/1': ('-1', None, '-1'),
+            '1|4': ('-1', None, '-1'),
+            '4|1': ('-1', None, '-1'),
+            '2/4': (None, '-1', None, '-1'),
+            '4/2': (None, '-1', None, '-1'),
+            '2|4': (None, '-1', None, '-1'),
+            '4|2': (None, '-1', None, '-1'),
+            '3/4': (None, None, '-1', '-1'),
+            '4/3': (None, None, '-1', '-1'),
+            '3|4': (None, None, '-1', '-1'),
+            '4|3': (None, None, '-1', '-1'),
+            '4/4': (None, None, None, '2'),
+            '4|4': (None, None, None, '2'),
+            '0': default,
+            '1': ('1',)
+        }
 
     def __call__(self, item):
         # the most common and correct case...
@@ -344,7 +412,9 @@ class VcfGenotype:
             env.logger.debug('Genotype {} cannot be imported'.format(item))
             return None
 
+
 class VcfGenoFromFormat:
+
     def __init__(self, default=None):
         '''Define an extractor that return genotype according to a format string.
         This is used to extract genotype from the format string of vcf files.
@@ -352,22 +422,60 @@ class VcfGenoFromFormat:
         self.fmt = '\t'
         self.idx = None
         self.default = default
-        self.map = {'0/0': default, '0|0': default,
-            '0/1': ('1',), '1/0': ('1',), '0|1': ('1',), '1|0': ('1',),
-            '1/1': ('2',), '1|1': ('2',),
-            '0/2': (None, '1'), '2/0': (None, '1'), '0|2': (None, '1'), '2|0': (None, '1'), 
-            '1/2': ('-1', '-1'), '2/1': ('-1', '-1'), '1|2': ('-1', '-1'), '2|1': ('-1', '-1'),
-            '2/2': (None, '2'), '2|2': (None, '2'),
-            '0/3': (None, None, '1'), '3/0': (None, None, '1'), '0|3': (None, None, '1'), '3|0': (None, None, '1'), 
-            '1/3': ('-1', None, '-1'), '3/1': ('-1', None, '-1'), '1|3': ('-1', None, '-1'), '3|1': ('-1', None, '-1'), 
-            '2/3': (None, '-1', '-1'), '3/2': (None, '-1', '-1'), '2|3': (None, '-1', '-1'), '3|2': (None, '-1', '-1'), 
-            '3/3': (None, None, '2'), '3|3': (None, None, '2'), 
-            '0/4': (None, None, None, '1'), '4/0': (None, None, None, '1'), '0|4': (None, None, None, '1'), '4|0': (None, None, None, '1'), 
-            '1/4': ('-1', None, '-1'), '4/1': ('-1', None, '-1'), '1|4': ('-1', None, '-1'), '4|1': ('-1', None, '-1'), 
-            '2/4': (None, '-1', None, '-1'), '4/2': (None, '-1', None, '-1'), '2|4': (None, '-1', None, '-1'), '4|2': (None, '-1', None, '-1'), 
-            '3/4': (None, None, '-1', '-1'), '4/3': (None, None, '-1', '-1'), '3|4': (None, None, '-1', '-1'), '4|3': (None, None, '-1', '-1'), 
-            '4/4': (None, None, None, '2'), '4|4': (None, None, None, '2'), 
-            '0': default, '1': ('1',)}
+        self.map = {
+            '0/0': default,
+            '0|0': default,
+            '0/1': ('1',),
+            '1/0': ('1',),
+            '0|1': ('1',),
+            '1|0': ('1',),
+            '1/1': ('2',),
+            '1|1': ('2',),
+            '0/2': (None, '1'),
+            '2/0': (None, '1'),
+            '0|2': (None, '1'),
+            '2|0': (None, '1'),
+            '1/2': ('-1', '-1'),
+            '2/1': ('-1', '-1'),
+            '1|2': ('-1', '-1'),
+            '2|1': ('-1', '-1'),
+            '2/2': (None, '2'),
+            '2|2': (None, '2'),
+            '0/3': (None, None, '1'),
+            '3/0': (None, None, '1'),
+            '0|3': (None, None, '1'),
+            '3|0': (None, None, '1'),
+            '1/3': ('-1', None, '-1'),
+            '3/1': ('-1', None, '-1'),
+            '1|3': ('-1', None, '-1'),
+            '3|1': ('-1', None, '-1'),
+            '2/3': (None, '-1', '-1'),
+            '3/2': (None, '-1', '-1'),
+            '2|3': (None, '-1', '-1'),
+            '3|2': (None, '-1', '-1'),
+            '3/3': (None, None, '2'),
+            '3|3': (None, None, '2'),
+            '0/4': (None, None, None, '1'),
+            '4/0': (None, None, None, '1'),
+            '0|4': (None, None, None, '1'),
+            '4|0': (None, None, None, '1'),
+            '1/4': ('-1', None, '-1'),
+            '4/1': ('-1', None, '-1'),
+            '1|4': ('-1', None, '-1'),
+            '4|1': ('-1', None, '-1'),
+            '2/4': (None, '-1', None, '-1'),
+            '4/2': (None, '-1', None, '-1'),
+            '2|4': (None, '-1', None, '-1'),
+            '4|2': (None, '-1', None, '-1'),
+            '3/4': (None, None, '-1', '-1'),
+            '4/3': (None, None, '-1', '-1'),
+            '3|4': (None, None, '-1', '-1'),
+            '4|3': (None, None, '-1', '-1'),
+            '4/4': (None, None, None, '2'),
+            '4|4': (None, None, None, '2'),
+            '0': default,
+            '1': ('1',)
+        }
 
     def __call__(self, item):
         # the most common and correct case...
@@ -384,15 +492,19 @@ class VcfGenoFromFormat:
                 else:
                     self.idx = None
                     return self.default
-            return self.map[item[1].split(':', self.idx + 1)[self.idx]] if self.idx is not None else self.default
+            return self.map[item[1].split(
+                ':', self.idx +
+                1)[self.idx]] if self.idx is not None else self.default
         except KeyError:
             env.logger.debug('Genotype {} cannot be imported'.format(item))
             return None
-        
+
+
 class ExtractValue:
+
     def __init__(self, name, sep=';', default=None):
         '''Define an extractor that returns the value after name in one of the fields,
-        and a default value if no such field is found. No space is allowed between 
+        and a default value if no such field is found. No space is allowed between
         delimiter and the name.'''
         self.name = name
         self.sep = sep
@@ -401,7 +513,7 @@ class ExtractValue:
 
     def __call__(self, item):
         #
-        # Using two partisions seems to be a tiny bit faster than 
+        # Using two partisions seems to be a tiny bit faster than
         # split and startswith
         #
         #for field in item.split(self.sep):
@@ -413,8 +525,10 @@ class ExtractValue:
             ss = item.partition(self.sep + self.name)
             return ss[2].partition(self.sep)[0] if ss[2] else self.default
 
+
 class IncreaseBy:
     '''Increase passed value by a given number, will convert input to integer'''
+
     def __init__(self, inc=1):
         '''Adjust position'''
         self.inc = inc
@@ -422,8 +536,10 @@ class IncreaseBy:
     def __call__(self, item):
         return str(int(item) + self.inc) if item.isdigit() else None
 
+
 class MapValue:
     '''Map value to another one, return the item itself if unmapped'''
+
     def __init__(self, map):
         self.map = map
 
@@ -432,10 +548,12 @@ class MapValue:
             return self.map[item]
         except:
             return item
-        
+
+
 class RemoveLeading:
     '''Remove specified leading string if the input string starts with it. Used
     for example to remove chr from inputs such as chr15'''
+
     def __init__(self, val):
         self.val = val
         self.vlen = len(val)
@@ -443,23 +561,41 @@ class RemoveLeading:
     def __call__(self, item):
         return item[self.vlen:] if item.startswith(self.val) else item
 
+
 class EncodeGenotype:
     '''Encode 1/1, 1/2 etc to variant tools code'''
+
     def __init__(self, default=None):
-        self.map = {'0/0': default, '0|0': default,
-            '0/1': ('1',), '1/0': ('1',), '0|1': ('1',), '1|0': ('1',),
-            '1/1': ('2',), '1|1': ('2',),
-            '0/2': ('0', '1'), '2/0': ('0', '1'), '0|2': ('0', '1'), '2|0': ('0', '1'), 
-            '1/2': ('-1', '-1'), '2/1': ('-1', '-1'), '1|2': ('-1', '-1'), '2|1': ('-1', '-1'),
-            '2/2': ('0', '2'), '2|2': ('0', '2'),
-            '0': default, '1': ('1',)}
+        self.map = {
+            '0/0': default,
+            '0|0': default,
+            '0/1': ('1',),
+            '1/0': ('1',),
+            '0|1': ('1',),
+            '1|0': ('1',),
+            '1/1': ('2',),
+            '1|1': ('2',),
+            '0/2': ('0', '1'),
+            '2/0': ('0', '1'),
+            '0|2': ('0', '1'),
+            '2|0': ('0', '1'),
+            '1/2': ('-1', '-1'),
+            '2/1': ('-1', '-1'),
+            '1|2': ('-1', '-1'),
+            '2|1': ('-1', '-1'),
+            '2/2': ('0', '2'),
+            '2|2': ('0', '2'),
+            '0': default,
+            '1': ('1',)
+        }
 
     def __call__(self, item):
         return self.map[item]
-        
+
 
 class Nullify:
     '''Change specified input value to NULL '''
+
     def __init__(self, val):
         self.val = val
         if type(self.val) == str:
@@ -473,14 +609,18 @@ class Nullify:
     def nullify_multiple(self, item):
         return None if item in self.val else item
 
+
 class IgnoredRecord(Exception):
+
     def __init__(self, value=None):
         self.value = value
 
     def __str__(self):
         return repr(self.value)
 
+
 class DiscardRecord:
+
     def __init__(self, val, keepMatched=False):
         self.val = val
         if hasattr(self.val, '__call__'):
@@ -529,14 +669,17 @@ class DiscardRecord:
         if item in self.val:
             raise IgnoredRecord()
         return item
-    
+
+
 __databases = {}
 #
 # lock the database until it is sure that indexes are created
 __db_lock = Lock()
 
+
 class _DatabaseQuerier:
     '''This query a field from an annotation database'''
+
     def __init__(self, cursor, name, res_field, cond_fields, default=None):
         '''Supose res_field is alt, cond_fields are chr,pos, this querier
         will get alt using query
@@ -545,8 +688,9 @@ class _DatabaseQuerier:
         self.default = default
         self.cur = cursor
         self.single_cond = len(cond_fields) == 1
-        self.query = 'SELECT {} FROM {} WHERE {}'.format(res_field,
-            name, ' AND '.join(['{}=?'.format(x) for x in cond_fields]))
+        self.query = 'SELECT {} FROM {} WHERE {}'.format(
+            res_field, name,
+            ' AND '.join(['{}=?'.format(x) for x in cond_fields]))
 
     def __call__(self, item):
         if self.single_cond:
@@ -562,6 +706,7 @@ class _DatabaseQuerier:
         else:
             return self.default
 
+
 def FieldFromDB(dbfile, res_field, cond_fields, default=None):
     global __databases
     global __db_lock
@@ -569,25 +714,31 @@ def FieldFromDB(dbfile, res_field, cond_fields, default=None):
     if dbfile not in __databases:
         db = DatabaseEngine()
         if not os.path.isfile(os.path.expanduser(dbfile)):
-            if os.path.isfile(os.path.join(env.local_resource, 'annoDB', dbfile)):
-                database_file = os.path.join(env.local_resource, 'annoDB', dbfile)
+            if os.path.isfile(
+                    os.path.join(env.local_resource, 'annoDB', dbfile)):
+                database_file = os.path.join(env.local_resource, 'annoDB',
+                                             dbfile)
             else:
                 raise ValueError('Database file {} does not exist locally or '
-                    'under resource directory'.format(dbfile))
+                                 'under resource directory'.format(dbfile))
         else:
             database_file = os.path.expanduser(dbfile)
         db.connect(database_file, readonly=True)
         cur = db.cursor()
         tables = db.tables()
         if not tables:
-            raise ValueError('Incorrect annotation database with tables {}'.format(', '.join(tables)))
+            raise ValueError(
+                'Incorrect annotation database with tables {}'.format(
+                    ', '.join(tables)))
         #
         try:
             name = [x for x in tables if x.endswith('_info')][0][:-5]
         except Exception as e:
-            raise ValueError('Incorrect database (missing info table): {}'.format(e))
+            raise ValueError(
+                'Incorrect database (missing info table): {}'.format(e))
         if not name in tables:
-            raise ValueError('Incorrect database (missing table {})'.format(name))
+            raise ValueError(
+                'Incorrect database (missing table {})'.format(name))
         if not name + '_field':
             raise ValueError('Incorrect database (missing field table)')
         #
@@ -599,19 +750,24 @@ def FieldFromDB(dbfile, res_field, cond_fields, default=None):
             if not db.hasIndex('{}_idx'.format(fld)):
                 db.close()
                 db.connect(database_file, readonly=False)
-                env.logger.info('Creating index for field "{}" in database {}'.format(fld, name))
-                db.execute('CREATE INDEX {0}_idx ON {1} ({0} ASC);'.format(fld, name))
+                env.logger.info(
+                    'Creating index for field "{}" in database {}'.format(
+                        fld, name))
+                db.execute('CREATE INDEX {0}_idx ON {1} ({0} ASC);'.format(
+                    fld, name))
                 db.commit()
                 db.close()
                 db.connect(database_file, readonly=True)
                 cur = db.cursor()
         __databases[dbfile] = (cur, name)
     __db_lock.release()
-    return _DatabaseQuerier(__databases[dbfile][0], __databases[dbfile][1], 
-        res_field, cond_fields.split(','), default)
+    return _DatabaseQuerier(__databases[dbfile][0], __databases[dbfile][1],
+                            res_field, cond_fields.split(','), default)
+
 
 class RefAtPos:
     '''This function returns the reference allele from a position'''
+
     def __init__(self, build):
         self.refGenome = RefGenome(build)
 
@@ -619,8 +775,10 @@ class RefAtPos:
         # enter chromosome and pos
         return self.refGenome.getBase(item[0], int(item[1]))
 
+
 class AltAtPos:
     '''This function returns the alternative allele from two-given alleles, and reference allele from a position'''
+
     def __init__(self, build):
         self.refGenome = RefGenome(build)
 
@@ -634,20 +792,25 @@ class AltAtPos:
         elif ref == item[3]:
             return item[2]
         else:
-            raise ValueError('Two non-ref alleles are provided: chr={}, pos={}, ref={}, observed {} {}'.format(
-                item[0], item[1], ref, item[2], item[3]))
+            raise ValueError(
+                'Two non-ref alleles are provided: chr={}, pos={}, ref={}, observed {} {}'
+                .format(item[0], item[1], ref, item[2], item[3]))
 
 
 # this is a dictionary to save extractors for each file used
 g_SeqExtractor = {}
+
+
 def SeqAtLoc(filename):
     # return the same object for multiple instances of SeqAtLoc because
     # we do not want to read the fasta file multiple times
     if filename not in g_SeqExtractor:
         g_SeqExtractor[filename] = SequentialExtractor(filename)
     return g_SeqExtractor[filename]
-    
+
+
 class SequentialExtractor:
+
     def __init__(self, extractors):
         '''Define an extractor that calls a list of extractors. The string extracted from
         the first extractor will be passed to the second, and so on.'''
@@ -673,14 +836,14 @@ class SequentialExtractor:
         return item
 
 
-
 class JoinFields:
+
     def __init__(self, sep=','):
         '''Define an extractor that returns all items in a field separated by
         specified delimiter. These items will lead to multiple records in
         the database.'''
         self.sep = sep
-    
+
     def __call__(self, item):
         try:
             if type(item) == str:
@@ -690,7 +853,9 @@ class JoinFields:
         except:
             return str(item)
 
+
 class IfMulti:
+
     def __init__(self, ifFunc=None, elseFunc=None):
         if hasattr(ifFunc, '__call__'):
             self.ifFunc = ifFunc.__call__
@@ -706,14 +871,16 @@ class IfMulti:
             return item[0] if self.ifFunc is None else self.ifFunc(item)
         else:
             return item if self.elseFunc is None else self.elseFunc(item)
-        
+
+
 class JoinRecords:
+
     def __init__(self, sep=','):
         '''Define an extractor that returns all items in a field separated by
         specified delimiter. These items will lead to multiple records in
         the database.'''
         self.sep = sep
-    
+
     def __call__(self, item):
         try:
             if type(item) == tuple or type(item) == list:
@@ -723,7 +890,9 @@ class JoinRecords:
         except:
             return str(item)
 
+
 class ValueOfNull:
+
     def __init__(self, val):
         self.val = val
 
@@ -732,6 +901,7 @@ class ValueOfNull:
 
 
 class Formatter:
+
     def __init__(self, fmt):
         self.fmt = fmt
 
@@ -741,13 +911,15 @@ class Formatter:
         except:
             return str(item)
 
+
 class PlainFormatter:
+
     def __init__(self, mode='vcf'):
         self.mode = mode
-    
+
     def mergeVariants(self, item):
         #
-        # This is UGLY code but it is not my fault, it is the vcf format's fault. :-( 
+        # This is UGLY code but it is not my fault, it is the vcf format's fault. :-(
         #
         # this is a special case for vcf. It is better to assign a special
         # adjuster but I put it here for backward compatibility of the .vcf
@@ -766,13 +938,14 @@ class PlainFormatter:
         # join each subitems
         uniq = [[x] for x in item[0].split('\t')]
         for x in item[1:]:
-            for idx,y in enumerate(x.split('\t')):
+            for idx, y in enumerate(x.split('\t')):
                 if idx >= len(uniq):
                     uniq.append([y])
                 elif y and y not in uniq[idx]:
                     uniq[idx].append(y)
         # we can only handle case 2 with 2 items
-        if len(uniq[1]) == 1 or len(uniq) != 5 or len(item) != 2 or len(uniq[0]) != 1 or len(uniq[3]) == 1:
+        if len(uniq[1]) == 1 or len(uniq) != 5 or len(item) != 2 or len(
+                uniq[0]) != 1 or len(uniq[3]) == 1:
             return '\t'.join([','.join(x) for x in uniq])
         else:
             # we have same chromosome, two position, two items, two ref, length 5
@@ -786,7 +959,7 @@ class PlainFormatter:
                         uniq[1][min_item],        # minimal pos
                         uniq[2][0],
                         ref,        # longer ref
-                        #  X  10000 TAC T  
+                        #  X  10000 TAC T
                         #  X  10001 A  T
                         (alt0 + ',' + ref[:int(uniq[1][1]) - min_pos] + alt1) if min_item == 0 \
                         else (ref[:int(uniq[1][0]) - min_pos] + alt0 + ',' + alt1)])
@@ -809,6 +982,7 @@ class PlainFormatter:
 
 
 class CSVFormatter:
+
     def __init__(self):
         pass
 
@@ -837,24 +1011,30 @@ class CSVFormatter:
                 return '"' + val + '"'
             return val
 
+
 rec_alleles = ['-', '-']
 
+
 class InfoFormatter:
+
     def __init__(self, name, ignore=''):
         '''Output value as $name=val'''
         self.name = name
         self.ignore = ignore
-    
+
     def __call__(self, item):
         return '' if item == self.ignore else '{}={}'.format(self.name, item)
 
+
 class FlagFormatter:
+
     def __init__(self, name):
         '''Output value as $name=val'''
         self.name = name
-    
+
     def __call__(self, item):
         return self.name if item else ''
+
 
 class GenoFormatter:
     # representation for missing value is style dependent,
@@ -870,7 +1050,7 @@ class GenoFormatter:
             # PED format seems to use ACTG, and 0 for missing.
             # see http://www.sph.umich.edu/csg/abecasis/Merlin/tour/input_files.html
             self.missing = '0'
-        elif style :
+        elif style:
             self.missing = ''
         self.base = base
         #
@@ -879,29 +1059,38 @@ class GenoFormatter:
             #   0, 1, 2, and (-1, -1)
             # as we imported from .vcf file.
             #
-            0: '0/0',
-            1: '0/1',
-            2: '1/1',
-            (-1,-1): '1/2',
+            0:
+                '0/0',
+            1:
+                '0/1',
+            2:
+                '1/1',
+            (-1, -1):
+                '1/2',
             #
             # if one of the two alternative variants is filtered out, we can have
             # a single -1 variant. Note that we cannot yet import partial missing
             # data.
-            -1: './1',
+            -1:
+                './1',
             #
             # when two or more samples are outputted, one sample might not have
-            # any genotype for a variant, or more than one variant. There can 
+            # any genotype for a variant, or more than one variant. There can
             # be more than one variant at a location though.
             #
-            None: '.',
-            (None, None): '.',
-            (None, None, None): '.',
-            # 
+            None:
+                '.',
+            (None, None):
+                '.',
+            (None, None, None):
+                '.',
+            #
             # Having two valid and complete genotypes for both variants is
             # as far as I can imagine, not possible. However, because it is
             # true that the variant is homogenous wildtype at both variants,
             # (0,0) is listed here.
-            (0,0): '0/0',
+            (0, 0):
+                '0/0',
             #
             #(0,1): '0/1',
             #(0,2): '2/2',
@@ -909,33 +1098,56 @@ class GenoFormatter:
             # However, if there are two variants, one sample can have 0, 1, 2, and
             # the None for another variant (because that variant exists in other
             # samples). Note that the second item is for another variant
-            (0, None): '0/0',
-            (None,0):  '0/0',
-            (1, None): '0/1',
-            (None, 1): '0/2',
-            (2,None):  '1/1', 
-            (None, 2): '2/2',
-            # the single -1 case 
-            (-1, None): './1',
-            (None, -1): './2',
+            (0, None):
+                '0/0',
+            (None, 0):
+                '0/0',
+            (1, None):
+                '0/1',
+            (None, 1):
+                '0/2',
+            (2, None):
+                '1/1',
+            (None, 2):
+                '2/2',
+            # the single -1 case
+            (-1, None):
+                './1',
+            (None, -1):
+                './2',
             #
             # the same goes to the case with three alternative alleles
-            (0, None, None): '0/0',
-            (None, 0, None): '0/0',
-            (None, None, 0): '0/0', 
-            (1, None, None): '0/1',
-            (None, 1, None): '0/2',
-            (None, None, 1): '0/3', 
-            (2, None, None): '1/1',
-            (None, 2, None): '2/2',
-            (None, None, 2): '3/3',
+            (0, None, None):
+                '0/0',
+            (None, 0, None):
+                '0/0',
+            (None, None, 0):
+                '0/0',
+            (1, None, None):
+                '0/1',
+            (None, 1, None):
+                '0/2',
+            (None, None, 1):
+                '0/3',
+            (2, None, None):
+                '1/1',
+            (None, 2, None):
+                '2/2',
+            (None, None, 2):
+                '3/3',
             # the -1 case is more complicated because there can be one or two -1
-            (-1, None, None): './1',
-            (None, -1, None): './2',
-            (None, None, -1): './3',
-            (-1, -1, None):   '1/2',
-            (-1, None, -1):   '1/3',
-            (None, -1, -1):   '2/3',
+            (-1, None, None):
+                './1',
+            (None, -1, None):
+                './2',
+            (None, None, -1):
+                './3',
+            (-1, -1, None):
+                '1/2',
+            (-1, None, -1):
+                '1/3',
+            (None, -1, -1):
+                '2/3',
         }
         #
         self.numeric_map = {
@@ -953,16 +1165,16 @@ class GenoFormatter:
             (None, None): None,
             (None, None, None): None,
             (None, None, None, None): None,
-            # 
-            (0,0): 0,
+            #
+            (0, 0): 0,
             #
             (0, None): 0,
-            (None,0):  0,
+            (None, 0): 0,
             (1, None): 1,
             (None, 1): 1,
-            (2,None):  2, 
+            (2, None): 2,
             (None, 2): 2,
-            # 
+            #
             (-1, None): 1,
             (None, -1): 1,
             #
@@ -979,9 +1191,9 @@ class GenoFormatter:
             (-1, None, None): 1,
             (None, -1, None): 1,
             (None, None, -1): 1,
-            (-1, -1, None):   2,
-            (-1, None, -1):   2,
-            (None, -1, -1):   2,
+            (-1, -1, None): 2,
+            (-1, None, -1): 2,
+            (None, -1, -1): 2,
         }
         #
         if style == 'genotype':
@@ -997,8 +1209,8 @@ class GenoFormatter:
 
     def fmt_genotype(self, item):
         global rec_alleles
-        if type(item)==float and item is not None:
-            item=int(item) 
+        if type(item) == float and item is not None:
+            item = int(item)
         if type(item) == int:
             # single genotype case
             ref = self.null if rec_alleles[0] == '-' else rec_alleles[0]
@@ -1011,16 +1223,21 @@ class GenoFormatter:
                 return ref + self.sep + alt
             elif item == 2:
                 return alt + self.sep + alt
-            else: 
+            else:
                 return alt + self.sep + self.null
         elif type(item) == tuple:
             # Two aleternative alleles
             if item == (-1, -1):
-                return (self.null if rec_alleles[1][0] == '-' else rec_alleles[1][0]) + self.sep + (self.null if rec_alleles[1][1] == '-' else rec_alleles[1][1])
+                return (self.null if rec_alleles[1][0] == '-' else
+                        rec_alleles[1][0]) + self.sep + (
+                            self.null
+                            if rec_alleles[1][1] == '-' else rec_alleles[1][1])
             elif len(item) > 1 and item.count(item[0]) == len(item):
                 # assume duplicate entry caused by annotation database
-                ref = self.null if rec_alleles[0][0] == '-' else rec_alleles[0][0]
-                alt = self.null if rec_alleles[1][0] == '-' else rec_alleles[1][0]
+                ref = self.null if rec_alleles[0][0] == '-' else rec_alleles[0][
+                    0]
+                alt = self.null if rec_alleles[1][0] == '-' else rec_alleles[1][
+                    0]
                 if item[0] == 1:
                     return ref + self.sep + alt
                 elif item[0] == 2:
@@ -1032,7 +1249,9 @@ class GenoFormatter:
             elif all([x is None for x in item]):
                 return self.missing + self.sep + self.missing
             else:
-                raise ValueError('Failed to export genotype {} with ref {} and alt {}'.format(item, rec_alleles[0], rec_alleles[1]))
+                raise ValueError(
+                    'Failed to export genotype {} with ref {} and alt {}'
+                    .format(item, rec_alleles[0], rec_alleles[1]))
         elif item is None:
             return self.missing + self.sep + self.missing
         else:
@@ -1040,8 +1259,8 @@ class GenoFormatter:
 
     def fmt_plink(self, item):
         global rec_alleles
-        if type(item)==float and item is not None:
-            item=int(item) 
+        if type(item) == float and item is not None:
+            item = int(item)
         if type(item) == int:
             # single genotype case
             ref = self.null if rec_alleles[0] == '-' else rec_alleles[0]
@@ -1058,12 +1277,12 @@ class GenoFormatter:
                 return self.missing + self.sep + self.missing
         # multi-allele case, ignore
         elif type(item) == tuple:
-            raise ValueError('plink format cannot handle multiple alleles {}'.format(item))
+            raise ValueError(
+                'plink format cannot handle multiple alleles {}'.format(item))
         elif item is None:
             return self.missing + self.sep + self.missing
         else:
             raise ValueError('Failed to export genotype {}'.format(item))
-
 
     def fmt_numeric(self, item):
         try:
@@ -1073,22 +1292,30 @@ class GenoFormatter:
             else:
                 return str(cnt + self.base)
         except Exception as e:
-            raise ValueError('Failed to export genotype {} in numeric style: {}'.format(item, e))
+            raise ValueError(
+                'Failed to export genotype {} in numeric style: {}'.format(
+                    item, e))
 
     def fmt_vcf(self, item):
         try:
             return self.vcf_map[item]
         except:
-            raise ValueError('Failed to export genotype {} in vcf style with ref {} and alt {}.'.format(item, rec_alleles[0], rec_alleles[1]))
+            raise ValueError(
+                'Failed to export genotype {} in vcf style with ref {} and alt {}.'
+                .format(item, rec_alleles[0], rec_alleles[1]))
+
 
 class Constant:
+
     def __init__(self, val=''):
         self.val = val
 
     def __call__(self, item):
         return self.val
 
+
 class SequentialCollector:
+
     def __init__(self, extractors):
         '''Define an extractor that calls a list of extractors. The string extracted from
         the first extractor will be passed to the second, and so on.'''
@@ -1111,11 +1338,10 @@ class SequentialCollector:
         return item
 
 
-
-
 class BatchWriter:
     '''write text to file in batches (#lines)'''
-    def __init__(self, fn, batch = 1000):
+
+    def __init__(self, fn, batch=1000):
         self.batch = batch
         if os.path.exists(fn):
             os.remove(fn)
@@ -1136,11 +1362,12 @@ class BatchWriter:
                 self.counter = 0
                 self.swap = ''
 
+
 class PlinkBinaryToVariants:
     """
     Class to write a PLINK BED format genotype dataset (.bed, .fam and .bim files)
-    to vtools compatible variant format 
-    
+    to vtools compatible variant format
+
     c.f., http://pngu.mgh.harvard.edu/~purcell/plink/binary.shtml
 
     @param    dataset: path + prefix for a .bed, .fam and .bim without extensions
@@ -1169,7 +1396,8 @@ class PlinkBinaryToVariants:
 
     self.determineMajorAllele() Attempts to resolve this issue
     """
-    def __init__(self, dataset, build, chrom_namemap = {}):
+
+    def __init__(self, dataset, build, chrom_namemap={}):
         # check file path
         for ext in ['.fam', '.bed', '.bim']:
             if not os.path.exists(dataset + ext):
@@ -1178,7 +1406,7 @@ class PlinkBinaryToVariants:
         self.build = build
         self.cur = PlinkFile(self.dataset)
         # a list of sample names (sample ID's in .fam file)'''
-        self.samples =  [x.iid for x in self.cur.get_samples()]
+        self.samples = [x.iid for x in self.cur.get_samples()]
         if None in self.samples:
             raise ValueError("Cannot read sample ID from malformed '{0}.fam' file.".\
                              format(self.dataset))
@@ -1186,10 +1414,7 @@ class PlinkBinaryToVariants:
         self.variants = it.chain(self.cur.get_loci())
         # reference genome object and ATCG dictionary
         self.hgref = RefGenome(build)
-        self.CSTRANDS = {'A':'T',
-                         'G':'C',
-                         'T':'A',
-                         'C':'G'}
+        self.CSTRANDS = {'A': 'T', 'G': 'C', 'T': 'A', 'C': 'G'}
         # status 0 for not flip, 1 for flip, -1 for bad match
         self.status = 0
         # chromosome naming convention map
@@ -1199,8 +1424,9 @@ class PlinkBinaryToVariants:
         self.data_writer = None
 
     def initWriter(self, ofile):
-        self.variant_writer = BatchWriter(self.dataset + ".{0}adjusted".format(self.build), batch = 1000)
-        self.data_writer = BatchWriter(ofile, batch = 5)
+        self.variant_writer = BatchWriter(
+            self.dataset + ".{0}adjusted".format(self.build), batch=1000)
+        self.data_writer = BatchWriter(ofile, batch=5)
 
     def getValidatedLocusGenotype(self, chrom, pos, allele1, allele2, geno_cur):
         '''Use cgatools to obtain validated genotype for given locus.
@@ -1218,14 +1444,17 @@ class PlinkBinaryToVariants:
             chrom = self.cmap[chrom]
         try:
             ref = self.hgref.getBase(chrom, pos)
-        except Exception as e:
-            env.logger.warning('Cannot find genomic coordinate {0}:{1} in reference genome {2}. '
-                                'Input variant is ignored'.format(chrom, pos, self.build))
+        except Exception:
+            env.logger.warning(
+                'Cannot find genomic coordinate {0}:{1} in reference genome {2}. '
+                'Input variant is ignored'.format(chrom, pos, self.build))
             self.status = -1
             if self.variant_writer:
-                self.variant_writer.write("{}\t{}\t{}\t{}\n".format(chrom, pos, 0, 0))
+                self.variant_writer.write("{}\t{}\t{}\t{}\n".format(
+                    chrom, pos, 0, 0))
             return None
-        self.status, strand, allele1, allele2 = self._matchref(ref, allele1, allele2)
+        self.status, strand, allele1, allele2 = self._matchref(
+            ref, allele1, allele2)
         if self.status < 0:
             if self.status == -2:
                 env.logger.warning('All genotypes for variant "{0}:{1}" are missing'.\
@@ -1235,39 +1464,45 @@ class PlinkBinaryToVariants:
                                    'to match reference genome {4}/(A,T,C,G)'.\
                                     format(chrom, pos, allele1, allele2, ref))
             if self.variant_writer:
-                self.variant_writer.write("{}\t{}\t{}\t{}\n".format(chrom, pos, 0, 0))
+                self.variant_writer.write("{}\t{}\t{}\t{}\n".format(
+                    chrom, pos, 0, 0))
             return None
         elif self.status == 0:
             if strand:
-                env.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
+                env.logger.debug('Use alternative strand for {0}:{1}'.format(
+                    chrom, pos))
             if self.variant_writer:
-                self.variant_writer.write("{}\t{}\t{}\t{}\n".format(chrom, pos, allele1, allele2))
-            return ','.join([chrom, str(pos), allele1, allele2]) + ',' + str(geno_cur)
+                self.variant_writer.write("{}\t{}\t{}\t{}\n".format(
+                    chrom, pos, allele1, allele2))
+            return ','.join([chrom, str(pos), allele1, allele2
+                            ]) + ',' + str(geno_cur)
         else:
             # have to flip the genotypes coding
             if strand:
-                env.logger.debug('Use alternative strand for {0}:{1}'.format(chrom, pos))
+                env.logger.debug('Use alternative strand for {0}:{1}'.format(
+                    chrom, pos))
             # env.logger.debug('Allele coding flipped for {0}:{1}'.format(chrom, pos))
             # Very time consuming compare to not flipping the genotype codes
             if self.variant_writer:
-                self.variant_writer.write("{}\t{}\t{}\t{}\n".format(chrom, pos, allele2, allele1))
+                self.variant_writer.write("{}\t{}\t{}\t{}\n".format(
+                    chrom, pos, allele2, allele1))
             return ','.join([chrom, str(pos), allele2, allele1]) + ',' + \
                 ','.join([str(x) if x == 3 or x == 'E' else str(2 - x) for x in geno_cur])
-            
+
     def getLociCounts(self):
         # FIXME: not efficient
         return len(self.cur.get_loci())
-        
+
     def getHeader(self):
         '''a line of headers for the output text file'''
-        return ','.join(
-            ['#chr', 'pos', 'ref', 'alt'] + self.samples
-            )
-        
-    def getLine(self, viter = None, giter = None, which_major = 1):
+        return ','.join(['#chr', 'pos', 'ref', 'alt'] + self.samples)
+
+    def getLine(self, viter=None, giter=None, which_major=1):
         '''a line of validated genotypes for a locus'''
-        if viter is None: viter = self.variants
-        if giter is None: giter = self.cur
+        if viter is None:
+            viter = self.variants
+        if giter is None:
+            giter = self.cur
         try:
             locus = next(viter)
             genotypes = next(giter)
@@ -1276,18 +1511,19 @@ class PlinkBinaryToVariants:
             return False, None
         except Exception as e:
             env.logger.error('Failed to retrieve locus {0}:{1} '
-                                '(plinkio error "{2}")'.format(locus.chromosome, locus.bp_position, e))
+                             '(plinkio error "{2}")'.format(
+                                 locus.chromosome, locus.bp_position, e))
             return True, None
         if which_major == 1:
             # allele 1 is the major allele
-            return True, self.getValidatedLocusGenotype(str(locus.chromosome), int(locus.bp_position),
-                                                        locus.allele1.upper(), locus.allele2.upper(),
-                                                        genotypes)
+            return True, self.getValidatedLocusGenotype(
+                str(locus.chromosome), int(locus.bp_position),
+                locus.allele1.upper(), locus.allele2.upper(), genotypes)
         else:
             # allele 2 is the major allele
-            return True, self.getValidatedLocusGenotype(str(locus.chromosome), int(locus.bp_position),
-                                                        locus.allele2.upper(), locus.allele1.upper(),
-                                                        genotypes)
+            return True, self.getValidatedLocusGenotype(
+                str(locus.chromosome), int(locus.bp_position),
+                locus.allele2.upper(), locus.allele1.upper(), genotypes)
 
     def determineMajorAllele(self, n=1000):
         '''The logic here is that for the first n loci we
@@ -1305,7 +1541,7 @@ class PlinkBinaryToVariants:
         while i < n:
             self.status = 0
             # self.status will be updated
-            flag, line = self.getLine(viter = variants, giter = cur)
+            flag, line = self.getLine(viter=variants, giter=cur)
             if not flag:
                 # end of line
                 n = i
@@ -1332,8 +1568,7 @@ class PlinkBinaryToVariants:
             # allele 2 seems to be major allele
             return 2
         else:
-            return 1 
-        
+            return 1
 
     def _matchref(self, ref, major, minor):
         '''try best to match reference allele
@@ -1350,7 +1585,8 @@ class PlinkBinaryToVariants:
         in data. Such loci is not considered a variant site and will be ignored
         '''
         # monomorphic, missing, or invalid coding
-        if major not in ['A','T','C','G','0'] or minor not in ['A','T','C','G','0']:
+        if major not in ['A', 'T', 'C', 'G', '0'
+                        ] or minor not in ['A', 'T', 'C', 'G', '0']:
             return -1, 0, major, minor
         if major == '0' and minor == '0':
             return -2, 0, major, minor
@@ -1375,14 +1611,17 @@ class PlinkBinaryToVariants:
                 status = 0 if ref == major else 1
         return status, strand, major, minor
 
+
 #
 #
 # Preprocessors of input files
-# They will convert input files to intermediate variant based text files for easy import 
+# They will convert input files to intermediate variant based text files for easy import
 #
 #
 
+
 class Preprocessor:
+
     def __init__(self):
         '''Base preprocessor class that converts $files
         and write intermediate output files to $outdir/file.format'''
@@ -1391,22 +1630,26 @@ class Preprocessor:
     def convert(self, files, output_files):
         for item, ofile in zip(files, output_files):
             env.logger.info('Convert {} to {}'.format(item, ofile))
-        
+
+
 class Dos2Unix(Preprocessor):
+
     def __init__(self):
         Preprocessor.__init__(self)
 
     def convert(self, files, output_files):
         for ifile, ofile in zip(files, output_files):
-            env.logger.info('Converting {} with \r newline charater to unix format.'
-                .format(ifile))
+            env.logger.info(
+                'Converting {} with \r newline charater to unix format.'.format(
+                    ifile))
             with open(ifile, 'rU') as input, open(ofile, 'w') as output:
                 for line in input:
                     output.write(line)
 
 
 class PlinkConverter(Preprocessor):
-    def __init__(self, build, chrom_namemap = {}):
+
+    def __init__(self, build, chrom_namemap={}):
         Preprocessor.__init__(self)
         self.build = build
         self.cmap = chrom_namemap
@@ -1414,8 +1657,8 @@ class PlinkConverter(Preprocessor):
     def convert(self, files, output_files):
         for item, ofile in zip(files, output_files):
             if os.path.exists(item + ".bed"):
-                self.decode_plink(PlinkBinaryToVariants(item, self.build, self.cmap),
-                                  ofile)
+                self.decode_plink(
+                    PlinkBinaryToVariants(item, self.build, self.cmap), ofile)
             else:
                 import glob
                 files = '/'.join([x for x in glob.glob(item + '*')])
@@ -1424,19 +1667,21 @@ class PlinkConverter(Preprocessor):
                     raise ValueError("Unsupported input file '{}' (supported file types are {})".\
                                          format(files, ';'.join(supported)))
                 else:
-                    raise ValueError("Cannot find input files '{}'".format(item + '*'))
-            
-    def decode_plink(self, p2v, ofile, n = 1000):
+                    raise ValueError(
+                        "Cannot find input files '{}'".format(item + '*'))
+
+    def decode_plink(self, p2v, ofile, n=1000):
         '''decode plink data from p2v object and output to ofile'''
         env.logger.info("Determining major/minor allele from data")
         # check major allele
         which_major = p2v.determineMajorAllele(n)
         # raise on bad match
         if which_major == -9:
-            raise ValueError ('Invalid dataset {0}: too many unmatched loci to reference genome {1}. '
-                              'Perhaps you specified the wrong build, or have too many unsupported allele '
-                              'types (not A/T/C/G, e.g, indels I/D) in BED file which you have to remove before '
-                              'import'.format(p2v.dataset, p2v.build))
+            raise ValueError(
+                'Invalid dataset {0}: too many unmatched loci to reference genome {1}. '
+                'Perhaps you specified the wrong build, or have too many unsupported allele '
+                'types (not A/T/C/G, e.g, indels I/D) in BED file which you have to remove before '
+                'import'.format(p2v.dataset, p2v.build))
         env.logger.debug("allele{} is major allele".format(which_major))
         # output
         nloci = p2v.getLociCounts()
@@ -1447,7 +1692,7 @@ class PlinkConverter(Preprocessor):
         p2v.variant_writer.write("#chr\tpos\tref\talt\n")
         count = 0
         while True:
-            flag, line = p2v.getLine(which_major = which_major)
+            flag, line = p2v.getLine(which_major=which_major)
             count += 1
             if not flag:
                 prog.done()

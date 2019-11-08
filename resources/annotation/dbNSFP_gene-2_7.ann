@@ -9,7 +9,7 @@
 #vtools use HGNC --linked_by refGene.name2
 #vtools use dbNSFP_gene --linked_by HGNC.name
 #
- 
+
 [linked fields]
 *=Gene_name
 
@@ -252,4 +252,3 @@ index=38
 type=VARCHAR(255)
 adj=Nullify('.')
 comment=Phenotype tag for the homolog zebrafish gene from ZFIN
-

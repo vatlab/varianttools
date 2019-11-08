@@ -64,7 +64,7 @@ static PyObject* module_connect(PyObject* self, PyObject* args, PyObject*
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|diOiOi", kwlist,
                                      &database, &timeout, &detect_types, &isolation_level, &check_same_thread, &factory, &cached_statements))
     {
-        return NULL; 
+        return NULL;
     }
 
     if (factory == NULL) {
@@ -93,7 +93,7 @@ static PyObject* module_complete(PyObject* self, PyObject* args, PyObject*
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist, &statement))
     {
-        return NULL; 
+        return NULL;
     }
 
     if (sqlite3_complete(statement)) {
@@ -122,7 +122,7 @@ static PyObject* module_enable_shared_cache(PyObject* self, PyObject* args, PyOb
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "i", kwlist, &do_enable))
     {
-        return NULL; 
+        return NULL;
     }
 
     rc = sqlite3_enable_shared_cache(do_enable);
@@ -434,7 +434,7 @@ PyMODINIT_FUNC init_vt_sqlite3(void)
 
     /* Original comment from _bsddb.c in the Python core. This is also still
      * needed nowadays for Python 2.3/2.4.
-     * 
+     *
      * PyEval_InitThreads is called here due to a quirk in python 1.5
      * - 2.2.1 (at least) according to Russell Williamson <merel@wt.net>:
      * The global interpreter lock is not initialized until the first

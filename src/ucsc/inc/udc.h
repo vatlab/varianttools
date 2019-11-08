@@ -1,8 +1,8 @@
 /* udc - url data cache - a caching system that keeps blocks of data fetched from URLs in
- * sparse local files for quick use the next time the data is needed. 
+ * sparse local files for quick use the next time the data is needed.
  *
  * This cache is enormously simplified by there being no local _write_ to the cache,
- * just reads.  
+ * just reads.
  *
  * The overall strategy of the implementation is to have a root cache directory
  * with a subdir for each file being cached.  The directory for a single cached file
@@ -16,7 +16,7 @@
  * URL, with some necessary escaping, is used to define the rest of the cache directory
  * structure, with each '/' after the protocol line translating into another directory
  * level.
- *    
+ *
  * The bitmap file contains time stamp and size data as well as an array with one bit
  * for each block of the file that has been fetched.  Currently the block size is 8K. */
 
@@ -103,7 +103,7 @@ bits64 udcCleanup(char *cacheDir, double maxDays, boolean testOnly);
 void udcParseUrlFull(char *url, char **retProtocol, char **retAfterProtocol, char **retColon,
 		     char **retAuth);
 /* Parse the URL into components that udc treats separately.
- * *retAfterProtocol is Q-encoded to keep special chars out of filenames.  
+ * *retAfterProtocol is Q-encoded to keep special chars out of filenames.
  * Free all *ret's except *retColon when done. */
 
 char *udcDefaultDir();

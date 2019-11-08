@@ -7,7 +7,7 @@
 [pipeline description]
 description=Re-implementation of some of the simulations performed by SRV
    (Peng & Liu, Simulating Sequences of the Human Genome with Rare Variants,
-   2011). 	
+   2011).
 
 ex1_neutral_description=Implementation of the neutral SRV simulation in
     the first example of Peng & Liu 2011.
@@ -26,7 +26,7 @@ regions_comment=One or more chromosome regions (separated by ',') in the format 
   annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947).
   Please visit http://varianttools.sourceforge.net/Simulation for detailed
   description of this parameter.
-  
+
 mu=1.8e-8
 mu_comment=Mutation rate for the srv model.
 
@@ -54,7 +54,7 @@ selCoef_comment=Coefficient that should be passed as a list of numbers with numb
     h=0.5, p=0.0186, a=0.0001, lower=0.0001, upper=0.1) for bounded_gamma, and
 	(k=0.562341, theta=0.01, h=0.5, p=0, a=0, lower=0.00001, upper=0.1) for
 	trimmed_gamma. Other sets of paramters could be gamma(k=0.184, theta=0.160*2, h=0.5)
-	for African population (Boyko et al, 2008), and gamma(0.206, 0.146*2) for 
+	for African population (Boyko et al, 2008), and gamma(0.206, 0.146*2) for
 	European population (Boyko et al, 2008, gamma3 for srv).
 
 scale=10
@@ -101,7 +101,7 @@ action=EvolvePopulation(
 			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
         ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
      ]))
-comment=Evolve the population with a SNP mutator, without recombination and natural selection. 
+comment=Evolve the population with a SNP mutator, without recombination and natural selection.
 
 [ex1_neutral_50]
 action=OutputPopulationStatistics(
@@ -146,7 +146,7 @@ action=EvolvePopulation(
 			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
         ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
      ]))
-comment=Evolve the population with a SNP mutator, without recombination and natural selection. 
+comment=Evolve the population with a SNP mutator, without recombination and natural selection.
 
 [ex1_with_selection_50]
 action=OutputPopulationStatistics(
@@ -181,12 +181,10 @@ action=EvolvePopulation(
 			G=[70000 / %(scale)s, 71000 / %(scale)s], NG=[7900 / %(scale)s, 8100 / %(scale)s]),
         ExponentialGrowthModel(T=370 / %(scale)s, NT=900000 / %(scale)s)
      ]))
-comment=Evolve the population with a SNP mutator, without recombination and natural selection. 
+comment=Evolve the population with a SNP mutator, without recombination and natural selection.
 
 [srv_50]
 action=OutputPopulationStatistics(
 	mut_count=['srv_freq_spec_${seed}.txt', 700],
 	)
 comment=Get allele frequency spectrum in a sample of 700 individuals.
-
-

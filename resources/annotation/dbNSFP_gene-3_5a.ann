@@ -575,4 +575,3 @@ index=80
 type=VARCHAR(255) COLLATE NOCASE
 adj=Nullify('.')
 comment=Phenotype tag for the homolog zebrafish gene from ZFIN
-

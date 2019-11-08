@@ -15,7 +15,7 @@ NUMBER_OF_PROCESSES=24
 #LSB_HOSTS has the name of all the nodes running the jobs.
 NODE_LIST=($LSB_HOSTS)
 
-#The main program is running on the node with $HOSTNAME, the rest of nodes are saved into $WORKDER_NODES and written into hostlist.txt. 
+#The main program is running on the node with $HOSTNAME, the rest of nodes are saved into $WORKDER_NODES and written into hostlist.txt.
 WORKER_NODES=()
 for node in "${NODE_LIST[@]}";
 do
@@ -39,5 +39,5 @@ done
 #Get the path for mpiexec
 MPIEXECPATH=$(which mpiexec)
 
-#The IP address for the main node $ZEROMQIP and $PROJECTFOLDER are needed for the woker script to communicate. 
+#The IP address for the main node $ZEROMQIP and $PROJECTFOLDER are needed for the woker script to communicate.
 $MPIEXECPATH -d -x PATH  -H $HOSTNAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -np $NUMBER_OF_PROCESSES  worker_run

@@ -3,9 +3,9 @@
  * makes use of this module and the bPlusTree module - rather than this module directly.
  * This module works with chromosomes mapped to small integers rather than chromosomes
  * as strings, saving space and speeding things up in the process, but requiring the
- * separate bPlusTree to map the names to IDs. 
+ * separate bPlusTree to map the names to IDs.
  *   This module implements a one dimensional R-tree index treating the chromosome ID
- * as the most significant part of a two-part key, and the base position as the least 
+ * as the most significant part of a two-part key, and the base position as the least
  * significant part of the key.  */
 
 #ifndef CIRTREE_H
@@ -42,7 +42,7 @@ struct cirTreeFile *cirTreeFileAttach(char *fileName, struct udcFile *udc);
 void cirTreeFileDetach(struct cirTreeFile **pCrt);
 /* Detach and free up cirTree file opened with cirTreeFileAttach. */
 
-struct fileOffsetSize *cirTreeFindOverlappingBlocks(struct cirTreeFile *crf, 
+struct fileOffsetSize *cirTreeFindOverlappingBlocks(struct cirTreeFile *crf,
 	bits32 chromIx, bits32 start, bits32 end);
 /* Return list of file blocks that between them contain all items that overlap
  * start/end on chromIx.  Also there will be likely some non-overlapping items
@@ -57,11 +57,11 @@ struct cirTreeRange
     };
 
 void cirTreeFileBulkIndexToOpenFile(
-	void *itemArray, int itemSize, bits64 itemCount, 
+	void *itemArray, int itemSize, bits64 itemCount,
 	bits32 blockSize, bits32 itemsPerSlot,
 	void *context,
 	struct cirTreeRange (*fetchKey)(const void *va, void *context),
-	bits64 (*fetchOffset)(const void *va, void *context), 
+	bits64 (*fetchOffset)(const void *va, void *context),
 	bits64 endFileOffset, FILE *f);
 /* Create a r tree index from a sorted array, writing output starting at current position
  * of an already open file.  See cirTreeFileCreate for explanation of parameters. */

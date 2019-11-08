@@ -2773,7 +2773,7 @@ cdef class VCFCallDataParserBase:
         else:
             field = 'calldata/' + str(self.key, 'ascii')
         values = self.values[:limit]
-       
+
         if self.number == 1:
             values = values.squeeze(axis=2)
 
@@ -3024,7 +3024,7 @@ cdef int vcf_genotype_parse(InputStreamBase stream,
 
         if stream.c == SLASH or stream.c == PIPE:
             allele1=vcf_genotype_check(context, value_index)
-          
+
             # value_index += 1
             CharVector_clear(&context.temp)
 
@@ -3087,7 +3087,7 @@ cdef int vcf_genotype_store(VCFContext context,
 
     # attempt to parse allele
     parsed = vcf_strtol(&context.temp, context, &allele)
-    
+
     # store value
     if parsed > 0:
         memory[context.chunk_variant_index, context.sample_output_index, value_index] = allele

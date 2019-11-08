@@ -93,7 +93,7 @@ namespace cgatools { namespace util {
             for(size_t ii=0; ii<exceptions_.size(); ii++)
             {
                 size_t strSize = exceptions_[ii].first.length();
-                if (size_t(last-first) == strSize && 
+                if (size_t(last-first) == strSize &&
                     0 == std::strncmp(first, exceptions_[ii].first.c_str(), strSize))
                 {
                     *val_ = exceptions_[ii].second;

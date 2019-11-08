@@ -55,8 +55,8 @@ comment=rs number
 # input ref allele (4), all1(5), all2(6), and genotype from 8, 10, 12
 index=4,5,6,8::2
 type=INT
-# for SNV: 
-#     ref A,   Genotype=AA, AT, TT has GT=0, 1, 2 
+# for SNV:
+#     ref A,   Genotype=AA, AT, TT has GT=0, 1, 2
 #     ==> GT = 2 - # of reference
 #
 # for insertion:
@@ -83,4 +83,3 @@ comment=Genotype as number of alternative allele
 index=9::2
 type=INT
 comment=Lod score
-

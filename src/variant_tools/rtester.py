@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 #
-# $File: rtester.py $
-# $LastChangedDate: 2012-06-05 12:31:19 -0500 (Tue, 05 Jun 2012) $
-# $Rev: 1179 $
-#
 # This file is part of variant_tools, a software application to annotate,
 # summarize, and filter variants for next-gen sequencing ananlysis.
-# Please visit http://varianttools.sourceforge.net for details.
+# Please visit https://github.com/vatlab/varianttools for details.
 #
-# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org) and Gao Wang (wangow@gmail.com)
+# Copyright (C) 2011 - 2020 Bo Peng (bpeng@mdanderson.org) and Gao Wang (wangow@gmail.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,18 +19,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-# Copyright Gao Wang 2012
+import argparse
+import io
 import os
 import re
+import signal
 import time
-import argparse
-from .utils import env, downloadFile, runCommand, mkdir_p, pairwise, make_unique, flatten
-from .project import Field
-from .tester import freq, ExternTest
-from configparser import SafeConfigParser as RCP
 from collections import OrderedDict
+from configparser import SafeConfigParser as RCP
 
-import io
+from .project import Field
+from .tester import ExternTest, freq
+from .utils import (downloadFile, env, flatten, make_unique, mkdir_p, pairwise,
+                    runCommand)
 
 StringType = str
 _mybytes = lambda s:bytes(s, 'utf8') #'ascii')
@@ -122,7 +119,6 @@ def Str4R(obj, method = 'c'):
             return str_func[tp](obj)
     return OtherStr(obj)
 
-import signal
 class TimeoutException(Exception):
     pass
 

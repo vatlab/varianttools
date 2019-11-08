@@ -170,9 +170,9 @@ namespace cgatools { namespace util {
 
     //! Parse a user-token-specified separated string
     //! The function can be used if the input string format is not strictly defined
-    void parseTokenString(std::string const & inputString, char const * sep, 
-        std::vector<std::string> & tokens, 
-        bool trimWhitespace = false, 
+    void parseTokenString(std::string const & inputString, char const * sep,
+        std::vector<std::string> & tokens,
+        bool trimWhitespace = false,
         bool compressEmpty = false);
 
 } } // cgatools::util

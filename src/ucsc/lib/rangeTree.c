@@ -3,7 +3,7 @@
  * based on the self-balancing rbTree code.  Use it in
  * place of a bitmap when the total number of ranges
  * is significantly smaller than the number of bits would
- * be. 
+ * be.
  * Beware the several static/global variables which can be
  * changed by various function calls. */
 
@@ -31,7 +31,7 @@ else
 
 
 static void *sumInt(void *a, void *b)
-/* Local function used by rangeTreeAddValCount, which sums two ints a and b, 
+/* Local function used by rangeTreeAddValCount, which sums two ints a and b,
  * referenced by void pointers, returning the result in a */
 {
 int *i = a, *j = b;
@@ -41,9 +41,9 @@ return a;
 
 
 struct range *rangeTreeAddVal(struct rbTree *tree, int start, int end, void *val, void *(*mergeVals)(void *existingVal, void *newVal) )
-/* Add range to tree, merging with existing ranges if need be. 
+/* Add range to tree, merging with existing ranges if need be.
  * If this is a new range, set the value to this val.
- * If there are existing items for this range, and if mergeVals function is not null, 
+ * If there are existing items for this range, and if mergeVals function is not null,
  * apply mergeVals to the existing values and this new val, storing the result as the val
  * for this range (see rangeTreeAddValCount() and rangeTreeAddValList() below for examples). */
 {
@@ -72,8 +72,8 @@ struct range *rangeTreeAdd(struct rbTree *tree, int start, int end)
 
 
 struct range *rangeTreeAddValCount(struct rbTree *tree, int start, int end)
-/* Add range to tree, merging with existing ranges if need be. 
- * Set range val to count of elements in the range. Counts are pointers to 
+/* Add range to tree, merging with existing ranges if need be.
+ * Set range val to count of elements in the range. Counts are pointers to
  * ints allocated in tree localmem */
 {
     int *a = lmAlloc(tree->lm, sizeof(*a)); /* keep the count in localmem */
@@ -83,7 +83,7 @@ struct range *rangeTreeAddValCount(struct rbTree *tree, int start, int end)
 
 
 struct range *rangeTreeAddValList(struct rbTree *tree, int start, int end, void *val)
-/* Add range to tree, merging with existing ranges if need be. 
+/* Add range to tree, merging with existing ranges if need be.
  * Add val to the list of values (if any) in each range.
  * val must be valid argument to slCat (ie, be a struct with a 'next' pointer as its first member) */
 {
@@ -137,8 +137,8 @@ else
         existing->val = (char *)(existing->val) + 1;
 	}
     else
-    /* In general case fetch list of regions that overlap us. 
-       Remaining cases to handle are: 
+    /* In general case fetch list of regions that overlap us.
+       Remaining cases to handle are:
 	     r >> e     rrrrrrrrrrrrrrrrrrrr
 			     eeeeeeeeee
 
@@ -221,7 +221,7 @@ slAddHead(&rangeList, r);
 }
 
 struct range *rangeTreeList(struct rbTree *tree)
-/* Return list of all ranges in tree in order.  Not thread safe. 
+/* Return list of all ranges in tree in order.  Not thread safe.
  * No need to free this when done, memory is local to tree. */
 {
 rangeList = NULL;
@@ -231,7 +231,7 @@ return rangeList;
 }
 
 struct range *rangeTreeFindEnclosing(struct rbTree *tree, int start, int end)
-/* Find item in range tree that encloses range between start and end 
+/* Find item in range tree that encloses range between start and end
  * if there is any such item. */
 {
 struct range tempR, *r;
@@ -266,7 +266,7 @@ struct range *rangeTreeMaxOverlapping(struct rbTree *tree, int start, int end)
  * by rangeTreeAllOverlapping. */
 {
 struct range *range, *best = NULL;
-int bestOverlap = 0; 
+int bestOverlap = 0;
 for (range  = rangeTreeAllOverlapping(tree, start, end); range != NULL; range = range->next)
     {
     int overlap = rangeIntersection(range->start, range->end, start, end);
@@ -289,14 +289,14 @@ static void addOverlap(void *v)
 /* Callback to add item to range list. */
 {
 struct range *r = v;
-totalOverlap += positiveRangeIntersection(r->start, r->end, 
+totalOverlap += positiveRangeIntersection(r->start, r->end,
 	overlapStart, overlapEnd);
 }
 
 int rangeTreeOverlapSize(struct rbTree *tree, int start, int end)
 /* Return the total size of intersection between interval
  * from start to end, and items in range tree. Sadly not
- * thread-safe. 
+ * thread-safe.
  * On 32 bit machines be careful not to overflow
  * range of start, end or total size return value. */
 {
@@ -310,7 +310,7 @@ return totalOverlap;
 
 int rangeTreeOverlapTotalSize(struct rbTree *tree)
 /* Return the total size of all ranges in range tree.
- * Sadly not thread-safe. 
+ * Sadly not thread-safe.
  * On 32 bit machines be careful not to overflow
  * range of start, end or total size return value. */
 {
@@ -343,9 +343,8 @@ return rbTreeNew(rangeCmp);
 
 struct rbTree *rangeTreeNewDetailed(struct lm *lm, struct rbTreeNode *stack[128])
 /* Allocate rangeTree on an existing local memory & stack.  This is for cases
- * where you want a lot of trees, and don't want the overhead for each one. 
+ * where you want a lot of trees, and don't want the overhead for each one.
  * Note, to clean these up, just do freez(&rbTree) rather than rbFreeTree(&rbTree). */
 {
 return rbTreeNewDetailed(rangeCmp, lm, stack);
 }
-

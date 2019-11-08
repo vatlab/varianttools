@@ -28,13 +28,18 @@ import unittest
 from testUtils import ProcessTestCase
 import os
 
+
 class TestAvgDepth(ProcessTestCase):
+
     def setUp(self):
         'Create a project'
         ProcessTestCase.setUp(self)
-        self.runCmd('vtools import vcf/CEU.vcf.gz --build hg18 --geno_info DP_geno')
-        self.runCmd('vtools update variant --from_stat "num=#(alt)" "depth=avg(DP_geno)"')
-        
+        self.runCmd(
+            'vtools import vcf/CEU.vcf.gz --build hg18 --geno_info DP_geno')
+        self.runCmd(
+            'vtools update variant --from_stat "num=#(alt)" "depth=avg(DP_geno)"'
+        )
+
     def testAvgDepth(self):
         'Test command vtools_report avg_depth'
         self.assertFail('vtools_report avg_depth')
@@ -47,8 +52,11 @@ class TestAvgDepth(ProcessTestCase):
         self.assertSucc('vtools_report avg_depth variant -d depth -n num')
         # error: argument -d/--depth_field is required
         self.assertFail('vtools_report avg_depth variant -n num --group_by num')
-        self.assertSucc('vtools_report avg_depth variant -n num -d depth --group_by num')
-        self.assertSucc('vtools_report avg_depth variant -n num -d depth --group_by depth')
+        self.assertSucc(
+            'vtools_report avg_depth variant -n num -d depth --group_by num')
+        self.assertSucc(
+            'vtools_report avg_depth variant -n num -d depth --group_by depth')
+
 
 if __name__ == '__main__':
     unittest.main()

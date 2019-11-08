@@ -1,4 +1,4 @@
-/* Hash - a simple hash table that provides name/value pairs. 
+/* Hash - a simple hash table that provides name/value pairs.
  * The most common usage is to create a hash as so:
  *    struct hash *hash = hashNew(0);
  * to add elements to a hash as so:
@@ -29,7 +29,7 @@
  *     for (hel = helList; hel != NULL; hel = hel->next)
  *        {
  *        value = hel->val;
- *        // Further processing of value here. 
+ *        // Further processing of value here.
  *        }
  *     hashElFreeList(&helList);
  * One can avoid the overhead of creating a list by using an iterator object
@@ -39,7 +39,7 @@
  *    while ((hel = hashNext(&cookie)) != NULL)
  *        {
  *        value = hel->val;
- * Finally one can use hashTraverseEls or hashTraverseVals with a callback 
+ * Finally one can use hashTraverseEls or hashTraverseVals with a callback
  * function that takes a hashEl, or the void *value as parameter respectively.
  *
  * There are various other functions involving hashes in this module as well
@@ -78,7 +78,7 @@ struct hash
 
 #define defaultExpansionFactor 1.0
 
-#define hashMaxSize 28 
+#define hashMaxSize 28
 
 struct hashCookie
 /* used by hashFirst/hashNext in tracking location in traversing hash */
@@ -121,7 +121,7 @@ struct hashEl *hashAddN(struct hash *hash, char *name, int nameSize, void *val);
 /* Add name of given size to hash (no need to be zero terminated) */
 
 void *hashRemove(struct hash *hash, char *name);
-/* Remove item of the given name from hash table. 
+/* Remove item of the given name from hash table.
  * Returns value of removed item, or NULL if not in the table.
  * If their are multiple entries for name, the last one added
  * is removed (LIFO behavior).
@@ -145,7 +145,7 @@ char  *hashStoreName(struct hash *hash, char *name);
 /* Put name into hash table. */
 
 char *hashMustFindName(struct hash *hash, char *name);
-/* Return name as stored in hash table (in hel->name). 
+/* Return name as stored in hash table (in hel->name).
  * Abort if not found. */
 
 void *hashMustFindVal(struct hash *hash, char *name);
@@ -168,11 +168,11 @@ void hashIncInt(struct hash *hash, char *name);
 /* Increment integer value in hash */
 
 int hashIntVal(struct hash *hash, char *name);
-/* Return integer value associated with name in a simple 
+/* Return integer value associated with name in a simple
  * hash of ints. */
 
 int hashIntValDefault(struct hash *hash, char *name, int defaultInt);
-/* Return integer value associated with name in a simple 
+/* Return integer value associated with name in a simple
  * hash of ints or defaultInt if not found. */
 
 long long hashIntSum(struct hash *hash);
@@ -276,4 +276,3 @@ int hashNumEntries(struct hash *hash);
 /* count the number of entries in a hash */
 
 #endif /* HASH_H */
-

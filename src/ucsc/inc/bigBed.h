@@ -65,7 +65,7 @@ struct bigBedInterval *bigBedMultiNameQuery(struct bbiFile *bbi, struct bptFile 
 /* Fetch all records matching any of the names. Using given index on given field.
  * Return list is allocated out of lm. */
 
-int bigBedIntervalToRowLookupChrom(struct bigBedInterval *interval, 
+int bigBedIntervalToRowLookupChrom(struct bigBedInterval *interval,
     struct bigBedInterval *prevInterval, struct bbiFile *bbi,
     char *chromBuf, int chromBufSize, char *startBuf, char *endBuf, char **row, int rowSize);
 /* Convert bigBedInterval to array of chars equivalend to what you'd get by parsing the
@@ -73,9 +73,9 @@ int bigBedIntervalToRowLookupChrom(struct bigBedInterval *interval,
  * bigBedIntervalToRow.  This one will look up the chromosome based on the chromId field
  * of the interval,  which is relatively time consuming.  To avoid doing this unnecessarily
  * pass in a non-NULL prevInterval,  and if the chromId is the same on prevInterval as this,
- * it will avoid the lookup.  The chromBufSize should be at greater or equal to 
+ * it will avoid the lookup.  The chromBufSize should be at greater or equal to
  * bbi->chromBpt->keySize+1.  The startBuf and endBuf are used to hold the ascii representation of
- * start and end, and should be 16 bytes.  Note that the interval->rest string will have zeroes 
+ * start and end, and should be 16 bytes.  Note that the interval->rest string will have zeroes
  * inserted as a side effect.  Returns number of fields in row.  */
 
 void bigBedIntervalListToBedFile(struct bbiFile *bbi, struct bigBedInterval *intervalList, FILE *f);
@@ -109,4 +109,3 @@ struct slName *bigBedListExtraIndexes(struct bbiFile *bbi);
 /* Return list of names of extra indexes beyond primary chrom:start-end one" */
 
 #endif /* BIGBED_H */
-

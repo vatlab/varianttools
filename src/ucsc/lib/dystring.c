@@ -247,4 +247,3 @@ while ((c = *text++) != 0)
     }
 dyStringAppendC(dy, quotChar);
 }
-

@@ -14,12 +14,12 @@ variant=Chromosome,Start_Position,Reference_Allele,Alternative_Allele
 [Hugo_Symbol]
 index=1
 type=VARCHAR(255)
-comment=HUGO symbol for the gene (HUGO symbols are always in all caps). If no gene exists within 3kb enter "Unknown". 
+comment=HUGO symbol for the gene (HUGO symbols are always in all caps). If no gene exists within 3kb enter "Unknown".
 
 [Entrez_Gene_Id]
 index=2
 type=VARCHAR(255)
-comment=Entrez gene ID (an integer). If no gene exists within 3kb enter "0". 
+comment=Entrez gene ID (an integer). If no gene exists within 3kb enter "0".
 
 [Center]
 index=3
@@ -157,7 +157,7 @@ comment=Second pass results from orthogonal technology.
 index=26
 type=VARCHAR(255)
 comment= Updated to reflect validation or verification status and to be in agreement with the VCF VLS field. The values allowed in this field are constrained by the value in the Validation_Status field.
- 
+
 [Sequencing_Phase]
 index=27
 type=VARCHAR(255)
@@ -191,10 +191,10 @@ comment=Instrument used to produce primary data. Separate multiple entries using
 [Tumor_Sample_UUID]
 index=33
 type=VARCHAR(255)
-comment=BCR aliquot UUID for tumor sample	
+comment=BCR aliquot UUID for tumor sample
 
 [Matched_Norm_Sample_UUID]
-index=34	
+index=34
 type=VARCHAR(255)
 comment=BCR aliquot UUID for matched normal	567e8487-e29b-32d4-a716-446655443246
 
@@ -202,11 +202,11 @@ comment=BCR aliquot UUID for matched normal	567e8487-e29b-32d4-a716-446655443246
 [col_1]
 # Hugo_Symbol
 field=HGNC.name
-comment=HUGO symbol for the gene (HUGO symbols are always in all caps). If no gene exists within 3kb enter "Unknown". 
+comment=HUGO symbol for the gene (HUGO symbols are always in all caps). If no gene exists within 3kb enter "Unknown".
 
 [col_2]
 field=HGNC.Entrez_Gene_ID
-comment=Entrez gene ID (an integer). If no gene exists within 3kb enter "0". 
+comment=Entrez gene ID (an integer). If no gene exists within 3kb enter "0".
 
 [col_3]
 field=
@@ -267,7 +267,7 @@ comment=Primary data genotype. Tumor sequencing (discovery) allele 2. " -" for a
 field=
 adj=Constant("-")
 field=dbSNP.name
-comment=Latest dbSNP rs ID (dbSNP_ID) or "novel" if there is no dbSNP record. 
+comment=Latest dbSNP rs ID (dbSNP_ID) or "novel" if there is no dbSNP record.
 
 [col_15]
 field=
@@ -369,9 +369,9 @@ comment=Instrument used to produce primary data. Separate multiple entries using
 [col_33]
 field=
 adj=Constant("00000000-0000-0000-0000-000000000000")
-comment=BCR aliquot UUID for tumor sample	
+comment=BCR aliquot UUID for tumor sample
 
 [col_34]
 field=
 adj=Constant("00000000-0000-0000-0000-000000000000")
-comment=BCR aliquot UUID for matched normal	
+comment=BCR aliquot UUID for matched normal

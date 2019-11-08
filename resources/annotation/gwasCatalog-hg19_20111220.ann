@@ -1,17 +1,17 @@
 # Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
 # Distributed under GPL. see <http://www.gnu.org/licenses/>
-# 
-# Please refer to http://varianttools.sourceforge.net/Annotation/New 
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
 # for a description of the format of this file.
 #
 # The best way to use this annotation source is to link your variants
 # to these gwas hits with a position range (the following uses a +/- 5000bp range):
 # vtools use gwasCatalog.ann --anno_type range --linked_fields chr position-5000 position+5000
-# 
+#
 # Then you can generate a useful report showing what known gwas hits are near your
 # variants (the following shows Type 2 diabetes hits near your variants):
-# vtools select variant "gwasCatalog.trait == 'Type 2 diabetes'" 
-#        -o variant.chr variant.pos variant.ref variant.alt gwasCatalog.trait gwasCatalog.name 
+# vtools select variant "gwasCatalog.trait == 'Type 2 diabetes'"
+#        -o variant.chr variant.pos variant.ref variant.alt gwasCatalog.trait gwasCatalog.name
 #        gwasCatalog.position gwasCatalog.pValue gwasCatalog.journal gwasCatalog.title > variants_near_diabetes_gwas_hits.txt
 
 
@@ -50,7 +50,7 @@ comment=PubMed ID of publication of the study
 #[author]
 #index=7
 #type=VARCHAR(255)
-#comment=First author of publication 
+#comment=First author of publication
 
 [pubDate]
 index=8
@@ -131,4 +131,3 @@ comment=Platform and [SNPs passing QC]
 index=23
 type=VARCHAR(255)
 comment=Y if copy number variant
-

@@ -1,15 +1,15 @@
 [format description]
-description=Input format for variants with multiple sample genotypes. 
+description=Input format for variants with multiple sample genotypes.
 delimiter=None
 variant=chr,%(pos)s,%(ref)s,%(alt)s
 genotype=%(geno)s
 
 [DEFAULT]
 pos=pos
-pos_comment=Field for position. 
+pos_comment=Field for position.
 
 ref=ref
-ref_comment=Field for reference allele. 
+ref_comment=Field for reference allele.
 
 alt=alt
 alt_comment=Field for alternative allele.
@@ -26,7 +26,7 @@ comment=Chromosome
 [pos]
 index=2
 type=INTEGER NOT NULL
-comment=1-based Position of the snp 
+comment=1-based Position of the snp
 
 [ref]
 index=3
@@ -40,5 +40,5 @@ comment=Alternative allele
 
 [GT]
 index=5:
-type=INTEGER 
+type=INTEGER
 comment=Gentoype w/ 0,1,2 codings

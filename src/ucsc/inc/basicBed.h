@@ -83,11 +83,11 @@ void bedStaticLoad(char **row, struct bed *ret);
 
 struct bed *bedLoad(char **row);
 /* Load a bed from row fetched with select * from bed
- * from database.  Dispose of this with bedFree(). 
+ * from database.  Dispose of this with bedFree().
  * This loads first four fields. */
 
 struct bed *bedCommaIn(char **pS, struct bed *ret);
-/* Create a bed out of a comma separated string. 
+/* Create a bed out of a comma separated string.
  * This will fill in ret if non-null, otherwise will
  * return a new bed */
 
@@ -182,10 +182,10 @@ void bedLoadAllReturnFieldCount(char *fileName, struct bed **retList, int *retFi
 /* Load bed of unknown size and return number of fields as well as list of bed items.
  * Ensures that all lines in bed file have same field count. */
 
-void bedLoadAllReturnFieldCountAndRgb(char *fileName, struct bed **retList, int *retFieldCount, 
+void bedLoadAllReturnFieldCountAndRgb(char *fileName, struct bed **retList, int *retFieldCount,
     boolean *retRgb);
 /* Load bed of unknown size and return number of fields as well as list of bed items.
- * Ensures that all lines in bed file have same field count.  Also returns whether 
+ * Ensures that all lines in bed file have same field count.  Also returns whether
  * column 9 is being used as RGB or not. */
 
 void bedOutputN(struct bed *el, int wordCount, FILE *f, char sep, char lastSep);
@@ -268,7 +268,7 @@ boolean bedExactMatch(struct bed *oldBed, struct bed *newBed);
 
 boolean bedCompatibleExtension(struct bed *oldBed, struct bed *newBed);
 /* Return TRUE if newBed is a compatible extension of oldBed, meaning
- * all internal exons and all introns of old bed are contained, in the 
+ * all internal exons and all introns of old bed are contained, in the
  * same order in the new bed. */
 
 struct rbTree *bedToRangeTree(struct bed *bed);
@@ -288,7 +288,7 @@ struct bed *bedThickOnlyList(struct bed *inList);
 /* Return a list of beds that only are the thick part of input. */
 
 char *bedAsDef(int bedFieldCount, int totalFieldCount);
-/* Return an autoSql definition for a bed of given number of fields. 
+/* Return an autoSql definition for a bed of given number of fields.
  * Normally totalFieldCount is equal to bedFieldCount.  If there are extra
  * fields they are just given the names field16, field17, etc and type string. */
 

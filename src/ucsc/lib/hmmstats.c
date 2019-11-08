@@ -1,5 +1,5 @@
-/* hmmstats.c - Stuff for doing statistical analysis in general and 
- * hidden Markov models in particular. 
+/* hmmstats.c - Stuff for doing statistical analysis in general and
+ * hidden Markov models in particular.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -44,5 +44,3 @@ double calcStdFromSums(double sum, double sumSquares, bits64 n)
 {
 return sqrt(calcVarianceFromSums(sum, sumSquares, n));
 }
-
-

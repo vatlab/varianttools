@@ -57,7 +57,7 @@ parse_header(struct pio_bed_file_t *bed_file)
     {
         return PIO_ERROR;
     }
-    
+
     bed_header_from_bytes( &bed_file->header, header );
 
     fseek( bed_file->fp, bed_header_data_offset( &bed_file->header ), SEEK_SET );
@@ -72,20 +72,20 @@ parse_header(struct pio_bed_file_t *bed_file)
  * - Each byte contains 4 SNPs
  * - The SNPs are read from right to left in each byte.
  * - The packed SNPs encoded as follows:
- *   * 00 is homozygous major 
+ *   * 00 is homozygous major
  *   * 01 is missing value
  *   * 10 is hetrozygous
  *   * 11 is homozygous minor
  *
  * - The unpacked SNPs are encoded as follows:
  *   * 0 is homozygous major
- *   * 1 is hetrozygous 
+ *   * 1 is hetrozygous
  *   * 2 is homozygous minor
  *   * 3 is missing value
  *
  * @param packed_snps The packed SNPs.
  * @param unpacked_snps The unpacked SNPs.
- * @param num_cols The number of SNPs. 
+ * @param num_cols The number of SNPs.
  */
 void
 unpack_snps(const snp_t *packed_snps, unsigned char *unpacked_snps, size_t num_cols)
@@ -98,7 +98,7 @@ unpack_snps(const snp_t *packed_snps, unsigned char *unpacked_snps, size_t num_c
     int i;
     int packed_length = num_cols / 4;
     for(i = 0; i < packed_length; i++)
-    { 
+    {
         *unpacked_snps_p = snp_lookup[ packed_snps[ i ] ].snp_block;
         unpacked_snps_p += 1;
     }
@@ -142,7 +142,7 @@ transpose_rows(const unsigned char *rows, size_t num_rows, size_t num_cols, FILE
 
             /* Values to swap */
             int from_value = ( rows[ from_index ] >> from_shift ) & 0x3;
-            
+
             row_buffer[ to_index ] |= ( from_value << to_shift );
         }
 
@@ -168,31 +168,31 @@ transpose_file(const unsigned char *mapped_file, size_t num_loci, size_t num_sam
     struct bed_header_t header = bed_header_init2( num_loci, num_samples, mapped_file );
     size_t original_num_rows = bed_header_num_rows( &header );
     size_t original_num_cols = bed_header_num_cols( &header );
-   
+
     FILE *output_file = fopen( output_path, "w" );
     if( output_file == NULL )
     {
         return PIO_ERROR;
     }
-    
+
     /* Clear size of file, otherwise we might have trailing bytes */
     if( ftruncate( fileno( output_file ), 0 ) == - 1)
     {
         return PIO_ERROR;
     }
-    
+
     /* Transpose and write header */
     unsigned char byte_header[ BED_HEADER_MAX_SIZE ];
     int byte_header_length = 0;
     bed_header_transpose( &header );
     bed_header_to_bytes( &header, byte_header, &byte_header_length );
-    
+
     if( fwrite( byte_header, sizeof( unsigned char ), byte_header_length, output_file ) != byte_header_length )
     {
         fclose( output_file );
         return PIO_ERROR;
     }
-    
+
     /* Transpose data */
     transpose_rows( mapped_file + bed_header_data_offset( &header ),
                     original_num_rows,
@@ -209,7 +209,7 @@ bed_open(struct pio_bed_file_t *bed_file, const char *path, size_t num_loci, siz
 {
     size_t row_size_bytes;
     FILE *bed_fp;
-   
+
     bzero( bed_file, sizeof( *bed_file ) );
     bed_fp = fopen( path, "r" );
     if( bed_fp == NULL )
@@ -223,8 +223,8 @@ bed_open(struct pio_bed_file_t *bed_file, const char *path, size_t num_loci, siz
     {
         return PIO_ERROR;
     }
- 
-    row_size_bytes = bed_header_row_size( &bed_file->header ); 
+
+    row_size_bytes = bed_header_row_size( &bed_file->header );
     bed_file->read_buffer = ( snp_t * ) malloc( row_size_bytes );
     bed_file->cur_row = 0;
 
@@ -243,7 +243,7 @@ bed_read_row(struct pio_bed_file_t *bed_file, snp_t *buffer)
     }
 
     row_size_bytes = bed_header_row_size( &bed_file->header );
-    bytes_read = fread( bed_file->read_buffer, 
+    bytes_read = fread( bed_file->read_buffer,
                         1,
                         row_size_bytes,
                         bed_file->fp );
@@ -302,7 +302,7 @@ bed_close(struct pio_bed_file_t *bed_file)
 pio_status_t
 bed_transpose(const char *original_path, const char *transposed_path, size_t num_loci, size_t num_samples)
 {
-    /* Open original for mmap */ 
+    /* Open original for mmap */
     int original_fd = open( original_path, O_RDONLY );
     if( original_fd == -1 )
     {
@@ -314,7 +314,7 @@ bed_transpose(const char *original_path, const char *transposed_path, size_t num
     {
         return PIO_ERROR;
     }
-   
+
     void *mapped_file = mmap( NULL,
                               file_stats.st_size,
                               PROT_READ,
@@ -333,6 +333,6 @@ bed_transpose(const char *original_path, const char *transposed_path, size_t num
     /* Release alloacted resources */
     munmap( mapped_file, file_stats.st_size );
     close( original_fd );
-    
+
     return status;
 }

@@ -19,7 +19,7 @@ vcf/CEU.vcf.gz	NA11881	2	F	17.79
 vcf/CEU.vcf.gz	NA11894	2	F	19.22
 vcf/CEU.vcf.gz	NA11918	2	F	25.56
 vcf/CEU.vcf.gz	NA11919	1	F	22.28
-vcf/CEU.vcf.gz	NA11920	2	F	22.28	
+vcf/CEU.vcf.gz	NA11920	2	F	22.28
 vcf/CEU.vcf.gz	NA11931	2	F	16.15
 vcf/CEU.vcf.gz	NA11992	2	F	20.41
 vcf/CEU.vcf.gz	NA11993	2	F	17.09

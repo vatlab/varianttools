@@ -1,4 +1,4 @@
-/* Stuff that's specific for .brc.mcw.edu server goes here. 
+/* Stuff that's specific for .brc.mcw.edu server goes here.
  *
  * This file is copyright 2004 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -36,7 +36,7 @@ static double _speed()
 {
 return 3.0;
 }
-    
+
 struct webServerSpecific wssBrcMcw =
     {
     "default",

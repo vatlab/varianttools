@@ -11,10 +11,10 @@ description=Simulation for association mapping with lineage information.
 [DEFAULT]
 regions=chr1:700001-900000
 regions_comment=
-  
+
 causing_genes=chr1:800001-900000
 causing_genes_comment=A subset of regions from which a phenotype is simulated.
-  
+
 scale=1
 scale_comment=Scaling factor to speed up the simulation by scaling down the
   simulation while boosting mutation, selection and recombination rates.
@@ -69,6 +69,5 @@ action=EvolvePopulation(
 		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
 	demoModel=NoAS_OutOfAfricaModel(20000, scale=%(scale)s)
 	)
-comment=Evolve and expand the population using a K80 mutation model	and a demographic 
+comment=Evolve and expand the population using a K80 mutation model	and a demographic
 	model that models the settlement of new world model of the Mexican American population.
- 

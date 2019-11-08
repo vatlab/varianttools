@@ -78,7 +78,7 @@ bim_open(struct pio_bim_file_t *bim_file, const char *path)
 struct pio_locus_t *
 bim_get_locus(struct pio_bim_file_t *bim_file, size_t pio_id)
 {
-    return (struct pio_locus_t *) utarray_eltptr( bim_file->locus, pio_id );  
+    return (struct pio_locus_t *) utarray_eltptr( bim_file->locus, pio_id );
 }
 
 size_t

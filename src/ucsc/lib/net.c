@@ -1,4 +1,4 @@
-/* net.c some stuff to wrap around net communications. 
+/* net.c some stuff to wrap around net communications.
  *
  * This file is copyright 2002 Jim Kent, but license is hereby
  * granted for all use - public, private or commercial. */
@@ -41,7 +41,7 @@ static int setSocketNonBlocking(int sd, boolean set)
 {
 long fcntlFlags;
 // Set or clear non-blocking
-if ((fcntlFlags = fcntl(sd, F_GETFL, NULL)) < 0) 
+if ((fcntlFlags = fcntl(sd, F_GETFL, NULL)) < 0)
     {
     warn("Error fcntl(..., F_GETFL) (%s)", strerror(errno));
     return -1;
@@ -50,7 +50,7 @@ if (set)
     fcntlFlags |= O_NONBLOCK;
 else
     fcntlFlags &= (~O_NONBLOCK);
-if (fcntl(sd, F_SETFL, fcntlFlags) < 0) 
+if (fcntl(sd, F_SETFL, fcntlFlags) < 0)
     {
     warn("Error fcntl(..., F_SETFL) (%s)", strerror(errno));
     return -1;
@@ -59,8 +59,8 @@ return 0;
 }
 
 static struct timeval tvMinus(struct timeval a, struct timeval b)
-/* Return the result of a - b; this handles wrapping of milliseconds. 
- * result.tv_usec will always be positive. 
+/* Return the result of a - b; this handles wrapping of milliseconds.
+ * result.tv_usec will always be positive.
  * result.tv_sec will be negative if b > a. */
 {
 // subtract b from a.
@@ -112,16 +112,16 @@ if (res < 0)
 	struct timeval remainingTime;
 	remainingTime.tv_sec = (long) (msTimeout/1000);
 	remainingTime.tv_usec = (long) (((msTimeout/1000)-remainingTime.tv_sec)*1000000);
-	while (1) 
+	while (1)
 	    {
 	    FD_ZERO(&mySet);
 	    FD_SET(sd, &mySet);
 	    // use tempTime (instead of using remainingTime directly) because on some platforms select() may modify the time val.
 	    struct timeval tempTime = remainingTime;
-	    res = select(sd+1, NULL, &mySet, &mySet, &tempTime);  
-	    if (res < 0) 
+	    res = select(sd+1, NULL, &mySet, &mySet, &tempTime);
+	    if (res < 0)
 		{
-		if (errno == EINTR)  // Ignore the interrupt 
+		if (errno == EINTR)  // Ignore the interrupt
 		    {
                     // Subtract the elapsed time from remaining time since some platforms need this.
 		    struct timeval newTime;
@@ -217,7 +217,7 @@ return netMustConnect(hostName, atoi(portName));
 
 
 int netAcceptingSocketFrom(int port, int queueSize, char *host)
-/* Create a socket that can accept connections from a 
+/* Create a socket that can accept connections from a
  * IP address on the current machine if the current machine
  * has multiple IP addresses. */
 {
@@ -259,7 +259,7 @@ return accept(sd, NULL, &fromLen);
 int netAcceptFrom(int acceptor, unsigned char subnet[4])
 /* Wait for incoming connection from socket descriptor
  * from IP address in subnet.  Subnet is something
- * returned from netParseSubnet or internetParseDottedQuad. 
+ * returned from netParseSubnet or internetParseDottedQuad.
  * Subnet may be NULL. */
 {
 struct sockaddr_in sai;		/* Some system socket info. */
@@ -275,7 +275,7 @@ for (;;)
 	    return sd;
 	else
 	    {
-	    unsigned char unpacked[4]; 
+	    unsigned char unpacked[4];
 	    internetUnpackIp(ntohl(sai.sin_addr.s_addr), unpacked);
 	    if (internetIpInSubnet(unpacked, subnet))
 		{
@@ -403,10 +403,10 @@ if (x)
 	    if (terminateAtByteRange)
 		*x = 0;
 	    // TODO: use something better than atoll() ?
-	    *rangeStart = atoll(y); 
+	    *rangeStart = atoll(y);
 	    if (z[0] != '\0')
 		*rangeEnd = atoll(z);
-	    }    
+	    }
 	}
     }
 
@@ -416,7 +416,7 @@ void netParseUrl(char *url, struct netParsedUrl *parsed)
 /* Parse a URL into components.   A full URL is made up as so:
  *   http://user:password@hostName:port/file;byterange=0-499
  * User and password may be cgi-encoded.
- * This is set up so that the http:// and the port are optional. 
+ * This is set up so that the http:// and the port are optional.
  */
 {
 char *s, *t, *u, *v, *w;
@@ -493,7 +493,7 @@ else
 	safecpy(parsed->user, sizeof(parsed->user), s);
 	safecpy(parsed->password, sizeof(parsed->password), w+1);
 	}
-    
+
     cgiDecode(parsed->user,parsed->user,strlen(parsed->user));
     cgiDecode(parsed->password,parsed->password,strlen(parsed->password));
     s = v+1;
@@ -590,11 +590,11 @@ for (;;)
     FD_ZERO(&set);
     FD_SET(sd, &set);
     readyCount = select(sd+1, &set, NULL, NULL, &tv);
-    if (readyCount < 0) 
+    if (readyCount < 0)
 	{
 	if (errno == EINTR)	/* Select interrupted, not timed out. */
 	    continue;
-    	else 
+    	else
     	    warn("select failure %s", strerror(errno));
     	}
     else
@@ -614,14 +614,14 @@ return readyCount > 0;	/* Zero readyCount indicates time out */
 
 static void sendFtpCommandOnly(int sd, char *cmd)
 /* send command to ftp server */
-{   
+{
 mustWriteFd(sd, cmd, strlen(cmd));
 }
 
 #define NET_FTP_TIMEOUT 1000000
 
 static boolean receiveFtpReply(int sd, char *cmd, struct dyString **retReply, int *retCode)
-/* send command to ftp server and check resulting reply code, 
+/* send command to ftp server and check resulting reply code,
  * warn and return FALSE if not desired reply.  If retReply is non-NULL, store reply text there. */
 {
 char *startLastLine = NULL;
@@ -644,16 +644,16 @@ while (1)
 	if (endsWith(rs->string,"\n"))
 	    break;
 	}
-	
+
     /* find the start of the last line in the buffer */
     startLastLine = rs->string+strlen(rs->string)-1;
     if (startLastLine >= rs->string)
-	if (*startLastLine == '\n') 
+	if (*startLastLine == '\n')
 	    --startLastLine;
     while ((startLastLine >= rs->string) && (*startLastLine != '\n'))
 	--startLastLine;
     ++startLastLine;
-	
+
     if (strlen(startLastLine)>4)
       if (
 	isdigit(startLastLine[0]) &&
@@ -661,7 +661,7 @@ while (1)
 	isdigit(startLastLine[2]) &&
 	startLastLine[3]==' ')
 	break;
-	
+
     if (readSize == 0)
 	break;  // EOF
     /* must be some text info we can't use, ignore it till we get status code */
@@ -673,7 +673,7 @@ if ((reply < 200) || (reply > 399))
     warn("ftp server error on cmd=[%s] response=[%s]",cmd,rs->string);
     return FALSE;
     }
-    
+
 if (retReply)
     *retReply = rs;
 else
@@ -684,9 +684,9 @@ return TRUE;
 }
 
 static boolean sendFtpCommand(int sd, char *cmd, struct dyString **retReply, int *retCode)
-/* send command to ftp server and check resulting reply code, 
+/* send command to ftp server and check resulting reply code,
  * warn and return FALSE if not desired reply.  If retReply is non-NULL, store reply text there. */
-{   
+{
 sendFtpCommandOnly(sd, cmd);
 return receiveFtpReply(sd, cmd, retReply, retCode);
 }
@@ -704,9 +704,9 @@ rsStart++;
 wordCount = chopString(rsStart, ",", words, ArraySize(words));
 if (wordCount != 6)
     errAbort("PASV reply does not parse correctly");
-result = atoi(words[4])*256+atoi(words[5]);    
+result = atoi(words[4])*256+atoi(words[5]);
 return result;
-}    
+}
 
 
 static long long parseFtpSIZE(char *rs)
@@ -719,9 +719,9 @@ long long result = 0;
 wordCount = chopString(rsStart, " ", words, ArraySize(words));
 if (wordCount != 2)
     errAbort("SIZE reply does not parse correctly");
-result = atoll(words[1]);    
+result = atoll(words[1]);
 return result;
-}    
+}
 
 
 static time_t parseFtpMDTM(char *rs)
@@ -770,11 +770,11 @@ time_t t = mktime(&tm);
 if (t == -1)
     errAbort("mktime failed while parsing strptime'd MDTM string [%s]", words[1]);
 return t;
-}    
+}
 
 
 static int openFtpControlSocket(char *host, int port, char *user, char *password)
-/* Open a socket to host,port; authenticate anonymous ftp; set type to I; 
+/* Open a socket to host,port; authenticate anonymous ftp; set type to I;
  * return socket desc or -1 if there was an error. */
 {
 int sd = netConnect(host, port);
@@ -855,7 +855,7 @@ if (!sendFtpCommand(sd, cmd, &rs, NULL))
 *retTime = parseFtpMDTM(rs->string);
 /* 200 YYYYMMDDhhmmss */
 dyStringFree(&rs);
-close(sd);   
+close(sd);
 return TRUE;
 }
 
@@ -865,7 +865,7 @@ struct netConnectFtpParams
 pthread_t thread;
 int pipefd[2];
 int sd;
-int sdata; 
+int sdata;
 struct netParsedUrl npu;
 };
 
@@ -882,10 +882,10 @@ pthread_detach(params->thread);  // this thread will never join back with it's p
 
 char buf[32768];
 int rd = 0;
-long long dataPos = 0; 
+long long dataPos = 0;
 if (params->npu.byteRangeStart != -1)
     dataPos = params->npu.byteRangeStart;
-while((rd = read(params->sdata, buf, 32768)) > 0) 
+while((rd = read(params->sdata, buf, 32768)) > 0)
     {
     if (params->npu.byteRangeEnd != -1 && (dataPos + rd) > params->npu.byteRangeEnd)
 	rd = params->npu.byteRangeEnd - dataPos + 1;
@@ -900,7 +900,7 @@ while((rd = read(params->sdata, buf, 32768)) > 0)
 	}
     dataPos += rd;
     if (params->npu.byteRangeEnd != -1 && dataPos >= params->npu.byteRangeEnd)
-	break;	    
+	break;
     }
 if (rd == -1)
     // Again, avoid abort in child process.
@@ -915,7 +915,7 @@ static int netGetOpenFtpSockets(char *url, int *retCtrlSd)
 /* Return a socket descriptor for url data (url can end in ";byterange:start-end",
  * or -1 if error.
  * If retCtrlSd is non-null, keep the control socket alive and set *retCtrlSd.
- * Otherwise, create a pipe and fork to keep control socket alive in the child 
+ * Otherwise, create a pipe and fork to keep control socket alive in the child
  * process until we are done fetching data. */
 {
 char cmd[256];
@@ -1058,7 +1058,7 @@ int netHttpConnect(char *url, char *method, char *protocol, char *agent, char *o
  * and password too.  Typically the "method" will be "GET" or "POST"
  * and the agent will be the name of your program or
  * library. optionalHeader may be NULL or contain additional header
- * lines such as cookie info. 
+ * lines such as cookie info.
  * Proxy support via hg.conf httpProxy or env var http_proxy
  * Return data socket, or -1 if error.*/
 {
@@ -1147,7 +1147,7 @@ return netOpenHttpExt(url, "GET", NULL);
 int netUrlHeadExt(char *url, char *method, struct hash *hash)
 /* Go get head and return status.  Return negative number if
  * can't get head. If hash is non-null, fill it with header
- * lines with upper cased keywords for case-insensitive lookup, 
+ * lines with upper cased keywords for case-insensitive lookup,
  * including hopefully CONTENT-TYPE: . */
 {
 int sd = netOpenHttpExt(url, method, NULL);
@@ -1190,7 +1190,7 @@ return status;
 int netUrlHead(char *url, struct hash *hash)
 /* Go get head and return status.  Return negative number if
  * can't get head. If hash is non-null, fill it with header
- * lines with upper cased keywords for case-insensitive lookup, 
+ * lines with upper cased keywords for case-insensitive lookup,
  * including hopefully CONTENT-TYPE: . */
 {
 return netUrlHeadExt(url, "HEAD", hash);
@@ -1198,7 +1198,7 @@ return netUrlHeadExt(url, "HEAD", hash);
 
 
 long long netUrlSizeByRangeResponse(char *url)
-/* Use byteRange as a work-around alternate method to get file size (content-length).  
+/* Use byteRange as a work-around alternate method to get file size (content-length).
  * Return negative number if can't get. */
 {
 long long retVal = -1;
@@ -1207,7 +1207,7 @@ safef(rangeUrl, sizeof(rangeUrl), "%s;byterange=0-0", url);
 struct hash *hash = newHash(0);
 int status = netUrlHeadExt(rangeUrl, "GET", hash);
 if (status == 206)
-    { 
+    {
     char *rangeString = hashFindValUpperCase(hash, "Content-Range:");
     if (rangeString)
 	{
@@ -1226,10 +1226,10 @@ return retVal;
 
 int netUrlOpenSockets(char *url, int *retCtrlSocket)
 /* Return socket descriptor (low-level file handle) for read()ing url data,
- * or -1 if error. 
+ * or -1 if error.
  * If retCtrlSocket is non-NULL and url is FTP, set *retCtrlSocket
  * to the FTP control socket which is left open for a persistent connection.
- * close(result) (and close(*retCtrlSocket) if applicable) when done. 
+ * close(result) (and close(*retCtrlSocket) if applicable) when done.
  * If url is missing :// then it's just treated as a file. */
 {
 if (stringIn("://", url) == NULL)
@@ -1240,10 +1240,10 @@ else
 	return netGetOpenHttp(url);
     else if (startsWith("ftp://",url))
 	return netGetOpenFtpSockets(url, retCtrlSocket);
-    else    
+    else
 	errAbort("Sorry, can only netUrlOpen http, https and ftp currently, not '%s'", url);
     }
-return -1;    
+return -1;
 }
 
 int netUrlOpen(char *url)
@@ -1278,7 +1278,7 @@ return dy;
 }
 
 static void parseContentRange(char *x, ssize_t *rangeStart, ssize_t *rangeEnd)
-/* parse the content range information from response header value 
+/* parse the content range information from response header value
 	"bytes 763400000-763400112/763400113"
  */
 {
@@ -1294,10 +1294,10 @@ if (startsWith("bytes ", x))
 	{
 	++z;
 	// TODO: use something better than atoll() ?
-	*rangeStart = atoll(y); 
+	*rangeStart = atoll(y);
 	if (z[0] != '\0')
 	    *rangeEnd = atoll(z);
-	}    
+	}
     }
 
 }
@@ -1393,9 +1393,9 @@ while(TRUE)
 	    {
 	    mustUseProxyAuth = TRUE;
 	    }
-	else if (byteRangeUsed 
+	else if (byteRangeUsed
 	    /* hack for Apache bug 2.2.20 and 2.2.21 2011-10-21 should be OK to remove after one year. */
-		&& !(sameString(code, "200") && byteRangeStart == 0 && byteRangeEnd == -1))  
+		&& !(sameString(code, "200") && byteRangeStart == 0 && byteRangeEnd == -1))
 	    {
 	    if (!sameString(code, "206"))
 		{
@@ -1440,7 +1440,7 @@ while(TRUE)
 	if (byteRangeUsed)
 	    {
 	    foundContentRange = TRUE;
-	    parseContentRange(headerVal, &contentRangeStart, &contentRangeEnd);	
+	    parseContentRange(headerVal, &contentRangeStart, &contentRangeEnd);
     	    if ((contentRangeStart != byteRangeStart) ||
 		(byteRangeEnd != -1 && (contentRangeEnd != byteRangeEnd)))
 		{
@@ -1457,15 +1457,15 @@ while(TRUE)
     }
 if (mustUseProxy ||  mustUseProxyAuth)
     {
-    warn("%s: %s error. Use Proxy%s. Location = %s", url, 
-	mustUseProxy ? "" : " Authentication", 
-	mustUseProxy ? "305" : "407", 
+    warn("%s: %s error. Use Proxy%s. Location = %s", url,
+	mustUseProxy ? "" : " Authentication",
+	mustUseProxy ? "305" : "407",
 	proxyLocation ? proxyLocation : "not given");
     return FALSE;
     }
 if (byteRangeUsed && !foundContentRange
 	    /* hack for Apache bug 2.2.20 and 2.2.21 2011-10-21 should be OK to remove after one year. */
-		&& !(byteRangeStart == 0 && byteRangeEnd == -1))  
+		&& !(byteRangeStart == 0 && byteRangeEnd == -1))
     {
     char bre[256];
     safef(bre, sizeof bre, "%lld", (long long)byteRangeEnd);
@@ -1529,13 +1529,13 @@ while (TRUE)
 	    warn("code 30x redirects: exceeded limit of 5 redirects, %s", newUrl);
 	    success = FALSE;
 	    }
-	else if (!startsWith("http://",newUrl) 
+	else if (!startsWith("http://",newUrl)
               && !startsWith("https://",newUrl))
 	    {
 	    warn("redirected to non-http(s): %s", newUrl);
 	    success = FALSE;
 	    }
-	else 
+	else
 	    {
 	    struct netParsedUrl npu, newNpu;
 	    /* Parse the old URL to make parts available for graft onto the redirected url. */
@@ -1596,7 +1596,7 @@ else
     char *newUrl = NULL;
     int newSd = 0;
     if (startsWith("http://",url) || startsWith("https://",url))
-	{  
+	{
 	if (!netSkipHttpHeaderLinesHandlingRedirect(sd, url, &newSd, &newUrl))
 	    {
 	    return NULL;
@@ -1624,8 +1624,8 @@ else
 	{
 	lf = lineFileAttach(url, TRUE, sd);
 	}
-    if (newUrl) 
-	freeMem(newUrl); 
+    if (newUrl)
+	freeMem(newUrl);
     return lf;
     }
 }
@@ -1640,14 +1640,14 @@ if (sd < 0)
     noWarnAbort();
 int newSd = 0;
 if (startsWith("http://",url) || startsWith("https://",url))
-    {  
+    {
     char *newUrl = NULL;
     if (!netSkipHttpHeaderLinesHandlingRedirect(sd, url, &newSd, &newUrl))
 	noWarnAbort();
     if (newUrl != NULL)
 	{
 	sd = newSd;
-	freeMem(newUrl); 
+	freeMem(newUrl);
 	}
     }
 return sd;
@@ -1860,7 +1860,7 @@ char *netRecieveString(int sd, char buf[256])
 {
 char *s = netGetString(sd, buf);
 if (s == NULL)
-     noWarnAbort();   
+     noWarnAbort();
 return s;
 }
 
@@ -1870,7 +1870,7 @@ char *netRecieveLongString(int sd)
 {
 char *s = netGetLongString(sd);
 if (s == NULL)
-     noWarnAbort();   
+     noWarnAbort();
 return s;
 }
 
@@ -1880,7 +1880,7 @@ char *netRecieveHugeString(int sd)
 {
 char *s = netGetHugeString(sd);
 if (s == NULL)
-     noWarnAbort();   
+     noWarnAbort();
 return s;
 }
 
@@ -1942,12 +1942,12 @@ dyStringFree(&dy);
 int netHttpGetMultiple(char *url, struct slName *queries, void *userData,
 		       void (*responseCB)(void *userData, char *req,
 					  char *hdr, struct dyString *body))
-/* Given an URL which is the base of all requests to be made, and a 
- * linked list of queries to be appended to that base and sent in as 
- * requests, send the requests as a batch and read the HTTP response 
- * headers and bodies.  If not all the requests get responses (i.e. if 
- * the server is ignoring Keep-Alive or is imposing a limit), try again 
- * until we can't connect or until all requests have been served. 
+/* Given an URL which is the base of all requests to be made, and a
+ * linked list of queries to be appended to that base and sent in as
+ * requests, send the requests as a batch and read the HTTP response
+ * headers and bodies.  If not all the requests get responses (i.e. if
+ * the server is ignoring Keep-Alive or is imposing a limit), try again
+ * until we can't connect or until all requests have been served.
  * For each HTTP response, do a callback. */
 {
   struct slName *qStart;
@@ -1966,7 +1966,7 @@ int netHttpGetMultiple(char *url, struct slName *queries, void *userData,
   boolean done;
   boolean keepAlive;
 
-  /* Find out how many queries we'll need to do so we know how many times 
+  /* Find out how many queries we'll need to do so we know how many times
    * it's OK to run into end of file in case server ignores Keep-Alive. */
   qTotal = 0;
   for (qPtr = queries;  qPtr != NULL;  qPtr = qPtr->next)
@@ -1997,7 +1997,7 @@ int netHttpGetMultiple(char *url, struct slName *queries, void *userData,
 	  keepAlive = (qPtr->next == NULL) ? FALSE : TRUE;
 	  netHttpGet(lf, npu, keepAlive);
 	}
-      /* Get as many responses as we can; call responseCB() and 
+      /* Get as many responses as we can; call responseCB() and
        * advance qStart for each. */
       for (qPtr = qStart;  qPtr != NULL;  qPtr = qPtr->next)
         {
@@ -2029,4 +2029,3 @@ boolean hasProtocol(char *urlOrPath)
 {
 return stringIn("://", urlOrPath) != NULL;
 }
-

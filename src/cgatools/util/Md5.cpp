@@ -37,12 +37,12 @@ namespace cgatools { namespace util {
     {
         digest_.assign(0);
     }
-    
+
     Md5Digest::Md5Digest(const void* val)
     {
         set(val);
     }
-    
+
     void Md5Digest::set(const void* vval)
     {
         const uint8_t* val = reinterpret_cast<const uint8_t*>(vval);

@@ -198,10 +198,10 @@ return bbiSummaryArray(bbi, chrom, start, end, bigBedCoverageIntervals,
 	summaryType, summarySize, summaryValues);
 }
 
-struct offsetSize 
+struct offsetSize
 /* Simple file offset and file size. */
     {
-    bits64 offset; 
+    bits64 offset;
     bits64 size;
     };
 
@@ -215,7 +215,7 @@ const struct slRef *b = *((struct slRef **)vb);
 return memcmp(a->val, b->val, sizeof(struct offsetSize));
 }
 
-static struct fileOffsetSize *fosFromRedundantBlockList(struct slRef **pBlockList, 
+static struct fileOffsetSize *fosFromRedundantBlockList(struct slRef **pBlockList,
     boolean isSwapped)
 /* Convert from list of references to offsetSize format to list of fileOffsetSize
  * format, while removing redundancy.   Sorts *pBlockList as a side effect. */
@@ -252,29 +252,29 @@ return fosList;
 }
 
 
-static struct fileOffsetSize *bigBedChunksMatchingName(struct bbiFile *bbi, 
+static struct fileOffsetSize *bigBedChunksMatchingName(struct bbiFile *bbi,
     struct bptFile *index, char *name)
 /* Get list of file chunks that match name.  Can slFreeList this when done. */
 {
-struct slRef *blockList = bptFileFindMultiple(index, 
+struct slRef *blockList = bptFileFindMultiple(index,
 	name, strlen(name), sizeof(struct offsetSize));
 struct fileOffsetSize *fosList = fosFromRedundantBlockList(&blockList, bbi->isSwapped);
 slRefFreeListAndVals(&blockList);
 return fosList;
 }
 
-static struct fileOffsetSize *bigBedChunksMatchingNames(struct bbiFile *bbi, 
+static struct fileOffsetSize *bigBedChunksMatchingNames(struct bbiFile *bbi,
 	struct bptFile *index, char **names, int nameCount)
 /* Get list of file chunks that match any of the names.  Can slFreeList this when done. */
 {
-/* Go through all names and make a blockList that includes all blocks with any hit to any name.  
+/* Go through all names and make a blockList that includes all blocks with any hit to any name.
  * Many of these blocks will occur multiple times. */
 struct slRef *blockList = NULL;
 int nameIx;
 for (nameIx = 0; nameIx < nameCount; ++nameIx)
     {
     char *name = names[nameIx];
-    struct slRef *oneList = bptFileFindMultiple(index, 
+    struct slRef *oneList = bptFileFindMultiple(index,
 	    name, strlen(name), sizeof(struct offsetSize));
     blockList = slCat(oneList, blockList);
     }
@@ -337,10 +337,10 @@ struct hash *hash = target;
 return hashLookup(hash, fieldString) != NULL;
 }
 
-static struct bigBedInterval *bigBedIntervalsMatchingName(struct bbiFile *bbi, 
-    struct fileOffsetSize *fosList, BbFirstWordMatch matcher, int fieldIx, 
+static struct bigBedInterval *bigBedIntervalsMatchingName(struct bbiFile *bbi,
+    struct fileOffsetSize *fosList, BbFirstWordMatch matcher, int fieldIx,
     void *target, struct lm *lm)
-/* Return list of intervals inside of sectors of bbiFile defined by fosList where the name 
+/* Return list of intervals inside of sectors of bbiFile defined by fosList where the name
  * matches target somehow. */
 {
 struct bigBedInterval *interval, *intervalList = NULL;
@@ -415,7 +415,7 @@ struct bigBedInterval *bigBedNameQuery(struct bbiFile *bbi, struct bptFile *inde
 /* Return list of intervals matching file. These intervals will be allocated out of lm. */
 {
 struct fileOffsetSize *fosList = bigBedChunksMatchingName(bbi, index, name);
-struct bigBedInterval *intervalList = bigBedIntervalsMatchingName(bbi, fosList, 
+struct bigBedInterval *intervalList = bigBedIntervalsMatchingName(bbi, fosList,
     bbWordMatchesName, fieldIx, name, lm);
 slFreeList(&fosList);
 return intervalList;
@@ -437,7 +437,7 @@ for (nameIx=0; nameIx < nameCount; ++nameIx)
 
 
 /* Get intervals where name matches hash target. */
-struct bigBedInterval *intervalList = bigBedIntervalsMatchingName(bbi, fosList, 
+struct bigBedInterval *intervalList = bigBedIntervalsMatchingName(bbi, fosList,
     bbWordIsInHash, fieldIx, hash, lm);
 
 /* Clean up and return results. */
@@ -460,7 +460,7 @@ for (interval = intervalList; interval != NULL; interval = interval->next)
     }
 }
 
-int bigBedIntervalToRowLookupChrom(struct bigBedInterval *interval, 
+int bigBedIntervalToRowLookupChrom(struct bigBedInterval *interval,
     struct bigBedInterval *prevInterval, struct bbiFile *bbi,
     char *chromBuf, int chromBufSize, char *startBuf, char *endBuf, char **row, int rowSize)
 /* Convert bigBedInterval to array of chars equivalend to what you'd get by parsing the
@@ -468,9 +468,9 @@ int bigBedIntervalToRowLookupChrom(struct bigBedInterval *interval,
  * bigBedIntervalToRow.  This one will look up the chromosome based on the chromId field
  * of the interval,  which is relatively time consuming.  To avoid doing this unnecessarily
  * pass in a non-NULL prevInterval,  and if the chromId is the same on prevInterval as this,
- * it will avoid the lookup.  The chromBufSize should be at greater or equal to 
+ * it will avoid the lookup.  The chromBufSize should be at greater or equal to
  * bbi->chromBpt->keySize+1. The startBuf and endBuf are used to hold the ascii representation of
- * start and end, and should be 16 bytes.  Note that the interval->rest string will have zeroes 
+ * start and end, and should be 16 bytes.  Note that the interval->rest string will have zeroes
  * inserted as a side effect.  Returns number of fields in row.  */
 {
 int lastChromId = (prevInterval == NULL ? -1 : prevInterval->chromId);
@@ -540,7 +540,7 @@ if (offset == 0)
    return NULL;
 udcSeek(udc, offset);
 
-/* Construct list of field that are being indexed.  List is list of 
+/* Construct list of field that are being indexed.  List is list of
  * field numbers within asObj. */
 int i;
 struct slInt *intList = NULL, *intEl;
@@ -641,6 +641,3 @@ internalErr();
 errAbort("%s is not indexed in %s", fieldName, bbi->fileName);
 return NULL;
 }
-
-
-

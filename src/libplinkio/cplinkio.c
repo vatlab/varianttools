@@ -28,7 +28,7 @@ typedef struct
 
 /**
  * Deallocates a Python CPlinkFile object.
- * 
+ *
  * @param self Pointer to a c_plink_file_t.
  */
 void
@@ -120,7 +120,7 @@ plinkio_open(PyObject *self, PyObject *args)
     const char *path;
     struct pio_file_t plink_file = { {0} };
     c_plink_file_t *c_plink_file;
-    
+
     if( !PyArg_ParseTuple( args, "s", &path ) )
     {
         return NULL;
@@ -135,7 +135,7 @@ plinkio_open(PyObject *self, PyObject *args)
             PyErr_SetString( PyExc_IOError, "Error while trying to load the BED file." );
         }else{
             PyErr_SetString( PyExc_IOError, "Unknown plink file I/O Error." );
-        } 
+        }
         return NULL;
     }
 
@@ -168,7 +168,7 @@ plinkio_next_row(PyObject *self, PyObject *args)
 {
     PyObject *plink_file;
     c_plink_file_t *c_plink_file;
-    
+
     if( !PyArg_ParseTuple( args, "O!", &c_plink_file_prototype, &plink_file ) )
     {
         return NULL;
@@ -202,16 +202,16 @@ plinkio_reset_row(PyObject *self, PyObject *args)
 {
     PyObject *plink_file;
     c_plink_file_t *c_plink_file;
-    
+
     if( !PyArg_ParseTuple( args, "O!", &c_plink_file_prototype, &plink_file ) )
     {
         return NULL;
     }
 
     c_plink_file = (c_plink_file_t *) plink_file;
-    
+
     pio_reset_row( &c_plink_file->file );
-    
+
     Py_RETURN_NONE;
 }
 
@@ -230,7 +230,7 @@ plinkio_get_loci(PyObject *self, PyObject *args)
     PyObject *plink_file;
     c_plink_file_t *c_plink_file;
     int i;
-    
+
     if( !PyArg_ParseTuple( args, "O!", &c_plink_file_prototype, &plink_file ) )
     {
         return NULL;
@@ -285,7 +285,7 @@ plinkio_get_samples(PyObject *self, PyObject *args)
     PyObject *plink_file;
     c_plink_file_t *c_plink_file;
     int i;
-    
+
     if( !PyArg_ParseTuple( args, "O!", &c_plink_file_prototype, &plink_file ) )
     {
         return NULL;
@@ -339,14 +339,14 @@ plinkio_one_locus_per_row(PyObject *self, PyObject *args)
 {
     PyObject *plink_file;
     c_plink_file_t *c_plink_file;
-    
+
     if( !PyArg_ParseTuple( args, "O!", &c_plink_file_prototype, &plink_file ) )
     {
         return NULL;
     }
 
     c_plink_file = (c_plink_file_t *) plink_file;
- 
+
     return PyBool_FromLong( (long) pio_one_locus_per_row( &c_plink_file->file ) );
 }
 
@@ -363,7 +363,7 @@ plinkio_close(PyObject *self, PyObject *args)
 {
     PyObject *plink_file;
     c_plink_file_t *c_plink_file;
-    
+
     if( !PyArg_ParseTuple( args, "O!", &c_plink_file_prototype, &plink_file ) )
     {
         return NULL;
@@ -372,8 +372,8 @@ plinkio_close(PyObject *self, PyObject *args)
     c_plink_file = (c_plink_file_t *) plink_file;
 
     pio_close( &c_plink_file->file );
-    
-    Py_RETURN_NONE;    
+
+    Py_RETURN_NONE;
 }
 
 /**
@@ -390,12 +390,12 @@ plinkio_transpose(PyObject *self, PyObject *args)
 {
     const char *old_path;
     const char *new_path;
-    
+
     if( !PyArg_ParseTuple( args, "ss", &old_path, &new_path ) )
     {
         return NULL;
     }
-     
+
     return PyBool_FromLong( (long) ( pio_transpose( old_path, new_path ) == PIO_OK ) );
 }
 

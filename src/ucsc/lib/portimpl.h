@@ -22,7 +22,7 @@ struct webServerSpecific
     /* Return cgi suffix. */
     char * (*cgiSuffix)();
 #endif /* NEVER */
-    
+
     /* Return relative speed of CPU. (UCSC CSE 1999 FTP machine is 1.0) */
     double (*speed)();
 
