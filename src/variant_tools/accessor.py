@@ -19,17 +19,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import os
-
-os.environ['NUMEXPR_MAX_THREADS'] = '8'
-
 import numpy as np
 import tables as tb
 
 from .merge_sort_parallel import binarySearch
-import time
 
 from .utils import chunks_start_stop, env
 
+os.environ['NUMEXPR_MAX_THREADS'] = '8'
 
 
 class Engine_Storage(object):
@@ -186,11 +183,12 @@ class HDF5Engine_storage(Base_Storage):
                 i = np.where(colnames == sample_id)[0][0]
 
                 group.samplemask[i] = True
-            except:
+            except Exception as e:
+                print(e)
                 pass
 
     def remove_genotype(self, cond):
-        chrs = []  #["X","Y"]
+        chrs = []  # ["X","Y"]
         chrs.extend(range(1, 20))
         for chr in chrs:
             genoNode = "/chr" + str(chr)
@@ -248,7 +246,6 @@ class HDF5Engine_storage(Base_Storage):
 
                 pass
             except Exception as e:
-                # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
                 env.logger.error(e)
                 pass
 
@@ -282,7 +279,6 @@ class HDF5Engine_storage(Base_Storage):
                 except tb.exceptions.NoSuchNodeError:
                     pass
                 except Exception as e:
-                    # env.logger.error("The imported VCF file doesn't have DP or GQ value available for chromosome {}.".format(chr))
                     print(e)
                     pass
 
@@ -510,15 +506,15 @@ class HDF5Engine_access(Base_Access):
         node = "/chr" + chr
         if node not in self.file:
 
-            self.file.create_group("/","chr"+chr,"chromosome")
-        group=self.file.get_node(node)
-        groupName=str(groupName)
-        if len(groupName)>0:
+            self.file.create_group("/", "chr" + chr, "chromosome")
+        group = self.file.get_node(node)
+        groupName = str(groupName)
+        if len(groupName) > 0:
             if "_" not in chr:
-                node="/chr"+chr+"/"+groupName
+                node = "/chr" + chr + "/" + groupName
                 if node not in self.file:
-                    self.file.create_group("/chr"+chr,groupName)
-                group=self.file.get_node(node)
+                    self.file.create_group("/chr" + chr, groupName)
+                group = self.file.get_node(node)
         return group
 
     def checkGroup(self, chr, groupName=""):
@@ -552,8 +548,7 @@ class HDF5Engine_access(Base_Access):
         numVariants = 0
         if method == "min":
             num = 1000000
-        for rownames, colnames, sub_all in self.get_all_genotype_genoinfo(
-            [sampleID], [], [info]):
+        for rownames, colnames, sub_all in self.get_all_genotype_genoinfo([sampleID], [], [info]):
             # genotype = sub_all[0]
             genoinfo = sub_all[1]
             if method == "avg":
@@ -591,11 +586,10 @@ class HDF5Engine_access(Base_Access):
             numCount[chr] = numVariants - len(numNan[0])
         return totalNum, numCount
 
-    def num_samples_variants(self,sampleIDs):
-        totalNum = [0]*len(sampleIDs)
-        numCount={}
+    def num_samples_variants(self, sampleIDs):
+        totalNum = [0] * len(sampleIDs)
+        numCount = {}
         for rownames, colnames, genoinfo in self.get_all_genotype(sampleIDs):
-            total=0
             for i, sampleID in enumerate(sampleIDs):
                 numVariants = rownames.shape[:][0]
                 colPos = np.where(colnames == sampleID)[0]
@@ -603,14 +597,12 @@ class HDF5Engine_access(Base_Access):
                 numNan = np.where(np.isnan(data))
                 totalNum[i] += numVariants - len(numNan[0])
                 # numCount[chr] = numVariants - len(numNan[0])
-        return totalNum,numCount
-
+        return totalNum, numCount
 
     def num_genotypes(self, sampleID, cond, genotypes):
         totalNum = 0
 
-        for rownames, colnames, genoinfo in self.get_all_genotype_filter(
-            [sampleID], genotypes):
+        for rownames, colnames, genoinfo in self.get_all_genotype_filter([sampleID], genotypes):
             if cond is None:
                 numNan = np.where(np.isnan(genoinfo))
                 # numNone = np.where(genoinfo == -1)
@@ -628,8 +620,7 @@ class HDF5Engine_access(Base_Access):
 
     def sum_genotypes(self, sampleID, cond, genotypes):
         totalGeno = 0
-        for rownames, colnames, genoinfo in self.get_all_genotype_filter(
-            [sampleID], genotypes):
+        for rownames, colnames, genoinfo in self.get_all_genotype_filter([sampleID], genotypes):
             numGeno = np.nansum(genoinfo)
             totalGeno += numGeno
         return int(totalGeno)
@@ -641,17 +632,15 @@ class HDF5Engine_access(Base_Access):
         self.rownames = group.rownames[:].tolist()
 
         if "GT" in group:
-            self.GT=group.GT[:]
+            self.GT = group.GT[:]
 
-            snpdict=dict.fromkeys(self.colnames,{})
-            for key,value in snpdict.items():
-                snpdict[key]=dict.fromkeys(self.rownames,(0,))
-
+            snpdict = dict.fromkeys(self.colnames, {})
+            for key, value in snpdict.items():
+                snpdict[key] = dict.fromkeys(self.rownames, (0,))
 
             for rowidx, rowID in enumerate(self.rownames):
                 for colidx, colID in enumerate(self.colnames):
                     snpdict[colID][rowID] = (self.GT[rowidx, colidx],)
-
 
         else:
             snpdict = dict.fromkeys(self.colnames, {})
@@ -683,15 +672,15 @@ class HDF5Engine_access(Base_Access):
             sub_Mask[sub_Mask == -1.0] = np.nan
             sub_geno = np.multiply(sub_geno, sub_Mask)
             update_rowMask = rowMask[rowPos]
-            rowMasked = np.where(update_rowMask == True)[0]
-            sampleMasked = np.where(sampleMask == True)[0]
+            rowMasked = np.where(update_rowMask is True)[0]
+            sampleMasked = np.where(sampleMask is True)[0]
             if len(rowMasked) > 0:
                 update_rownames = np.array(update_rownames)[np.where(
-                    update_rowMask == False)[0]]
+                    update_rowMask is False)[0]]
                 sub_geno = np.delete(sub_geno, rowMasked, 0)
 
             if len(sampleMasked) > 0:
-                colnames = colnames[np.where(sampleMask == False)[0]]
+                colnames = colnames[np.where(sampleMask is False)[0]]
                 sub_geno = np.delete(sub_geno, sampleMasked, 1)
             return np.array(update_rownames), colnames, np.array(sub_geno)
         except IndexError:
@@ -732,8 +721,7 @@ class HDF5Engine_access(Base_Access):
                 if (len(sampleNames) > 0):
                     colpos = list(map(lambda x: colnames.index(x), sampleNames))
                 else:
-                    colpos=range(0,len(colnames))
-
+                    colpos = range(0, len(colnames))
 
                 if len(variantIDs) > 0:
                     for id in variantIDs:
@@ -755,7 +743,8 @@ class HDF5Engine_access(Base_Access):
                         # genoinfo=node.GT[minPos:maxPos,colpos]
                         genoinfo = node.GT[minPos:maxPos, :]
 
-                        updated_rownames,updated_colnames,updated_geno=self.filter_removed_genotypes(minPos,maxPos,genoinfo,node,colpos,[],"GT")
+                        updated_rownames, updated_colnames, updated_geno = self.filter_removed_genotypes(
+                            minPos, maxPos, genoinfo, node, colpos, [], "GT")
 
                     except NameError:
                         env.logger.error(
@@ -932,7 +921,7 @@ class HDF5Engine_access(Base_Access):
                                  colpos,
                                  rowpos,
                                  field=""):
-        #assume rowIDs are sorted by genome position
+        # assume rowIDs are sorted by genome position
         rownames = node.rownames[minPos:maxPos]
         colnames = node.colnames[:]
         rowMask = node.rowmask[minPos:maxPos]
@@ -943,12 +932,12 @@ class HDF5Engine_access(Base_Access):
         #     genoinfo=np.nan_to_num(genoinfo)
 
         try:
-            sub_Mask = node.Mask[minPos:maxPos,:]
+            sub_Mask = node.Mask[minPos:maxPos, :]
             sub_Mask = sub_Mask.astype(float)
             sub_Mask[sub_Mask == -1.0] = np.nan
             sub_geno = np.multiply(genoinfo, sub_Mask)
 
-            rowMasked = np.where(rowMask == True)[0]
+            rowMasked = np.where(rowMask is True)[0]
 
             # sampleMasked=np.where(sampleMask==True)[0]
 
@@ -962,7 +951,7 @@ class HDF5Engine_access(Base_Access):
 
             if len(rowpos) == 0 and len(rowMasked) > 0:
 
-                rownames = rownames[np.where(rowMask == False)]
+                rownames = rownames[np.where(rowMask is False)]
                 sub_geno = np.delete(sub_geno, rowMasked, 0)
 
             # if len(sampleMasked)>0:
@@ -1079,7 +1068,7 @@ class HDF5Engine_access(Base_Access):
                         sub_all.append(np.array(row_info))
                 return sub_all
             else:
-                #return np.zeros(shape=(len(node.GT[1,colpos])),dtype=int)
+                # return np.zeros(shape=(len(node.GT[1,colpos])),dtype=int)
                 # return [None]*len(node.GT[1,colpos])
 
                 sub_all.append([np.full(len(node.GT[1, colpos]), np.nan)])

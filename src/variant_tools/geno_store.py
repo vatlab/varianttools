@@ -106,8 +106,8 @@ class ImportStatus:
 
     def pendingImport(self):
         # return waiting (queued, to be imported) and ongoing import
-        return sum([x == 0 for x in list(self.tasks.values())
-            ]), sum([x == 1 for x in list(self.tasks.values())])
+        return sum([x == 0 for x in list(self.tasks.values())]),
+        sum([x == 1 for x in list(self.tasks.values())])
 
     def addDedupItem(self, geno_file, geno_status, IDs):
         self.lock.acquire()
@@ -551,7 +551,8 @@ class GenotypeImportWorker(Process):
                         self.proc_index))
                     break
             # get parameters
-            self.input_filename, self.genotype_file, self.genotype_status, start_sample, end_sample, self.sample_ids = item
+            self.input_filename, self.genotype_file, self.genotype_status,
+            start_sample, end_sample, self.sample_ids = item
             self.processor.reset(
                 import_var_info=False,
                 import_sample_range=[0, 0]
@@ -697,12 +698,11 @@ class Sqlite_Store(Base_Store):
         self.cur.execute('SELECT count(*) FROM genotype_{};'.format(sample_id))
         return self.cur.fetchone()[0]
 
-    def num_samples_variants(self,sample_ids):
-        return [self.num_variants(sample_id) for sample_id in sample_ids ]
+    def num_samples_variants(self, sample_ids):
+        return [self.num_variants(sample_id) for sample_id in sample_ids]
 
-    def get_samplesGenotypeFields(self,sample_ids):
+    def get_samplesGenotypeFields(self, sample_ids):
         return [','.join(self.geno_fields_nolower(sample_id)) for sample_id in sample_ids]
-
 
     def geno_fields(self, sample_id):
         # sampleGenotypeHeader = [x.lower() for x in self.db.getHeaders('genotype_{}'.format(sample_id))]
@@ -789,8 +789,7 @@ class Sqlite_Store(Base_Store):
             try:
                 # self.cur.execute('DELETE FROM {}_genotype.genotype_{} WHERE {};'\
                 #     .format(self.proj.name, ID, cond))
-                self.cur.execute('DELETE FROM genotype_{} WHERE {};'\
-                    .format(ID, cond))
+                self.cur.execute('DELETE FROM genotype_{} WHERE {};'.format(ID, cond))
             except Exception as e:
                 env.logger.warning(
                     'Failed to remove genotypes from sample {}: {}'.format(
@@ -821,8 +820,8 @@ class Sqlite_Store(Base_Store):
         #
         # This special case does not hold because sometimes variants are imported without sample information.
         #
-        #elif len(IDs) == proj.db.numOfRows('sample'):
-        #    env.logger.info('All {} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
+        # elif len(IDs) == proj.db.numOfRows('sample'):
+        #   env.logger.info('All {} samples are selected by condition: {}'.format(len(IDs), ' AND '.join(args.samples)))
         #    # we do not have to add anything to where_clause
         elif len(IDs) < 50:
             # we allow 14 tables in other 'union' or from condition...
@@ -948,7 +947,7 @@ class Sqlite_Store(Base_Store):
                         if rec[queryIndex] in [None, '', '.']:
                             continue
                         operation = operations[index]
-                        #field = genotypeFields[index]
+                        # field = genotypeFields[index]
                         if operation == MEAN:
                             if variants[rec[0]][recIndex] is None:
                                 # we need to track the number of valid records
@@ -1039,11 +1038,11 @@ class Sqlite_Store(Base_Store):
             env.logger.info('{} variants from {} ({}/{})'.format(
                 'Importing', input_filename, count + 1, len(importer.files)))
             importer.importVariant(input_filename)
-            env.logger.info('{:,} new variants {}{}{} from {:,} lines are imported.'\
-                .format(importer.count[2], "(" if importer.count[2] else '',
-                    ', '.join(['{:,} {}'.format(x, y) for x, y in \
-                        zip(importer.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'unsupported']) if x > 0]),
-                        ")" if importer.count[2] else '', importer.count[0]))
+            env.logger.info('{:,} new variants {}{}{} from {:,} lines are imported.'
+            .format(importer.count[2], "(" if importer.count[2] else '',
+                ', '.join(['{:,} {}'.format(x, y) for x, y in
+            zip(importer.count[3:8], ['SNVs', 'insertions', 'deletions', 'complex variants', 'unsupported']) if x > 0]),
+                ")" if importer.count[2] else '', importer.count[0]))
             # genotypes?
             if importer.genotype_field:
                 importer.prober.reset()
@@ -1185,9 +1184,9 @@ class Sqlite_Store(Base_Store):
             time.sleep(1)
         # final status line
         if len(importer.files) > 1:
-            env.logger.info('{:,} new variants ({}) from {:,} lines ({:,} samples) are imported.'\
+            env.logger.info('{:,} new variants ({}) from {:,} lines ({:,} samples) are imported.'
                 .format(importer.total_count[2],
-                    ', '.join(['{:,} {}'.format(x, y) for x, y in \
+                    ', '.join(['{:,} {}'.format(x, y) for x, y in
                         zip(importer.total_count[3:8], ['SNVs', 'insertions',
                         'deletions', 'complex variants', 'unsupported']) if x > 0]),
                     importer.total_count[0], status.total_sample_count))
@@ -1230,8 +1229,7 @@ class HDF5_Store(Base_Store):
         proj.saveProperty('store', proj.store)
 
         if (os.path.isfile('{}_genotype.DB'.format(self.proj.name)) and
-                os.path.getsize('{}_genotype.DB'.format(self.proj.name)) > 0
-           ) or 'snapshot_genotype.DB' in all_files:
+                os.path.getsize('{}_genotype.DB'.format(self.proj.name)) > 0) or 'snapshot_genotype.DB' in all_files:
             # if os.path.isfile('{}_genotype.DB'.format(self.proj.name)):
             #     os.remove('{}_genotype.DB'.format(self.proj.name))
             if 'snapshot_genotype.DB' in all_files:
@@ -1492,31 +1490,31 @@ class HDF5_Store(Base_Store):
             accessEngine.close()
         return num
 
-    def num_samples_variants(self,sampleIDs):
+    def num_samples_variants(self, sampleIDs):
         sampleFileMap = self.get_HDF5_sampleMap()
-        totalNum=[]
-        HDF5Files=glob.glob("tmp*genotypes.h5")
-        HDF5Files.sort(key=lambda x:int(x.split("_")[1]))
+        totalNum = []
+        HDF5Files = glob.glob("tmp*genotypes.h5")
+        HDF5Files.sort(key=lambda x: int(x.split("_")[1]))
         for HDFfileName in HDF5Files:
-            num=[]
+            num = []
             filename = HDFfileName.split("/")[-1]
             if filename in sampleFileMap:
                 samplesInfile = sampleFileMap[filename]
                 accessEngine = Engine_Access.choose_access_engine(HDFfileName)
 
-                colnames=np.intersect1d(sampleIDs,samplesInfile)
-                if len(colnames)>0:
+                colnames = np.intersect1d(sampleIDs, samplesInfile)
+                if len(colnames) > 0:
                     num, _ = accessEngine.num_samples_variants(colnames)
                 accessEngine.close()
-            if len(num)>0:
+            if len(num) > 0:
                 totalNum.extend(num)
         return totalNum
 
-    def get_samplesGenotypeFields(self,sampleIDs):
+    def get_samplesGenotypeFields(self, sampleIDs):
         sampleFileMap = self.get_HDF5_sampleMap()
-        samplesGenotypeFields=[]
-        HDF5Files=glob.glob("tmp*genotypes.h5")
-        HDF5Files.sort(key=lambda x:int(x.split("_")[1]))
+        samplesGenotypeFields = []
+        HDF5Files = glob.glob("tmp*genotypes.h5")
+        HDF5Files.sort(key=lambda x: int(x.split("_")[1]))
         for HDFfileName in HDF5Files:
             filename = HDFfileName.split("/")[-1]
             if filename in sampleFileMap:
@@ -1526,7 +1524,6 @@ class HDF5_Store(Base_Store):
                     if sample in sampleIDs:
                         samplesGenotypeFields.append(sampleGenotypeFields)
         return samplesGenotypeFields
-
 
     def geno_fields(self, sampleID):
         HDFfileName = self.get_sampleFileName(sampleID)
@@ -1661,7 +1658,7 @@ class HDF5_Store(Base_Store):
                               prog_step):
         # print(genotypes)
         sampleFileMap = self.get_HDF5_sampleMap()
-        #fieldSelect = list(sampleDict.values())[0][1]
+        # fieldSelect = list(sampleDict.values())[0][1]
         variants = []
         if variant_table != 'variant':
             variants = self.get_selected_variants(variant_table)
@@ -1751,10 +1748,12 @@ class HDF5_Store(Base_Store):
         # prog.done()
         return master
 
-    # def get_genoType_genoInfo_worker(self,queue,accessEngine,samples,variants,genotypes,fieldSelect,validGenotypeFields,operations):
+    # def get_genoType_genoInfo_worker(self,queue,accessEngine,samples,variants,genotypes,fieldSelect,
+    # validGenotypeFields,operations):
     #     queue.put(accessEngine.get_geno_field_from_HDF5(samples,variants,genotypes,fieldSelect,validGenotypeFields,operations))
 
-    # def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,validGenotypeFields,operations,fieldCalcs,prog,prog_step):
+    # def get_genoType_genoInfo(self,sampleDict,genotypes,variant_table,genotypeFields,validGenotypeIndices,
+    # validGenotypeFields,operations,fieldCalcs,prog,prog_step):
     #     # print(genotypes)
     #     # print(validGenotypeFields)
     #     sampleFileMap=self.get_HDF5_sampleMap()
@@ -1831,8 +1830,7 @@ class HDF5_Store(Base_Store):
         invalidate = []
         if sex == 1:
             # geno=accessEngine.get_geno_by_sample_ID(sample_ID,"GT_geno",["X"])
-            for rownames, colnames, genoinfo in accessEngine.get_all_genotype(
-                [sample_ID], ["X"]):
+            for rownames, colnames, genoinfo in accessEngine.get_all_genotype([sample_ID], ["X"]):
                 for idx, rowname in enumerate(rownames):
                     genotype = genoinfo[idx]
                     if np.isnan(genotype):
@@ -1842,8 +1840,7 @@ class HDF5_Store(Base_Store):
             invalidate = geno[geno == 2]
         if sex == 2:
             # invalidate=accessEngine.get_geno_by_sample_ID(sample_ID,"GT_geno",["Y"])
-            for rownames, colnames, genoinfo in accessEngine.get_all_genotype(
-                [sample_ID], ["Y"]):
+            for rownames, colnames, genoinfo in accessEngine.get_all_genotype([sample_ID], ["Y"]):
                 for idx, rowname in enumerate(rownames):
                     genotype = genoinfo[idx]
                     if np.isnan(genotype):

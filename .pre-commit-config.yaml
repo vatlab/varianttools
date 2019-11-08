@@ -9,7 +9,7 @@ repos:
     -   id: check-yaml
     -   id: check-added-large-files
     -   id: flake8
-        args: ["--ignore=E501,W504,W503"]
+        args: ["--ignore=E501,W504,W503, E128"]
 -   repo: https://github.com/pre-commit/mirrors-yapf
     rev: ''
     hooks:
