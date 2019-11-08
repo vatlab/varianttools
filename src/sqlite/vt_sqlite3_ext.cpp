@@ -2302,6 +2302,11 @@ static void samples(
 	}
 
 	char * geno_db_file = (char *)sqlite3_value_text(argv[0]);
+	bool hdf5=false;
+
+	if (strstr(geno_db_file,"proj")!=NULL){
+		hdf5=true;
+	}
 	int variant_id = sqlite3_value_int(argv[1]);
 	char * sample_id_file = (char *)sqlite3_value_text(argv[2]);
 	samplesParams params(argc > 3 ? (char *)sqlite3_value_text(argv[3]) : NULL);
@@ -2325,8 +2330,9 @@ static void samples(
 		it = idNameMap.find(std::string(sample_id_file));
 	}
 	IdNameMap & idMap = it->second;
-
 	int result = 0;
+	printf("%s\n",geno_db_file);
+	
 	// open databases
 	if (!geno_db) {
 		result = sqlite3_open_v2(geno_db_file, &geno_db, SQLITE_OPEN_READONLY, NULL);
@@ -2335,17 +2341,12 @@ static void samples(
 			return;
 		}
 	}
-	//
-	// go through all samples (with id)
-	std::stringstream res;
-	IdNameMap::iterator im = idMap.begin();
-	IdNameMap::iterator im_end = idMap.end();
-	bool first = true;
-	for (; im != im_end; ++im) {
+	
+	if (hdf5){
 		char sql[255];
-		sprintf(sql, "SELECT variant_id FROM genotype_%d WHERE variant_id = %d AND (%s) LIMIT 0,1",
-			im->first, variant_id, params.geno_filter() == NULL ? "1" : params.geno_filter());
-		//
+		printf("success open variant_id is %d\n", variant_id);
+		sprintf(sql, "SELECT chr FROM variant WHERE variant_id = %d ", variant_id);
+		printf("got here\n");
 		sqlite3_stmt * stmt;
 		result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
 		if (result != SQLITE_OK) {
@@ -2354,17 +2355,45 @@ static void samples(
 		}
 		result = sqlite3_step(stmt);
 		if (result == SQLITE_ROW) {
-			if (first)
-				first = false;
-			else
-				res << params.delimiter();
-			res << im->second;
+			char* txt = (char*)sqlite3_column_text(stmt, 0);
+			printf("got there\n");
+			printf("%s\n",txt);
+		
 		}
+
+
+	}else{
+
+		// go through all samples (with id)
+		std::stringstream res;
+		IdNameMap::iterator im = idMap.begin();
+		IdNameMap::iterator im_end = idMap.end();
+		bool first = true;
+		for (; im != im_end; ++im) {
+			char sql[255];
+			sprintf(sql, "SELECT variant_id FROM genotype_%d WHERE variant_id = %d AND (%s) LIMIT 0,1",
+				im->first, variant_id, params.geno_filter() == NULL ? "1" : params.geno_filter());
+			//
+			sqlite3_stmt * stmt;
+			result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
+			if (result != SQLITE_OK) {
+				sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
+				return;
+			}
+			result = sqlite3_step(stmt);
+			if (result == SQLITE_ROW) {
+				if (first)
+					first = false;
+				else
+					res << params.delimiter();
+				res << im->second;
+			}
+		}
+		if (res.str().empty())
+			sqlite3_result_null(context);
+		else
+			sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
 	}
-	if (res.str().empty())
-		sqlite3_result_null(context);
-	else
-		sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
 	// output a string with all information
 	// we do not close the database because we are readonly and we need the database for
 	// next use.

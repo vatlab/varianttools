@@ -225,9 +225,10 @@ def outputVariants(proj,
     env.logger.trace('Running query {}'.format(query))
     # if output to a file
     cur = proj.db.cursor()
-
+    print(query)
     try:
         cur.execute(query)
+
     except OperationalError as e:
         # if there is only one field, we know what has gone wrong
         if len(output_fields) == 1:

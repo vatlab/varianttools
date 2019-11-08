@@ -3929,8 +3929,8 @@ def consolidateFieldName(proj, table, clause_or_list, alt_build=False):
                     return ("samples('{}_genotype.DB', variant.variant_id, '{}')"
                             .format(proj.name, ret))
                 elif proj.store == "hdf5":
-                    return ("samples('hdf5', variant.variant_id, '{}')"
-                            .format(ret))
+                    return ("samples('{}.proj', variant.variant_id, '{}')"
+                            .format(proj.name,ret))
             else:
                 return (
                     "samples('{}_genotype.DB', variant.variant_id, '{}', '{}')"
