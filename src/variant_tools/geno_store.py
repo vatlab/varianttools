@@ -106,8 +106,7 @@ class ImportStatus:
 
     def pendingImport(self):
         # return waiting (queued, to be imported) and ongoing import
-        return sum([x == 0 for x in list(self.tasks.values())]),
-        sum([x == 1 for x in list(self.tasks.values())])
+        return sum([x == 0 for x in list(self.tasks.values())]), sum([x == 1 for x in list(self.tasks.values())])
 
     def addDedupItem(self, geno_file, geno_status, IDs):
         self.lock.acquire()
@@ -551,8 +550,7 @@ class GenotypeImportWorker(Process):
                         self.proc_index))
                     break
             # get parameters
-            self.input_filename, self.genotype_file, self.genotype_status,
-            start_sample, end_sample, self.sample_ids = item
+            self.input_filename, self.genotype_file, self.genotype_status, start_sample, end_sample, self.sample_ids = item
             self.processor.reset(
                 import_var_info=False,
                 import_sample_range=[0, 0]
