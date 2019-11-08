@@ -162,12 +162,14 @@ class TestRemove(ProcessTestCase):
         self.assertFail('vtools remove geno_fields')
         self.assertFail('vtools remove geno_fields variant_id')
         self.assertFail('vtools remove geno_fields gt')
-        self.assertSucc('vtools remove geno_fields DP_geno')
+        
 
         if self.storeMode == "sqlite":
+            self.assertSucc('vtools remove geno_fields DP_geno')
             self.assertOutput('vtools show genotypes',
                               'output/remove_genofield_after_sqlite.txt')
         elif self.storeMode == "hdf5":
+            self.assertSucc('vtools remove geno_fields DP')
             self.assertOutput('vtools show genotypes',
                               'output/remove_genofield_after_hdf5.txt')
 
