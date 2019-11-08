@@ -697,6 +697,13 @@ class Sqlite_Store(Base_Store):
         self.cur.execute('SELECT count(*) FROM genotype_{};'.format(sample_id))
         return self.cur.fetchone()[0]
 
+    def num_samples_variants(self,sample_ids):
+        return [self.num_variants(sample_id) for sample_id in sample_ids ]
+
+    def get_samplesGenotypeFields(self,sample_ids):
+        return [','.join(self.geno_fields_nolower(sample_id)) for sample_id in sample_ids]
+
+
     def geno_fields(self, sample_id):
         # sampleGenotypeHeader = [x.lower() for x in self.db.getHeaders('genotype_{}'.format(sample_id))]
         sampleGenotypeHeader = [
@@ -1488,7 +1495,9 @@ class HDF5_Store(Base_Store):
     def num_samples_variants(self,sampleIDs):
         sampleFileMap = self.get_HDF5_sampleMap()
         totalNum=[]
-        for HDFfileName in glob.glob("tmp*genotypes.h5"):
+        HDF5Files=glob.glob("tmp*genotypes.h5")
+        HDF5Files.sort(key=lambda x:int(x.split("_")[1]))
+        for HDFfileName in HDF5Files:
             num=[]
             filename = HDFfileName.split("/")[-1]
             if filename in sampleFileMap:
@@ -1497,10 +1506,26 @@ class HDF5_Store(Base_Store):
 
                 colnames=np.intersect1d(sampleIDs,samplesInfile)
                 if len(colnames)>0:
-                    num, _ = accessEngine.num_samples_variants(samplesInfile)
+                    num, _ = accessEngine.num_samples_variants(colnames)
                 accessEngine.close()
-            totalNum.extend(num)
+            if len(num)>0:
+                totalNum.extend(num)
         return totalNum
+
+    def get_samplesGenotypeFields(self,sampleIDs):
+        sampleFileMap = self.get_HDF5_sampleMap()
+        samplesGenotypeFields=[]
+        HDF5Files=glob.glob("tmp*genotypes.h5")
+        HDF5Files.sort(key=lambda x:int(x.split("_")[1]))
+        for HDFfileName in HDF5Files:
+            filename = HDFfileName.split("/")[-1]
+            if filename in sampleFileMap:
+                samplesInfile = sampleFileMap[filename]
+                sampleGenotypeFields = ','.join(self.geno_fields_nolower(samplesInfile[0]))
+                for sample in samplesInfile:
+                    if sample in sampleIDs:
+                        samplesGenotypeFields.append(sampleGenotypeFields)
+        return samplesGenotypeFields
 
 
     def geno_fields(self, sampleID):

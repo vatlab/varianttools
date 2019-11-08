@@ -799,7 +799,7 @@ class HDF5Engine_access(Base_Access):
                 for minPos, maxPos in chunkPos:
                     if "/chr" + str(
                             chr) + "/GT" in self.file and minPos != maxPos:
-                        genoinfo = node.GT[minPos:maxPos, colpos]
+                        genoinfo = node.GT[minPos:maxPos, :]
                         sub_rownames, updated_colnames, sub_geno = self.filter_removed_genotypes(
                             minPos, maxPos, genoinfo, node, colpos, [])
                         yield np.array(sub_rownames), np.array(
@@ -943,7 +943,7 @@ class HDF5Engine_access(Base_Access):
         #     genoinfo=np.nan_to_num(genoinfo)
 
         try:
-            sub_Mask = node.Mask[minPos:maxPos, :]
+            sub_Mask = node.Mask[minPos:maxPos,:]
             sub_Mask = sub_Mask.astype(float)
             sub_Mask[sub_Mask == -1.0] = np.nan
             sub_geno = np.multiply(genoinfo, sub_Mask)
