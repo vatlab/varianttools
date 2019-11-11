@@ -466,6 +466,7 @@ extern "C" {
 #include "vcf.h"
 // for bam file
 #include "bamFile.h"
+#include "genotypes.h"
 }
 
 
@@ -2358,7 +2359,8 @@ static void samples(
 			char* txt = (char*)sqlite3_column_text(stmt, 0);
 			printf("got there\n");
 			printf("%s\n",txt);
-		
+			int check=get_Genotype("/Users/jma7/Development/VAT_ref/ismb-2018/data/tmp_1_90_genotypes.h5");
+			printf("check %d\n",check);
 		}
 
 

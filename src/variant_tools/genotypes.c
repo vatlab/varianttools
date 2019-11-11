@@ -8,7 +8,9 @@
 #include "dirent.h"
 #include "regex.h"
 #include "string.h"
-#include "../hdf5-blosc/src/blosc_filter.h"
+// #include "../hdf5-blosc/src/blosc_filter.h"
+#include "blosc_filter.h"
+#include "genotypes.h"
 
 
 int findIndex(int *array, size_t size, int target) 
@@ -56,30 +58,30 @@ int getData(char * fileName, char * node, int size){
 }
 
 
-int get_Genotype(char *fileName){
+// int get_Genotype(char *fileName){
 
-    char *version, *date;
-    int r;
-    hsize_t i;
+//     char *version, *date;
+//     int r;
+//     hsize_t i;
        
-    r = register_blosc(&version, &date);
-    printf("Blosc version info: %s (%s) %d\n", version, date,r);
-    int dataInNode=getData(fileName,"/chr8/GT",2);
+//     r = register_blosc(&version, &date);
+//     printf("Blosc version info: %s (%s) %d\n", version, date,r);
+//     int dataInNode=getData(fileName,"/chr8/GT",2);
 
-    printf("\n");
-    printf("Dataset: \n");
-    int pos=0;
-    for (i = 0; i < dims[1]; i++) printf("%d ", genotypes[pos][i]);
-    printf("\n");
-    return 0;    
-
-
-}
+//     printf("\n");
+//     printf("Dataset: \n");
+//     int pos=0;
+//     for (i = 0; i < dims[1]; i++) printf("%d ", genotypes[pos][i]);
+//     printf("\n");
+//     return 0;    
 
 
+// }
 
 
-int getGenotype(char * fileName)
+
+
+int get_Genotype(char * fileName)
 {
 
     hid_t       file;                        /* handles */
@@ -192,7 +194,7 @@ int getGenotype(char * fileName)
    // } 
 
 
-    int variant_id=1472;
+    int variant_id=1;
     int pos=findIndex(rownames,row_dims[0],variant_id);
 
     for (i = 0; i < dims[1]; i++) printf("%d ", genotypes[pos][i]);

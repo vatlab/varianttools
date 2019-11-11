@@ -177,6 +177,7 @@ UCSC_FILES = [
 ]
 
 STAT_FILES = ['src/variant_tools/fisher2.c']
+UTIL_FILES = ['src/variant_tools/genotypes.c']
 #
 # During development, if an interface file needs to be re-generated, please
 # remove these files and they will be re-generated with SWIG
@@ -283,9 +284,9 @@ ext_modules=[
         ),
         Extension('variant_tools._vt_sqlite3_ext',
             # stop warning message for sqlite because it is written by us.
-            sources = ['src/sqlite/vt_sqlite3_ext.cpp'] + CGATOOLS_FILES + STAT_FILES + UCSC_FILES,
+            sources = ['src/sqlite/vt_sqlite3_ext.cpp'] + CGATOOLS_FILES + STAT_FILES + UCSC_FILES + UTIL_FILES,
             include_dirs = ["src/", 'src/ucsc/inc', 'src/ucsc/tabix', 'src/ucsc/samtools',
-                'src/sqlite', "src/variant_tools", "src/cgatools"] + ENV_INCLUDE_DIRS,
+                'src/sqlite', "src/variant_tools", "src/cgatools", "src/hdf5-blosc"] + ENV_INCLUDE_DIRS,
             library_dirs = ["build"] + ENV_LIBRARY_DIRS,
             libraries = ['gsl'] + \
                 ['boost_iostreams', 'boost_regex', 'boost_filesystem'] + \
