@@ -42,3 +42,4 @@ variant_tools/ucsctools_wrap.cpp
 .DS_Store
 src/hdf5-blosc/
 src/variant_tools/*.o
+.vscode/

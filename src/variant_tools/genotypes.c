@@ -8,9 +8,10 @@
 #include "dirent.h"
 #include "regex.h"
 #include "string.h"
-// #include "../hdf5-blosc/src/blosc_filter.h"
-#include "blosc_filter.h"
+#include "../hdf5-blosc/blosc_filter.h"
+//#include "blosc_filter.h"
 #include "genotypes.h"
+#include "unistd.h"
 
 
 int findIndex(int *array, size_t size, int target) 
@@ -81,7 +82,7 @@ int getData(char * fileName, char * node, int size){
 
 
 
-int get_Genotype(char * fileName)
+int get_Genotype_from_hdf5(char * fileName, char * chr, int variant_id)
 {
 
     hid_t       file;                        /* handles */
@@ -120,7 +121,20 @@ int get_Genotype(char * fileName)
      * Open the file and the dataset.
      * Get dataset rank and dimension.
      */
-    char * genotypeData="/chr8/GT";
+    // char * genotypeData="/chr8/GT";
+
+    char chrName[20]="";
+    strcpy(chrName, "/chr");
+    strcat(chrName,chr);
+
+    char genotypeData[20]="";
+    strcpy(genotypeData, chrName);
+    strcat(genotypeData, "/GT");
+
+
+
+
+
     genotype = H5Dopen(file, genotypeData, H5P_DEFAULT);
  
 
@@ -131,7 +145,14 @@ int get_Genotype(char * fileName)
        rank, (unsigned long)(dims[0]), (unsigned long)(dims[1]));
 
 
-    char * row_name="/chr8/rownames";
+    // char * row_name="/chr8/rownames";
+
+
+    char row_name[20]="";
+    strcpy(row_name, chrName);
+    strcat(row_name, "/rownames");
+
+
     rowname = H5Dopen(file, row_name, H5P_DEFAULT);
 
     rowSpace = H5Dget_space(rowname);    /* Get filespace handle first. */
@@ -140,7 +161,12 @@ int get_Genotype(char * fileName)
     printf("rownames rank %d, dimensions %lu\n",
        row_rank, (unsigned long)(row_dims[0]));
 
-    char * col_name="/chr8/colnames";
+    // char * col_name="/chr8/colnames";
+    char col_name[20]="";
+    strcpy(col_name, chrName);
+    strcat(col_name, "/rownames");
+
+
     colname = H5Dopen(file, col_name, H5P_DEFAULT);
 
     colSpace = H5Dget_space(colname);    /* Get filespace handle first. */
@@ -194,7 +220,7 @@ int get_Genotype(char * fileName)
    // } 
 
 
-    int variant_id=1;
+    // int variant_id=1;
     int pos=findIndex(rownames,row_dims[0],variant_id);
 
     for (i = 0; i < dims[1]; i++) printf("%d ", genotypes[pos][i]);
@@ -253,25 +279,34 @@ int get_Genotype(char * fileName)
 
 
 
-int
-main (void)
+int get_Genotypes(char *chr,int variant_id)
 {
     
     regex_t     regex;   
     DIR *dir;
     char *dirName="/Users/jma7/Development/VAT_ref/ismb-2018/data/";
+   //  char dirName[200];
+   //  if (getcwd(dirName, sizeof(dirName)) != NULL) {
+   //     printf("Current working dir: %s\n", dirName);
+   // } else {
+   //     perror("getcwd() error");
+   //     return 1;
+   // }
+
     struct dirent *ent;
     int reti = regcomp(&regex, "^tmp.*genotypes.h5$", REG_EXTENDED);
     if ((dir = opendir (dirName)) != NULL) {
       while ((ent = readdir (dir)) != NULL) {
         reti = regexec(&regex, ent->d_name, 0, NULL, 0);
         if (!reti){
-            printf ("%s\n", dirName);
-            char * filePath = (char *) malloc(1 + strlen(dirName)+ strlen(ent->d_name) );
+            char * filePath = (char *) malloc(2 + strlen(dirName)+ strlen(ent->d_name) );
             strcpy(filePath, dirName);
+            strcat(filePath,"/");
             strcat(filePath, ent->d_name);
+            // snprintf(filePath,"%s\\%s",dirName, ent->d_name);
             // int result=getGenotype(filePath);
-            int result=get_Genotype(filePath);
+            printf("%s\n",filePath);
+            int result=get_Genotype_from_hdf5(filePath,chr,variant_id);
 
         }
       }
@@ -281,10 +316,11 @@ main (void)
       return EXIT_FAILURE;
     }
 
+    return 0;
+}
 
 
-
-
-
+int main(void){
+    int result=get_Genotypes("8",1473);
     return 0;
 }

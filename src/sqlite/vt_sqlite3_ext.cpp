@@ -2347,7 +2347,6 @@ static void samples(
 		char sql[255];
 		printf("success open variant_id is %d\n", variant_id);
 		sprintf(sql, "SELECT chr FROM variant WHERE variant_id = %d ", variant_id);
-		printf("got here\n");
 		sqlite3_stmt * stmt;
 		result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
 		if (result != SQLITE_OK) {
@@ -2356,11 +2355,8 @@ static void samples(
 		}
 		result = sqlite3_step(stmt);
 		if (result == SQLITE_ROW) {
-			char* txt = (char*)sqlite3_column_text(stmt, 0);
-			printf("got there\n");
-			printf("%s\n",txt);
-			int check=get_Genotype("/Users/jma7/Development/VAT_ref/ismb-2018/data/tmp_1_90_genotypes.h5");
-			printf("check %d\n",check);
+			char* chr = (char*)sqlite3_column_text(stmt, 0);
+			int check=get_Genotypes(char* chr, int variant_id);
 		}
 
 
