@@ -10,8 +10,9 @@ from next-generation sequencing studies.
 If you are using a conda environment, you can install variant tools with command
 
 ```
-conda install variant_tools -c bioconda
+conda install variant_tools -c bioconda -c conda-forge
 ```
+Option `-c conda-forge` is required to enforce the use of `conda-forge` version of dependencies (e.g. `boost-cpp`) over their counterpoarts in the base channel.
 
 Otherwise, you can try to install it through `pip`
 
