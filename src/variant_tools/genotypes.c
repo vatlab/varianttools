@@ -8,8 +8,8 @@
 #include "dirent.h"
 #include "regex.h"
 #include "string.h"
-#include "../hdf5-blosc/blosc_filter.h"
-//#include "blosc_filter.h"
+//#include "../hdf5-blosc/blosc_filter.h"
+#include "blosc_filter.h"
 #include "genotypes.h"
 #include "unistd.h"
 
@@ -82,7 +82,7 @@ int getData(char * fileName, char * node, int size){
 
 
 
-int get_Genotype_from_hdf5(char * fileName, char * chr, int variant_id)
+int get_Genotype_from_hdf5(char * fileName, char * chr, int variant_id, int samples[],int index)
 {
 
     hid_t       file;                        /* handles */
@@ -113,7 +113,7 @@ int get_Genotype_from_hdf5(char * fileName, char * chr, int variant_id)
     char *version, *date;
     int r;
     r = register_blosc(&version, &date);
-    printf("Blosc version info: %s (%s) %d\n", version, date,r);
+    // printf("Blosc version info: %s (%s) %d\n", version, date,r);
         // char * fileName="/Users/jma7/Development/VAT_ref/ismb-2018/data/tmp_1_90_genotypes.h5";
     file = H5Fopen(fileName, H5F_ACC_RDONLY, H5P_DEFAULT);
    
@@ -164,7 +164,7 @@ int get_Genotype_from_hdf5(char * fileName, char * chr, int variant_id)
     // char * col_name="/chr8/colnames";
     char col_name[20]="";
     strcpy(col_name, chrName);
-    strcat(col_name, "/rownames");
+    strcat(col_name, "/colnames");
 
 
     colname = H5Dopen(file, col_name, H5P_DEFAULT);
@@ -189,8 +189,8 @@ int get_Genotype_from_hdf5(char * fileName, char * chr, int variant_id)
      * Get chunking information: rank and dimensions
      */
     rank_chunk = H5Pget_chunk(cparms, 2, chunk_dims);
-    printf("chunk rank %d, dimensions %lu x %lu\n", rank_chunk,
-           (unsigned long)(chunk_dims[0]), (unsigned long)(chunk_dims[1]));
+    // printf("chunk rank %d, dimensions %lu x %lu\n", rank_chunk,
+    //        (unsigned long)(chunk_dims[0]), (unsigned long)(chunk_dims[1]));
     }
  
     /*
@@ -214,55 +214,33 @@ int get_Genotype_from_hdf5(char * fileName, char * chr, int variant_id)
 
     printf("\n");
     printf("Dataset: \n");
-    //for (j = 0; j < dims[0]; j++) {
-    //  for (i = 0; i < dims[1]; i++) printf("%d ", data_out[j][i]);
-    //  printf("\n");
-   // } 
-
 
     // int variant_id=1;
     int pos=findIndex(rownames,row_dims[0],variant_id);
 
-    for (i = 0; i < dims[1]; i++) printf("%d ", genotypes[pos][i]);
-    printf("\n");    
+    printf("row pos %d.\n", pos);
+    if (pos!=-1){
+        for (i = 0; i < dims[1]; i++) printf("%d ", genotypes[pos][i]);
+        
 
-    printf("\n");
-    printf("rownames: \n");
+        // printf("\n");
+        // printf("rownames: \n");
 
-    for (i = 0; i<row_dims[0]; i++) printf("%d ",rownames[i]);
-
-
-    printf("\n");
-    printf("colnames: \n");
-
-    for (i = 0; i<col_dims[0]; i++) printf("%d ",colnames[i]);
+        // for (i = 0; i<row_dims[0]; i++) printf("%d ",rownames[i]);
 
 
-    
+        printf("\n");
+        printf("colnames: \n");
 
-
-
-    /*
-     * Read the third column from the dataset.
-     * First define memory dataspace, then define hyperslab
-     * and read it into column array.
-     */
- //    col_dims[0] = 10;
- //    memspace =  H5Screate_simple(RANKC, col_dims, NULL);
-
- //    offset[0] = 0;
- //    offset[1] = 2;
- //    count[0]  = 10;
- //    count[1]  = 1;
- //    status = H5Sselect_hyperslab(filespace, H5S_SELECT_SET, offset, NULL,
-    //           count, NULL);
- //    status = H5Dread(dataset, H5T_NATIVE_INT, memspace, filespace,
-    //       H5P_DEFAULT, column);
- //    printf("\n");
- //    printf("Third column: \n");
- //    for (i = 0; i < 10; i++) {
-    // printf("%d \n", column[i]);
- //    }
+        for (i = 0; i<col_dims[0]; i++) {
+            if (genotypes[pos][i]==1){
+                samples[index]=colnames[i];
+                printf("%d ",colnames[i]);
+                index+=1;
+            }
+        }
+        printf("\n");
+    }
 
    
     H5Pclose(cparms);
@@ -274,12 +252,12 @@ int get_Genotype_from_hdf5(char * fileName, char * chr, int variant_id)
     H5Sclose(colSpace);
 
     H5Fclose(file);
-    return 0;
+    return index;
 }
 
 
 
-int get_Genotypes(char *chr,int variant_id)
+int * get_Genotypes(char *chr,int variant_id)
 {
     
     regex_t     regex;   
@@ -295,6 +273,8 @@ int get_Genotypes(char *chr,int variant_id)
 
     struct dirent *ent;
     int reti = regcomp(&regex, "^tmp.*genotypes.h5$", REG_EXTENDED);
+    static int samples[300];
+    int index=0;
     if ((dir = opendir (dirName)) != NULL) {
       while ((ent = readdir (dir)) != NULL) {
         reti = regexec(&regex, ent->d_name, 0, NULL, 0);
@@ -305,22 +285,31 @@ int get_Genotypes(char *chr,int variant_id)
             strcat(filePath, ent->d_name);
             // snprintf(filePath,"%s\\%s",dirName, ent->d_name);
             // int result=getGenotype(filePath);
-            printf("%s\n",filePath);
-            int result=get_Genotype_from_hdf5(filePath,chr,variant_id);
-
+            printf("%s,%s,%d\n",filePath,chr,variant_id);
+            index=get_Genotype_from_hdf5(filePath,chr,variant_id,samples,index);
+            printf("done with file %s ,index %d \n",filePath,index);
         }
       }
       closedir (dir);
+      
     } else {
       perror ("");
       return EXIT_FAILURE;
     }
+    
+    size_t sizeOfsamples = sizeof(samples)/sizeof(samples[0]);
+    printf("close dir %s,sizd of samples %d\n",dirName,sizeOfsamples);
 
-    return 0;
+    
+    return samples;
 }
 
 
 int main(void){
-    int result=get_Genotypes("8",1473);
+    int *samples;
+    samples=get_Genotypes("8",1473);
+    int i;
+    printf("%s\n", "hah");
+    for (i = 0; i<10; i++) printf("%d ",samples[i]);
     return 0;
 }

@@ -2333,6 +2333,7 @@ static void samples(
 	IdNameMap & idMap = it->second;
 	int result = 0;
 	printf("%s\n",geno_db_file);
+	int numberOfSamples=idMap.size();
 	
 	// open databases
 	if (!geno_db) {
@@ -2342,10 +2343,16 @@ static void samples(
 			return;
 		}
 	}
+
+	std::stringstream res;
+	IdNameMap::iterator im = idMap.begin();
+	IdNameMap::iterator im_end = idMap.end();
+
+	int * hdf5_result;
 	
 	if (hdf5){
 		char sql[255];
-		printf("success open variant_id is %d\n", variant_id);
+		
 		sprintf(sql, "SELECT chr FROM variant WHERE variant_id = %d ", variant_id);
 		sqlite3_stmt * stmt;
 		result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
@@ -2356,16 +2363,31 @@ static void samples(
 		result = sqlite3_step(stmt);
 		if (result == SQLITE_ROW) {
 			char* chr = (char*)sqlite3_column_text(stmt, 0);
-			int check=get_Genotypes(char* chr, int variant_id);
-		}
+			printf("success open variant_id is %d, %s \n", variant_id,chr);
+			hdf5_result =get_Genotypes(chr, variant_id);
+			
+			int i;
+			// for (i = 0; i<30; i++) {
+   //              printf("%d ",*(hdf5_result+i));
+   //          }
+   //          printf("\n");
+        
+			printf("done with this id %d ",variant_id);
+			
+    
+    		for (i = 0; i<4; i++) {
+    			res << idMap.find(*(hdf5_result+i))->second ;
+    		};
+    		
 
+    	}
+		
 
 	}else{
 
 		// go through all samples (with id)
-		std::stringstream res;
-		IdNameMap::iterator im = idMap.begin();
-		IdNameMap::iterator im_end = idMap.end();
+		
+		
 		bool first = true;
 		for (; im != im_end; ++im) {
 			char sql[255];
@@ -2387,11 +2409,12 @@ static void samples(
 				res << im->second;
 			}
 		}
-		if (res.str().empty())
-			sqlite3_result_null(context);
-		else
-			sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
+		
 	}
+	if (res.str().empty())
+		sqlite3_result_null(context);
+	else
+		sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
 	// output a string with all information
 	// we do not close the database because we are readonly and we need the database for
 	// next use.
