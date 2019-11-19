@@ -3,7 +3,7 @@
 #ifdef  __cplusplus
 extern "C" {
 #endif
-	int * get_Genotypes(char* chr, int variant_id,int numberOfSamples);
+	void get_Genotypes(char* chr, int variant_id,int* samples,int numberOfSamples);
 #ifdef  __cplusplus
 }
 #endif
