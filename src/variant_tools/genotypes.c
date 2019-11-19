@@ -154,7 +154,6 @@ int get_Genotype_from_hdf5(char * filePath, char * chr, int variant_id, int *sam
 
 
     rowname = H5Dopen(file, row_name, H5P_DEFAULT);
-
     rowSpace = H5Dget_space(rowname);    /* Get filespace handle first. */
     row_rank      = H5Sget_simple_extent_ndims(rowSpace);
     status_n  = H5Sget_simple_extent_dims(rowSpace, row_dims, NULL);
@@ -168,7 +167,6 @@ int get_Genotype_from_hdf5(char * filePath, char * chr, int variant_id, int *sam
 
 
     colname = H5Dopen(file, col_name, H5P_DEFAULT);
-
     colSpace = H5Dget_space(colname);    /* Get filespace handle first. */
     col_rank      = H5Sget_simple_extent_ndims(colSpace);
     status_n  = H5Sget_simple_extent_dims(colSpace, col_dims, NULL);
@@ -222,10 +220,8 @@ int get_Genotype_from_hdf5(char * filePath, char * chr, int variant_id, int *sam
     if (pos!=-1){
         for (i = 0; i < dims[1]; i++) printf("%d ", genotypes[pos][i]);
         
-
         // printf("\n");
         // printf("rownames: \n");
-
         // for (i = 0; i<row_dims[0]; i++) printf("%d ",rownames[i]);
 
 
@@ -262,14 +258,13 @@ void get_Genotypes(char *chr,int variant_id,int* samples,int numberOfSamples)
     
     regex_t     regex;   
     DIR *dir;
-    char *dirName="/Users/jma7/Development/VAT_ref/ismb-2018/data/";
-   //  char dirName[200];
-   //  if (getcwd(dirName, sizeof(dirName)) != NULL) {
-   //     printf("Current working dir: %s\n", dirName);
-   // } else {
-   //     perror("getcwd() error");
-   //     return 1;
-   // }
+    // char *dirName="/Users/jma7/Development/VAT_ref/ismb-2018/data/";
+    char dirName[200];
+    if (getcwd(dirName, sizeof(dirName)) != NULL) {
+       printf("Current working dir: %s\n", dirName);
+   } else {
+       perror("getcwd() error");
+   }
 
     struct dirent *ent;
     int reti = regcomp(&regex, "^tmp.*genotypes.h5$", REG_EXTENDED);
@@ -297,13 +292,17 @@ void get_Genotypes(char *chr,int variant_id,int* samples,int numberOfSamples)
             printf("%s,%s,%d\n",filePath,chr,variant_id);
             // index=get_Genotype_from_hdf5(filePath,chr,variant_id,&samples,index);
 
+
             hid_t       file;                        /* handles */
             hid_t       genotype;
+            hid_t       mask;
             hid_t       rowname;
-            hid_t       colname;  
+            hid_t       colname;
+            hid_t       maskSpace;  
             hid_t       genoSpace;
             hid_t       rowSpace;
-            hid_t       colSpace;                   
+            hid_t       colSpace;
+            hid_t       mask_memspace;                   
             hid_t       geno_memspace;
             hid_t       row_memspace;
             hid_t       col_memspace;                  
@@ -320,13 +319,10 @@ void get_Genotypes(char *chr,int variant_id,int* samples,int numberOfSamples)
             int         rank, row_rank,col_rank,rank_chunk;
             hsize_t i, j;
          
-
-
             char *version, *date;
             int r;
             r = register_blosc(&version, &date);
             // printf("Blosc version info: %s (%s) %d\n", version, date,r);
-                // char * fileName="/Users/jma7/Development/VAT_ref/ismb-2018/data/tmp_1_90_genotypes.h5";
             file = H5Fopen(filePath, H5F_ACC_RDONLY, H5P_DEFAULT);
            
             /*
@@ -343,11 +339,20 @@ void get_Genotypes(char *chr,int variant_id,int* samples,int numberOfSamples)
             strcpy(genotypeData, chrName);
             strcat(genotypeData, "/GT");
 
+            char row_name[20]="";
+            strcpy(row_name, chrName);
+            strcat(row_name, "/rownames");
+
+            char col_name[20]="";
+            strcpy(col_name, chrName);
+            strcat(col_name, "/colnames");
+
+            char maskData[20]="";
+            strcpy(maskData, chrName);
+            strcat(maskData, "/Mask");
 
 
             genotype = H5Dopen(file, genotypeData, H5P_DEFAULT);
-         
-
             genoSpace = H5Dget_space(genotype);    /* Get filespace handle first. */
             rank      = H5Sget_simple_extent_ndims(genoSpace);
             status_n  = H5Sget_simple_extent_dims(genoSpace, dims, NULL);
@@ -355,30 +360,20 @@ void get_Genotypes(char *chr,int variant_id,int* samples,int numberOfSamples)
                rank, (unsigned long)(dims[0]), (unsigned long)(dims[1]));
 
 
-            // char * row_name="/chr8/rownames";
-
-
-            char row_name[20]="";
-            strcpy(row_name, chrName);
-            strcat(row_name, "/rownames");
+            mask = H5Dopen(file, maskData, H5P_DEFAULT);
+            maskSpace = H5Dget_space(mask);  
+            
 
 
             rowname = H5Dopen(file, row_name, H5P_DEFAULT);
-
             rowSpace = H5Dget_space(rowname);    /* Get filespace handle first. */
             row_rank      = H5Sget_simple_extent_ndims(rowSpace);
             status_n  = H5Sget_simple_extent_dims(rowSpace, row_dims, NULL);
             printf("rownames rank %d, dimensions %lu\n",
                row_rank, (unsigned long)(row_dims[0]));
 
-            // char * col_name="/chr8/colnames";
-            char col_name[20]="";
-            strcpy(col_name, chrName);
-            strcat(col_name, "/colnames");
-
 
             colname = H5Dopen(file, col_name, H5P_DEFAULT);
-
             colSpace = H5Dget_space(colname);    /* Get filespace handle first. */
             col_rank      = H5Sget_simple_extent_ndims(colSpace);
             status_n  = H5Sget_simple_extent_dims(colSpace, col_dims, NULL);
@@ -411,6 +406,11 @@ void get_Genotypes(char *chr,int variant_id,int* samples,int numberOfSamples)
             status = H5Dread(genotype, H5T_NATIVE_INT, geno_memspace, genoSpace,
                      H5P_DEFAULT, genotypes);
 
+            mask_memspace = H5Screate_simple(rank,dims,NULL);
+            int         masks[dims[0]][dims[1]];  /* buffer for dataset to be read */
+            status = H5Dread(mask, H5T_NATIVE_INT, mask_memspace, maskSpace,
+                     H5P_DEFAULT, masks);
+
             row_memspace = H5Screate_simple(row_rank,row_dims,NULL);
             int         rownames[row_dims[0]];  /* buffer for dataset to be read */
             status = H5Dread(rowname, H5T_NATIVE_INT, row_memspace, rowSpace,
@@ -435,7 +435,6 @@ void get_Genotypes(char *chr,int variant_id,int* samples,int numberOfSamples)
 
                 // printf("\n");
                 // printf("rownames: \n");
-
                 // for (i = 0; i<row_dims[0]; i++) printf("%d ",rownames[i]);
 
 
@@ -443,7 +442,7 @@ void get_Genotypes(char *chr,int variant_id,int* samples,int numberOfSamples)
                 printf("colnames: \n");
 
                 for (i = 0; i<col_dims[0]; i++) {
-                    if (genotypes[pos][i]==1 || genotypes[pos][i]==0){
+                    if (genotypes[pos][i]>=0 && masks[pos][i]>0){
                         samples[index]=colnames[i];
                         printf("%d ",colnames[i]);
                         index+=1;
@@ -455,9 +454,11 @@ void get_Genotypes(char *chr,int variant_id,int* samples,int numberOfSamples)
            
             H5Pclose(cparms);
             H5Dclose(genotype);
+            H5Dclose(mask);
             H5Dclose(rowname);
             H5Dclose(colname);
             H5Sclose(genoSpace);
+            H5Sclose(maskSpace);
             H5Sclose(rowSpace);
             H5Sclose(colSpace);
 
