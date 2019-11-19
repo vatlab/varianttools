@@ -82,7 +82,7 @@ int getData(char * fileName, char * node, int size){
 
 
 
-int get_Genotype_from_hdf5(char * fileName, char * chr, int variant_id, int samples[],int index)
+int get_Genotype_from_hdf5(char * fileName, char * chr, int variant_id, int *samples,int index)
 {
 
     hid_t       file;                        /* handles */
@@ -257,7 +257,7 @@ int get_Genotype_from_hdf5(char * fileName, char * chr, int variant_id, int samp
 
 
 
-int * get_Genotypes(char *chr,int variant_id)
+int * get_Genotypes(char *chr,int variant_id,int numberOfSamples)
 {
     
     regex_t     regex;   
@@ -273,7 +273,15 @@ int * get_Genotypes(char *chr,int variant_id)
 
     struct dirent *ent;
     int reti = regcomp(&regex, "^tmp.*genotypes.h5$", REG_EXTENDED);
-    static int samples[300];
+    // static int samples[300];
+    int samples[numberOfSamples];
+    memset( samples, -1, numberOfSamples*sizeof(int) );
+    printf("initial lization\n");
+    for (int j=0;j<numberOfSamples;j++){
+        printf("%d ",samples[j]);
+    }
+    printf("\n");
+
     int index=0;
     if ((dir = opendir (dirName)) != NULL) {
       while ((ent = readdir (dir)) != NULL) {
@@ -286,8 +294,12 @@ int * get_Genotypes(char *chr,int variant_id)
             // snprintf(filePath,"%s\\%s",dirName, ent->d_name);
             // int result=getGenotype(filePath);
             printf("%s,%s,%d\n",filePath,chr,variant_id);
-            index=get_Genotype_from_hdf5(filePath,chr,variant_id,samples,index);
+            index=get_Genotype_from_hdf5(filePath,chr,variant_id,&samples,index);
             printf("done with file %s ,index %d \n",filePath,index);
+            for (int j=0;j<numberOfSamples;j++){
+                printf("%d ",samples[j]);
+            }
+            printf("\n");
         }
       }
       closedir (dir);
@@ -300,6 +312,7 @@ int * get_Genotypes(char *chr,int variant_id)
     size_t sizeOfsamples = sizeof(samples)/sizeof(samples[0]);
     printf("close dir %s,sizd of samples %d\n",dirName,sizeOfsamples);
 
+
     
     return samples;
 }
@@ -307,7 +320,7 @@ int * get_Genotypes(char *chr,int variant_id)
 
 int main(void){
     int *samples;
-    samples=get_Genotypes("8",1473);
+    samples=get_Genotypes("8",1473,20);
     int i;
     printf("%s\n", "hah");
     for (i = 0; i<10; i++) printf("%d ",samples[i]);

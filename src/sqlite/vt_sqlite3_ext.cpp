@@ -2349,7 +2349,6 @@ static void samples(
 	IdNameMap::iterator im_end = idMap.end();
 
 	int * hdf5_result;
-	
 	if (hdf5){
 		char sql[255];
 		
@@ -2364,7 +2363,7 @@ static void samples(
 		if (result == SQLITE_ROW) {
 			char* chr = (char*)sqlite3_column_text(stmt, 0);
 			printf("success open variant_id is %d, %s \n", variant_id,chr);
-			hdf5_result =get_Genotypes(chr, variant_id);
+			hdf5_result =get_Genotypes(chr, variant_id, numberOfSamples);
 			
 			int i;
 			// for (i = 0; i<30; i++) {
@@ -2372,15 +2371,22 @@ static void samples(
    //          }
    //          printf("\n");
         
-			printf("done with this id %d ",variant_id);
+			printf("done with this id %d \n",variant_id);
 			
-    
-    		for (i = 0; i<4; i++) {
-    			res << idMap.find(*(hdf5_result+i))->second ;
+    		printf("SampleIDs \n");
+    		for (i = 0; i<numberOfSamples; i++) {
+    			printf("%d ",*(hdf5_result+i));
+    			
+    			if (idMap.find(*(hdf5_result+i))==idMap.end()){
+
+    			}else{
+    				res << idMap.find(*(hdf5_result+i))->second ;
+    			}
     		};
     		
 
     	}
+
 		
 
 	}else{
