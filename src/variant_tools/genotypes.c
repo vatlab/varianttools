@@ -253,7 +253,7 @@ int get_Genotype_from_hdf5(char * filePath, char * chr, int variant_id, int *sam
 
 
 
-void get_Genotypes(char *chr,int variant_id,int* samples,int numberOfSamples)
+void get_Genotypes(char* chr,int variant_id,int* samples,int numberOfSamples, char* genoFilter)
 {
     
     regex_t     regex;   
@@ -337,8 +337,20 @@ void get_Genotypes(char *chr,int variant_id,int* samples,int numberOfSamples)
 
             char genotypeData[20]="";
             strcpy(genotypeData, chrName);
-            strcat(genotypeData, "/GT");
+ 
+            if (genoFilter != NULL){
+                char delim[]="=";
+                char *ptr = strtok(genoFilter, delim);
+                while(ptr != NULL)
+                {
+                    printf("'%s'\n", ptr);
+                    ptr = strtok(NULL, delim);
+                }
 
+
+            }else{
+                strcat(genotypeData, "/GT");
+            }
             char row_name[20]="";
             strcpy(row_name, chrName);
             strcat(row_name, "/rownames");

@@ -2350,6 +2350,7 @@ static void samples(
 
 	int hdf5_result[numberOfSamples];
 	bool first = true;
+	char* genoFilter=params.geno_filter();
 	if (hdf5){
 		char sql[255];
 		
@@ -2364,7 +2365,7 @@ static void samples(
 		if (result == SQLITE_ROW) {
 			char* chr = (char*)sqlite3_column_text(stmt, 0);
 			printf("success open variant_id is %d, %s \n", variant_id,chr);
-			get_Genotypes(chr, variant_id, hdf5_result, numberOfSamples);
+			get_Genotypes(chr, variant_id, hdf5_result, numberOfSamples, genoFilter);
 			
 			int i;
         
