@@ -82,217 +82,8 @@ int getData(char * fileName, char * node, int size){
 
 
 
-int get_Genotype_from_hdf5(char * filePath, char * chr, int variant_id, int *samples,int index)
+int get_Genotype_from_hdf5(char * filePath, char * chr, int variant_id, int *samples,int index, char* genoFilter)
 {
-
-    hid_t       file;                        /* handles */
-    hid_t       genotype;
-    hid_t       rowname;
-    hid_t       colname;  
-    hid_t       genoSpace;
-    hid_t       rowSpace;
-    hid_t       colSpace;                   
-    hid_t       geno_memspace;
-    hid_t       row_memspace;
-    hid_t       col_memspace;                  
-    hid_t       cparms;                   
-    hsize_t     dims[2];                     /* dataset and chunk dimensions*/ 
-    hsize_t     chunk_dims[2];
-    hsize_t     row_dims[1];
-    hsize_t     col_dims[1];
-    hsize_t     count[2];
-    hsize_t     offset[2];
-    herr_t      status, status_n;
-                          
-
-    int         rank, row_rank,col_rank,rank_chunk;
-    hsize_t i, j;
- 
-
-
-    char *version, *date;
-    int r;
-    r = register_blosc(&version, &date);
-    // printf("Blosc version info: %s (%s) %d\n", version, date,r);
-        // char * fileName="/Users/jma7/Development/VAT_ref/ismb-2018/data/tmp_1_90_genotypes.h5";
-    file = H5Fopen(filePath, H5F_ACC_RDONLY, H5P_DEFAULT);
-   
-    /*
-     * Open the file and the dataset.
-     * Get dataset rank and dimension.
-     */
-    // char * genotypeData="/chr8/GT";
-
-    char chrName[20]="";
-    strcpy(chrName, "/chr");
-    strcat(chrName,chr);
-
-    char genotypeData[20]="";
-    strcpy(genotypeData, chrName);
-    strcat(genotypeData, "/GT");
-
-
-
-
-
-    genotype = H5Dopen(file, genotypeData, H5P_DEFAULT);
- 
-
-    genoSpace = H5Dget_space(genotype);    /* Get filespace handle first. */
-    rank      = H5Sget_simple_extent_ndims(genoSpace);
-    status_n  = H5Sget_simple_extent_dims(genoSpace, dims, NULL);
-    printf("genotype rank %d, dimensions %lu x %lu\n",
-       rank, (unsigned long)(dims[0]), (unsigned long)(dims[1]));
-
-
-    // char * row_name="/chr8/rownames";
-
-
-    char row_name[20]="";
-    strcpy(row_name, chrName);
-    strcat(row_name, "/rownames");
-
-
-    rowname = H5Dopen(file, row_name, H5P_DEFAULT);
-    rowSpace = H5Dget_space(rowname);    /* Get filespace handle first. */
-    row_rank      = H5Sget_simple_extent_ndims(rowSpace);
-    status_n  = H5Sget_simple_extent_dims(rowSpace, row_dims, NULL);
-    printf("rownames rank %d, dimensions %lu\n",
-       row_rank, (unsigned long)(row_dims[0]));
-
-    // char * col_name="/chr8/colnames";
-    char col_name[20]="";
-    strcpy(col_name, chrName);
-    strcat(col_name, "/colnames");
-
-
-    colname = H5Dopen(file, col_name, H5P_DEFAULT);
-    colSpace = H5Dget_space(colname);    /* Get filespace handle first. */
-    col_rank      = H5Sget_simple_extent_ndims(colSpace);
-    status_n  = H5Sget_simple_extent_dims(colSpace, col_dims, NULL);
-    printf("colnames rank %d, dimensions %lu\n",
-       col_rank, (unsigned long)(col_dims[0]));
-
-    /*
-     * Get creation properties list.
-     */
-    cparms = H5Dget_create_plist(genotype); /* Get properties handle first. */
-
-    /* 
-     * Check if dataset is chunked.
-     */
-    if (H5D_CHUNKED == H5Pget_layout(cparms))  {
-
-    /*
-     * Get chunking information: rank and dimensions
-     */
-    rank_chunk = H5Pget_chunk(cparms, 2, chunk_dims);
-    // printf("chunk rank %d, dimensions %lu x %lu\n", rank_chunk,
-    //        (unsigned long)(chunk_dims[0]), (unsigned long)(chunk_dims[1]));
-    }
- 
-    /*
-     * Define the memory space to read dataset.
-     */
-    geno_memspace = H5Screate_simple(rank,dims,NULL);
-    int         genotypes[dims[0]][dims[1]];  /* buffer for dataset to be read */
-    status = H5Dread(genotype, H5T_NATIVE_INT, geno_memspace, genoSpace,
-             H5P_DEFAULT, genotypes);
-
-    row_memspace = H5Screate_simple(row_rank,row_dims,NULL);
-    int         rownames[row_dims[0]];  /* buffer for dataset to be read */
-    status = H5Dread(rowname, H5T_NATIVE_INT, row_memspace, rowSpace,
-             H5P_DEFAULT, rownames);
-
-    col_memspace = H5Screate_simple(col_rank,col_dims,NULL);
-    int         colnames[col_dims[0]];  /* buffer for dataset to be read */
-    status = H5Dread(colname, H5T_NATIVE_INT, col_memspace, colSpace,
-             H5P_DEFAULT, colnames);
-
-
-    printf("\n");
-    printf("Dataset: \n");
-
-    // int variant_id=1;
-    int pos=findIndex(rownames,row_dims[0],variant_id);
-
-    printf("row pos %d.\n", pos);
-    if (pos!=-1){
-        for (i = 0; i < dims[1]; i++) printf("%d ", genotypes[pos][i]);
-        
-        // printf("\n");
-        // printf("rownames: \n");
-        // for (i = 0; i<row_dims[0]; i++) printf("%d ",rownames[i]);
-
-
-        printf("\n");
-        printf("colnames: \n");
-
-        for (i = 0; i<col_dims[0]; i++) {
-            if (genotypes[pos][i]==1){
-                samples[index]=colnames[i];
-                printf("%d ",colnames[i]);
-                index+=1;
-            }
-        }
-        printf("\n");
-    }
-
-   
-    H5Pclose(cparms);
-    H5Dclose(genotype);
-    H5Dclose(rowname);
-    H5Dclose(colname);
-    H5Sclose(genoSpace);
-    H5Sclose(rowSpace);
-    H5Sclose(colSpace);
-
-    H5Fclose(file);
-    return index;
-}
-
-
-
-void get_Genotypes(char* chr,int variant_id,int* samples,int numberOfSamples, char* genoFilter)
-{
-    
-    regex_t     regex;   
-    DIR *dir;
-    // char *dirName="/Users/jma7/Development/VAT_ref/ismb-2018/data/";
-    char dirName[200];
-    if (getcwd(dirName, sizeof(dirName)) != NULL) {
-       printf("Current working dir: %s\n", dirName);
-   } else {
-       perror("getcwd() error");
-   }
-
-    struct dirent *ent;
-    int reti = regcomp(&regex, "^tmp.*genotypes.h5$", REG_EXTENDED);
-    // static int samples[300];
-    // int samples[numberOfSamples];
-    // samples=malloc(numberOfSamples * sizeof(int));
-    memset( samples, -1, numberOfSamples*sizeof(int) );
-    printf("initial lization\n");
-    for (int j=0;j<numberOfSamples;j++){
-        printf("%d ",samples[j]);
-    }
-    printf("\n");
-
-    int index=0;
-    if ((dir = opendir (dirName)) != NULL) {
-      while ((ent = readdir (dir)) != NULL) {
-        reti = regexec(&regex, ent->d_name, 0, NULL, 0);
-        if (!reti){
-            char * filePath = (char *) malloc(2 + strlen(dirName)+ strlen(ent->d_name) );
-            strcpy(filePath, dirName);
-            strcat(filePath,"/");
-            strcat(filePath, ent->d_name);
-            // snprintf(filePath,"%s\\%s",dirName, ent->d_name);
-            // int result=getGenotype(filePath);
-            printf("%s,%s,%d\n",filePath,chr,variant_id);
-            // index=get_Genotype_from_hdf5(filePath,chr,variant_id,&samples,index);
-
-
             hid_t       file;                        /* handles */
             hid_t       genotype;
             hid_t       mask;
@@ -475,7 +266,49 @@ void get_Genotypes(char* chr,int variant_id,int* samples,int numberOfSamples, ch
             H5Sclose(colSpace);
 
             H5Fclose(file);
-                    
+            return index;
+}
+
+
+
+void get_Genotypes(char* chr,int variant_id,int* samples,int numberOfSamples, char* genoFilter)
+{
+    
+    regex_t     regex;   
+    DIR *dir;
+    // char *dirName="/Users/jma7/Development/VAT_ref/ismb-2018/data/";
+    char dirName[200];
+    if (getcwd(dirName, sizeof(dirName)) != NULL) {
+       printf("Current working dir: %s\n", dirName);
+   } else {
+       perror("getcwd() error");
+   }
+
+    struct dirent *ent;
+    int reti = regcomp(&regex, "^tmp.*genotypes.h5$", REG_EXTENDED);
+    // static int samples[300];
+    // int samples[numberOfSamples];
+    // samples=malloc(numberOfSamples * sizeof(int));
+    memset( samples, -1, numberOfSamples*sizeof(int) );
+    printf("initial lization\n");
+    for (int j=0;j<numberOfSamples;j++){
+        printf("%d ",samples[j]);
+    }
+    printf("\n");
+
+    int index=0;
+    if ((dir = opendir (dirName)) != NULL) {
+      while ((ent = readdir (dir)) != NULL) {
+        reti = regexec(&regex, ent->d_name, 0, NULL, 0);
+        if (!reti){
+            char * filePath = (char *) malloc(2 + strlen(dirName)+ strlen(ent->d_name) );
+            strcpy(filePath, dirName);
+            strcat(filePath,"/");
+            strcat(filePath, ent->d_name);
+            // snprintf(filePath,"%s\\%s",dirName, ent->d_name);
+            // int result=getGenotype(filePath);
+            printf("%s,%s,%d\n",filePath,chr,variant_id);
+            index=get_Genotype_from_hdf5(filePath,chr,variant_id,samples,index, genoFilter);
 
 
             printf("done with file %s ,index %d \n",filePath,index);
