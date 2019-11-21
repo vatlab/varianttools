@@ -177,6 +177,85 @@ UCSC_FILES = [
 ]
 
 STAT_FILES = ['src/variant_tools/fisher2.c']
+
+LIB_BOOST = [
+    'src/boost_1_49_0/libs/iostreams/src/bzip2.cpp',
+    'src/boost_1_49_0/libs/iostreams/src/file_descriptor.cpp',
+    'src/boost_1_49_0/libs/iostreams/src/gzip.cpp',
+    'src/boost_1_49_0/libs/iostreams/src/mapped_file.cpp',
+    'src/boost_1_49_0/libs/iostreams/src/zlib.cpp',
+    'src/boost_1_49_0/libs/regex/src/c_regex_traits.cpp',
+    'src/boost_1_49_0/libs/regex/src/cpp_regex_traits.cpp',
+    'src/boost_1_49_0/libs/regex/src/cregex.cpp',
+    'src/boost_1_49_0/libs/regex/src/fileiter.cpp',
+    'src/boost_1_49_0/libs/regex/src/icu.cpp',
+    'src/boost_1_49_0/libs/regex/src/instances.cpp',
+    'src/boost_1_49_0/libs/regex/src/posix_api.cpp',
+    'src/boost_1_49_0/libs/regex/src/regex.cpp',
+    'src/boost_1_49_0/libs/regex/src/regex_debug.cpp',
+    'src/boost_1_49_0/libs/regex/src/regex_raw_buffer.cpp',
+    'src/boost_1_49_0/libs/regex/src/regex_traits_defaults.cpp',
+    'src/boost_1_49_0/libs/regex/src/static_mutex.cpp',
+    'src/boost_1_49_0/libs/regex/src/usinstances.cpp',
+    'src/boost_1_49_0/libs/regex/src/w32_regex_traits.cpp',
+    'src/boost_1_49_0/libs/regex/src/wc_regex_traits.cpp',
+    'src/boost_1_49_0/libs/regex/src/wide_posix_api.cpp',
+    'src/boost_1_49_0/libs/regex/src/winstances.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/codecvt_error_category.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/operations.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/path.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/path_traits.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/portability.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/unique_path.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/utf8_codecvt_facet.cpp',
+    'src/boost_1_49_0/libs/filesystem/v3/src/windows_file_codecvt.cpp',
+    'src/boost_1_49_0/libs/filesystem/v2/src/v2_operations.cpp',
+    'src/boost_1_49_0/libs/filesystem/v2/src/v2_portability.cpp',
+    'src/boost_1_49_0/libs/filesystem/v2/src/v2_path.cpp',
+    'src/boost_1_49_0/libs/system/src/error_code.cpp'
+]
+
+EMBEDDED_BOOST = os.path.isdir('src/boost_1_49_0')
+if not EMBEDDED_BOOST:
+
+    def downloadProgress(count, blockSize, totalSize):
+        perc = count * blockSize * 100 // totalSize
+        if perc > downloadProgress.counter:
+            sys.stdout.write('.' * (perc - downloadProgress.counter))
+            downloadProgress.counter = perc
+        sys.stdout.flush()
+
+    if sys.version_info.major == 2:
+        from urllib import urlretrieve
+    else:
+        from urllib.request import urlretrieve
+    import tarfile
+    downloadProgress.counter = 0
+    try:
+        BOOST_URL = 'http://downloads.sourceforge.net/project/boost/boost/1.49.0/boost_1_49_0.tar.gz?r=&ts=1435893980&use_mirror=iweb'
+        sys.stdout.write('Downloading boost C++ library 1.49.0 ')
+        sys.stdout.flush()
+        if not os.path.isfile('src/boost_1_49_0.tar.gz'):
+            urlretrieve(BOOST_URL, 'src/boost_1_49_0.tar.gz', downloadProgress)
+        sys.stdout.write('\n')
+        # extract needed files
+        with tarfile.open('src/boost_1_49_0.tar.gz', 'r:gz') as tar:
+            files = [h for h in tar.getmembers() if h.name.startswith('boost_1_49_0/boost') \
+                or h.name.startswith('boost_1_49_0/libs/iostreams') \
+                or h.name.startswith('boost_1_49_0/libs/regex') \
+                or h.name.startswith('boost_1_49_0/libs/filesystem') \
+                or h.name.startswith('boost_1_49_0/libs/detail') \
+                or h.name.startswith('boost_1_49_0/libs/system') ]
+            sys.stdout.write('Extracting %d files\n' % len(files))
+            tar.extractall(path='src', members=files)
+        os.remove('src/boost_1_49_0.tar.gz')
+        EMBEDDED_BOOST = True
+    except Exception as e:
+        print(e)
+        print(
+            'The boost C++ library version 1.49.0 is not found under the current directory. Will try to use the system libraries.'
+        )
+
 #
 # During development, if an interface file needs to be re-generated, please
 # remove these files and they will be re-generated with SWIG
@@ -256,6 +335,28 @@ ENV_LIBRARY_DIRS = [
     x for x in os.environ.get('LD_LIBRARY_PATH', '').split(os.pathsep) if x
 ]
 
+if EMBEDDED_BOOST:
+    try:
+        from distutils.ccompiler import new_compiler
+
+        c = new_compiler()
+        if not os.path.isfile(
+                os.path.join(
+                    'build', c.static_lib_format %
+                    ('embedded_boost', c.static_lib_extension))):
+            # -w suppress all warnings caused by the use of boost libraries
+            print('Building embedded boost library')
+            objects = c.compile(
+                LIB_BOOST,
+                include_dirs=['src/boost_1_49_0'] + ENV_INCLUDE_DIRS,
+                output_dir='build',
+                extra_preargs=['-w', '-fPIC'],
+                macros=[('BOOST_ALL_NO_LIB', None)])
+            c.create_static_lib(objects, "embedded_boost", output_dir='build')
+    except Exception as e:
+        sys.exit("Failed to build embedded boost library: {}".format(e))
+
+
 ext_modules=[
         Extension('variant_tools._vt_sqlite3',
             # stop warning message for sqlite because it is written by us.
@@ -288,7 +389,7 @@ ext_modules=[
                 'src/sqlite', "src/variant_tools", "src/cgatools"] + ENV_INCLUDE_DIRS,
             library_dirs = ["build"] + ENV_LIBRARY_DIRS,
             libraries = ['gsl'] + \
-                ['boost_iostreams', 'boost_regex', 'boost_filesystem'] + \
+                (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']) + \
                 ['z', 'bz2'],
             extra_compile_args = gccargs,
             define_macros = [
@@ -301,7 +402,7 @@ ext_modules=[
         Extension('variant_tools._cgatools',
             sources = [CGATOOLS_WRAPPER_CPP_FILE] + CGATOOLS_FILES,
             libraries = \
-                ['boost_iostreams', 'boost_regex', 'boost_filesystem'] + \
+                (['embedded_boost'] if EMBEDDED_BOOST else ['boost_iostreams', 'boost_regex', 'boost_filesystem']) + \
                 ['z', 'bz2'] + ENV_INCLUDE_DIRS,
             define_macros = [('CGA_TOOLS_IS_PIPELINE', 0),
                 ('CGA_TOOLS_VERSION', r'"1.6.0.43"')],
