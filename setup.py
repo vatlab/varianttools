@@ -236,12 +236,12 @@ if not os.path.isfile(UCSCTOOLS_WRAPPER_PY_FILE) or not os.path.isfile(
         sys.exit('Failed to generate wrapper file for ucsctools.')
     os.rename('src/variant_tools/ucsctools.py', UCSCTOOLS_WRAPPER_PY_FILE)
 
-# Under linux/gcc, lib stdc++ is needed for C++ based extension.
+# Under linux/gcc, for gcc > 4.8.5 (from conda), force c++11 to be compatible with boost
 if sys.platform in 'linux2':
-    libs = ['stdc++']
+    libs = []
     # gcc optimizations
     # gccargs = ["-O3", "-march=native"]
-    gccargs = ["-O3", '-Wno-unused-local-typedef']
+    gccargs = ["-O3", '-Wno-unused-local-typedef', '-std=c++11']
 else:
     # mac system
     libs = []
@@ -315,7 +315,7 @@ ext_modules=[
         Extension('variant_tools._assoTests',
             sources = [ASSO_WRAPPER_CPP_FILE] + STAT_FILES + ASSOC_FILES,
             extra_compile_args = gccargs,
-            libraries = libs + ['gsl', 'blas'],
+            libraries = libs + ['gsl', 'gslcblas'],
             library_dirs = ["build"] + ENV_LIBRARY_DIRS,
             include_dirs = ["src", "src/variant_tools"] + ENV_INCLUDE_DIRS,
 
