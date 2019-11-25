@@ -3932,9 +3932,14 @@ def consolidateFieldName(proj, table, clause_or_list, alt_build=False):
                     return ("samples('{}.proj', variant.variant_id, '{}')"
                             .format(proj.name,ret))
             else:
-                return (
-                    "samples('{}_genotype.DB', variant.variant_id, '{}', '{}')"
-                    .format(proj.name, ret, params))
+                if proj.store == "sqlite":
+                    return (
+                        "samples('{}_genotype.DB', variant.variant_id, '{}', '{}')"
+                        .format(proj.name, ret, params))
+                elif proj.store == "hdf5":
+                     return (
+                        "samples('{}.proj', variant.variant_id, '{}', '{}')"
+                        .format(proj.name, ret, params))
 
         #
         query = re.sub("__SAMPLES__\s*\(([^\)]*)\)", handleSamplesParams, query)

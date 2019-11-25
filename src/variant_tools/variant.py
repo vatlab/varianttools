@@ -225,7 +225,7 @@ def outputVariants(proj,
     env.logger.trace('Running query {}'.format(query))
     # if output to a file
     cur = proj.db.cursor()
-    print(query)
+    # print(query)
     try:
         cur.execute(query)
 

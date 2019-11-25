@@ -2364,16 +2364,16 @@ static void samples(
 		result = sqlite3_step(stmt);
 		if (result == SQLITE_ROW) {
 			char* chr = (char*)sqlite3_column_text(stmt, 0);
-			printf("success open variant_id is %d, %s \n", variant_id,chr);
+			// printf("success open variant_id is %d, %s \n", variant_id,chr);
 			get_Genotypes(chr, variant_id, hdf5_result, numberOfSamples, genoFilter);
 			
 			int i;
         
-			printf("done with this id %d \n",variant_id);
+			// printf("done with this id %d \n",variant_id);
 			
-    		printf("SampleIDs \n");
+   //  		printf("SampleIDs \n");
     		for (i = 0; i<numberOfSamples; i++) {
-    			printf("%d ",*(hdf5_result+i));
+    			// printf("%d ",*(hdf5_result+i));
     			
     			if (idMap.find(*(hdf5_result+i))==idMap.end()){
 
