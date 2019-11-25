@@ -3875,29 +3875,53 @@ def consolidateFieldName(proj, table, clause_or_list, alt_build=False):
             ret = writeIDList(params[0])
             if len(params) == 0:
                 # a filename of IDs
-                return ("genotype('{}_genotype.DB', variant.variant_id, '{}')"
+                if proj.store == "sqlite":
+                    return ("genotype('{}_genotype.DB', variant.variant_id, '{}')"
                         .format(proj.name, ret))
+                elif proj.store == "hdf5":
+                    return ("genotype('{}.proj', variant.variant_id, '{}')"
+                        .format(proj.name,ret))
+
             elif len(params) == 1:
                 if type(ret) == str:
                     # a filename of IDs
-                    return (
-                        "genotype('{}_genotype.DB', variant.variant_id, '{}')"
-                        .format(proj.name, ret))
+                    if proj.store == "sqlite":
+                        return (
+                            "genotype('{}_genotype.DB', variant.variant_id, '{}')"
+                            .format(proj.name, ret))
+                    elif proj.store == "hdf5":
+                        return ("genotype('{}.proj', variant.variant_id, '{}')"
+                            .format(proj.name,ret))
                 else:
                     # a single ID
-                    return ("genotype('{}_genotype.DB', variant.variant_id, {})"
-                            .format(proj.name, ret))
+                    if proj.store == "sqlite":
+                        return ("genotype('{}_genotype.DB', variant.variant_id, {})"
+                                .format(proj.name, ret))
+                    elif proj.store == "hdf5":
+                        return ("genotype('{}.proj', variant.variant_id, {})"
+                            .format(proj.name,ret))
             elif len(params) == 2:
                 if type(ret) == str:
                     # a filename of IDs
-                    return (
-                        "genotype('{}_genotype.DB', variant.variant_id, '{}', {})"
-                        .format(proj.name, ret, params[1]))
+                    if proj.store == "sqlite":
+                        return (
+                            "genotype('{}_genotype.DB', variant.variant_id, '{}', {})"
+                            .format(proj.name, ret, params[1]))
+                    elif proj.store == "hdf5":
+                        return (
+                            "genotype('{}.proj', variant.variant_id, '{}', {})"
+                            .format(proj.name, ret, params[1]))
+
                 else:
                     # a single ID
-                    return (
-                        "genotype('{}_genotype.DB', variant.variant_id, {}, {})"
-                        .format(proj.name, ret, params[1]))
+                    if proj.store == "sqlite":
+                        return (
+                            "genotype('{}_genotype.DB', variant.variant_id, {}, {})"
+                            .format(proj.name, ret, params[1]))
+                    elif proj.store == "hdf5":
+                        return (
+                            "genotype('{}.proj', variant.variant_id, {}, {})"
+                            .format(proj.name, ret, params[1]))
 
         #
         def handleSamplesParams(matchObj):

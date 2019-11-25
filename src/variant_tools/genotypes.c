@@ -1,8 +1,5 @@
 
-/*  
- *   This example shows how to read data from a chunked dataset.
- *   We will read from the file created by h5_extend_write.c 
- */
+
  
 #include "hdf5.h"
 #include "dirent.h"
@@ -12,6 +9,7 @@
 #include "blosc_filter.h"
 #include "genotypes.h"
 #include "unistd.h"
+#include "stdbool.h" 
 
 
 int findIndex(int *array, size_t size, int target) 
@@ -25,7 +23,7 @@ int findIndex(int *array, size_t size, int target)
 
 
 
-int get_Genotype_from_hdf5(char* filePath, char* chrName, int variant_id, int *samples,int index, char* genotypeData ,char* conditionalNodeValue)
+int get_Genotype_from_hdf5(char* filePath, char* chrName, int variant_id, int *samples,int index, char* genotypeData ,char* conditionalNodeValue, int* sample_IDs, int numberOfSamples)
 {
             hid_t       file;                        /* handles */
             hid_t       genotype;
@@ -151,10 +149,20 @@ int get_Genotype_from_hdf5(char* filePath, char* chrName, int variant_id, int *s
 
                 for (i = 0; i<numberOfColumns; i++) {
                     if (!conditionalNodeValue){
-                        if (genotypes[i]>=0 && masks[i]>0){
-                            samples[index]=colnames[i];
-                            // printf("%d ",colnames[i]);
-                            index+=1;
+                        if (sample_IDs[0]==-1){
+                            if (genotypes[i]>=0 && masks[i]>0){
+                                samples[index]=colnames[i];
+                                // printf("%d ",colnames[i]);
+                                index+=1;
+                            }
+                        }else{
+                            if (findIndex(sample_IDs,numberOfSamples,colnames[i])!=-1){
+                                if (masks[i]>0){
+                                    samples[index]=genotypes[i];
+                                    index+=1;
+                                }
+                            }
+
                         }
                     }else{
                         if (genotypes[i]==atoi(conditionalNodeValue) && masks[i]>0){
@@ -189,7 +197,7 @@ int get_Genotype_from_hdf5(char* filePath, char* chrName, int variant_id, int *s
 
 
 
-void get_Genotypes(char* chr,int variant_id,int* samples,int numberOfSamples, char* genoFilter)
+void get_Genotypes(char* chr,int variant_id,int* samples,int numberOfSamples, char* genoFilter, int* sample_IDs)
 {
     
     regex_t     regex;   
@@ -249,7 +257,7 @@ void get_Genotypes(char* chr,int variant_id,int* samples,int numberOfSamples, ch
             strcat(filePath, ent->d_name);
 
             // printf("%s,%s,%d\n",filePath,chr,variant_id);
-            index=get_Genotype_from_hdf5(filePath,chrName,variant_id,samples,index, genotypeData, conditionalNodeValue);
+            index=get_Genotype_from_hdf5(filePath,chrName,variant_id,samples,index, genotypeData, conditionalNodeValue, sample_IDs,numberOfSamples);
             // printf("done with file %s ,index %d \n",filePath,index);
         }
       }

@@ -325,7 +325,6 @@ ext_modules=[
 ext_modules += cythonize([
     Extension(
         'variant_tools.io_vcf_read',
-        # sources=['/Users/jma7/Development/VAT/VariantTools/src/variant_tools/io_vcf_read.c'],
         sources=['src/variant_tools/io_vcf_read.pyx'],
         include_dirs=[np.get_include()],
         library_dirs=["build"])

@@ -2014,7 +2014,31 @@ static void in_table(
 
 
 
+
+
+
 sqlite3 * geno_db;
+
+
+static char* getChrForVariant(int variant_id,sqlite3_context * context){
+	char sql[255];
+		
+	sprintf(sql, "SELECT chr FROM variant WHERE variant_id = %d ", variant_id);
+	sqlite3_stmt * stmt;
+	int result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
+	if (result != SQLITE_OK) {
+		sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
+		return "error";
+	}
+	result = sqlite3_step(stmt);
+	char* chr=NULL;
+	if (result == SQLITE_ROW) {
+		chr = (char*)sqlite3_column_text(stmt, 0);
+	}
+	return chr;
+}
+
+
 typedef std::map<std::string, int> SampleNameIdMap;
 SampleNameIdMap nameIdMap;
 
@@ -2081,6 +2105,9 @@ private:
 };
 
 
+
+
+
 static void genotype(
                      sqlite3_context * context,
                      int argc,
@@ -2097,7 +2124,14 @@ static void genotype(
 		return;
 	}
 
+
+
 	char * geno_db_file = (char *)sqlite3_value_text(argv[0]);
+	bool hdf5=false;
+	if (strstr(geno_db_file,"proj")!=NULL){
+		hdf5=true;
+	}
+	
 	int variant_id = sqlite3_value_int(argv[1]);
 	// there are two cases, if a single integer is passed
 	// otherwise a list of IDs are saved in a file
@@ -2167,53 +2201,84 @@ static void genotype(
 	}
 	// if there are multiple IDs
 	// go through all samples (with id)
+	int numberOfSamples=sample_IDs.size();
 	std::stringstream res;
 	bool first = true;
 	std::vector<int>::iterator it = sample_IDs.begin();
 	std::vector<int>::iterator it_end = sample_IDs.end();
-	for (; it != it_end; ++it) {
-		// run some query
-		char sql[255];
-		sprintf(sql, "SELECT %s FROM genotype_%d WHERE variant_id = %d LIMIT 0,1",
-			params.field(), *it, variant_id);
-		sqlite3_stmt * stmt;
-		int result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
-		if (result != SQLITE_OK) {
-			if (params.missing() != NULL)
-				res << params.missing();
-			continue;
+	
+	if (hdf5){
+		int hdf5_result[numberOfSamples];
+		char* chr=getChrForVariant(variant_id,context);
+		if (chr !=NULL){
+			get_Genotypes(chr, variant_id, hdf5_result, numberOfSamples, NULL, &sample_IDs[0]);
+			int i;
+     		// printf("SampleIDs \n");
+    		for (i = 0; i<numberOfSamples; i++) {
+    			// printf("%d ",*(hdf5_result+i));
+    			if (*(hdf5_result+i)>=0){
+    				if (first)
+						first = false;
+					else
+						res << params.delimiter();
+    				res << *(hdf5_result+i);
+    			}else{
+    				if (params.missing() != NULL) {
+						if (first)
+							first = false;
+						else
+							res << params.delimiter();
+						res << params.missing();
+					}
+    			}
+    		};
 		}
-		// there should be only one matching record
-		result = sqlite3_step(stmt);
-		if (result == SQLITE_ROW) {
-			if (first)
-				first = false;
-			else
-				res << params.delimiter();
-			// how to pass whatever type the query gets to the output???
-			switch (sqlite3_column_type(stmt, 0)) {
-			case SQLITE_INTEGER:
-				res << sqlite3_column_int(stmt, 0);
-				break;
-			case SQLITE_FLOAT:
-				res << sqlite3_column_double(stmt, 0);
-				break;
-			case SQLITE_TEXT:
-				res << (const char *)sqlite3_column_text(stmt, 0);
-				break;
-			case SQLITE_BLOB:
-				res << sqlite3_column_blob(stmt, 0);
-				break;
-			case SQLITE_NULL:
-				res << params.missing();
-				break;
+
+	}else{
+		for (; it != it_end; ++it) {
+			// run some query
+			char sql[255];
+			sprintf(sql, "SELECT %s FROM genotype_%d WHERE variant_id = %d LIMIT 0,1",
+				params.field(), *it, variant_id);
+			sqlite3_stmt * stmt;
+			int result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
+			if (result != SQLITE_OK) {
+				if (params.missing() != NULL)
+					res << params.missing();
+				continue;
 			}
-		} else if (params.missing() != NULL) {
-			if (first)
-				first = false;
-			else
-				res << params.delimiter();
-			res << params.missing();
+			// there should be only one matching record
+			result = sqlite3_step(stmt);
+			if (result == SQLITE_ROW) {
+				if (first)
+					first = false;
+				else
+					res << params.delimiter();
+				// how to pass whatever type the query gets to the output???
+				switch (sqlite3_column_type(stmt, 0)) {
+				case SQLITE_INTEGER:
+					res << sqlite3_column_int(stmt, 0);
+					break;
+				case SQLITE_FLOAT:
+					res << sqlite3_column_double(stmt, 0);
+					break;
+				case SQLITE_TEXT:
+					res << (const char *)sqlite3_column_text(stmt, 0);
+					break;
+				case SQLITE_BLOB:
+					res << sqlite3_column_blob(stmt, 0);
+					break;
+				case SQLITE_NULL:
+					res << params.missing();
+					break;
+				}
+			} else if (params.missing() != NULL) {
+				if (first)
+					first = false;
+				else
+					res << params.delimiter();
+				res << params.missing();
+			}
 		}
 	}
 	// we do not close the database because we are readonly and we need the database for
@@ -2223,6 +2288,9 @@ static void genotype(
 	else
 		sqlite3_result_text(context, (char *)(res.str().c_str()), -1, SQLITE_TRANSIENT);
 }
+
+
+
 
 
 typedef std::map<int, std::string> IdNameMap;
@@ -2352,26 +2420,16 @@ static void samples(
 	bool first = true;
 	char* genoFilter=params.geno_filter();
 	if (hdf5){
-		char sql[255];
-		
-		sprintf(sql, "SELECT chr FROM variant WHERE variant_id = %d ", variant_id);
-		sqlite3_stmt * stmt;
-		result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
-		if (result != SQLITE_OK) {
-			sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
-			return;
-		}
-		result = sqlite3_step(stmt);
-		if (result == SQLITE_ROW) {
-			char* chr = (char*)sqlite3_column_text(stmt, 0);
-			// printf("success open variant_id is %d, %s \n", variant_id,chr);
-			get_Genotypes(chr, variant_id, hdf5_result, numberOfSamples, genoFilter);
+		int sample_IDs[1];
+		sample_IDs[0]=-1;
+		char* chr=getChrForVariant(variant_id,context);
+		if (chr !=NULL){
+			get_Genotypes(chr, variant_id, hdf5_result, numberOfSamples, genoFilter, sample_IDs);
 			
 			int i;
         
-			// printf("done with this id %d \n",variant_id);
-			
-   //  		printf("SampleIDs \n");
+			// printf("done with this id %d \n",variant_id)		
+            // printf("SampleIDs \n");
     		for (i = 0; i<numberOfSamples; i++) {
     			// printf("%d ",*(hdf5_result+i));
     			
