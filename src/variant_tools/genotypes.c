@@ -131,13 +131,20 @@ int get_Genotype_from_hdf5(char * filePath, char * chr, int variant_id, int *sam
  
             if (genoFilter != NULL){
                 char delim[]="=";
+                int stringPos=0;
                 char *ptr = strtok(genoFilter, delim);
+                char *array[2];
                 while(ptr != NULL)
                 {
+                    array[stringPos++]=ptr;
                     printf("'%s'\n", ptr);
                     ptr = strtok(NULL, delim);
                 }
-
+                char nodeName[20]="";
+                strcpy(nodeName, "/");
+                strcat(nodeName,array[0]);
+                strcat(genotypeData, "/GT");
+                printf("%s\n",genotypeData);
 
             }else{
                 strcat(genotypeData, "/GT");
@@ -204,16 +211,17 @@ int get_Genotype_from_hdf5(char * filePath, char * chr, int variant_id, int *sam
             /*
              * Define the memory space to read dataset.
              */
-            geno_memspace = H5Screate_simple(rank,dims,NULL);
-            int         genotypes[dims[0]][dims[1]];  /* buffer for dataset to be read */
-            status = H5Dread(genotype, H5T_NATIVE_INT, geno_memspace, genoSpace,
-                     H5P_DEFAULT, genotypes);
+            // geno_memspace = H5Screate_simple(rank,dims,NULL);
+            // int         genotypes[dims[0]][dims[1]];   buffer for dataset to be read 
+            // status = H5Dread(genotype, H5T_NATIVE_INT, geno_memspace, genoSpace,
+            //          H5P_DEFAULT, genotypes);
 
-            mask_memspace = H5Screate_simple(rank,dims,NULL);
-            int         masks[dims[0]][dims[1]];  /* buffer for dataset to be read */
-            status = H5Dread(mask, H5T_NATIVE_INT, mask_memspace, maskSpace,
-                     H5P_DEFAULT, masks);
+            // mask_memspace = H5Screate_simple(rank,dims,NULL);
+            // int         masks[dims[0]][dims[1]];   buffer for dataset to be read 
+            // status = H5Dread(mask, H5T_NATIVE_INT, mask_memspace, maskSpace,
+            //          H5P_DEFAULT, masks);
 
+            
             row_memspace = H5Screate_simple(row_rank,row_dims,NULL);
             int         rownames[row_dims[0]];  /* buffer for dataset to be read */
             status = H5Dread(rowname, H5T_NATIVE_INT, row_memspace, rowSpace,
@@ -225,27 +233,46 @@ int get_Genotype_from_hdf5(char * filePath, char * chr, int variant_id, int *sam
                      H5P_DEFAULT, colnames);
 
 
-            printf("\n");
-            printf("Dataset: \n");
 
             // int variant_id=1;
             int pos=findIndex(rownames,row_dims[0],variant_id);
 
-            printf("row pos %d.\n", pos);
+            printf("row position %d.\n", pos);
             if (pos!=-1){
-                for (i = 0; i < dims[1]; i++) printf("%d ", genotypes[pos][i]);
+
+                // int numberOfColumns=dims[1];
+                int numberOfColumns=dims[1];
+                offset[0] = pos;
+                offset[1] = 0;
+                count[0]  = 1;
+                count[1]  = numberOfColumns;
+                geno_memspace = H5Screate_simple(1,col_dims,NULL);     
+                int         genotypes[numberOfColumns];
+                status = H5Sselect_hyperslab(genoSpace, H5S_SELECT_SET, offset, NULL,
+                             count, NULL);
+                status = H5Dread(genotype, H5T_NATIVE_INT, geno_memspace, genoSpace,
+                         H5P_DEFAULT, genotypes);
+               
+
+                mask_memspace = H5Screate_simple(1,col_dims,NULL);    
+                int         masks[numberOfColumns];
+                status = H5Sselect_hyperslab(maskSpace, H5S_SELECT_SET, offset, NULL,
+                             count, NULL);
+                status = H5Dread(mask, H5T_NATIVE_INT, mask_memspace, maskSpace,
+                         H5P_DEFAULT, masks);
+                printf("Dataset: \n");
+                for (i = 0; i < numberOfColumns; i++) printf("%d ", genotypes[i]);
                 
 
                 // printf("\n");
                 // printf("rownames: \n");
                 // for (i = 0; i<row_dims[0]; i++) printf("%d ",rownames[i]);
 
-
                 printf("\n");
                 printf("colnames: \n");
 
-                for (i = 0; i<col_dims[0]; i++) {
-                    if (genotypes[pos][i]>=0 && masks[pos][i]>0){
+                for (i = 0; i<numberOfColumns; i++) {
+                    if (genotypes[i]>=0 && masks[i]>0){
                         samples[index]=colnames[i];
                         printf("%d ",colnames[i]);
                         index+=1;
@@ -253,6 +280,7 @@ int get_Genotype_from_hdf5(char * filePath, char * chr, int variant_id, int *sam
                 }
                 printf("\n");
             }
+            printf("cleanup\n");
 
            
             H5Pclose(cparms);
@@ -264,6 +292,11 @@ int get_Genotype_from_hdf5(char * filePath, char * chr, int variant_id, int *sam
             H5Sclose(maskSpace);
             H5Sclose(rowSpace);
             H5Sclose(colSpace);
+            H5Sclose(mask_memspace);
+            H5Sclose(geno_memspace);
+            H5Sclose(row_memspace);
+            H5Sclose(col_memspace);
+
 
             H5Fclose(file);
             return index;

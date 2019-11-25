@@ -2332,7 +2332,7 @@ static void samples(
 	}
 	IdNameMap & idMap = it->second;
 	int result = 0;
-	printf("%s\n",geno_db_file);
+	// printf("%s\n",geno_db_file);
 	int numberOfSamples=idMap.size();
 	
 	// open databases
