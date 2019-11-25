@@ -2161,53 +2161,13 @@ static void genotype(
 		}
 	}
 
-	if (single_ID) {
-		int result = 0;
-		// run some query
-		char sql[255];
-		sprintf(sql, "SELECT %s FROM genotype_%d WHERE variant_id = %d LIMIT 0,1",
-			params.field(), sample_IDs[0], variant_id);
-		sqlite3_stmt * stmt;
-		result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
-		if (result != SQLITE_OK) {
-			//sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
-			sqlite3_result_null(context);
-			return;
-		}
-		// there should be only one matching record
-		result = sqlite3_step(stmt);
-		if (result == SQLITE_ROW) {
-			// how to pass whatever type the query gets to the output???
-			switch (sqlite3_column_type(stmt, 0)) {
-			case SQLITE_INTEGER:
-				sqlite3_result_int(context, sqlite3_column_int(stmt, 0));
-				break;
-			case SQLITE_FLOAT:
-				sqlite3_result_double(context, sqlite3_column_double(stmt, 0));
-				break;
-			case SQLITE_TEXT:
-				sqlite3_result_text(context, (const char *)sqlite3_column_text(stmt, 0), -1, SQLITE_TRANSIENT);
-				break;
-			case SQLITE_BLOB:
-				sqlite3_result_blob(context, sqlite3_column_blob(stmt, 0), -1, SQLITE_TRANSIENT);
-				break;
-			case SQLITE_NULL:
-				sqlite3_result_null(context);
-				break;
-			}
-		} else
-			sqlite3_result_null(context);
-		return;
-	}
-	// if there are multiple IDs
-	// go through all samples (with id)
-	int numberOfSamples=sample_IDs.size();
 	std::stringstream res;
 	bool first = true;
-	std::vector<int>::iterator it = sample_IDs.begin();
-	std::vector<int>::iterator it_end = sample_IDs.end();
-	
 	if (hdf5){
+		int numberOfSamples=sample_IDs.size();
+		char * genoFilter=params.field()
+		printf("%s\n",genoFilter)
+
 		int hdf5_result[numberOfSamples];
 		char* chr=getChrForVariant(variant_id,context);
 		if (chr !=NULL){
@@ -2235,6 +2195,50 @@ static void genotype(
 		}
 
 	}else{
+		if (single_ID) {
+			int result = 0;
+			// run some query
+			char sql[255];
+			sprintf(sql, "SELECT %s FROM genotype_%d WHERE variant_id = %d LIMIT 0,1",
+				params.field(), sample_IDs[0], variant_id);
+			sqlite3_stmt * stmt;
+			result = sqlite3_prepare_v2(geno_db, sql, -1, &stmt, NULL) ;
+			if (result != SQLITE_OK) {
+				//sqlite3_result_error(context, sqlite3_errmsg(geno_db), -1);
+				sqlite3_result_null(context);
+				return;
+			}
+			// there should be only one matching record
+			result = sqlite3_step(stmt);
+			if (result == SQLITE_ROW) {
+				// how to pass whatever type the query gets to the output???
+				switch (sqlite3_column_type(stmt, 0)) {
+				case SQLITE_INTEGER:
+					sqlite3_result_int(context, sqlite3_column_int(stmt, 0));
+					break;
+				case SQLITE_FLOAT:
+					sqlite3_result_double(context, sqlite3_column_double(stmt, 0));
+					break;
+				case SQLITE_TEXT:
+					sqlite3_result_text(context, (const char *)sqlite3_column_text(stmt, 0), -1, SQLITE_TRANSIENT);
+					break;
+				case SQLITE_BLOB:
+					sqlite3_result_blob(context, sqlite3_column_blob(stmt, 0), -1, SQLITE_TRANSIENT);
+					break;
+				case SQLITE_NULL:
+					sqlite3_result_null(context);
+					break;
+				}
+			} else
+				sqlite3_result_null(context);
+			return;
+		}
+		// if there are multiple IDs
+		// go through all samples (with id)
+
+		std::vector<int>::iterator it = sample_IDs.begin();
+		std::vector<int>::iterator it_end = sample_IDs.end();
+	
 		for (; it != it_end; ++it) {
 			// run some query
 			char sql[255];
