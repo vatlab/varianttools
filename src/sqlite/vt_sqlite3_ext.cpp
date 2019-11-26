@@ -2171,7 +2171,7 @@ static void genotype(
 		int hdf5_result[numberOfSamples];
 		char* chr=getChrForVariant(variant_id,context);
 		if (chr !=NULL){
-			get_Genotypes(chr, variant_id, hdf5_result, numberOfSamples, NULL, &sample_IDs[0]);
+			get_Genotypes(chr, variant_id, hdf5_result, numberOfSamples, genoFilter, &sample_IDs[0]);
 			int i;
      		// printf("SampleIDs \n");
     		for (i = 0; i<numberOfSamples; i++) {

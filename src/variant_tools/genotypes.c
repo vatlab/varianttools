@@ -226,23 +226,29 @@ void get_Genotypes(char* chr,int variant_id,int* samples,int numberOfSamples, ch
     char *conditionalNodeValue=NULL;
 
     if (genoFilter != NULL){
-        char delim[]="=";
-        int stringPos=0;
-        char *ptr = strtok(genoFilter, delim);
-        char *array[2];
-        while(ptr != NULL)
-        {
-            array[stringPos++]=ptr;
-            ptr = strtok(NULL, delim);
+        if (sample_IDs[0]==-1){
+            char delim[]="=";
+            int stringPos=0;
+            char *ptr = strtok(genoFilter, delim);
+            char *array[2];
+            while(ptr != NULL)
+            {
+                array[stringPos++]=ptr;
+                ptr = strtok(NULL, delim);
+            }
+            char nodeName[20]="";
+            strcpy(nodeName, "/");
+            strcat(nodeName,array[0]);
+            strcat(genotypeData, nodeName);
+            // printf("%s\n",genotypeData);
+            // printf("%s\n",array[1]);
+            conditionalNodeValue=array[1];
+        }else{
+            char nodeName[20]="";
+            strcpy(nodeName, "/");
+            strcat(nodeName,genoFilter);
+            strcat(genotypeData, nodeName);
         }
-        char nodeName[20]="";
-        strcpy(nodeName, "/");
-        strcat(nodeName,array[0]);
-        strcat(genotypeData, nodeName);
-        // printf("%s\n",genotypeData);
-        // printf("%s\n",array[1]);
-        conditionalNodeValue=array[1];
-
     }else{
         strcat(genotypeData, "/GT");
     }
