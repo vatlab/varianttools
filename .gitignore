@@ -1,4 +1,6 @@
-src/hdf5-blosc/
+src/hdf5-blosc/.genotypes.c.swp
+src/hdf5-blosc/builder
+src/hdf5-blosc/src
 src/variant_tools/blosc_filter.o
 boost_1_49_0/
 src/boost_1_49_0/
@@ -40,6 +42,5 @@ variant_tools/swigpyrun.h
 variant_tools/ucsctools.py
 variant_tools/ucsctools_wrap.cpp
 .DS_Store
-src/hdf5-blosc/
 src/variant_tools/*.o
 .vscode/

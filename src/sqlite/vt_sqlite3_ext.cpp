@@ -2165,8 +2165,8 @@ static void genotype(
 	bool first = true;
 	if (hdf5){
 		int numberOfSamples=sample_IDs.size();
-		char * genoFilter=params.field()
-		printf("%s\n",genoFilter)
+		char * genoFilter=params.field();
+		// printf("%s\n",genoFilter);
 
 		int hdf5_result[numberOfSamples];
 		char* chr=getChrForVariant(variant_id,context);
