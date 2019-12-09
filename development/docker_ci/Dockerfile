@@ -48,4 +48,3 @@ RUN     vtools use refGene
 
 WORKDIR /home/bpeng
 RUN     rm -rf temp
-
