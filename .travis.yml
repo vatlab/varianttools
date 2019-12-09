@@ -21,6 +21,7 @@ install:
     - docker run -dt --name vtools_test junmahouston/vtools_test:latest
     - docker cp ./src vtools_test:/home/bpeng/VariantTools
     - docker cp ./test vtools_test:/home/bpeng/VariantTools
+    - docker cp setup.py vtools_test:/home/bpeng/VariantTools
     - docker exec vtools_test bash -c "cd VariantTools && python setup.py install"
 script:
     - docker exec vtools_test bash -c "cd VariantTools/test && python run_tests.py"
