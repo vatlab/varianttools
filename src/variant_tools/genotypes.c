@@ -52,8 +52,8 @@ int get_Genotype_from_hdf5(char* filePath, char* chrName, int variant_id, int *s
             hsize_t i, j;
          
             char *version, *date;
-            int r;
-            r = register_blosc(&version, &date);
+            // int r;
+            // r = register_blosc(&version, &date);
             // printf("Blosc version info: %s (%s) %d\n", version, date,r);
             file = H5Fopen(filePath, H5F_ACC_RDONLY, H5P_DEFAULT);
 

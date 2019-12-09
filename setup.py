@@ -289,7 +289,7 @@ ext_modules=[
                 'src/sqlite', "src/variant_tools", "src/cgatools", "src/hdf5-blosc"] + ENV_INCLUDE_DIRS,
             library_dirs = ["build"] + ENV_LIBRARY_DIRS,
             libraries = ['gsl'] + \
-                ['boost_iostreams', 'boost_regex', 'boost_filesystem'] + \
+                ['boost_iostreams', 'boost_regex', 'boost_filesystem','hdf5'] + \
                 ['z', 'bz2'],
             extra_compile_args = gccargs,
             define_macros = [
