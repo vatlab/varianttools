@@ -18,7 +18,7 @@ services:
 #     - python run_tests.py
 install:
     - docker pull junmahouston/vtools_test:latest
-    - docker run -dt --name vtools_test junmahouston/vtools_test:latest
+    - docker run -dt --name vtools_test junmahouston/vtools_test:v3
     - docker cp ./src vtools_test:/home/bpeng/VariantTools
     - docker cp ./test vtools_test:/home/bpeng/VariantTools
     - docker cp setup.py vtools_test:/home/bpeng/VariantTools
