@@ -39,6 +39,7 @@ from .assoTests import AssoData
 from .project import AnnoDB, AnnoDBWriter, Field, MaintenanceProcess, Project
 from .tester import ExternTest, NullTest
 from .tester import *
+from .rtester import *
 from .utils import (DatabaseEngine, PrettyPrinter, ProgressBar, ShelfDB,
                     consolidateFieldName, delayedAction, env,
                     executeUntilSucceed, flatten, hasGenoInfo, safeMapFloat)
