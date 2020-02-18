@@ -93,7 +93,7 @@ CGATOOLS_FILES = [
     'src/cgatools/util/Streams.cpp',
     'src/cgatools/util/Exception.cpp',
     'src/cgatools/util/StringSet.cpp',
-    'src/cgatools/util/Files.cpp',
+    # 'src/cgatools/util/Files.cpp',
     'src/cgatools/util/parse.cpp',
     #'src/cgatools/util/GenericHistogram.cpp',
     'src/cgatools/reference/ChromosomeIdField.cpp',
