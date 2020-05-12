@@ -23,6 +23,9 @@
 import argparse
 import subprocess
 import sys
+from multiprocessing import set_start_method
+
+set_start_method('fork')
 
 import variant_tools.annotation as annotation
 import variant_tools.compare as compare
@@ -42,6 +45,7 @@ if sys.platform != 'win32':
 
 # save the command line that has been processed by the shell.
 env.command_line = subprocess.list2cmdline(sys.argv[1:])
+
 
 def addCommonArgs(parser):
     parser.add_argument(
