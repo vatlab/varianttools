@@ -43,7 +43,6 @@ except ImportError as e:
         '"python setup.py install")'.format(e))
 
 
-
 #
 #
 # Process each line using the above functors
@@ -243,6 +242,7 @@ class LineProcessor:
             records = [(tokens[col] if t else [tokens[x] for x in col]) if adj is None else \
                 (adj(tokens[col]) if t else adj([tokens[x] for x in col])) for col,t,adj in self.fields]
         except IgnoredRecord:
+            env.logger.debug('Record ignored')
             return
         except Exception:
             # If anything wrong happends, process one by one to get a more proper error message (and None values)
