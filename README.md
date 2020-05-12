@@ -28,21 +28,16 @@ You will need to install
 * `Cython`
 * `hdf5`
 * `blosc`
-
 * A C++ compiler such as `gcc`
 
 which, in a conda environment, could be installed with command
 
 ```
-conda install -c conda-forge boost-cpp gsl numpy cython blosc
+conda install -c conda-forge boost-cpp gsl numpy cython blosc hdf5
 ```
 
-Finally, you can checkout the latest version of variant tools from github, and install it with command
-
-```
-python setup.py install
-```
-with the aforementioned packages installed.
+This method can be used if you download or clone the latest version
+of variant tools from this repository.
 
 # Documentation
 
