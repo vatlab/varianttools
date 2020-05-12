@@ -448,10 +448,9 @@ class GenotypeCopier(Process):
             if None in ID_and_DUPs[-1]:
                 try:
                     # remove the temporary file
-                    os.remove(self.genotype_file)
+                    os.remove(genotype_file)
                 except Exception as e:
-                    print(e)
-                    pass
+                    env.logger.debug(e)
 
 
 class DedupWorker(Process):
