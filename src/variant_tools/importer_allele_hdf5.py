@@ -40,9 +40,10 @@ from shutil import copyfile
 import numpy as np
 
 from variant_tools.io_vcf_read import FileInputStream, VCFChunkIterator
+from variant_tools.cgatools import normalize_variant
 
 from .accessor import Engine_Storage, Engine_Access
-from .utils import DatabaseEngine, ProgressBar, env
+from .utils import DatabaseEngine, ProgressBar, env, RefGenome
 
 # expose some names from cython extension
 # from variant_tools.io_vcf_read import (  # noqa: F401
@@ -992,7 +993,44 @@ def _read_vcf_headers(stream):
     return VCFHeaders(headers, filters, infos, formats, samples)
 
 
-class HDF5GenotypeImportWorker(Process):
+class HDFGenotypeBaseWorker:
+
+    def get_variant_id(self, chr, pos, ref, alt):
+
+        try:
+            return self.variantIndex[tuple((chr, ref, alt))][pos][0]
+        except KeyError:
+            pass
+
+        try:
+            return self.variantIndex[tuple((str(chr), ref, alt))][str(pos)][0]
+        except KeyError:
+            pass
+
+        if len(ref) == len(alt) and len(ref) == 1:
+            return None
+
+        crr = RefGenome(self.build).crr
+        rec = [chr, str(pos), ref, alt]
+
+        try:
+            msg = normalize_variant(crr, rec, 0, 1, 2, 3)
+
+            if msg:
+                # if the message says 'Unrecognized allele', the variant will be ignored.
+                if msg[0] == 'U':
+                    raise ValueError(msg)
+                else:
+                    env.logger.warning('{}: {}'.format(self.build, msg))
+            else:
+                return self.get_variant_id(chr, rec[1], rec[2], rec[3])
+        except Exception as e:
+            env.logger.error(e)
+            return None
+        return None
+
+
+class HDF5GenotypeImportWorker(Process, HDFGenotypeBaseWorker):
     '''This class starts a process, import genotype to a temporary HDF5 file.
         Args
 
@@ -1102,10 +1140,9 @@ class HDF5GenotypeImportWorker(Process):
                     self.info[info].append(
                         np.array([self.chunk[self.namedict[info]][pos]]))
                 else:
-                    self.info[info].append(self.chunk[self.namedict[info]]
-                                           [pos, self.start_sample -
-                                            self.firstID:self.end_sample -
-                                            self.firstID])
+                    self.info[info].append(self.chunk[self.namedict[info]][
+                        pos, self.start_sample - self.firstID:self.end_sample -
+                        self.firstID])
                 # print(self.namedict[info],info,self.start_sample,self.end_sample,pos,(self.chunk[self.namedict[info]][pos,self.start_sample-self.firstID:self.end_sample-self.firstID]))
 
     def writeIntoHDF(self, chr):
@@ -1149,29 +1186,20 @@ class HDF5GenotypeImportWorker(Process):
             pos = self.chunk["variants/POS"][i]
             for altIndex in range(len(self.chunk["variants/ALT"][i])):
                 alt = self.chunk["variants/ALT"][i][altIndex]
-                if alt != "":
-                    if tuple((chr, ref, alt)) in self.variantIndex:
-                        variant_id = self.variantIndex[tuple(
-                            (chr, ref, alt))][pos][0]
-
-                        if variant_id != prev_variant_id:
-                            self.get_geno(variant_id, i, altIndex)
-                            prev_variant_id = variant_id
-
-                    else:
-                        rec = [str(chr), str(pos), ref, alt]
-                        #msg = normalize_variant(
-                        #    RefGenome(self.build).crr, rec, 0, 1, 2, 3)
-                        if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
-                            variant_id = self.variantIndex[tuple(
-                                (rec[0], rec[2], rec[3]))][rec[1]][0]
-                            if variant_id != prev_variant_id:
-                                self.get_geno(variant_id, i, altIndex)
-                                prev_variant_id = variant_id
+                if alt == "":
+                    continue
+                variant_id = self.get_variant_id(chr, pos, ref, alt)
+                if variant_id is None:
+                    env.logger.warning(
+                        f'Failed to locate variant {chr} {pos} {ref} {alt}')
+                    continue
+                if variant_id != prev_variant_id:
+                    self.get_geno(variant_id, i, altIndex)
+                    prev_variant_id = variant_id
         self.writeIntoHDF(chr)
 
 
-class HDF5GenotypeSortWorker(Process):
+class HDF5GenotypeSortWorker(Process, HDFGenotypeBaseWorker):
 
     def __init__(self, chunk, importer, start_sample, end_sample, sample_ids,
                  variant_count, proc_index, dbLocation, estart, eend, efirst):
@@ -1253,10 +1281,9 @@ class HDF5GenotypeSortWorker(Process):
             # self.rowData.extend([[variant_id,idx]+[self.chunk[field][i][idx] for field in self.fields] for idx in range(self.start_sample,self.end_sample)])
             # self.getInfoTable(variant_id,infoDict,altIndex)
             for info in self.geno_info:
-                self.info[info].append(self.chunk[self.namedict[info]]
-                                       [pos, self.start_sample -
-                                        self.firstID:self.end_sample -
-                                        self.firstID])
+                self.info[info].append(self.chunk[self.namedict[info]][
+                    pos, self.start_sample - self.firstID:self.end_sample -
+                    self.firstID])
 
     def writeIntoHDF(self, chr):
         # if self.dbLocation==self.checkfileName:
@@ -1431,22 +1458,16 @@ class HDF5GenotypeSortWorker(Process):
 
             for altIndex in range(len(self.chunk["variants/ALT"][i])):
                 alt = self.chunk["variants/ALT"][i][altIndex]
-                if alt != "":
-                    if tuple((chr, ref, alt)) in self.variantIndex:
-                        variant_id = self.variantIndex[tuple(
-                            (chr, ref, alt))][pos][0]
-                        self.get_geno(variant_id, i, altIndex)
+                if alt == "":
+                    continue
 
-                    else:
-                        rec = [str(chr), str(pos), ref, alt]
-                        #msg = normalize_variant(
-                        #    RefGenome(self.build).crr, rec, 0, 1, 2, 3)
-                        if tuple((rec[0], rec[2], rec[3])) in self.variantIndex:
-                            variant_id = self.variantIndex[tuple(
-                                (rec[0], rec[2], rec[3]))][rec[1]][0]
-                            self.get_geno(variant_id, i, altIndex)
-                    # if self.dbLocation==self.checkfileName:
-                    #     print("1",pos,variant_id)
+                variant_id = self.get_variant_id(chr, pos, ref, alt)
+                if variant_id is None:
+                    env.logger.warning(
+                        f'Failed to locate variant {chr} {pos} {ref} {alt}')
+                    continue
+
+                self.get_geno(variant_id, i, altIndex)
         if last < len(erowpos):
             self.estart.value = self.estart.value + last
             self.eend.value = self.estart.value + READ_EXISTING_CHUNK_LENGTH
@@ -1624,7 +1645,6 @@ def importGenotypesInParallel(importer, num_sample=0):
             'Importing genotypes', importer.total_count[2], initCount=0)
         lines = 0
 
-
         estart = [Value('L', 0) for x in range(numTasks)]
         eend = [Value('L', READ_EXISTING_CHUNK_LENGTH) for x in range(numTasks)]
         efirst = [Value('b', True) for x in range(numTasks)]
@@ -1761,8 +1781,8 @@ class HDF5GenotypeUpdateWorker(Process):
                                 np.array([self.chunk[self.namedict[name]][i]]))
                         else:
                             self.info[name].append(
-                                self.chunk[self.namedict[name]]
-                                [i, self.start_sample:self.end_sample])
+                                self.chunk[self.namedict[name]][
+                                    i, self.start_sample:self.end_sample])
 
         self.writeIntoHDF(chr)
 
