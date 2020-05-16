@@ -502,6 +502,9 @@ class MultiVariantReader(BaseVariantReader):
                         if idx == 0:
                             id = val[0]
                         elif id != val[0]:
+                            env.logger.warning(
+                                f'Inconsistent IDs from readers. Please report this bug at https://github.com/vatlab/varianttools/issues'
+                            )
                             raise ValueError(
                                 'Read different IDs from multiple processes')
                         rec.extend(val[1:])
@@ -522,6 +525,12 @@ class MultiVariantReader(BaseVariantReader):
                     if val is None:
                         all_done = True
                         break
+
+                    # if no sample is exported, there will be no other reader
+                    if len(self.readers) == 1:
+                        yield val[1:]
+                        continue
+
                     # sys.stdou.flush()
                     id = val[0]
                     rec.extend(val[1:])
