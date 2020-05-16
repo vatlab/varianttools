@@ -31,8 +31,8 @@ from setuptools import Extension, find_packages, setup
 # before installation
 with open('src/variant_tools/_version.py') as init:
     for line in init:
-        if line.startswith('VTOOLS_VERSION='):
-            VTOOLS_VERSION = line[15:].strip().strip('"').strip("'")
+        if line.startswith('VTOOLS_VERSION'):
+            VTOOLS_VERSION = line.split('=')[1].strip().strip('"').strip("'")
             break
 
 SWIG_OPTS = [

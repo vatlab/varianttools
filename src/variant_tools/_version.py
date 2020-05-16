@@ -22,9 +22,12 @@
 
 import sys
 
-VTOOLS_VERSION='3.1.3'
+VTOOLS_VERSION = '3.1.4'
 
 pyver = sys.version_info
-VTOOLS_FULL_VERSION='{} for Python {}.{}.{}'.format(VTOOLS_VERSION, pyver.major, pyver.minor, pyver.micro)
-VTOOLS_COPYRIGHT = '''variant tools {} : Copyright (c) 2011 - 2016 Bo Peng'''.format(VTOOLS_VERSION)
+VTOOLS_FULL_VERSION = '{} for Python {}.{}.{}'.format(VTOOLS_VERSION,
+                                                      pyver.major, pyver.minor,
+                                                      pyver.micro)
+VTOOLS_COPYRIGHT = '''variant tools {} : Copyright (c) 2011 - 2016 Bo Peng'''.format(
+    VTOOLS_VERSION)
 VTOOLS_CONTACT = '''Please visit https://github.com/vatlab/varianttools for more information.'''
