@@ -158,7 +158,7 @@ PyObject* pysqlite_row_keys(pysqlite_Row* self, PyObject* args, PyObject* kwargs
 
 static int pysqlite_row_print(pysqlite_Row* self, FILE *fp, int flags)
 {
-    return (&PyTuple_Type)->tp_print(self->data, fp, flags);
+    return tp_print(self->data, fp, flags);
 }
 
 static PyObject* pysqlite_iter(pysqlite_Row* self)
@@ -217,7 +217,11 @@ PyTypeObject pysqlite_RowType = {
         0,                                              /* tp_as_number */
         0,                                              /* tp_as_sequence */
         0,                                              /* tp_as_mapping */
+        #if PY_VERSION_HEX >= 0x03060000
+        0,
+        #else
         (hashfunc)pysqlite_row_hash,                    /* tp_hash */
+        #endif
         0,                                              /* tp_call */
         0,                                              /* tp_str */
         0,                                              /* tp_getattro */
