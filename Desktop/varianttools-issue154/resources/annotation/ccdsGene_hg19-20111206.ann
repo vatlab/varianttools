@@ -1,0 +1,67 @@
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
+# for a description of the format of this file.
+
+[linked fields]
+hg19=chr, cdsStart, cdsEnd
+
+[data sources]
+anno_type=range
+description=CCDS Genes
+version=hg19_20111206
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/ccdsGene.txt.gz
+direct_url=annoDB/ccdsGene-hg19_20111206.DB.gz
+source_type=txt
+
+[name]
+index=2
+type=VARCHAR(255)
+comment=Gene name (usually a CCDS transcript ID)
+
+[chr]
+index=3
+adj=RemoveLeading('chr')
+type=VARCHAR(20)
+
+[strand]
+index=4
+type=CHAR(1) NULL
+comment=which DNA strand contains the observed alleles
+
+[cdsStart]
+index=7
+type=INTEGER
+adj=IncreaseBy(1)
+comment=Coding region start
+
+[cdsEnd]
+index=8
+type=INTEGER
+comment=Coding region end
+
+[exonCount]
+index=9
+type=INTEGER NULL
+comment=Number of exons
+
+[score]
+index=12
+type=INTEGER NULL
+comment=Score
+
+[name2]
+index=13
+type=VARCHAR(255)
+comment=Alternate name
+
+[cdsStartStat]
+index=14
+type=VARCHAR(10)
+comment=cds start stat, can be 'non', 'unk', 'incompl', and 'cmp1'
+
+[cdsEndStat]
+index=15
+type=VARCHAR(10)
+comment=cds end stat, can be 'non', 'unk', 'incompl', and 'cmp1'

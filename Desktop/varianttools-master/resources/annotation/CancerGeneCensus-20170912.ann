@@ -1,0 +1,113 @@
+# Copyright (C) 2017 Man Chong Leong (ml69@rice.edu)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
+# for a description of the format of this file.
+#
+# To rebuild this database using a new version of data
+# 1. download an excel file from Cancer Genome Project: http://www.sanger.ac.uk/genetics/CGP/Census/
+# 2. save the data in a tab-delimited text file in filename CancerGeneCensus.txt.
+# 3. run vtools use CancerGeneCensus.ann --files CancerGeneCensus.txt
+
+[linked fields]
+*=GeneSymbol
+
+[data sources]
+description=This database contains variants from the Cancer Genome Project. It is
+  an ongoing effort to catalogue those genes for which mutations have been causally
+  implicated in cancer. The original census and analysis was published in Nature
+  Reviews Cancer and supplemental analysis information related to the paper is also
+  available. Currently, more than 1%% of all human genes are implicated via mutation
+  in cancer. Of these, approximately 90%% have somatic mutations in cancer, 20%% bear
+  germline mutations that predispose to cancer and 10%% show both somatic and
+  germline mutations.
+version=20170912
+encoding=ISO-8859-1
+anno_type=field
+header=1
+direct_url=annoDB/CancerGeneCensus-20170912.DB.gz	ade36e0dc8a65629fea8f58274431c52
+source_url=http://cancer.sanger.ac.uk/cancergenome/assets/cancer_gene_census.tsv
+#the input file is ^M delimited and will be read as one single line
+preprocessor=Dos2Unix()
+source_type=txt
+
+[GeneSymbol]
+index=1
+type=VARCHAR(255)
+
+[kgID]
+index=1
+type=VARCHAR(255)
+
+
+[Name]
+index=2
+type=VARCHAR(255)
+
+[EntrezGeneId]
+index=3
+type=VARCHAR(255)
+
+[GenomeLocation]
+index=4
+type=VARCHAR(255)
+
+[Hallmark]
+index=5
+type=VARCHAR(255)
+
+[ChrBand]
+index=6
+type=VARCHAR(255)
+
+[Somatic]
+index=7
+type=VARCHAR(255)
+
+[Germline]
+index=8
+type=VARCHAR(255)
+
+[TumourTypes_Somatic]
+index=9
+type=VARCHAR(255)
+
+[TumourTypes_Germline]
+index=10
+type=VARCHAR(255)
+
+[CancerSyndrome]
+index=11
+type=VARCHAR(255)
+
+[TissueType]
+index=12
+type=VARCHAR(255)
+
+[MolecularGenetics]
+index=13
+type=VARCHAR(255)
+
+[RoleinCancer]
+index=14
+type=VARCHAR(255)
+
+[MutationTypes]
+index=15
+type=VARCHAR(255)
+
+[TranslocationPartner]
+index=16
+type=VARCHAR(255)
+
+[OtherGermlineMut]
+index=17
+type=VARCHAR(255)
+
+[OtherSyndrome]
+index=18
+type=VARCHAR(255)
+
+[Synonyms]
+index=19
+type=VARCHAR(255)

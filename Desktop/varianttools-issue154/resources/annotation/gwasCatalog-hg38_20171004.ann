@@ -1,0 +1,133 @@
+# Copyright (C) 2017 Man Chong Leong (henryleong@rice.edu)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
+# for a description of the format of this file.
+#
+
+[linked fields]
+hg38=chr, position
+
+[data sources]
+anno_type=position
+description=This database contains single nucleotide polymorphisms (SNPs) identified by published Genome-Wide
+  Association Studies (GWAS), collected in the Catalog of Published Genome-Wide Association Studies at the
+  National Human Genome Research Institute (NHGRI). From http://www.genome.gov/gwastudies/:
+
+version=hg38_20171004
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/gwasCatalog.txt.gz
+direct_url=annoDB/gwasCatalog-hg38_20171004.DB.gz	3e3eba250048e084ef31f909fae07a59
+source_type=txt
+encoding=ISO-8859-1
+
+[chr]
+index=2
+adj=RemoveLeading('chr')
+type=VARCHAR(255)
+comment=Reference sequence chromosome or scaffold
+
+[chr_start]
+index=3
+adj=IncreaseBy(1)
+type=INTEGER
+comment=Start position in chromosome
+
+[position]
+index=4
+type=INTEGER
+comment=End position in chromosome
+
+[name]
+index=5
+type=VARCHAR(255)
+comment=ID of SNP associated with trait
+
+[pubMedId]
+index=6
+type=INTEGER
+comment=PubMed ID of publication of the study
+
+[author]
+index=7
+type=VARCHAR(255)
+comment=First author of publication
+
+[pubDate]
+index=8
+type=VARCHAR(255)
+comment=Date of publication
+
+[journal]
+index=9
+type=VARCHAR(255)
+comment=Journal of publication
+
+[title]
+index=10
+type=VARCHAR(1024)
+comment=Title of publication
+
+[trait]
+index=11
+type=VARCHAR(255)
+comment=Disease or trait assessed in study
+
+[initSample]
+index=12
+type=VARCHAR(255)
+comment=Initial sample size
+
+[replSample]
+index=13
+type=VARCHAR(255)
+comment=Replication sample size
+
+[region]
+index=14
+type=VARCHAR(255)
+comment=Chromosome band / region of SNP
+
+[genes]
+index=15
+type=VARCHAR(255)
+comment=Reported gene(s)
+
+[riskAllele]
+index=16
+type=VARCHAR(255)
+comment=Strongest snp-risk allele
+
+[riskAlFreq]
+index=17
+type=VARCHAR(255)
+comment=risk allele frequency
+
+[pValue]
+index=18
+type=FLOAT
+comment=p-Value
+
+[pValueDesc]
+index=19
+type=VARCHAR(255)
+comment=p-Value description
+
+[orOrBeta]
+index=20
+type=VARCHAR(255)
+comment=Odds ratio or beta
+
+[ci95]
+index=21
+type=VARCHAR(255)
+comment=95% confidence interval
+
+[platform]
+index=22
+type=VARCHAR(255)
+comment=Platform and [SNPs passing QC]
+
+[cnv]
+index=23
+type=CHAR(1)
+comment=Y if copy number variant

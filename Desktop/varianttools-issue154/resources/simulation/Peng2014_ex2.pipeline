@@ -1,0 +1,184 @@
+# Copyright (C) 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Simulation/New for
+# a description of the format of this file.
+
+[pipeline description]
+description=Simulation of case control samples for 20 genes and analyze samples
+    of different sizes (1000, 2000 cases and matching number of
+    controls) draw from European, Mexican American (mixed and matched case
+    and control), and from both Asian (cases) and European (controls) populations
+    for a mismatch design. This simulation model has been used to simulate data
+    for the second example in paper "Reproducible Simulations of realistic samples
+    for next-gen sequencing studies using Variant Simulation Tools". The generated
+    samples are analyzed using Variant Association Tools, first for all variants
+    and then for non-synoymous variants.
+
+MexicanAmerican_description=This model draws samples from Mexican American population
+    which is mixed from Eurpean and Mexican populations.
+
+European_description=This model draws cases and controls from simulated European
+	population.
+
+Mismatch_description=This model draws cases from Asian population and controls
+    from European population.
+
+[DEFAULT]
+# GPCR signaling pathway
+regions=ccdsGene_exon.name:CCDS12419.1,CCDS46035.1,CCDS4360.1,CCDS3581.1,CCDS10170.1,CCDS6264.1,CCDS1708.1,CCDS44408.1,CCDS7260.1,CCDS47427.1,CCDS47426.1,CCDS47425.1,CCDS4863.1,CCDS8524.1,CCDS3997.1,CCDS6035.1,CCDS6036.1,CCDS14332.1,CCDS14331.1,CCDS11625.1
+regions_comment=One or more chromosome regions (separated by ',') in the format of
+  chr:start-end (e.g. chr21:33031597-33041570), or Field:Value from a region-based
+  annotation database (e.g. refGene.name2:TRIM2 or refGene_exon.name:NM_000947).
+  Please visit http://varianttools.sourceforge.net/Simulation for detailed
+  description of this parameter.
+
+causing_genes=ccdsGene_exon.name:CCDS12419.1,CCDS46035.1,CCDS4360.1,CCDS3581.1,CCDS10170.1
+causing_genes_comment=A subset of regions from which a phenotype is simulated.
+
+scale=4
+scale_comment=Scaling factor to speed up the simulation by scaling down the
+  simulation while boosting mutation, selection and recombination rates.
+
+[*_0]
+input_emitter=EmitInput(select=not os.path.isfile('${pipeline_name}_sample_2000_${seed}_ns.res'), pass_unselected=False)
+action=CheckVariantToolsVersion('2.3.1')
+comment=Check the version of variant tools. Version 2.3.1 or higher is required
+	for the execution of this simulation.
+
+[*_1]
+action=ImportModules('simuPOP.demography')
+comment=Import required modules.
+
+[*_10,*_110,*_210]
+# used for data simulation and analyses of 4 different types of samples
+action=RunCommand([
+	'vtools init Peng2014_ex2 --force',
+	'vtools use refGene',
+	'vtools use ccdsGene_exon'])
+comment=Create a new project Peng2014_ex2 and link the refGene and ccdsGene_exon databases to the project.
+
+[*_30]
+input_emitter=EmitInput(select=${pipeline_name:not os.path.isfile('cache/' + pipeline_name + '_init.pop')})
+action=CreatePopulation(
+	size=1000,
+	regions='%(regions)s',
+	output='cache/${pipeline_name}_init.pop')
+output='cache/${pipeline_name}_init.pop'
+comment=Create an empty simuPOP population for specified regions.
+
+[*_35]
+input='cache/${pipeline_name}_init.pop'
+input_emitter=EmitInput(select=${pipeline_name:not os.path.isfile('cache/' + pipeline_name + '_burnin.pop')})
+action=EvolvePopulation(
+	output='cache/${pipeline_name}_burnin.pop',
+	mutator=RefGenomeMutator(regions='%(regions)s', model='K80', rate=[1.8e-8 * %(scale)s, 2]),
+	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
+	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
+		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
+	demoModel=InstantChangeModel(T=int(80000 / %(scale)s), N0=int(7300 / %(scale)s)),
+	)
+output='cache/${pipeline_name}_burnin.pop'
+comment=Burn-in the population to create an ancestral population that will be used by all replicate simulations.
+
+[MexicanAmerican_40]
+input='cache/${pipeline_name}_burnin.pop'
+action=EvolvePopulation(
+	output='${pipeline_name}_evolved_${seed}.pop',
+	mutator=RefGenomeMutator(regions='%(regions)s', model='K80', rate=[1.8e-8 * %(scale)s, 2]),
+	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
+	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
+		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
+	demoModel=SettlementOfNewWorldModel(20000, scale=%(scale)s)
+	)
+comment=Evolve and expand the population using a K80 mutation model	and a demographic
+	model that models the settlement of new world model of the Mexican American population.
+
+[European_40,Mismatch_40]
+# the same as MexicanAmerican but without final mixing step (mix=False)
+input='cache/${pipeline_name}_burnin.pop'
+action=EvolvePopulation(
+	output='European_evolved_${seed}.pop',
+	mutator=RefGenomeMutator(regions='%(regions)s', model='K80', rate=[1.8e-8 * %(scale)s, 2]),
+	transmitter=FineScaleRecombinator(regions='%(regions)s', scale=%(scale)s),
+	selector=ProteinSelector('%(regions)s', s_missense=0.0001 * %(scale)s,
+		s_stoploss=0.0001 * %(scale)s, s_stopgain=0.001 * %(scale)s),
+	demoModel=SettlementOfNewWorldModel(20000, scale=%(scale)s, outcome=['AF', 'EU', 'AS'])
+	)
+comment=Evolve and expand the population using a K80 mutation model	and a demographic
+	model that models the settlement of new world model of the Mexican American population,
+	without mixing the final populations.
+
+[*_50]
+action=OutputPopulationStatistics(
+ 	mut_count=['${pipeline_name}_freq_spec_${seed}.txt', 700],
+    )
+comment=Get allele frequency spectrum in a sample of 700 individuals.
+
+[MexicanAmerican_100,MexicanAmerican_200]
+# draw different numbers of samples for different pipeline steps
+input=${OUTPUT40}
+action=DrawCaseControlSample(
+	cases=${pipeline_step: {'100':1000, '200':2000}[pipeline_step]},
+	controls=${pipeline_step: {'100':1000, '200':2000}[pipeline_step]},
+	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
+		s_stoploss=0.001, s_stopgain=0.01),
+	output='${pipeline_name}_sample_${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}_${seed}.pop')
+comment=Draw ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} cases
+	and ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} controls
+	from the mixed Mexican American population.
+
+[European_100,European_200]
+# The difference is that the case control samples are drawn from the European population
+input=${OUTPUT40}
+action=DrawCaseControlSample(
+	cases=[0, ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}, 0],
+	controls=[0, ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}, 0],
+	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
+		s_stoploss=0.001, s_stopgain=0.01),
+	output='${pipeline_name}_sample_${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}_${seed}.pop')
+comment=Draw ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} cases
+    and ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} controls
+	from the European population.
+
+[Mismatch_100,Mismatch_200]
+# The difference is that the case control samples are drawn from different populations
+input=${OUTPUT40}
+action=DrawCaseControlSample(
+	cases=[0, 0, ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}],
+	controls=[0, ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}, 0],
+	penetrance=ProteinPenetrance('%(causing_genes)s', s_sporadic=0.0001, s_missense=0.001,
+		s_stoploss=0.001, s_stopgain=0.01),
+	output='${pipeline_name}_sample_${pipeline_step: {'100':1000, '200':2000}[pipeline_step]}_${seed}.pop')
+comment=Draw ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} cases
+	from the European population and ${pipeline_step: {'100':1000, '200':2000}[pipeline_step]} controls
+	from the Asian population.
+
+
+[*_120,*_220]
+action=ExportPopulation(output=[
+	'${INPUT: INPUT[0][:-4] + ".vcf"}',
+	'${INPUT: INPUT[0][:-4] + ".phe"}'])
+comment=Export genotype and phenotype simulated samples in vcf and text formats, respectively.
+
+[*_130,*_230]
+action=RunCommand([
+	'vtools import ${INPUT: INPUT[0]} --build hg19',
+	'vtools phenotype --from_file ${INPUT: INPUT[1]}'])
+comment=Import data into a variant tools project.
+
+[*_140,*_240]
+action=RunCommand('vtools associate variant aff -m GroupStat BurdenBt --group_by refGene.name2 > ${INPUT: INPUT[0][:-4] + ".res"}')
+comment=Analyze the project using variant association tools.
+
+[*_150,*_250]
+action=RunCommand('vtools execute snpEff --snpeff_path ~/bin/snpEff/ --eff_fields EFF_Type')
+comment=Call snpEff to annotate variants.
+
+[*_160,*_260]
+action=RunCommand('''vtools select variant "EFF_Type in ('NON_SYNONYMOUS_CODING', 'STOP_LOST', 'STOP_GAINED')" -t ns ''')
+comment=Select non-synonymous variants according to snpEff annotation.
+
+[*_170,*_270]
+action=RunCommand(['vtools associate ns aff -m GroupStat BurdenBt --group_by refGene.name2 > ${INPUT: INPUT[0][:-4] + "_ns.res"}'])
+comment=Analyze the project using non-synonymous variants.

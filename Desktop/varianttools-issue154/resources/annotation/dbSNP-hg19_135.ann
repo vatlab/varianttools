@@ -1,0 +1,101 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Annotation/New
+# for a description of the format of this file.
+
+[linked fields]
+hg19=chr, start, refNCBI, alt
+
+[data sources]
+anno_type=variant
+description=dbSNP version 135
+version=hg19_135
+source_url=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/database/snp135.txt.gz
+direct_url=annoDB/dbSNP-hg19_135.DB.gz
+source_type=txt
+
+[chr]
+index=2
+adj=RemoveLeading('chr')
+type=VARCHAR(20)
+
+[start]
+index=3
+type=INTEGER
+adj=IncreaseBy(1)
+comment=start position in chrom (1-based)
+
+[end]
+index=4
+type=INTEGER
+comment=end position in chrom (1-based). start=end means zero-length feature
+
+[name]
+index=5
+type=VARCHAR(48) NULL
+adj=Nullify('.')
+comment=dbSNP reference SNP identifier
+
+[strand]
+index=7
+type=CHAR(1) NULL
+comment=which DNA strand contains the observed alleles
+
+[refNCBI]
+index=8
+type=VARCHAR(200) NULL
+comment=Reference genomic sequence from dbSNP
+
+[refUCSC]
+index=9
+type=VARCHAR(200) NULL
+comment=Reference genomic sequence from UCSC lookup of chrom,chromStart,chromEnd
+
+[observed]
+index=10
+type=VARCHAR(200) NULL
+comment=Strand-specific observed alleles
+
+[alt]
+index=7,8,10
+# lambda x converts the observed string to the positive strand
+# lambda z extracts out the alternate allele from lambda x
+adj=lambda x: [x[1], x[2].split('/')] if (x[0] == '+') else [x[1], ''.join(map(lambda y: {'A':'T', 'T':'A', 'C':'G', 'G':'C', '/':'/', '-':'-', '':''}[y], x[2])).split('/')], lambda z: z[1][0] if z[1][0] != z[0] else z[1][1]
+type=VARCHAR(200) NULL
+comment=alternate allele on the '+' strand
+
+[molType]
+index=11
+type=VARCHAR(15) NULL
+comment=sample type, can be one of unknown, genomic or cDNA
+
+[class]
+index=12
+type=VARCHAR(15) NULL
+comment=Class of variant (single, in-del, het, named, mixed, insertion, deletion etc
+
+[valid]
+index=13
+type=VARCHAR(15) NULL
+comment=validation status, can be unknown, by-cluster, by-frequency, by-submitter, by-2hit-2allele, by-hapmap, and by-1000genomes
+
+[avHet]
+index=14
+type=FLOAT NULL
+comment=Average heterozygosity from all observations
+
+[avHetSE]
+index=15
+type=FLOAT NULL
+comment=Standard error for the average heterozygosity
+
+[func]
+index=16
+type=VARCHAR(28) NULL
+comment=Functional cetegory of the SNP (coding-synon, coding-nonsynon, intron, etc.)
+
+[locType]
+index=17
+type=VARCHAR(20) NULL
+comment=Type of mapping inferred from size on reference.

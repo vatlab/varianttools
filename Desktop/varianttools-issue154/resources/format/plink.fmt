@@ -1,0 +1,39 @@
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+
+[format description]
+description=Input format for PLINK dataset. Currently only PLINK binary PED file format is supported (*.bed, *.bim & *.fam)
+delimiter=','
+variant=chr,pos,ref,alt
+genotype=GT
+# call a preprocessor to convert input PLINK files to a variant-based format
+preprocessor=PlinkConverter($build, chrom_namemap = {'23':'X', '24':'Y', '26':'M'})
+
+[chr]
+index=1
+type=VARCHAR(20)
+comment=Chromosome
+
+[pos]
+index=2
+type=INTEGER NOT NULL
+comment=1-based Position of the snp
+
+[ref]
+index=3
+type=VARCHAR(255)
+comment=Reference allele
+
+[alt]
+index=4
+type=VARCHAR(255)
+comment=Alternative allele
+
+[GT]
+index=5:
+type=INTEGER
+adj=Nullify(['3', 'E'])
+comment=Gentoype coded as 0 (ref ref), 1 (ref alt) and 2 (alt alt)

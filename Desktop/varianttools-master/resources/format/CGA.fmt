@@ -1,0 +1,115 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+#
+
+[format description]
+description=Input format from Complete Genomics Variant file masterVarBeta-[ASM-ID].tsv.bz2,
+	created by Complete Genomcis Analysis Tools (GSA Tools 1.5 or eariler,
+	http://www.completegenomics.com/sequence-data/cgatools/,
+	http://media.completegenomics.com/documents/DataFileFormats+Standard+Pipeline+2.0.pdf). This
+	format imports chr, pos, ref, alt of only variants that have been fully called and are not
+	equals to ref. (E.g. records with zygosity equal to no-call and half, and varType equal to
+	ref are discarded.)
+variant=chr, pos, ref, alt
+variant_info=%(var_info)s
+genotype=GT
+genotype_info=%(geno_info)s
+
+[DEFAULT]
+var_info=zygosity,varType,segDupOverlap
+var_info_comment=varant info fields
+
+geno_info=allele1VarScoreVAF,allele2VarScoreVAF,allele1VarScoreEAF,allele2VarScoreEAF
+geno_info_comment=genotype info fields
+
+[chr]
+index=3
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Chromosome
+
+[pos]
+index=4
+type=INTEGER NOT NULL
+# The header line starts with '>' and can only be discarded with DiscardRecord
+adj=DiscardRecord('begin'), IncreaseBy(1)
+comment=1-based position (increased by 1 from original start position)
+
+[zygosity]
+index=6
+adj=DiscardRecord(('no-call', 'half'))
+type=VARCHAR(8)
+comment=Call completeness and zygosity information, which is one of no-call, hap,
+	half, hom, het-ref and het-alt. Variations of type no-call will be discarded.
+
+[varType]
+index=7
+adj=DiscardRecord(('ref', 'complex'))
+type=VARCHAR(255)
+comment=Can be ref, snp, ins, del, sub, complex, no-ref, PAR-called-in-X. This format
+	discard variants with type ref and complex.
+
+[ref]
+index=8
+type=VARCHAR(255)
+comment=Reference allele, '-' for insertion
+
+[alt]
+index=6,9,10
+# hom, het-ref and hap all use allele1Seq as alternative allele
+# het-alt: will be split into two variants
+adj=lambda x: (x[1], x[2]) if x[0] == 'het-alt' else x[1]
+type=VARCHAR(255)
+comment=Alternative allele, '-' for deletion
+
+[GT]
+index=6
+adj=MapValue({'hom': '2', 'het-ref': '1', 'het-alt': '-1', 'hap': '1', 'half': None, 'no-call': None})
+type=INT
+comment=Genotype type (2 for homozygote, 1 for heterozygote, -1 for heterozygote alternative alelles, and None for others)
+
+[allele1VarScoreVAF]
+index=11
+type=INT
+comment=Quality score for allele 1, derived from the probability estimates under
+	maximum likelihood variable allele fraction.
+
+[allele2VarScoreVAF]
+index=12
+type=INT
+comment=Quality score for allele 2, derived from the probability estimates under
+	maximum likelihood variable allele fraction.
+
+[allele1VarScoreEAF]
+index=13
+type=INT
+comment=Quality score for allele 1, derived from the probability estimates under
+	equal allele fraction model
+
+[allele2VarScoreEAF]
+index=14
+type=INT
+comment=Quality score for allele 2, derived from the probability estimates under
+	equal allele fraction model
+
+[allele1Gene]
+index=21
+type=VARCHAR(255)
+comment=Semicolon-separated list of all gene annotations for the first allele of the
+	locus. For every gene annotation, the fields are geneId, mrnaAcc, symbol,
+	component, and impact.
+
+[allele2Gene]
+index=22
+type=VARCHAR(255)
+comment=Semicolon-separated list of all gene annotations for the second allele of the
+	locus. For every gene annotation, the fields are geneId, mrnaAcc, symbol,
+	component, and impact.
+
+[segDupOverlap]
+index=26
+type=INT
+comment=Number of distinct segmental duplications that overlap this locus.

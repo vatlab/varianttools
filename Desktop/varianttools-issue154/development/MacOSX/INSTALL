@@ -1,0 +1,11 @@
+This disk contains
+
+* A README file.
+
+* A MacOS X installer that installs variant tools apps to system Applications
+  directory and commands vtools and vtools_report to /usr/local/bin. It
+  requires root privilege.
+
+* Two self-contained executables vtools and vtools_report that can be executed
+  directly without installation. These commands start slower than the installed
+  version and are not recommended for general use.

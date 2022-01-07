@@ -1,0 +1,408 @@
+# http://varianttools.sourceforge.net/Format/New
+[format description]
+description=a customized import vcf configuration
+variant=chr,%(pos)s,%(ref)s,%(alt)s
+genotype=%(geno)s
+variant_info=%(var_info)s
+genotype_info=%(geno_info)s
+
+[DEFAULT]
+pos=pos
+pos_comment=Field for position. To export indel, set it to 'pos-length(upstream)'
+
+ref=ref
+ref_comment=Field for reference allele.
+
+alt=alt
+alt_comment=Field for alternative allele.
+
+var_info=DP,MQ,NS,AN,AC,AF,AB,LBS_A1,LBS_A2,LBS_C1,LBS_C2,LBS_G1,LBS_G2,LBS_T1,LBS_T2,OBS_A1,OBS_A2,OBS_C1,OBS_C2,OBS_G1,OBS_G2,OBS_T1,OBS_T2,STR,STZ,CBR,CBZ,QBR,QBZ,MBR,MSR,MBZ,IOR,IOZ,IOH,IOD,AOI,AOZ,ABE,ABZ,BCS,FIC,LQR,MQ0,MQ10,MQ20,MQ30,ANNO,SVM
+var_info_comment=Variant information fields to be imported. Please check the
+    INFO column of your vcf file for available fields.
+
+geno=GT
+geno_comment=Field to extract genotype from .vcf file.
+
+geno_info=GQ,GD,PL_1,PL_2,PL_3,PL3_1,PL3_2,PL3_3
+geno_info_comment=Genotype information fields. No genotype field is imported by
+    default. Please check the FORMAT string of your .vcf file to determine
+    available fields to be imported.
+
+wildtype_code=('0',)
+wildtype_code_comment=How wildtype homozygotes are imported. These genotypes are
+    by default imported as GT=0. They will be discarded if you set this parameter
+    to None.
+
+[chr]
+index=1
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Chromosome
+
+[pos]
+index=2
+type=INTEGER NOT NULL
+comment=1-based position
+
+[ref]
+index=4
+type=VARCHAR(255)
+comment=Reference allele, '-' for insertion.
+
+[alt]
+index=5
+adj=CheckSplit()
+type=VARCHAR(255)
+comment=Alternative allele, '-' for deletion.
+
+[GT]
+index=10:
+type=INTEGER
+adj=VcfGenotype(default=('0',))
+comment=Most Likely gentoype coded as 0, (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file. Missing genotypes are skipped
+
+[DP]
+index=8
+type=INTEGER
+adj=ExtractValue('DP=', ';')
+comment=Total Depth at Site
+
+[MQ]
+index=8
+type=INTEGER
+adj=ExtractValue('MQ=', ';')
+comment=Root Mean Squared Mapping Quality
+
+[NS]
+index=8
+type=INTEGER
+adj=ExtractValue('NS=', ';')
+comment=Number of Samples With Coverage
+
+[AN]
+index=8
+type=INTEGER
+adj=ExtractValue('AN=', ';')
+comment=Number of Alleles in Samples with Coverage
+
+[AC]
+index=8
+type=INTEGER
+adj=ExtractValue('AC=', ';')
+comment=Alternate Allele Counts in Samples with Coverage
+
+[AF]
+index=8
+type=FLOAT
+adj=ExtractValue('AF=', ';')
+comment=Alternate Allele Frequencies
+
+[AB]
+index=8
+type=FLOAT
+adj=ExtractValue('AB=', ';')
+comment=Allele Balance in Heterozygotes
+
+[LBS_A1]
+index=8
+type=INTEGER
+adj=ExtractValue('LBS=', ';'), ExtractField(1, ',')
+comment=Number of low-quality (q<13) of *A* base, strand 1
+
+[LBS_A2]
+index=8
+type=INTEGER
+adj=ExtractValue('LBS=', ';'), ExtractField(2, ',')
+comment=Number of low-quality (q<13) of *A* base, strand 2
+
+[LBS_C1]
+index=8
+type=INTEGER
+adj=ExtractValue('LBS=', ';'), ExtractField(3, ',')
+comment=Number of low-quality (q<13) of *C* base, strand 1
+
+[LBS_C2]
+index=8
+type=INTEGER
+adj=ExtractValue('LBS=', ';'), ExtractField(4, ',')
+comment=Number of low-quality (q<13) of *C* base, strand 2
+
+[LBS_G1]
+index=8
+type=INTEGER
+adj=ExtractValue('LBS=', ';'), ExtractField(5, ',')
+comment=Number of low-quality (q<13) of *G* base, strand 1
+
+[LBS_G2]
+index=8
+type=INTEGER
+adj=ExtractValue('LBS=', ';'), ExtractField(6, ',')
+comment=Number of low-quality (q<13) of *G* base, strand 2
+
+[LBS_T1]
+index=8
+type=INTEGER
+adj=ExtractValue('LBS=', ';'), ExtractField(7, ',')
+comment=Number of low-quality (q<13) of *T* base, strand 1
+
+[LBS_T2]
+index=8
+type=INTEGER
+adj=ExtractValue('LBS=', ';'), ExtractField(8, ',')
+comment=Number of low-quality (q<13) of *T* base, strand 2
+
+[OBS_A1]
+index=8
+type=INTEGER
+adj=ExtractValue('OBS=', ';'), ExtractField(1, ',')
+comment=Number of low-quality (q>13) of *A* base, strand 1
+
+[OBS_A2]
+index=8
+type=INTEGER
+adj=ExtractValue('OBS=', ';'), ExtractField(2, ',')
+comment=Number of low-quality (q>13) of *A* base, strand 2
+
+[OBS_C1]
+index=8
+type=INTEGER
+adj=ExtractValue('OBS=', ';'), ExtractField(3, ',')
+comment=Number of low-quality (q>13) of *C* base, strand 1
+
+[OBS_C2]
+index=8
+type=INTEGER
+adj=ExtractValue('OBS=', ';'), ExtractField(4, ',')
+comment=Number of low-quality (q>13) of *C* base, strand 2
+
+[OBS_G1]
+index=8
+type=INTEGER
+adj=ExtractValue('OBS=', ';'), ExtractField(5, ',')
+comment=Number of low-quality (q>13) of *G* base, strand 1
+
+[OBS_G2]
+index=8
+type=INTEGER
+adj=ExtractValue('OBS=', ';'), ExtractField(6, ',')
+comment=Number of low-quality (q>13) of *G* base, strand 2
+
+[OBS_T1]
+index=8
+type=INTEGER
+adj=ExtractValue('OBS=', ';'), ExtractField(7, ',')
+comment=Number of low-quality (q>13) of *T* base, strand 1
+
+[OBS_T2]
+index=8
+type=INTEGER
+adj=ExtractValue('OBS=', ';'), ExtractField(8, ',')
+comment=Number of low-quality (q>13) of *T* base, strand 2
+
+[STR]
+index=8
+type=FLOAT
+adj=ExtractValue('STR=', ';')
+comment=Strand Bias Pearson's Correlation
+
+[STZ]
+index=8
+type=FLOAT
+adj=ExtractValue('STZ=', ';')
+comment=Strand Bias z-score
+
+[CBR]
+index=8
+type=FLOAT
+adj=ExtractValue('CBR=', ';')
+comment=Cycle Bias Peason's correlation
+
+[CBZ]
+index=8
+type=FLOAT
+adj=ExtractValue('CBZ=', ';')
+comment=Cycle Bias z-score
+
+[QBR]
+index=8
+type=FLOAT
+adj=ExtractValue('QBR=', ';')
+comment=Base quality bias Pearson's correlation
+
+[QBZ]
+index=8
+type=FLOAT
+adj=ExtractValue('QBZ=', ';')
+comment=Base quality bias z-score
+
+[MBR]
+index=8
+type=FLOAT
+adj=ExtractValue('MBR=', ';')
+comment=Mapping quality bias Pearson's coreelation
+
+[MSR]
+index=8
+type=FLOAT
+adj=ExtractValue('MSR=', ';')
+comment=Mapping quality - strand bias Pearson's coreelation
+
+[MBZ]
+index=8
+type=FLOAT
+adj=ExtractValue('MBZ=', ';')
+comment=Mapping quality bias z-score
+
+[IOR]
+index=8
+type=FLOAT
+adj=ExtractValue('IOR=', ';')
+comment=Ratio of base-quality inflation
+
+[IOZ]
+index=8
+type=FLOAT
+adj=ExtractValue('IOZ=', ';')
+comment=Base quality inflation z-score
+
+[IOH]
+index=8
+type=FLOAT
+adj=ExtractValue('IOH=', ';')
+comment=Ratio of base-quality inflation at HETs
+
+[IOD]
+index=8
+type=FLOAT
+adj=ExtractValue('IOD=', ';')
+comment=Ratio of base-quality inflation difference between HETs and others
+
+[AOI]
+index=8
+type=FLOAT
+adj=ExtractValue('AOI=', ';')
+comment=Alternate allele inflation score
+
+[AOZ]
+index=8
+type=FLOAT
+adj=ExtractValue('AOZ=', ';')
+comment=Alternate allele quality z-score
+
+[ABE]
+index=8
+type=FLOAT
+adj=ExtractValue('ABE=', ';')
+comment=Exact allele balance score from base quality
+
+[ABZ]
+index=8
+type=FLOAT
+adj=ExtractValue('ABZ=', ';')
+comment=Exact allele balance z-score from base and quality
+
+[BCS]
+index=8
+type=FLOAT
+adj=ExtractValue('BCS=', ';')
+comment=Bayesian SNP call score
+
+[FIC]
+index=8
+type=FLOAT
+adj=ExtractValue('FIC=', ';')
+comment=Inbreeding coefficient
+
+[LQR]
+index=8
+type=FLOAT
+adj=ExtractValue('LQR=', ';')
+comment=Fraction of low quality (q<13) bases
+
+[MQ0]
+index=8
+type=FLOAT
+adj=ExtractValue('MQ0=', ';')
+comment=Fraction of bases with mapQ=0
+
+[MQ10]
+index=8
+type=FLOAT
+adj=ExtractValue('MQ10=', ';')
+comment=Fraction of bases with mapQ<=10
+
+[MQ20]
+index=8
+type=FLOAT
+adj=ExtractValue('MQ20=', ';')
+comment=Fraction of bases with mapQ<=20
+
+[MQ30]
+index=8
+type=FLOAT
+adj=ExtractValue('MQ30=', ';')
+comment=Fraction of bases with mapQ<=30
+
+[ANNO]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('ANNO=', ';')
+comment=Functional annotation from ANNOVAR software
+
+[SVM]
+index=8
+type=FLOAT
+adj=ExtractValue('SVM=', ';')
+comment=SVM-based variant quality score
+
+[GQ]
+index=9,10:
+type=INTEGER
+adj=FieldFromFormat('GQ', ':')
+comment=Genotype Call Quality
+
+[GD]
+index=9,10:
+type=INTEGER
+adj=FieldFromFormat('GD', ':')
+comment=Genotype Read Depth
+
+# genotypes 0/0,0/1,1/1
+
+[PL_1]
+index=9,10:
+type=INTEGER
+adj=FieldFromFormat('PL', ':'), ExtractField(1, ',')
+comment=Genotype Likelihoods for Genotypes 0/0
+
+[PL_2]
+index=9,10:
+type=INTEGER
+adj=FieldFromFormat('PL', ':'), ExtractField(2, ',')
+comment=Genotype Likelihoods for Genotypes 0/1
+
+[PL_3]
+index=9,10:
+type=INTEGER
+adj=FieldFromFormat('PL', ':'), ExtractField(3, ',')
+comment=Genotype Likelihoods for Genotypes 1/1
+
+# genotypes 0/0,0/1,1/1,0/2,1/2,2/2
+
+[PL3_1]
+index=9,10:
+type=INTEGER
+adj=FieldFromFormat('PL3', ':'), lambda x: tuple([x.split(',')[0], x.split(',')[3]])
+comment=Genotype Likelihoods for Genotypes 0/0,0/2
+
+[PL3_2]
+index=9,10:
+type=INTEGER
+adj=FieldFromFormat('PL3', ':'), lambda x: tuple([x.split(',')[1], x.split(',')[4]])
+comment=Genotype Likelihoods for Genotypes 0/1,1/2
+
+[PL3_3]
+index=9,10:
+type=INTEGER
+adj=FieldFromFormat('PL3', ':'), lambda x: tuple([x.split(',')[2], x.split(',')[5]])
+comment=Genotype Likelihoods for Genotypes 1/1,2/2

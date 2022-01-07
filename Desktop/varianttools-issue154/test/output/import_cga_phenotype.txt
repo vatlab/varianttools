@@ -1,0 +1,2 @@
+sample_name	filename       	num_genotypes	sample_genotype_fields
+samp_csv   	txt/CGA.tsv.bz2	95           	GT,allele1VarScoreVAF,allele2VarScoreVAF,allele1VarScoreEAF,allele2VarScoreEAF

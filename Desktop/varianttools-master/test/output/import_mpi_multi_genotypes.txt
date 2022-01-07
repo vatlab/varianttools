@@ -1,0 +1,4 @@
+sample_name	filename  	num_genotypes	sample_genotype_fields
+SAMP1      	vcf/V1.vcf	989          	GT
+SAMP1      	vcf/V2.vcf	990          	GT
+SAMP1      	vcf/V3.vcf	988          	GT

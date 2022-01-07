@@ -1,0 +1,363 @@
+#Variant tools schema version 1.0
+#
+# Test file for the thousandGenomes annotation database.
+#
+[linked fields]
+hg19=chr, pos, ref, alt
+
+[data sources]
+description=1000 Genomes VCF file (available from: ftp://ftp.ncbi.nih.gov/snp/organisms/human_9606/VCF/v4.0/00-All.vcf.gz).
+version=20110826
+anno_type=variant
+source_url=testThousandGenomes.zip
+source_type=txt
+source_pattern=testThousandGenomes
+
+[chr]
+index=1
+adj=RemoveLeading('chr')
+type=VARCHAR(20)
+
+[pos]
+index=2
+type=INTEGER
+
+[dbsnp_id]
+index=3
+type=VARCHAR(24) NULL
+comment=DB SNP ID
+
+[ref]
+index=4
+type=CHAR(1) NOT NULL
+comment=Reference allele (as on the + strand)
+
+[alt]
+index=5
+adj=CheckSplit(',')
+type=VARCHAR(48) NOT NULL
+comment=Alternative allele (as on the + strand)
+
+[RSPOS_INFO]
+index=8
+adj=ExtractValue('RSPOS=', ';')
+type=INTEGER
+comment=Chr position reported in dbSNP
+
+[RV_INFO]
+index=8
+adj=ExtractFlag('RV', ';')
+type=INTEGER
+comment=RS orientation is reversed
+
+[NS_INFO]
+index=8
+adj=ExtractValue('NS=', ';')
+type=INTEGER
+comment=Number of Samples With Data
+
+[AF_INFO]
+index=8
+adj=ExtractValue('AF=', ';')
+type=FLOAT
+comment=Allele Frequency
+
+[VP_INFO]
+index=8
+adj=ExtractValue('VP=', ';')
+type=VARCHAR(48)
+comment=Variation Property
+
+[dbSNPBuildID_INFO]
+index=8
+adj=ExtractValue('dbSNPBuildID=', ';')
+type=INTEGER
+comment=First SNP Build for RS
+
+[SAO_INFO]
+index=8
+adj=ExtractValue('SAO=', ';')
+type=INTEGER
+comment=SNP Allele Origin: 0 - unspecified, 1 - Germline, 2 - Somatic, 3 - Both
+
+[SSR_INFO]
+index=8
+adj=ExtractValue('SSR=', ';')
+type=INTEGER
+comment=SNP Suspect Reason Code, 0 - unspecified, 1 - Paralog, 2 - byEST, 3 - Para_EST, 4 - oldAlign, 5 - other
+
+[SCS_INFO]
+index=8
+adj=ExtractValue('SCS=', ';')
+type=INTEGER
+comment=SNP Clinical Significance, 0 - unknown, 1 - untested, 2 - non-pathogenic, 3 - probable-non-pathogenic, 4 - probable-pathogenic, 5 - pathogenic, 6 - drug-response, 7 - histocompatibility, 255 - other
+
+[GMAF_INFO]
+index=8
+adj=ExtractValue('GMAF=', ':')
+type=FLOAT
+comment=Global Minor Allele Frequency [0, 0.5_INFO]; global population is 1000GenomesProject phase 1 genotype data from 629 individuals, released in the 08-04-2010 dataset
+
+[WGT_INFO]
+index=8
+adj=ExtractValue('WGT=', ';')
+type=INTEGER
+comment=Weight, 00 - unmapped, 1 - weight 1, 2 - weight 2, 3 - weight 3 or more
+
+[VC_INFO]
+index=8
+adj=ExtractValue('VC=', ';')
+type=VARCHAR(48)
+comment=Variation Class
+
+[CLN_INFO]
+index=8
+adj=ExtractFlag('CLN', ';')
+type=INTEGER
+comment=SNP is Clinical(LSDB,OMIM,TPA,Diagnostic)
+
+[PM_INFO]
+index=8
+adj=ExtractFlag('PM', ';')
+type=INTEGER
+comment=SNP is Precious(Clinical,Pubmed Cited)
+
+[TPA_INFO]
+index=8
+adj=ExtractFlag('TPA', ';')
+type=INTEGER
+comment=Provisional Third Party Annotation(TPA) (currently rs from PHARMGKB who will give phenotype data)
+
+[PMC_INFO]
+index=8
+adj=ExtractFlag('PMC', ';')
+type=INTEGER
+comment=Links exist to PubMed Central article
+
+[S3D_INFO]
+index=8
+adj=ExtractFlag('S3D', ';')
+type=INTEGER
+comment=Has 3D structure - SNP3D table
+
+[SLO_INFO]
+index=8
+adj=ExtractFlag('SLO', ';')
+type=INTEGER
+comment=Has SubmitterLinkOut - From SNP->SubSNP->Batch.link_out
+
+[NSF_INFO]
+index=8
+adj=ExtractFlag('NSF', ';')
+type=INTEGER
+comment=Has non-synonymous frameshift A coding region variation where one allele in the set changes all downstream amino acids. FxnClass = 44
+
+[NSM_INFO]
+index=8
+adj=ExtractFlag('NSM', ';')
+type=INTEGER
+comment=Has non-synonymous missense A coding region variation where one allele in the set changes protein peptide. FxnClass = 42
+
+[NSN_INFO]
+index=8
+adj=ExtractFlag('NSN', ';')
+type=INTEGER
+comment=Has non-synonymous nonsense A coding region variation where one allele in the set changes to STOP codon (TER). FxnClass = 41
+
+[REF_INFO]
+index=8
+adj=ExtractFlag('REF', ';')
+type=INTEGER
+comment=Has reference A coding region variation where one allele in the set is identical to the reference sequence. FxnCode = 8
+
+[SYN_INFO]
+index=8
+adj=ExtractFlag('SYN', ';')
+type=INTEGER
+comment=Has synonymous A coding region variation where one allele in the set does not change the encoded amino acid. FxnCode = 3
+
+[U3_INFO]
+index=8
+adj=ExtractFlag('U3', ';')
+type=INTEGER
+comment=In 3' UTR Location is in an untranslated region (UTR). FxnCode = 53
+
+[U5_INFO]
+index=8
+adj=ExtractFlag('U5', ';')
+type=INTEGER
+comment=In 5' UTR Location is in an untranslated region (UTR). FxnCode = 55
+
+[ASS_INFO]
+index=8
+adj=ExtractFlag('ASS', ';')
+type=INTEGER
+comment=In acceptor splice site FxnCode = 73
+
+[DSS_INFO]
+index=8
+adj=ExtractFlag('DSS', ';')
+type=INTEGER
+comment=In donor splice-site FxnCode = 75
+
+[INT_INFO]
+index=8
+adj=ExtractFlag('INT', ';')
+type=INTEGER
+comment=In Intron FxnCode = 6
+
+[R3_INFO]
+index=8
+adj=ExtractFlag('R3', ';')
+type=INTEGER
+comment=In 3' gene region FxnCode = 13
+
+[R5_INFO]
+index=8
+adj=ExtractFlag('R5', ';')
+type=INTEGER
+comment=In 5' gene region FxnCode = 15
+
+[OTH_INFO]
+index=8
+adj=ExtractFlag('OTH', ';')
+type=INTEGER
+comment=Has other snp with exactly the same set of mapped positions on NCBI refernce assembly.
+
+[CFL_INFO]
+index=8
+adj=ExtractFlag('CFL', ';')
+type=INTEGER
+comment=Has Assembly conflict. This is for weight 1 and 2 snp that maps to different chromosomes on different assemblies.
+
+[ASP_INFO]
+index=8
+adj=ExtractFlag('ASP', ';')
+type=INTEGER
+comment=Is Assembly specific. This is set if the snp only maps to one assembly
+
+[MUT_INFO]
+index=8
+adj=ExtractFlag('MUT', ';')
+type=INTEGER
+comment=Is mutation (journal citation, explicit fact): a low frequency variation that is cited in journal and other reputable sources
+
+[VLD_INFO]
+index=8
+adj=ExtractFlag('VLD', ';')
+type=INTEGER
+comment=Is Validated.  This bit is set if the snp has 2+ minor allele count based on frequency or genotype data.
+
+[G5A_INFO]
+index=8
+adj=ExtractFlag('G5A', ';')
+type=INTEGER
+comment=>5% minor allele frequency in each and all populations
+
+[G5_INFO]
+index=8
+adj=ExtractFlag('G5', ';')
+type=INTEGER
+comment=>5% minor allele frequency in 1+ populations
+
+[HD_INFO]
+index=8
+adj=ExtractFlag('HD', ';')
+type=INTEGER
+comment=Marker is on high density genotyping kit (50K density or greater).  The snp may have phenotype associations present in dbGaP.
+
+[GNO_INFO]
+index=8
+adj=ExtractFlag('GNO', ';')
+type=INTEGER
+comment=Genotypes available. The snp has individual genotype (in SubInd table).
+
+[KGPilot1_INFO]
+index=8
+adj=ExtractFlag('KGPilot1', ';')
+type=INTEGER
+comment=1000 Genome discovery(pilot1) 2009
+
+[KGPilot123_INFO]
+index=8
+adj=ExtractFlag('KGPilot123', ';')
+type=INTEGER
+comment=1000 Genome discovery all pilots 2010(1,2,3)
+
+[KGVAL_INFO]
+index=8
+adj=ExtractFlag('KGVAL', ';')
+type=INTEGER
+comment=1000 Genome validated by second method
+
+[KGPROD_INFO]
+index=8
+adj=ExtractFlag('KGPROD', ';')
+type=INTEGER
+comment=1000 Genome production phase
+
+[PH1_INFO]
+index=8
+adj=ExtractFlag('PH1', ';')
+type=INTEGER
+comment=Phase 1 genotyped: filtered, non-redundant
+
+[PH2_INFO]
+index=8
+adj=ExtractFlag('PH2', ';')
+type=INTEGER
+comment=Phase 2 genotyped: filtered, non-redundant
+
+[PH3_INFO]
+index=8
+adj=ExtractFlag('PH3', ';')
+type=INTEGER
+comment=Phase 3 genotyped: filtered, non-redundant
+
+[CDA_INFO]
+index=8
+adj=ExtractFlag('CDA', ';')
+type=INTEGER
+comment=Variation is interrogated in a clinical diagnostic assay
+
+[LSD_INFO]
+index=8
+adj=ExtractFlag('LSD', ';')
+type=INTEGER
+comment=Submitted from a locus-specific database
+
+[MTP_INFO]
+index=8
+adj=ExtractFlag('MTP', ';')
+type=INTEGER
+comment=Microattribution/third-party annotation(TPA:GWAS,PAGE)
+
+[OM_INFO]
+index=8
+adj=ExtractFlag('OM', ';')
+type=INTEGER
+comment=Has OMIM/OMIA
+
+[NOC_INFO]
+index=8
+adj=ExtractFlag('NOC', ';')
+type=INTEGER
+comment=Contig allele not present in SNP allele list. The reference sequence allele at the mapped position is not present in the SNP allele list, adjusted for orientation.
+
+[WTD_INFO]
+index=8
+adj=ExtractFlag('WTD', ';')
+type=INTEGER
+comment=Is Withdrawn by submitter If one member ss is withdrawn by submitter, then this bit is set.  If all member ss' are withdrawn, then the rs is deleted to SNPHistory
+
+[NOV_INFO]
+index=8
+adj=ExtractFlag('NOV', ';')
+type=INTEGER
+comment=Rs cluster has non-overlapping allele sets. True when rs set has more than 2 alleles from different submissions and these sets share no alleles in common.
+
+[GCF_INFO]
+index=8
+adj=ExtractFlag('GCF', ';')
+type=INTEGER
+comment=Has Genotype Conflict Same (rs, ind), different genotype.  N/N is not included.

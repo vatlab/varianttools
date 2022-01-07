@@ -1,0 +1,66 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+
+[format description]
+description=This input format imports variants from files in MAP format (with columns chr, name
+        gen_dist, pos), or any delimiter-separated format with columns chr and pos. Because
+	these input files do not contain reference and alternative alleles of variants, this
+        format queries such information from the dbSNP database using chr and pos. Records that
+        does not exist in dbSNP will be discarded. Records with multiple alternative alleles will
+        lead to multiple records.
+variant=chr,pos,ref,alt
+delimiter=%(separator)s
+
+[DEFAULT]
+db_file=dbSNP.DB
+name_comment=Database name for dbSNP.
+
+pos_idx=4
+pos_idx_comment=Index of column for pyhysical location in the map file, should be 4
+    for a standard map file with chr, pos, gen_dist, pos.
+
+ref_field=refNCBI
+ref_field_comment=Name of ref field from the annotation database, used to retrieve
+    reference allele at specified location.
+
+alt_field=alt
+alt_field_comment=Name of alt field from the annotation database, used to retrieve
+    alternative allele at specified location.
+
+chr_field=chr
+chr_field_comment=Name of chr field from the annotation database, used to locate
+    variants from the dbSNP database.
+
+pos_field=start
+pos_field_comment=Name of pos field from the annotation database, used to locate
+    variants from the dbSNP database.
+
+separator=None
+separator_comment=Separator of the input file, default to space or tab.
+
+[chr]
+index=1
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Chromosome
+
+[pos]
+index=%(pos_idx)s
+type=INTEGER NOT NULL
+comment=1-based position
+
+[ref]
+index=1,%(pos_idx)s
+adj=FieldFromDB("%(db_file)s", "%(ref_field)s", "%(chr_field)s,%(pos_field)s")
+type=VARCHAR(255)
+comment=Reference allele, '-' for insertion.
+
+
+[alt]
+index=1,%(pos_idx)s
+type=VARCHAR(255)
+adj=FieldFromDB("%(db_file)s", "%(alt_field)s", "%(chr_field)s,%(pos_field)s")
+comment=Alternative allele obtained from another database

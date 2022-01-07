@@ -1,0 +1,220 @@
+#Variant tools schema version 1.0
+#
+# This is test decription for a few records in dbNSFP
+#
+[linked fields]
+hg18=chr, hg18pos, ref, alt
+hg19=chr, hg19pos, ref, alt
+
+[data sources]
+description=dbNSFP version 1.1, maintained by Xiaoming Liu from UTSPH. Please cite "Liu X, Jian X, and Boerwinkle E. 2011. dbNSFP: a lightweight database of human non-synonymous SNPs and their functional predictions. Human Mutation. 32:894-899" if you find this database useful.
+version=1.1_0
+source_type=txt
+anno_type=variant
+source_url=testNSFP.zip
+source_pattern=testNSFP.ch
+
+[chr]
+index=1
+type=CHAR(1) NOT NULL
+
+[hg18pos]
+index=2
+type=INTEGER NOT NULL
+
+[ref]
+index=3
+type=CHAR(1) NOT NULL
+comment=Reference nucleotide allele (as on the + strand)
+
+[alt]
+index=4
+type=CHAR(1) NOT NULL
+comment=Alternative nucleotide allele (as on the + strand)
+
+[aaref]
+index=5
+type=CHAR(1) NULL
+comment=reference amino acid
+
+[aaalt]
+index=6
+type=CHAR(1) NULL
+comment=alternative amino acid
+
+[hg19pos]
+index=7
+type=INTEGER NULL
+comment=physical position on the chromosome as to hg19 (1-based coordinate)
+adj=Nullify('NA')
+
+[genename]
+index=8
+type=VARCHAR(48) NULL
+comment=gene name
+
+[geneid]
+index=9
+type=VARCHAR(48) NULL
+comment=gene Entrez ID
+
+[CCDSid]
+index=10
+type=VARCHAR(48) NULL
+comment=CCDS ID
+
+[refcodon]
+index=11
+type=CHAR(3) NULL
+comment=reference codon
+
+[codonpos]
+index=12
+type=INT
+comment=position on the codon (1, 2 or 3)
+
+[fold_degenerate]
+index=13
+type=INT
+comment=degenerate type (0, 2 or 3)
+
+[aapos]
+index=14
+type=INT
+comment=amino acid position as to the protein
+
+[cds_strand]
+index=15
+type=CHAR(1) NULL
+comment=coding sequence (CDS) strand (+ or ?)
+
+[LRT_Omega]
+index=16
+type=FLOAT NULL
+adj=Nullify('NA')
+comment=estimated nonsynonymous-to-synonymous-rate ratio (reported by LRT)
+
+[PhyloP_score]
+index=17
+type=FLOAT NULL
+comment=PhyloP score, phyloPnew=1-0.5x10^phyloPori if phyloPori>0 or phyloPnew=0.5x10^phyloPori if phyloPori<0
+
+[PlyloP_pred]
+index=18
+type=VARCHAR(2) NULL
+adj=Nullify('NA')
+comment=PhyloP prediction, C(onserved) or N(on-conserved)
+
+[SIFT_score]
+index=19
+type=FLOAT NULL
+comment=SIFT score, SIFTnew=1-SIFTori
+
+[SIFT_pred]
+index=20
+type=VARCHAR(2) NULL
+adj=Nullify('NA')
+comment=SIFT prediction, D(amaging) or T(olerated)
+
+[Polyphen2_score]
+index=21
+type=FLOAT NULL
+comment=Polyphen2 score, i.e. pph2_prob
+
+[Polyphen2_pred]
+index=22
+type=VARCHAR(2) NULL
+adj=Nullify('NA')
+comment=Polyphen2 prediction,  "D" ("probably damaging"), "P" ("possibly damaging") or "B" ("benign")
+
+[LRT_score]
+index=23
+type=FLOAT NULL
+comment=LRT score, LRTnew=1-LRTorix0.5 if <1, or LRTnew=LRTorix0.5 if >=1
+
+[LRT_pred]
+index=24
+type=VARCHAR(2) NULL
+adj=Nullify('NA')
+comment=LRT prediction, D(eleterious), N(eutral) or U(nknown)
+
+[MutationTaster_score]
+index=25
+type=FLOAT NULL
+comment=MutationTaster score
+
+[MutationTaster_pred]
+index=26
+type=VARCHAR(2) NULL
+adj=Nullify('NA')
+comment=MutationTaster prediction, "A" ("disease_causing_automatic"), "D" ("disease_causing"), "N" ("polymorphism") or "P" ("polymorphism_automatic")
+
+[Ancestral_allele]
+index=27
+type=CHAR(1) NULL
+adj=Nullify('NA')
+comment=Ancestral allele (based on 1000 genomes reference data)
+
+[UniSNP_ids]
+index=28
+adj=Nullify('.')
+type=VARCHAR(128)
+comment=rs numbers from UniSNP, which is a cleaned version of dbSNP build 129, in format: rs number1;rs number2;...
+
+[A_freq]
+index=29
+type=VARCHAR(48)
+adj=Nullify('.'), ExtractValue('A/', ';', default=0)
+comment=frequency of allele A recorded in dbSNP
+
+[C_freq]
+index=29
+type=VARCHAR(48)
+adj=Nullify('.'), ExtractValue('C/', ';', default=0)
+comment=frequency of allele C recorded in dbSNP
+
+[G_freq]
+index=29
+type=VARCHAR(48)
+adj=Nullify('.'), ExtractValue('G/', ';', default=0)
+comment=frequency of allele G recorded in dbSNP
+
+[T_freq]
+index=29
+type=VARCHAR(48)
+adj=Nullify('.'), ExtractValue('T/', ';', default=0)
+comment=frequency of allele T recorded in dbSNP
+
+[Alt_gene_name]
+index=30
+type=VARCHAR(128)
+comment=alternative gene names, separated by bar
+
+[HGNC_id]
+index=31
+adj=ExtractValue('HGNC:', '|')
+type=VARCHAR(64)
+comment=HUGO Gene Nomenclature Committee id
+
+[Ensembl_id]
+index=31
+adj=ExtractValue('Ensembl:', '|')
+type=VARCHAR(64)
+comment=Ensembl id
+
+[HPRD_id]
+index=31
+adj=ExtractValue('HPRD:', '|')
+type=VARCHAR(64)
+comment=Human Protein Reference Database id
+
+[MIM_id]
+index=31
+adj=ExtractValue('MIM:', '|')
+type=VARCHAR(64)
+comment=Human Protein Reference Database id
+
+[Descriptive_gene_name]
+index=32
+type=VARCHAR(128)
+comment=descriptive gene name

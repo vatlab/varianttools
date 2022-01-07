@@ -1,0 +1,43 @@
+#!/bin/bash
+#BSUB -W 1:00
+#BSUB -J vtools_asociation_cluster
+#BSUB -n 32
+#BSUB -N
+#BSUB -M 16384
+#BSUB -R "span[ptile=8]"
+#BSUB -q short
+
+
+[[ -z "${PROJECTFOLDER}" ]] && PROJECTFOLDER='path to project folder' || PROJECTFOLDER="${PROJECTFOLDER}"
+COMMAND='vtools associate variant disease --discard_variants %(NA)>0.1 --method "BurdenBt --name BurdenTest --alternative 2" --group_by refgene.name2  -j 8 -v 2 -mpi'
+NUMBER_OF_PROCESSES=24
+
+#LSB_HOSTS has the name of all the nodes running the jobs.
+NODE_LIST=($LSB_HOSTS)
+
+#The main program is running on the node with $HOSTNAME, the rest of nodes are saved into $WORKDER_NODES and written into hostlist.txt.
+WORKER_NODES=()
+for node in "${NODE_LIST[@]}";
+do
+ if [ "$node" != "$HOSTNAME" ]; then
+   if [[ ! " ${WORKER_NODES[@]} " =~ " ${node} " ]]; then
+        WORKER_NODES+=($node)
+   fi
+ fi
+done
+
+export ZEROMQIP=$(hostname --ip-address)
+export PROJECTFOLDER
+HOSTFILE="$PROJECTFOLDER/hostlist.txt"
+
+rm -rf $HOSTFILE
+for node in "${WORKER_NODES[@]}";
+do
+    echo "$node slots=8"  >> $HOSTFILE
+done
+
+#Get the path for mpiexec
+MPIEXECPATH=$(which mpiexec)
+
+#The IP address for the main node $ZEROMQIP and $PROJECTFOLDER are needed for the woker script to communicate.
+$MPIEXECPATH -d -x PATH  -H $HOSTNAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -np $NUMBER_OF_PROCESSES  worker_run

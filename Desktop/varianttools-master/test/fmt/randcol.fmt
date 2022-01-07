@@ -1,0 +1,56 @@
+# Copyright (C) 2011 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+
+[format description]
+description=A basic variant input format with four columns: chr, pos, ref, alt.
+variant=chr,pos,ref,alt
+variant_info=%(var_info)s
+
+[DEFAULT]
+chr_col=1
+chr_col_comment=Column index for the chromosome field
+
+pos_col=2
+pos_col_comment=Column index for the position field
+
+ref_col=3
+ref_col_comment=Column index for the reference field
+
+alt_col=4
+alt_col_comment=Column index for the alternative field
+
+pos_adj=0
+pos_adj_comment=Set to 1 if the input position is zero-based.
+
+var_info=
+
+
+[chr]
+index=%(chr_col)s
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Chromosome
+
+[pos]
+index=%(pos_col)s
+adj=IncreaseBy(%(pos_adj)s)
+type=INTEGER NOT NULL
+comment=1-based position
+
+[ref]
+index=%(ref_col)s
+type=VARCHAR(255)
+comment=Reference allele, '-' for insertion.
+
+[alt]
+index=%(alt_col)s
+type=VARCHAR(255)
+comment=Alternative allele, '-' for deletion.
+
+[grpby]
+index=5
+type=VARCHAR(255)
+comment=group names

@@ -1,0 +1,377 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+
+[format description]
+description=This format allows export variants in TCGA Mutation Annotation Format (MAF).
+	Because this format needs annotation information from various sources, the project
+	should be linked to refGene and EntrezGene.
+variant=Chromosome,Start_Position,Reference_Allele,Alternative_Allele
+
+
+[Hugo_Symbol]
+index=1
+type=VARCHAR(255)
+comment=HUGO symbol for the gene (HUGO symbols are always in all caps). If no gene exists within 3kb enter "Unknown".
+
+[Entrez_Gene_Id]
+index=2
+type=VARCHAR(255)
+comment=Entrez gene ID (an integer). If no gene exists within 3kb enter "0".
+
+[Center]
+index=3
+type=VARCHAR(255)
+comment=Genome sequencing center reporting the variant. If multiple institutions report the same mutation separate list using semicolons.
+
+[NCBI_Build]
+index=4
+type=VARCHAR(255)
+comment=Any TGCA accepted genome identifier.  Can be string, integer or a float. hg18, hg19, GRCh37, GRCh37-lite, 36, 36.1, 37,
+
+[Chromosome]
+index=5
+type=VARCHAR(255)
+comment=Chromosome number without "chr" prefix that contains the gene. X, Y, M, 1, 2, etc.
+
+[Start_Position]
+index=6
+type=VARCHAR(255)
+comment=Lowest numeric position of the reported variant on the genomic reference sequence. Mutation start coordinate (1-based coordinate system).
+
+[End_Position]
+index=7
+type=VARCHAR(255)
+comment=Highest numeric genomic position of the reported variant on the genomic reference sequence. Mutation end coordinate (inclusive, 1-based coordinate system).
+
+[Strand]
+index=8
+type=VARCHAR(255)
+comment=Genomic strand of the reported allele. Variants should always be reported on the positive genomic strand. (Currently, only the positive strand is an accepted value).
+
+[Variant_Classification]
+index=9
+type=VARCHAR(255)
+comment=Translational effect of variant allele. Frame_Shift_Del, Frame_Shift_Ins, In_Frame_Del, In_Frame_Ins, Missense_Mutation, Nonsense_Mutation, Silent, Splice_Site, Translation_Start_Site, Nonstop_Mutation, 3'UTR, 3'Flank, 5'UTR, 5'Flank, IGR1 , Intron, RNA,
+
+[Variant_Type]
+index=10
+type=VARCHAR(255)
+comment=Type of mutation. TNP (tri-nucleotide polymorphism) is analogous to DNP but for 3 consecutive nucleotides. ONP (oligo-nucleotide polymorphism) is analogous to TNP but for consecutive runs of 4 or more.
+
+[Reference_Allele]
+index=11
+type=VARCHAR(255)
+comment=The plus strand reference allele at this position. Include the sequence deleted for a deletion, or "-" for an insertion.
+
+[Tumor_Seq_Allele1]
+index=12
+type=VARCHAR(255)
+comment=Primary data genotype. Tumor sequencing (discovery) allele 1. " -" for a deletion represent a variant. "-" for an insertion represents wild-type allele. Novel inserted sequence for insertion should not include flanking reference bases.
+
+[Tumor_Seq_Allele2]
+index=13
+type=VARCHAR(255)
+comment=Primary data genotype. Tumor sequencing (discovery) allele 2. " -" for a deletion represents a variant. "-" for an insertion represents wild-type allele. Novel inserted sequence for insertion should not include flanking reference bases.
+
+[Alternative_Allele]
+index=11,12,13
+# this is not very reliable
+type=VARCHAR(255)
+adj=lambda x: x[1] if x[0] == x[2] else x[2]
+comment=Alternative allele
+
+[GT]
+# this is also not well thought-out, need to see real data
+index=12,13
+type=INT
+adj=labmda x: 1 if x[1] != x[2] else 2
+
+[dbSNP_RS]
+index=14
+type=VARCHAR(255)
+comment=Latest dbSNP rs ID (dbSNP_ID) or "novel" if there is no dbSNP record. source: http://ncbi.nlm.nih.gov/projects/SNP/
+
+
+[dbSNP_Val_Status]
+index=15
+type=VARCHAR(255)
+comment=dbSNP validation status. Semicolon- separated list of validation statuses. by1000genomes;by2Hit2Allele; byCluster; byFrequency; byHapMap; byOtherPop; bySubmitter; alternate_allele3 Note that "none" will no longer be an acceptable value.
+
+
+[Tumor_Sample_Barcode]
+index=16
+type=VARCHAR(255)
+comment=BCR aliquot barcode for the tumor sample including the two additional fields indicating plate and well position. i.e. TCGA-SiteID-PatientID-SampleID-PortionID-PlateID-CenterID. The full TCGA Aliquot ID.
+
+[Matched_Norm_Sample_Barcode]
+index=17
+type=VARCHAR(255)
+comment=BCR aliquot barcode for the matched normal sample including the two additional fields indicating plate and well position. i.e. TCGA-SiteID-PatientID-SampleID-PortionID-PlateID-CenterID. The full TCGA Aliquot ID; e.g. TCGA-02-0021-10A-01D-0002-04 (compare portion ID '10A' normal sample, to '01A' tumor sample).
+
+[Match_Norm_Seq_Allele1]
+index=18
+type=VARCHAR(255)
+comment=Primary data. Matched normal sequencing allele 1. "-" for deletions; novel inserted sequence for INS not including flanking reference bases.
+
+
+[Match_Norm_Seq_Allele2]
+index=19
+type=VARCHAR(255)
+comment=Primary data. Matched normal sequencing allele 2. "-" for deletions; novel inserted sequence for INS not including flanking reference bases.
+
+[Tumor_Validation_Allele1]
+index=20
+type=VARCHAR(255)
+comment=Secondary data from orthogonal technology. Tumor genotyping (validation) for allele 1. "-" for deletions; novel inserted sequence for INS not including flanking reference bases.
+
+[Tumor_Validation_Allele2]
+index=21
+type=VARCHAR(255)
+comment=Secondary data from orthogonal technology. Tumor genotyping (validation) for allele 2. "-" for deletions; novel inserted sequence for INS not including flanking reference bases.
+
+[Match_Norm_Validation_Allele1]
+index=22
+type=VARCHAR(255)
+comment=Secondary data from orthogonal technology. Matched normal genotyping (validation) for allele 1. "-" for deletions; novel inserted sequence for INS not including flanking reference bases.
+
+
+[Match_Norm_Validation_Allele2]
+index=23
+type=VARCHAR(255)
+comment=Secondary data from orthogonal technology. Matched normal genotyping (validation) for allele 2. "-" for deletions; novel inserted sequence for INS not including flanking reference bases.
+
+[Verification_Status]
+index=24
+type=VARCHAR(255)
+comment=Second pass results from independent attempt using same methods as primary data source. Generally reserved for 3730 Sanger Sequencing.
+
+[Validation_Status]
+index=25
+type=VARCHAR(255)
+comment=Second pass results from orthogonal technology.
+
+[Mutation_Status]
+index=26
+type=VARCHAR(255)
+comment= Updated to reflect validation or verification status and to be in agreement with the VCF VLS field. The values allowed in this field are constrained by the value in the Validation_Status field.
+
+[Sequencing_Phase]
+index=27
+type=VARCHAR(255)
+comment=TCGA sequencing phase. Phase should change under any circumstance that the targets under consideration change.
+
+[Sequence_Source]
+index=28
+type=VARCHAR(255)
+comment=Molecular assay type used to produce the analytes used for sequencing. Allowed values are a subset of the SRA 1.5 library_strategy field values. This subset matches those used at CGHub.
+
+[Validation_Method]
+index=29
+type=VARCHAR(255)
+comment=The assay platforms used for the validation call. Examples: Sanger_PCR_WGA, Sanger_PCR_gDNA, 454_PCR_WGA, 454_PCR_gDNA; separate multiple entries using semicolons.
+
+[score]
+index=30
+type=VARCHAR(255)
+comment=Not in use.
+
+[BAM_File]
+index=31
+type=VARCHAR(255)
+comment=Not in use.
+
+[Sequencer]
+index=32
+type=VARCHAR(255)
+comment=Instrument used to produce primary data. Separate multiple entries using semicolons.
+
+[Tumor_Sample_UUID]
+index=33
+type=VARCHAR(255)
+comment=BCR aliquot UUID for tumor sample
+
+[Matched_Norm_Sample_UUID]
+index=34
+type=VARCHAR(255)
+comment=BCR aliquot UUID for matched normal	567e8487-e29b-32d4-a716-446655443246
+
+
+[col_1]
+# Hugo_Symbol
+field=HGNC.name
+comment=HUGO symbol for the gene (HUGO symbols are always in all caps). If no gene exists within 3kb enter "Unknown".
+
+[col_2]
+field=HGNC.Entrez_Gene_ID
+comment=Entrez gene ID (an integer). If no gene exists within 3kb enter "0".
+
+[col_3]
+field=
+adj=Constant("exported")
+comment=Genome sequencing center reporting the variant. Set to "exported"
+
+[col_4]
+field=
+adj=Constant("hg19")
+comment=Any TGCA accepted genome identifier.  Can be string, integer or a float.
+
+[col_5]
+field=chr
+comment=Chromosome number without "chr" prefix that contains the gene.
+
+[col_6]
+field=pos
+comment=Lowest numeric position of the reported variant on the genomic reference sequence. Mutation start coordinate (1-based coordinate system).
+
+[col_7]
+field=pos + length(alt) - 1
+comment=Highest numeric genomic position of the reported variant on the genomic reference sequence. Mutation end coordinate (inclusive, 1-based coordinate system).
+
+[col_8]
+field=
+adj=Constant("+")
+comment=Genomic strand of the reported allele. Variants should always be reported on the positive genomic strand. (Currently, only the positive strand is an accepted value).
+
+[col_9]
+field=
+adj=Constant("-")
+comment=Translational effect of variant allele. Can be Frame_Shift_Del, Frame_Shift_Ins, In_Frame_Del, In_Frame_Ins, Missense_Mutation, Nonsense_Mutation, Silent, Splice_Site, Translation_Start_Site, Nonstop_Mutation, 3'UTR, 3'Flank, 5'UTR, 5'Flank, IGR1 , Intron, RNA, Targeted_Region
+
+[col_10]
+field=
+adj=Constant("-")
+comment=Type of mutation. TNP (tri-nucleotide polymorphism) is analogous to DNP but for 3 consecutive nucleotides. ONP (oligo-nucleotide polymorphism) is analogous to TNP but for consecutive runs of 4 or more.
+
+[col_11]
+field=
+adj=Constant("-")
+field=ref
+comment=The plus strand reference allele at this position. Include the sequence deleted for a deletion, or "-" for an insertion.
+
+[col_12]
+field=
+adj=Constant("-")
+field=alt
+comment=Primary data genotype. Tumor sequencing (discovery) allele 1. " -" for a deletion represent a variant. "-" for an insertion represents wild-type allele. Novel inserted sequence for insertion should not include flanking reference bases.
+
+[col_13]
+field=
+adj=Constant("-")
+field=alt
+comment=Primary data genotype. Tumor sequencing (discovery) allele 2. " -" for a deletion represents a variant. "-" for an insertion represents wild-type allele. Novel inserted sequence for insertion should not include flanking reference bases.
+
+[col_14]
+field=
+adj=Constant("-")
+field=dbSNP.name
+comment=Latest dbSNP rs ID (dbSNP_ID) or "novel" if there is no dbSNP record.
+
+[col_15]
+field=
+adj=Constant("-")
+comment= dbSNP validation status. Semicolon- separated list of validation statuses. by1000genomes;by2Hit2Allele; byCluster; byFrequency; byHapMap; byOtherPop; bySubmitter; alternate_allele
+
+[col_16]
+field=
+adj=Constant("-")
+
+comment= BCR aliquot barcode for the tumor sample including the two additional fields indicating plate and well position. i.e. TCGA-SiteID-PatientID-SampleID-PortionID-PlateID-CenterID. The full TCGA Aliquot ID.
+
+[col_17]
+field=
+adj=Constant("-")
+comment= BCR aliquot barcode for the matched normal sample including the two additional fields indicating plate and well position. i.e. TCGA-SiteID-PatientID-SampleID-PortionID-PlateID-CenterID. The full TCGA Aliquot ID; e.g. TCGA-02-0021-10A-01D-0002-04 (compare portion ID '10A' normal sample, to '01A' tumor sample).
+
+[col_18]
+field=
+adj=Constant("-")
+comment=Primary data. Matched normal sequencing allele 1. "-" for deletions; novel inserted sequence for INS not including flanking reference bases.
+
+[col_19]
+field=
+adj=Constant("-")
+comment=Primary data. Matched normal sequencing allele 2. "-" for deletions; novel inserted sequence for INS not including flanking reference bases.
+
+[col_20]
+field=
+adj=Constant("-")
+comment=Secondary data from orthogonal technology. Tumor genotyping (validation) for allele 1. "-" for deletions; novel inserted sequence for INS not including flanking reference bases.
+
+[col_21]
+field=
+adj=Constant("-")
+comment=Secondary data from orthogonal technology. Tumor genotyping (validation) for allele 2. "-" for deletions; novel inserted sequence for INS not including flanking reference bases.
+
+
+[col_22]
+field=
+adj=Constant("-")
+comment=Secondary data from orthogonal technology. Matched normal genotyping (validation) for allele 1. "-" for deletions; novel inserted sequence for INS not including flanking reference bases.
+
+[col_23]
+field=
+adj=Constant("-")
+comment=Secondary data from orthogonal technology. Matched normal genotyping (validation) for allele 2. "-" for deletions; novel inserted sequence for INS not including flanking reference bases.
+
+[col_24]
+field=
+adj=Constant("-")
+comment=Second pass results from independent attempt using same methods as primary data source. Generally reserved for 3730 Sanger Sequencing.
+
+[col_25]
+field=
+adj=Constant("-")
+comment=Second pass results from orthogonal technology.
+
+
+[col_26]
+field=
+adj=Constant("-")
+comment=Updated to reflect validation or verification status and to be in agreement with the VCF VLS field. The values allowed in this field are constrained by the value in the Validation_Status field.
+
+
+[col_27]
+field=
+adj=Constant("-")
+comment=TCGA sequencing phase. Phase should change under any circumstance that the targets under consideration change.
+
+[col_28]
+field=
+adj=Constant("-")
+comment=Molecular assay type used to produce the analytes used for sequencing. Allowed values are a subset of the SRA 1.5 library_strategy field values. This subset matches those used at CGHub.
+
+
+[col_29]
+field=
+adj=Constant("-")
+comment=The assay platforms used for the validation call. Examples: Sanger_PCR_WGA, Sanger_PCR_gDNA, 454_PCR_WGA, 454_PCR_gDNA; separate multiple entries using semicolons.
+
+[col_30]
+field=
+adj=Constant("-")
+comment=Not in use.
+
+[col_31]
+field=
+adj=Constant("-")
+comment=Not in use.
+
+[col_32]
+field=
+adj=Constant("Illumina")
+comment=Instrument used to produce primary data. Separate multiple entries using semicolons. Can be Illumina GAIIx
+  Illumina HiSeq SOLID 454 ABI 3730xl Ion Torrent PGM Ion Torrent Proton PacBio RS Illumina MiSeq Illumina HiSeq 2500
+  454 GS FLX Titanium AB SOLiD 4 System
+
+[col_33]
+field=
+adj=Constant("00000000-0000-0000-0000-000000000000")
+comment=BCR aliquot UUID for tumor sample
+
+[col_34]
+field=
+adj=Constant("00000000-0000-0000-0000-000000000000")
+comment=BCR aliquot UUID for matched normal

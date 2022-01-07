@@ -1,0 +1,92 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+
+[format description]
+description=A basic variant import/export format that import variants
+    with four tab-delimited columns (chr, pos, ref, alt), and export
+	variants, optional variant info fields and genotypes.
+variant=chr,pos,ref,alt
+export_by=chr,pos,ref,alt
+
+[DEFAULT]
+chr_col=1
+chr_col_comment=Column index for the chromosome field
+
+pos_col=2
+pos_col_comment=Column index for the position field
+
+ref_col=3
+ref_col_comment=Column index for the reference field
+
+alt_col=4
+alt_col_comment=Column index for the alternative field
+
+pos_adj=0
+pos_adj_comment=Set to 1 to import variants with 0-based positions,
+    or to -1 to export variants in 0-based positions.
+
+fields=
+fields_comment=Fields to output, simple arithmetics are allowed
+    (e.g. pos+1) but aggregation functions are not supported.
+
+#
+# importing variants
+#
+[chr]
+index=%(chr_col)s
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Chromosome
+
+[pos]
+index=%(pos_col)s
+adj=IncreaseBy(%(pos_adj)s)
+type=INTEGER NOT NULL
+comment=1-based position, set --pos_adj to 1 if input position is 0 based.
+
+[ref]
+index=%(ref_col)s
+type=VARCHAR(255)
+comment=Reference allele, '-' for insertion.
+
+[alt]
+index=%(alt_col)s
+type=VARCHAR(255)
+comment=Alternative allele, '-' for deletion.
+
+[field formatter]
+fmt_GT=GenoFormatter(style='numeric')
+
+#
+# export variants, variant info and genotypes
+#
+[col_1]
+field=chr
+comment=chromosome
+
+[col_2]
+field=pos
+adj=IncreaseBy(%(pos_adj)s)
+comment=variant position, set --pos_adj to -1 to export variants in
+  0-based positions.
+
+[col_3]
+field=ref
+comment=reference allele
+
+[col_4]
+field=alt
+comment=alternative allele
+
+[col_5]
+field=%(fields)s
+adj=JoinRecords('\t')
+comment=Output variant info fields as one column
+
+
+[col_6]
+field=GT
+comment=genotype in numeric style

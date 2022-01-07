@@ -1,0 +1,37 @@
+#!/bin/bash
+#PBS -l nodes=4:lowmem:ppn=8,walltime=01:00:00
+#PBS -V
+#PBS -q short
+
+
+[[ -z "${PROJECTFOLDER}" ]] && PROJECTFOLDER='path to project folder' || PROJECTFOLDER="${PROJECTFOLDER}"
+COMMAND='vtools associate variant disease --discard_variants %(NA)>0.1 --method "BurdenBt --name BurdenTest --alternative 2" --group_by refgene.name2  -j 8 -v 2 -mpi'
+NUMBER_OF_PROCESSES_PER_NODE=8
+
+#PBS_NODEFILE has the name of all the nodes running the jobs.
+NODE_LIST=`cat $PBS_NODEFILE | uniq`
+nodes=(`echo $NODE_LIST | cut -d " "  --output-delimiter=" " -f 1-`)
+
+#The main program is running on the node with $HOSTNAME, the rest of nodes are saved into $WORKDER_NODES and written into hostlist.txt.
+WORKER_NODES=()
+for node in "${nodes[@]}"
+do
+   if [ "$node" != "$HOSTNAME" ]; then
+      WORKER_NODES+=($node)
+   fi
+done
+
+export ZEROMQIP=$(ifconfig | sed -En 's/127.0.0.1//;s/.*inet (addr:)?(([0-9]*\.){3}[0-9]*).*/\2/p')
+export PROJECTFOLDER
+HOSTFILE="$PROJECTFOLDER/hostlist.txt"
+
+rm -rf $HOSTFILE
+for node in "${WORKER_NODES[@]}";
+do
+  echo $node >> $HOSTFILE
+done
+
+#Get the path for mpiexec
+MPIEXECPATH=$(which mpiexec)
+#The IP address for the main node $ZEROMQIP and $PROJECTFOLDER are needed for the woker script to communicate.
+$MPIEXECPATH -d -x PATH  -H $HOSTNAME -np 1 -wdir $PROJECTFOLDER $COMMAND : -x ZEROMQIP -x PROJECTFOLDER  -x PATH -hostfile $HOSTFILE -npernode $NUMBER_OF_PROCESSES_PER_NODE  worker_run

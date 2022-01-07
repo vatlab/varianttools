@@ -1,0 +1,85 @@
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+#
+
+[format description]
+description=
+variant=chr, pos, ref, alt
+genotype=%(geno)s
+genotype_info=%(geno_info)s
+# the input file can have consecutive tabs and has to use \t as delimiter
+delimiter='\t'
+export_by=chr,pos,ref,alt
+
+[DEFAULT]
+geno=GT
+geno_comment=Field to extract genotype from data file.
+geno_info=lod_score
+
+[chr]
+index=1
+type=VARCHAR(20)
+comment=Chromosome
+
+[pos]
+index=2
+type=INTEGER NOT NULL
+comment=1-based position
+
+[ref]
+index=4
+type=VARCHAR(20)
+comment=Reference base, '-' for insertion.
+
+[all1]
+index=5
+type=VARCHAR(255)
+comment=First allele found
+
+[alt]
+# alternative allele has to be determined from
+# ref, all1, and all2
+index=4,5,6
+type=VARCHAR(255)
+adj=lambda x: x[2] if x[0] == x[1] else x[1]
+comment=Alternative allele, '-' for deletion.
+
+[rs]
+index=7
+type=VARCHAR(4)
+adj=Nullify('')
+comment=rs number
+
+[GT]
+# input ref allele (4), all1(5), all2(6), and genotype from 8, 10, 12
+index=4,5,6,8::2
+type=INT
+# for SNV:
+#     ref A,   Genotype=AA, AT, TT has GT=0, 1, 2
+#     ==> GT = 2 - # of reference
+#
+# for insertion:
+#     ref -,   Genotype=GG, G-, -- has GT=2, 1, 0 regardless of value of alt
+#     ==> GT = 2 - # of reference
+#
+# for deletion:
+#     ref TG, all1 TG, all2 -,
+#              Genotype=TT, T-, -- has GT=0, 1, 2 regardless of value of ref
+#     ==> GT = # of alternative
+#
+# So the logic is:
+#     if ref == -:    # is insertion
+#        or all1 != - and all2 != -:  # SNV
+#        return  2 - number of reference
+#     otherwise, ref != - and (all1 == - or all2 == -):  # deletion
+#        return  2 - number of '-'
+#
+adj=lambda x: 2 - x[3].count(x[0]) if (x[0] == '-' or (x[1] != '-' and x[2] != '-')) else x[3].count('-')
+comment=Genotype as number of alternative allele
+
+[lod_score]
+# lod score from columns 9, 11, 13
+index=9::2
+type=INT
+comment=Lod score

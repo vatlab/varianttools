@@ -1,0 +1,44 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+
+[format description]
+description=Import variants (chr, pos, ref, alt) that are queried from dbSNP database using provided rsnames
+delimiter=','
+variant=chr,pos,ref,alt
+
+[DEFAULT]
+sep=','
+sep_comment=delimiter used to separate input fields
+
+rsname_col=1
+rsname_col_comment=Index for the column with rsname
+
+dbfile=dbSNP-hg19_138.DB
+dbfile_comment=Name of an attached dbSNP database or path to the dbSNP database in sqlite format
+
+[chr]
+index=%(rsname_col)s
+type=VARCHAR(20)
+adj=FieldFromDB(dbfile="%(dbfile)s", res_field='chr', cond_fields='name')
+comment=Obtain chromosome from dbSNP by rsname
+
+[pos]
+index=%(rsname_col)s
+type=VARCHAR(20)
+adj=FieldFromDB(dbfile="%(dbfile)s", res_field='pos', cond_fields='name')
+comment=Obtain position from dbSNP by rsname
+
+[ref]
+index=%(rsname_col)s
+type=VARCHAR(20)
+adj=FieldFromDB(dbfile="%(dbfile)s", res_field='ref', cond_fields='name')
+comment=Obtain reference allele from dbSNP by rsname
+
+[alt]
+index=%(rsname_col)s
+type=VARCHAR(20)
+adj=FieldFromDB(dbfile="%(dbfile)s", res_field='alt', cond_fields='name')
+comment=Obtain alternative allele from dbSNP by rsname

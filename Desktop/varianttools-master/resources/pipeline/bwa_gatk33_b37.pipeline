@@ -1,0 +1,570 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Pipeline/New for
+# a description of the format of this file.
+
+[pipeline description]
+description=A pipeline to align raw reads from fastq or BAW/SAM files using BWA
+  and GATK best practice, and call variants from aligned BAM file. It uses b37
+  of human reference genome and assumes paired-end reads in plain text and
+  compressed formats.
+
+align_description=Align raw reads from input files using bwa, gatk, and picard.
+  This pipeline accepts raw input files in plain text format, SAM/BAM format,
+  and their compressed versions (.zip, .tar.gz, .tgz, .bz2, .tbz2 etc). All
+  input files are assumed to be raw reads from the same sample. This pipeline
+  generates a calibrated bam file (--output), and its reduced version if an
+  additional output file is specified.
+
+
+call_description=Call and validate variants (SNPs and Indels) from one or more
+  input bam files. This pipeline accepts one or more bam files as input and a
+  vcf file as output. If multiple input files are specified, multi-sample variant
+  calling will be performed.
+
+
+
+RESOURCE_URL=ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/b37/
+RESOURCE_DIR=${LOCAL_RESOURCE}/pipeline_resource/GATK/2.8/b37
+
+# directory to save all intermediate files
+TEMP_DIR=${CACHE_DIR}/%(name)s
+PRODUCTION_MODE=${:'%(production)s'.lower() in ('1', 'true', 'y', 'yes')}
+
+[DEFAULT]
+name=
+name_comment=Name of the job to be executed. All intermediate files generated
+  from this pipeline will be saved to $CACHE_DIR/$NAME where $CACHE_DIR is
+  the cache directory of the project.
+
+strict_prog_version=False
+strict_prog_version_comment=Whether or not use other version of programs if the
+  exact version does not exist. Setting it to False allows variant tools to
+  use other versions of the programs.
+
+production=False
+production_comment=If set to True or 1, all intermediate files will be removed.
+  The whole pipeline would need to be rerun if a different parameter or different
+  version of external program is used.
+
+picard_path=
+picard_path_comment=Path to picard jar files
+
+gatk_path=
+gatk_path_comment=Path to GATK jar file GenomeAnalysisTK.jar
+
+RGID=1
+RGID_comment=Read group ID
+
+RGLB=LIB
+RGLB_comment=Read group Library.
+
+RGPL=Illumina
+RGPL_comment=Read group Platform
+
+RGSM=
+RGSM_comment=Read group sample name. Value of parameter --name will be used if
+    this parameter is left unspecified.
+
+RGPU=FC.1
+RGPU_comment=Read group platform unit (e.g. flowcall-barcode.lane).
+
+opt_java=-Xmx4g -XX:-UseGCOverheadLimit -Djava.io.tmpdir=${TEMP_DIR}/tmp
+opt_java_comment=Option to java program. -Djava.io.tmpdir is frequently used to set java
+	temporary directory if system temporary partition is not big enough.
+
+opt_bwa_index=
+opt_bwa_index_comment=Option to command 'bwa index'
+
+opt_bwa_aln=
+opt_bwa_aln_comment=Option to command 'bwa aln'
+
+opt_bwa_sampe=
+opt_bwa_sampe_comment=Option to command 'bwa sampe'
+
+opt_samtools_faidx=
+opt_samtools_faidx_comment=Option to command 'samtools faidx'
+
+opt_samtools_index=
+opt_samtools_index_comment=Option to command 'samtools index'
+
+opt_picard_sortsam=VALIDATION_STRINGENCY=LENIENT
+opt_picard_sortsam_comment=Option to picard SortSam.jar
+
+opt_picard_mergesamfiles=MAX_RECORDS_IN_RAM=5000000
+opt_picard_mergesamfiles_comment=Option to picard MergeSamFiles.jar
+
+opt_picard_samtofastq=VALIDATION_STRINGENCY=LENIENT NON_PF=true
+opt_picard_samtofastq_comment=Option to picard SamToFastq.jar
+
+opt_picard_markduplicates=
+opt_picard_markduplicates_comment=Option to picard MarkDuplicates.jar
+#
+opt_gatk_realignertargetcreator=
+opt_gatk_realignertargetcreator_comment=Option to command gatk RealignerTargetCreator
+
+opt_gatk_indelrealigner=--filter_mismatching_base_and_quals
+opt_gatk_indelrealigner_comment=Option to command gatk IndelRealigner
+
+opt_gatk_baserecalibrator=-rf BadCigar
+opt_gatk_baserecalibrator_comment=Option to command gatk BaseRecalibrator
+
+opt_gatk_printreads=
+opt_gatk_printreads_comment=Option to command gatk PrintReads
+
+opt_gatk_reducereads=
+opt_gatk_reducereads_comment=Option to command gatk ReduceReads
+
+
+
+opt_gatk_unifiedgenotyper=-rf BadCigar  -stand_call_conf 50.0 -stand_emit_conf 10.0  -dcov 200 -A AlleleBalance -A QualByDepth -A HaplotypeScore -A MappingQualityRankSumTest -A ReadPosRankSumTest -A FisherStrand -A RMSMappingQuality -A InbreedingCoeff -A Coverage
+opt_gatk_unifiedgenotyper_comment=Option to command gatk UnifiedGenotyper
+
+opt_gatk_variantrecalibrator=
+opt_gatk_variantrecalibrator_comment=Option to command gatk VarintRecalibrator
+
+opt_gatk_variantrecalibrator_snp=-an QD -an MQRankSum -an ReadPosRankSum -an FS -an DP
+opt_gatk_variantrecalibrator_snp_comment=Option to command gatk VarintRecalibrator -mode SNP
+
+opt_gatk_variantrecalibrator_indel=--maxGaussians 4 -an DP -an FS -an ReadPosRankSum -an MQRankSum
+opt_gatk_variantrecalibrator_indel_comment=Option to command gatk VarintRecalibrator -mode INDEL
+
+opt_gatk_applyrecalibration=--ts_filter_level 99.9
+opt_gatk_applyrecalibration_comment=Option to command gatk ApplyRecalibrator
+
+opt_gatk_applyrecalibration_snp=
+opt_gatk_applyrecalibration_snp_comment=Option to command gatk ApplyRecalibrator  -mode SNP
+
+
+opt_gatk_applyrecalibration_indel=
+opt_gatk_applyrecalibration_indel_comment=Option to command gatk ApplyRecalibrator -mode INDEL
+
+
+[*_1]
+action=TerminateIf(cond=not '%(name)s', message='Please specify a name for the alignment job')
+comment=Check if a name has been asigned to the job
+
+[*_2]
+action=TerminateIf(cond=not '%(gatk_path)s', message='Please specify path to GATK jar file')
+comment=Check path to GATK jar file
+
+[align_3]
+action=TerminateIf(cond=not '%(picard_path)s', message='Please specify path to Picard jar file')
+comment=Check path to Picard jar file
+
+[*_5]
+action=ImportModules('DNASeq_tools.py')
+comment=Import module DNASeq_tools with some utility functions and actions
+
+[align_10]
+action=CheckCommands(['bwa', 'samtools'])
+comment=Check existence of commands bwa and, samtools
+
+[*_11]
+action=CheckCommands(['java'])
+comment=Check existence of java
+
+
+[align_12]
+action=CheckOutput('bwa', 'Version: 0.7.*', %(strict_prog_version)s)
+comment=Check the version of bwa. Version is 0.7.4 is recommended
+
+[align_13]
+action=CheckOutput('ls %(picard_path)s/picard*.jar', 'picard-1.82', %(strict_prog_version)s)
+comment=Check the version of picard. Version is 1.82 is recommended.
+
+[*_14]
+action=CheckOutput('java -jar %(gatk_path)s/GenomeAnalysisTK.jar -version', '^3.3', %(strict_prog_version)s)
+comment=Check the version of GATK. Version 3.3 is recommended.
+
+[*_20]
+# input = output = ${CMD_INPUT}
+action=CheckFiles(["%(gatk_path)s/GenomeAnalysisTK.jar"])
+comment=Check existence of class files for GATK
+
+[align_21]
+# input = output = ${CMD_INPUT}
+action=CheckFiles(["%(picard_path)s/SortSam.jar"])
+comment=Check existence of class files for Picard
+
+[*_50]
+# resources are downloaded from ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/2.8/b37/*
+# the .gz files will be automatically decompressed
+action=DownloadResource(resource='
+    ${RESOURCE_URL}/1000G_omni2.5.b37.vcf.gz
+    ${RESOURCE_URL}/1000G_omni2.5.b37.vcf.gz.md5
+    ${RESOURCE_URL}/1000G_omni2.5.b37.vcf.idx.gz
+    ${RESOURCE_URL}/1000G_omni2.5.b37.vcf.idx.gz.md5
+    ${RESOURCE_URL}/1000G_phase1.indels.b37.vcf.gz
+    ${RESOURCE_URL}/1000G_phase1.indels.b37.vcf.gz.md5
+    ${RESOURCE_URL}/1000G_phase1.indels.b37.vcf.idx.gz
+    ${RESOURCE_URL}/1000G_phase1.indels.b37.vcf.idx.gz.md5
+    ${RESOURCE_URL}/dbsnp_138.b37.excluding_sites_after_129.vcf.gz
+    ${RESOURCE_URL}/dbsnp_138.b37.excluding_sites_after_129.vcf.gz.md5
+    ${RESOURCE_URL}/dbsnp_138.b37.excluding_sites_after_129.vcf.idx.gz
+    ${RESOURCE_URL}/dbsnp_138.b37.excluding_sites_after_129.vcf.idx.gz.md5
+    ${RESOURCE_URL}/dbsnp_138.b37.vcf.gz
+    ${RESOURCE_URL}/dbsnp_138.b37.vcf.gz.md5
+    ${RESOURCE_URL}/dbsnp_138.b37.vcf.idx.gz
+    ${RESOURCE_URL}/dbsnp_138.b37.vcf.idx.gz.md5
+    ${RESOURCE_URL}/hapmap_3.3.b37.vcf.gz
+    ${RESOURCE_URL}/hapmap_3.3.b37.vcf.gz.md5
+    ${RESOURCE_URL}/hapmap_3.3.b37.vcf.idx.gz
+    ${RESOURCE_URL}/hapmap_3.3.b37.vcf.idx.gz.md5
+    ${RESOURCE_URL}/Mills_and_1000G_gold_standard.indels.b37.vcf.gz
+    ${RESOURCE_URL}/Mills_and_1000G_gold_standard.indels.b37.vcf.gz.md5
+    ${RESOURCE_URL}/Mills_and_1000G_gold_standard.indels.b37.vcf.idx.gz
+    ${RESOURCE_URL}/Mills_and_1000G_gold_standard.indels.b37.vcf.idx.gz.md5
+    ${RESOURCE_URL}/human_g1k_v37_decoy.dict.gz
+    ${RESOURCE_URL}/human_g1k_v37_decoy.dict.gz.md5
+    ${RESOURCE_URL}/human_g1k_v37_decoy.fasta.gz
+    ${RESOURCE_URL}/human_g1k_v37_decoy.fasta.gz.md5
+    ${RESOURCE_URL}/human_g1k_v37_decoy.fasta.fai.gz
+    ${RESOURCE_URL}/human_g1k_v37_decoy.fasta.fai.gz.md5',
+    dest_dir="${RESOURCE_DIR}")
+comment=Download the GATK resource bundle to resource directory
+
+[align_60]
+# customized input and output
+input=${RESOURCE_DIR}/human_g1k_v37_decoy.fasta
+# this step will be ignored if output exists and newer than $INPUT
+action=RunCommand('bwa index %(opt_bwa_index)s -a bwtsw ${INPUT}',
+    working_dir='${RESOURCE_DIR}',
+    output='${RESOURCE_DIR}/human_g1k_v37_decoy.fasta.amb')
+comment=Build bwa index for build b37 of reference genome
+
+[align_100]
+# input is reset to command input ${CMD_INPUT}
+# This step is optional because it convert Sam files to fastq files (assuming
+# paired). Non-sam files are passed directly to the next step.
+input=${CMD_INPUT}
+action=RunCommand("java %(opt_java)s -jar %(picard_path)s/SamToFastq.jar %(opt_picard_samtofastq)s
+    INPUT=${INPUT}
+    FASTQ=${TEMP_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_1.fastq'}
+    SECOND_END_FASTQ=${TEMP_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_2.fastq'}",
+    output=["${TEMP_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_1.fastq'}",
+         "${TEMP_DIR}/${INPUT: os.path.basename(INPUT[0]).rsplit('.', 1)[0] + '_2.fastq'}"])
+# unselected files (e.g. non-bam/sam files) will not be passed. This allows the
+# output of this step to be generated fastq files that can be differentiated from
+# original input fastq files, so that they could be removed in production mode.
+input_emitter=EmitInput(select=['bam', 'sam'], pass_unselected=False)
+comment=Convert bam files to paired fastq files if the input is in bam/sam format.
+    Other input files are returned untouched.
+
+[align_101]
+# input is input of 100 (all files), plus dumped fastq files
+input=${INPUT100} ${OUTPUT100}
+input_emitter=EmitInput('single')
+action=DecompressFiles(dest_dir="${TEMP_DIR}"), LinkToDir('${TEMP_DIR}')
+comment=Decompress all input files (.tgz2, .tar, .tar.gz, .gz, .tgz, .zip etc) to
+    a cache directory. Uncompressed files are hard-linked to the cache directory.
+
+[align_200]
+# input of ${OUTPUT101}, which is a list of fastq files
+# remove all non-fastq files that might have been inputted
+input_emitter=EmitInput('single', select='fastq', pass_unselected=False)
+action=CheckFastqVersion(output="${INPUT: INPUT[0] + '.aln_param'}")
+ALN_PARAM=${INPUT: open(INPUT[0] + ".aln_param").read().strip()}
+comment=Check the format of the input fastq file and write an option file
+    with option -I if the sequences are in Illumina 1.3+ format.
+
+[align_201]
+# cannot use output of step align200, because we need a list of fastq files
+input=${OUTPUT101}
+action=RunCommand(cmd='bwa aln ${ALN_PARAM}
+        %(opt_bwa_aln)s -t 4 ${RESOURCE_DIR}/human_g1k_v37_decoy.fasta
+        ${INPUT} > ${INPUT: INPUT[0] + '.sai'}',
+    output="${INPUT: INPUT[0] + '.sai'}")
+# remove all non-fastq files that might have been inputted
+input_emitter=EmitInput('single', select='fastq', pass_unselected=False)
+comment=Call bwa aln to produce .sai files
+
+[align_300]
+# cannot use output of step align201, because we need a list of fastq files
+input=${OUTPUT101}
+# cmd=r" " is needed because there are \t in the readgroup string
+action=RunCommand(cmd=r"bwa sampe %(opt_bwa_sampe)s
+        -r '@RG\tID:%(RGID)s\tSM:${: "%(RGSM)s" if "%(RGSM)s" else "%(name)s"}\tLB:%(RGLB)s\tPU:%(RGPU)s\tPL:%(RGPL)s'
+        ${RESOURCE_DIR}/human_g1k_v37_decoy.fasta
+        ${INPUT: INPUT[0] + '.sai'} ${INPUT: INPUT[1] + '.sai'}
+        ${INPUT: INPUT[0]} ${INPUT: INPUT[1]} > ${INPUT: INPUT[0] + '.sam'}",
+    output="${INPUT: INPUT[0] + '.sam'}")
+input_emitter=EmitInput(group_by='paired', select='fastq', pass_unselected=False)
+comment=Running bwa sampe for paired end reads, using read group tag saved
+    in a .RG file
+
+[align_302]
+action=CountMappedReads(output="${INPUT: INPUT[0] + '.counts'}")
+input_emitter=EmitInput('single')
+comment=Check the proportion of aligned reads and exit if there are less than
+    80% of aligned reads.
+
+[align_303]
+action=RemoveIntermediateFiles('${OUTPUT100}')
+input_emitter=EmitInput(select=${PRODUCTION_MODE})
+comment=If in production mode, remove fastq files dumped from bam files
+
+[align_400]
+input=${OUTPUT300}
+action=RunCommand(cmd="java %(opt_java)s
+        -jar %(picard_path)s/MergeSamFiles.jar
+        %(opt_picard_mergesamfiles)s
+        ${INPUT: ' '.join(['INPUT=' + x for x in INPUT])}
+        USE_THREADING=true
+        VALIDATION_STRINGENCY=LENIENT
+        OUTPUT=${INPUT: INPUT[0][:-4] + '_merged.bam'}",
+    output="${INPUT: INPUT[0][:-4] + '_merged.bam'}")
+# if there is only one input file, skip this step and pass the input to output
+input_emitter=EmitInput(select=${INPUT400:len(INPUT400)>1}, group_by="all")
+comment=Merge per-lane sam files into a single bam file. This step is skipped
+	if there is only one input file.
+
+[align_500]
+action=RunCommand(cmd="java %(opt_java)s
+        -jar %(picard_path)s/SortSam.jar
+        %(opt_picard_sortsam)s I=${INPUT}
+        O=${INPUT: INPUT[0][:-4] + '_sorted.bam'} SO=coordinate",
+    output="${INPUT: INPUT[0][:-4] + '_sorted.bam'}")
+comment=Sort merged bam file using picard SortSam
+
+[align_501]
+# we do not remove intermediate file 201 because they are implicitly used in
+# step 300. step 300 will not be able to detect input file error if the .sai
+# files are replaced by .file_info
+action=RemoveIntermediateFiles('${OUTPUT101} ${OUTPUT300}')
+input_emitter=EmitInput(select=${PRODUCTION_MODE})
+comment=If in production mode, remove decompressed fastq and individual
+  bam files after a single bam file has been produced.
+
+
+[align_600]
+action=RunCommand(cmd="java %(opt_java)s
+        -jar %(picard_path)s/MarkDuplicates.jar
+        %(opt_picard_markduplicates)s
+        INPUT=${INPUT}
+        OUTPUT=${INPUT: INPUT[0][:-4] + '_dedup.bam'}
+        METRICS_FILE=${INPUT: INPUT[0][:-4] + '.metrics'}
+        ASSUME_SORTED=true
+        VALIDATION_STRINGENCY=LENIENT",
+    output="${INPUT: INPUT[0][:-4] + '_dedup.bam'}")
+comment=Mark duplicates using picard MarkDuplicates command
+
+
+
+[align_601]
+action=RemoveIntermediateFiles('${OUTPUT500}')
+comment=Remove _sorted.bam file after deduplication is completed.
+
+[align_610]
+action=RunCommand(cmd="samtools index %(opt_samtools_index)s ${INPUT}",
+    output="${INPUT: INPUT[0] + '.bai'}")
+comment=Index dedupped bam file using samtools
+
+[align_700]
+input=${OUTPUT600}
+action=RunCommand(cmd="java %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -T RealignerTargetCreator
+        %(opt_gatk_realignertargetcreator)s
+        -I ${INPUT}
+        -R ${RESOURCE_DIR}/human_g1k_v37_decoy.fasta
+        --mismatchFraction 0.0
+        -o ${INPUT: INPUT[0][:-4] + '.IndelRealignerTarget.intervals'}
+        -known ${RESOURCE_DIR}/dbsnp_138.b37.vcf
+        -known ${RESOURCE_DIR}/hapmap_3.3.b37.vcf
+        -known ${RESOURCE_DIR}/1000G_omni2.5.b37.vcf
+        -known ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.b37.vcf
+        -known ${RESOURCE_DIR}/1000G_phase1.indels.b37.vcf",
+    output="${INPUT: INPUT[0][:-4] + '.IndelRealignerTarget.intervals'}")
+comment=Realign indels create indel realigner target
+
+[align_710]
+# input is still the bam file, not the realigner tager intervals
+input=${OUTPUT600}
+action=RunCommand(cmd="java %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -T IndelRealigner
+        %(opt_gatk_indelrealigner)s
+        -I ${INPUT}
+        -R ${RESOURCE_DIR}/human_g1k_v37_decoy.fasta
+        --targetIntervals ${INPUT: INPUT[0][:-4] + '.IndelRealignerTarget.intervals'}
+        --consensusDeterminationModel USE_READS
+        -compress 0
+        -o ${INPUT: INPUT[0][:-4] + '.clean.bam'}
+        -known ${RESOURCE_DIR}/dbsnp_138.b37.vcf
+        -known ${RESOURCE_DIR}/hapmap_3.3.b37.vcf
+        -known ${RESOURCE_DIR}/1000G_omni2.5.b37.vcf
+        -known ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.b37.vcf
+        -known ${RESOURCE_DIR}/1000G_phase1.indels.b37.vcf",
+    output="${INPUT: INPUT[0][:-4] + '.clean.bam'}")
+comment=Apply indel realigner target to bam file
+
+[align_711]
+action=RemoveIntermediateFiles('${OUTPUT600}')
+input_emitter=EmitInput(select=${PRODUCTION_MODE})
+comment=If in production mode, remove bam files before realignment steps
+
+[align_800]
+action=RunCommand(cmd="java %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -T BaseRecalibrator
+        %(opt_gatk_baserecalibrator)s
+        -I ${INPUT}
+        -R ${RESOURCE_DIR}/human_g1k_v37_decoy.fasta
+        -cov ReadGroupCovariate
+        -cov QualityScoreCovariate
+        -cov CycleCovariate
+        -cov ContextCovariate
+        -o ${INPUT: INPUT[0][:-4] + '.grp'}
+        -knownSites ${RESOURCE_DIR}/dbsnp_138.b37.vcf
+        -knownSites ${RESOURCE_DIR}/hapmap_3.3.b37.vcf
+        -knownSites ${RESOURCE_DIR}/1000G_omni2.5.b37.vcf
+        -knownSites ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.b37.vcf
+        -knownSites ${RESOURCE_DIR}/1000G_phase1.indels.b37.vcf",
+    output="${INPUT: INPUT[0][:-4] + '.grp'}")
+comment=Create base recalibrator target
+
+[align_810]
+input=${OUTPUT710}
+action=RunCommand(cmd="java %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -T PrintReads
+        %(opt_gatk_printreads)s
+        -I ${INPUT}
+        -R ${RESOURCE_DIR}/human_g1k_v37_decoy.fasta
+        -BQSR ${INPUT: INPUT[0][:-4] + '.grp'}
+        -o ${CMD_OUTPUT,CMD_INPUT: CMD_OUTPUT[0] if CMD_OUTPUT else CMD_INPUT[0].split('.', 1)[0] + '.bam'}",
+    output="${CMD_OUTPUT,CMD_INPUT: CMD_OUTPUT[0] if CMD_OUTPUT else CMD_INPUT[0].split('.', 1)[0] + '.bam'}")
+comment=Apply base recalibrator target
+
+[align_811]
+action=RemoveIntermediateFiles('${OUTPUT700} ${OUTPUT710} ${OUTPUT610}')
+input_emitter=EmitInput(select=${PRODUCTION_MODE})
+comment=If in production mode, remove bam files before realignment steps
+
+[align_900]
+# if there are more than 1 output file, emit input file for further processing
+# output file is specifed as the second command output
+input_emitter=EmitInput(select=${CMD_OUTPUT: len(CMD_OUTPUT) > 1})
+action=RunCommand(cmd="java %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -T ReduceReads
+        %(opt_gatk_reducereads)s
+        -I ${INPUT}
+        -R ${RESOURCE_DIR}/human_g1k_v37_decoy.fasta
+        -o ${CMD_OUTPUT: CMD_OUTPUT[1]}",
+    output="${CMD_OUTPUT: CMD_OUTPUT[1]}")
+comment=Generated bam file with reduced reads if more than one output file
+	is specified
+
+
+[align_1000]
+action=WarnIf('%(RGLB)s' == 'LIB' and '%(RGPU)s' == 'FC.1',
+	message='Default LD and PU values are used for the generated BAM file. Please '
+		'use sample-specific values if the BAM file will be analyzed with other '
+		'data.')
+comment=Send a warning message if default read group is used.
+
+[align_1001]
+action=WarnIf(not '${CMD_OUTPUT}',
+	message="No --output is specified. ALigned reads are saved to ${CMD_INPUT: CMD_INPUT[0].split('.', 1)[0] + '.bam'}")
+comment=Send a warning message if default read group is used.
+
+
+
+[call_100]
+action=RunCommand(cmd="%(java)s %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -T UnifiedGenotyper
+        %(opt_gatk_unifiedgenotyper)s
+        ${INPUT: ' '.join(['-I ' + x for x in INPUT])}
+        -R ${RESOURCE_DIR}/human_g1k_v37_decoy.fasta
+        --dbsnp ${RESOURCE_DIR}/dbsnp_138.b37.vcf
+        --genotype_likelihoods_model BOTH
+        -o ${AUXILIARY_DIR}/${INPUT: os.path.basename(INPUT[0])[:-4] + '_raw.vcf'}",
+    output="${AUXILIARY_DIR}/${INPUT: os.path.basename(INPUT[0])[:-4] + '_raw.vcf'}")
+# make sure the input is a bam file
+input_emitter=EmitInput(select='.bam')
+comment=Use unified genotyper to get raw variants
+
+
+[call_200]
+action=RunCommand(cmd="%(java)s %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        --input ${INPUT}
+        -T VariantRecalibrator
+        -R ${RESOURCE_DIR}/human_g1k_v37_decoy.fasta
+        %(opt_gatk_variantrecalibrator)s
+        %(opt_gatk_variantrecalibrator_snp)s
+        -resource:hapmap,known=false,training=true,truth=true,prior=15.0 ${RESOURCE_DIR}/hapmap_3.3.b37.vcf
+        -resource:omni,known=false,training=true,truth=true,prior=12.0	${RESOURCE_DIR}/1000G_omni2.5.b37.vcf
+        -resource:dbsnp,known=true,training=false,truth=false,prior=2.0	${RESOURCE_DIR}/dbsnp_138.b37.vcf
+        -mode SNP
+        -recalFile ${INPUT: INPUT[0][:-4] + '.SNPs.recal'}
+        -tranchesFile ${INPUT: INPUT[0][:-4] + '.SNPs.tranches'}
+        -rscriptFile ${INPUT: INPUT[0][:-4] + '.SNPs.R'}
+        -log ${INPUT: INPUT[0][:-4] + '.SNPs.log'}",
+    output=["${INPUT: INPUT[0][:-4] + '.SNPs.recal'}",
+        "${INPUT: INPUT[0][:-4] + '.SNPs.tranches'}",
+        "${INPUT: INPUT[0][:-4] + '.SNPs.R'}",
+        "${INPUT: INPUT[0][:-4] + '.SNPs.log'}"])
+comment=Recalibrate SNPs
+
+[call_210]
+# use the same .vcf file, not the output files of the SNP recalibration step
+input=${OUTPUT100}
+action=RunCommand(cmd="%(java)s %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        --input ${INPUT}
+        -T VariantRecalibrator
+        -R ${RESOURCE_DIR}/human_g1k_v37_decoy.fasta
+        %(opt_gatk_variantrecalibrator)s
+        %(opt_gatk_variantrecalibrator_indel)s
+        -resource:mills,known=false,training=true,truth=true,prior=12.0
+            ${RESOURCE_DIR}/Mills_and_1000G_gold_standard.indels.b37.vcf
+        -resource:dbsnp,known=true,training=false,truth=false,prior=2.0
+            ${RESOURCE_DIR}/dbsnp_138.b37.vcf
+        -mode INDEL
+        -recalFile ${INPUT: INPUT[0][:-4] + '.INDELs.recal'}
+        -tranchesFile ${INPUT: INPUT[0][:-4] + '.INDELs.tranches'}
+        -rscriptFile ${INPUT: INPUT[0][:-4] + '.INDELs.R'}
+        -log ${INPUT: INPUT[0][:-4] + '.INDELs.log'}",
+    output=["${INPUT: INPUT[0][:-4] + '.INDELs.recal'}",
+        "${INPUT: INPUT[0][:-4] + '.INDELs.tranches'}",
+        "${INPUT: INPUT[0][:-4] + '.INDELs.R'}",
+        "${INPUT: INPUT[0][:-4] + '.INDELs.log'}"])
+comment=Recalibrate INDELs
+
+[call_300]
+input=${OUTPUT100}
+action=RunCommand(cmd="%(java)s %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -T ApplyRecalibration
+        %(opt_gatk_applyrecalibration)s
+        %(opt_gatk_applyrecalibration_snp)s
+        --input ${INPUT}
+        -R ${RESOURCE_DIR}/human_g1k_v37_decoy.fasta
+        -mode SNP
+        -recalFile ${INPUT: INPUT[0][:-4] + '.SNPs.recal'}
+        -tranchesFile ${INPUT: INPUT[0][:-4] + '.SNPs.tranches'}
+        -o ${INPUT: INPUT[0][:-4] + '.recal.SNPs.vcf'}",
+    output="${INPUT: INPUT[0][:-4] + '.recal.SNPs.vcf'}")
+comment=Apply SNP recalibration
+
+[call_310]
+# use input from last step (.recal.SNPs.vcf)
+# need to use files such as .INDELs.recal, .INDELs.tranches
+action=RunCommand(cmd="%(java)s %(opt_java)s
+        -jar %(gatk_path)s/GenomeAnalysisTK.jar
+        -T ApplyRecalibration
+        %(opt_gatk_applyrecalibration)s
+        %(opt_gatk_applyrecalibration_indel)s
+        --input ${INPUT}
+        -R ${RESOURCE_DIR}/human_g1k_v37_decoy.fasta
+        -mode INDEL
+        -recalFile ${INPUT: INPUT[0][:-15] + '.INDELs.recal'}
+        -tranchesFile ${INPUT: INPUT[0][:-15] + '.INDELs.tranches'}
+        -o ${CMD_OUTPUT}",
+    output="${CMD_OUTPUT}")
+comment=Apply INDEL recalibration

@@ -1,0 +1,533 @@
+# Copyright (C) 2011 - 2013 Bo Peng (bpeng@mdanderson.org)
+# Distributed under GPL. see <http://www.gnu.org/licenses/>
+#
+# Please refer to http://varianttools.sourceforge.net/Format/New for
+# a description of the format of this file.
+
+[format description]
+description=Import vcf
+variant=chr,%(pos)s,%(ref)s,%(alt)s
+genotype=%(geno)s
+variant_info=%(var_info)s
+genotype_info=%(geno_info)s
+# variants with identical chr,pos,ref will be collapsed.
+export_by=chr,%(pos)s,%(ref)s
+
+[DEFAULT]
+format_string=
+format_string_comment=FORMAT string that is outputted in the 9th column of
+    exported vcf file. Please specified an appropriate value corresponding to the
+    parameter --geno_info because this column cannot be automatically determined.
+
+geno_info=
+geno_info_comment=Genotype information fields. No genotype field is imported by
+    default. You may edit it into, for example, "geno_info=GD,GQ,PL", if the .vcf
+    format field looks like "GT:GD:GQ:PL". Please check the FORMAT string of your .vcf
+    file to determine available fields to be imported.
+
+geno=GT
+geno_comment=Field to extract genotype from .vcf file. You can set it to
+    safe_GT if genotype is not the first field in the genotype columns of your .vcf file.
+
+var_info=
+var_info_comment=Variant information fields to be imported. Please check the
+    INFO column of your vcf file for available fields.
+
+wildtype_code=('0',)
+wildtype_code_comment=How wildtype homozygotes are imported. These genotypes are
+    by default imported as GT=0. They will be discarded if you set this parameter
+    to None.
+
+id="."
+id_comment=The field to output to the third (ID) column of the vcf file. You
+    can use a id field (if you imported or updated it from a vcf file), another ID field
+    (e.g. rsname) if available, or '' to output all missing values.
+
+pos=pos
+pos_comment=Field for position. To export indel, set it to 'pos-length(upstream)'
+
+ref=ref
+ref_comment=Field for reference allele
+
+alt=alt
+alt_comment=Field for alternative allele
+
+qual=
+qual_comment=Field for quality score
+
+filter=
+filter_comment=Field for filter status
+
+info=
+info_comment=Field for info status
+
+[field formatter]
+#
+# NOTE: if multiple records are collapsed, they are passed as tuples.
+# If no formatter is defined, the first value will be used in output.
+
+[col_1]
+field=vcf_variant(chr, pos, ref, alt, %(id)s)
+comment=variants in vcf format
+
+[col_2]
+field=%(qual)s
+adj=ValueOfNull('.')
+comment=quality
+
+[col_3]
+field=%(filter)s
+adj=ValueOfNull('PASS')
+comment=filter
+
+[col_4]
+field=%(var_info)s
+adj=ValueOfNull('.'), JoinFields(';')
+comment=variant info
+
+[col_5]
+field=
+adj=Constant("%(format_string)s")
+comment=genotype format
+
+[col_6]
+field=%(geno)s,%(geno_info)s
+adj=JoinFields(':')
+comment=genotype
+
+
+[chr]
+index=1
+type=VARCHAR(20)
+adj=RemoveLeading('chr')
+comment=Chromosome
+
+[pos]
+index=2
+type=INTEGER NOT NULL
+comment=1-based position
+
+[raw_pos]
+index=2
+type=INTEGER
+comment=1-based position
+
+[id]
+index=3
+type=VARCHAR(48)
+adj=Nullify('.')
+comment=variant id (rs number or other IDs)
+
+[ref]
+index=4
+type=VARCHAR(255)
+comment=Reference allele, '-' for insertion.
+
+[alt]
+index=5
+adj=CheckSplit()
+type=VARCHAR(255)
+fmt=JoinRecords(',')
+comment=Alternative allele, '-' for deletion.
+
+[raw_ref]
+index=4
+type=VARCHAR(255)
+comment=Reference allele, without remove common leading and ending nucleotide.
+
+[raw_alt]
+index=5
+adj=CheckSplit()
+type=VARCHAR(255)
+fmt=JoinRecords(',')
+comment=Alternative allele, without remove common leading and ending nucleotide.
+
+[upstream]
+index=4,5
+adj=CommonLeading()
+type=VARCHAR(255)
+comment=Common leading alleles of ref and alt alleles stored in .vcf
+    file. This field is only available for indels.
+
+[downstream]
+index=4,5
+adj=CommonEnding()
+type=VARCHAR(255)
+comment=Common ending alleles of ref and alt alleles stored in .vcf
+    file, common leading is extracted before common ending. This field
+    is only available for indels.
+
+[qual]
+index=6
+type=FLOAT
+comment=phred-scaled quality score for the assertion made in ALT. High QUAL scores indicate high confidence calls.
+
+[filter]
+index=7
+type=VARCHAR(255)
+comment=PASS if this position has passed all filters, i.e. a call is made at this position. Otherwise, if the site has not passed all filters, a semicolon-separated list of codes for filters that fail.
+
+[GT]
+index=10:
+type=INTEGER
+adj=VcfGenotype(default=%(wildtype_code)s)
+fmt=GenoFormatter(style='vcf')
+comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2), assuming GT is the first FORMAT field in the .vcf file. Missing genotype will be dropped.
+
+[safe_GT]
+# This vcf genotype extractor uses format string and genotype to
+# extract genotype. Although the format string should not be needed
+# because the genotype field should be the first one, one of my dataset
+# does not following this rule. The performance penalty is significant
+# 4.36 -> 3.03 for 50k records.
+index=9, 10:
+adj=VcfGenoFromFormat(default=%(wildtype_code)s)
+type=INTEGER
+comment=Gentoype coded as 0 (ref ref), 1 (ref alt), 2 (alt alt) or -1 (alt1, alt2). This field checks the FORMAT string and extract genotype accordingly. Missing genotype will be dropped.
+
+[info]
+index=8
+type=VARCHAR(255)
+comment=Raw INFO column in the vcf file. This may be further splitted into various specified info fields, such as DP, etc.
+
+[AA]
+index=8
+type=CHAR(1)
+adj=ExtractValue('AA=',';')
+fmt=InfoFormatter('AA')
+comment=ancestral allele
+
+[AC]
+index=8
+type=INT
+adj=ExtractValue('AC=',';')
+fmt=InfoFormatter('AC')
+comment=allele count in genotypes, for each ALT allele, in the same order as listed
+
+[AF]
+index=8
+type=FLOAT
+adj=ExtractValue('AF=',';')
+fmt=InfoFormatter('AF')
+comment=allele frequency for each ALT allele in the same order as listed: use this when estimated from primary data, not called genotypes
+
+[AN]
+index=8
+type=INT
+adj=ExtractValue('AN=',';')
+fmt=InfoFormatter('AN')
+comment=total number of alleles in called genotypes
+
+[BQ]
+index=8
+type=INT
+adj=ExtractValue('BQ=',';')
+fmt=InfoFormatter('BQ')
+comment=RMS base quality at this position
+
+[DB]
+index=8
+type=INT
+adj=ExtractValue('DB=',';')
+fmt=InfoFormatter('DB')
+comment=dbSNP membership
+
+[DP]
+index=8
+adj=ExtractValue('DP=', ';')
+fmt=InfoFormatter('DP')
+type=INTEGER
+comment=DP fields in INFO. Total depth of samples in a vcf file.
+
+[TI]
+index=8
+adj=ExtractValue('TI=', ';')
+fmt=InfoFormatter('TI')
+type=VARCHAR(255)
+comment=Transcript ID, recorded in Illumina produced VCF file
+
+[GI]
+index=8
+adj=ExtractValue('GI=', ';')
+fmt=InfoFormatter('GI')
+type=VARCHAR(255)
+comment=Gene ID, recorded in Illumina produced VCF file
+
+[EXON]
+index=8
+adj=ExtractFlag('EXON', ';')
+fmt=FlagFormatter('EXON')
+type=INTEGER
+comment=Exon region, recorded in Illumina produced VCF file
+
+[FC]
+index=8
+adj=ExtractValue('FC=', ';')
+fmt=InfoFormatter('FC')
+type=VARCHAR(255)
+comment=Functional Consequence, recorded in Illumina produced VCF file
+
+[BKPT]
+index=8
+adj=ExtractFlag('BKPT', ';')
+fmt=FlagFormatter('BKPT')
+type=INTEGER
+comment=Breakpoint, recorded in Illumina produced Indels.vcf file
+
+
+[H2]
+index=8
+adj=ExtractValue('H2=', ';')
+fmt=InfoFormatter('H2')
+type=INTEGER
+comment=membership in hapmap2
+
+[H3]
+index=8
+adj=ExtractValue('H3=', ';')
+fmt=InfoFormatter('H3')
+type=INTEGER
+comment=membership in hapmap3
+
+[MQ]
+index=8
+adj=ExtractValue('MQ=', ';')
+fmt=InfoFormatter('MQ')
+type=FLOAT
+comment=RMS mapping quality, e.g. MQ=52
+
+[MQ0]
+index=8
+adj=ExtractValue('MQ0=', ';')
+fmt=InfoFormatter('MQ0')
+type=INTEGER
+comment=Number of MAPQ == 0 reads covering this record (Total Mapping Quality Zero Reads)
+
+[NS]
+index=8
+adj=ExtractValue('NS=', ';')
+fmt=InfoFormatter('NS')
+type=INTEGER
+comment=Number of samples with data
+
+[SB]
+index=8
+adj=ExtractValue('SB=', ';')
+fmt=InfoFormatter('SB')
+type=INTEGER
+comment=strand bias at this position
+
+[SOMATIC]
+index=8
+adj=ExtractValue('SOMATIC=', ';')
+fmt=InfoFormatter('SOMATIC')
+type=INTEGER
+comment=indicates that the record is a somatic mutation, for cancer genomics
+
+[VALIDATED]
+index=8
+adj=ExtractValue('VALIDATED=', ';')
+fmt=InfoFormatter('VALIDATED')
+type=INTEGER
+comment=validated by follow-up experiment
+
+[1000G]
+index=8
+adj=ExtractValue('1000G=', ';')
+fmt=InfoFormatter('1000G')
+type=INTEGER
+comment=membership in 1000 Genomes
+
+
+[ABHet]
+index=8
+adj=ExtractValue('ABHet=', ';')
+fmt=InfoFormatter('ABHet')
+type=FLOAT
+comment=Allele Balance for hets (ref/(ref+alt))
+
+
+[ABHom]
+index=8
+adj=ExtractValue('ABHom=', ';')
+fmt=InfoFormatter('ABHom')
+type=FLOAT
+comment=Allele Balance for homs (A/(A+O))
+
+
+[BaseQRankSum]
+index=8
+adj=ExtractValue('BaseQRankSum=', ';')
+fmt=InfoFormatter('BaseQRankSum')
+type=FLOAT
+comment=Z-score from Wilcoxon rank sum test of Alt Vs. Ref base qualities
+
+
+[DS]
+index=8
+adj=ExtractFlag('DS', ';')
+fmt=FlagFormatter('DS')
+type=INTEGER
+comment=Were any of the samples downsampled?
+
+
+[Dels]
+index=8
+type=FLOAT
+adj=ExtractValue('Dels=', ';')
+fmt=InfoFormatter('Dels')
+comment=Fraction of Reads Containing Spanning Deletions
+
+
+[FS]
+index=8
+type=FLOAT
+adj=ExtractValue('FS=', ';')
+fmt=InfoFormatter('FS')
+comment=Phred-scaled p-value using Fisher's exact test to detect strand bias
+
+
+[HaplotypeScore]
+index=8
+type=FLOAT
+adj=ExtractValue('HaplotypeScore=', ';')
+fmt=InfoFormatter('HaplotypeScore')
+comment=Consistency of the site with at most two segregating haplotypes
+
+
+[InbreedingCoeff]
+index=8
+type=FLOAT
+adj=ExtractValue('InbreedingCoeff=', ';')
+fmt=InfoFormatter('InbreedingCoeff')
+comment=Inbreeding coefficient as estimated from the genotype likelihoods per-sample when compared against the Hardy-Weinberg expectation
+
+
+[MLEAC]
+index=8
+type=INTEGER
+adj=ExtractValue('MLEAC=', ';')
+fmt=InfoFormatter('MLEAC')
+comment=Maximum likelihood expectation (MLE) for the allele counts (not necessarily the same as the AC), for each ALT allele, in the same order as listed
+
+
+[MLEAF]
+index=8
+type=FLOAT
+adj=ExtractValue('MLEAF=', ';')
+fmt=InfoFormatter('MLEAF')
+comment=Maximum likelihood expectation (MLE) for the allele frequency (not necessarily the same as the AF), for each ALT allele, in the same order as listed
+
+
+[MQRankSum]
+index=8
+type=FLOAT
+adj=ExtractValue('MQRankSum=', ';')
+fmt=InfoFormatter('MQRankSum')
+comment=Z-score From Wilcoxon rank sum test of Alt vs. Ref read mapping qualities
+
+
+[OND]
+index=8
+type=FLOAT
+adj=ExtractValue('OND=', ';')
+fmt=InfoFormatter('OND')
+comment=Overall non-diploid ratio (alleles/(alleles+non-alleles))
+
+
+[QD]
+index=8
+type=FLOAT
+adj=ExtractValue('QD=', ';')
+fmt=InfoFormatter('QD')
+comment=Variant Confidence/Quality by Depth
+
+
+[RPA]
+index=8
+type=INTEGER
+adj=ExtractValue('RPA=', ';')
+fmt=InfoFormatter('RPA')
+comment=Number of times tandem repeat unit is repeated, for each allele (including reference)
+
+
+[RU]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('RU=', ';')
+fmt=InfoFormatter('RU')
+comment=Tandem repeat unit (bases)
+
+
+[ReadPosRankSum]
+index=8
+type=FLOAT
+adj=ExtractValue('ReadPosRankSum=', ';')
+fmt=InfoFormatter('ReadPosRankSum')
+comment=Z-score from Wilcoxon rank sum test of Alt vs. Ref read position bias
+
+
+[STR]
+index=8
+type=INTEGER
+adj=ExtractFlag('STR', ';')
+fmt=FlagFormatter('STR')
+comment=Variant is a short tandem repeat
+
+[EFF]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('EFF=',';')
+fmt=InfoFormatter('EFF')
+comment=Variant effect annotation provided by snpEff
+
+[EFF_Type]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('EFF=',';'), lambda x: x.split('(')[0]
+fmt=InfoFormatter('EFF_Type')
+comment=Category of effect returned by snpEff, as the first entry in the EFF info.
+    A complete list of effect is available at http://snpeff.sourceforge.net/SnpEff_manual.html#eff.
+
+
+[EFF_Impact]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('EFF=',';'), lambda x: x.split('(')[-1].split('|')[0]
+fmt=InfoFormatter('EFF_Impact')
+comment=Impact of variant, as the second entry in the EFF info, as explained in
+    http://snpeff.sourceforge.net/SnpEff_manual.html#eff
+
+
+[EFF_Functional_Class]
+index=8
+type=VARCHAR(255)
+adj=ExtractValue('EFF=',';'), lambda x: x.split('|', 1)[-1].split('|')[0]
+fmt=InfoFormatter('EFF_Functional_Class')
+comment=Category of effect returned by snpEff, as the first entry in the EFF info.
+    A complete list of effect is available at http://snpeff.sourceforge.net/SnpEff_manual.html#eff.
+
+[DP_geno]
+# Passing 'GT:DP\t0/0:64'
+index=9, 10:
+adj=FieldFromFormat('DP', ':')
+type=INTEGER
+comment=DP fields in FORMAT. Depth for each sample genotype in a vcf file.
+
+[GQ_geno]
+index=9, 10:
+adj=FieldFromFormat('GQ', ':')
+type=INTEGER
+comment=Genotype quality. The value of Q(max_gt) from Illumina platform.
+
+[AD_geno]
+index=9, 10:
+adj=FieldFromFormat('AD', ':')
+type=INTEGER
+comment=Allelic depths for the ref and alt alleles in the order listed, produced by GATK.
+
+[PL_geno]
+index=9, 10:
+adj=FieldFromFormat('PL', ':')
+type=INTEGER
+comment=Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification
