@@ -156,10 +156,12 @@ PyObject* pysqlite_row_keys(pysqlite_Row* self, PyObject* args, PyObject* kwargs
     return list;
 }
 
-static int pysqlite_row_print(pysqlite_Row* self, FILE *fp, int flags)
-{
-    return (&PyTuple_Type)->tp_print(self->data, fp, flags);
-}
+#if PY_VERSION_HEX <= 0x03060000
+    static int pysqlite_row_print(pysqlite_Row* self, FILE *fp, int flags)
+    {
+        return (&PyTuple_Type)->tp_print(self->data, fp, flags);
+    }
+#endif
 
 static PyObject* pysqlite_iter(pysqlite_Row* self)
 {
@@ -209,7 +211,11 @@ PyTypeObject pysqlite_RowType = {
         sizeof(pysqlite_Row),                           /* tp_basicsize */
         0,                                              /* tp_itemsize */
         (destructor)pysqlite_row_dealloc,               /* tp_dealloc */
+        #if PY_VERSION_HEX <= 0x0306000
         (printfunc)pysqlite_row_print,                  /* tp_print */
+        #else
+        0,
+        #endif
         0,                                              /* tp_getattr */
         0,                                              /* tp_setattr */
         0,                                              /* tp_reserved */
